@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Create new investment — credits first day's profit immediately
+// POST: Create new investment — NO immediate profit. Profit ONLY at 00:00 WIB via cron
 export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request);
@@ -185,18 +185,18 @@ export async function POST(request: NextRequest) {
           data: updateData,
         });
 
-        // Create investment record with lastProfitDate set to NOW (first day profit already credited)
+        // Create investment WITHOUT immediate profit — cron will credit at 00:00 WIB
         const investment = await tx.investment.create({
           data: {
             userId: user.id,
             packageId: pkg.id,
             amount: pkg.amount,
             dailyProfit,
-            totalProfitEarned: dailyProfit, // First day profit already earned
+            totalProfitEarned: 0, // No profit yet — will be credited by cron at 00:00 WIB
             status: 'active',
             startDate,
             endDate,
-            lastProfitDate: new Date(), // Mark as credited for today
+            lastProfitDate: null, // No profit yet — cron will handle first credit
           },
           include: {
             package: {
@@ -209,29 +209,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // ★ CREDIT FIRST DAY'S PROFIT IMMEDIATELY ★
-        // Credit daily profit to user's mainBalance right away
-        await tx.user.update({
-          where: { id: user.id },
-          data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
-          },
-        });
-
-        // Create BonusLog entry for the first day's profit
-        await tx.bonusLog.create({
-          data: {
-            userId: user.id,
-            fromUserId: user.id,
-            type: 'profit',
-            level: 0,
-            amount: dailyProfit,
-            description: `Profit harian ${pkg.name} — Rp${Math.floor(pkg.amount).toLocaleString('id-ID')} × ${pkg.profitRate}% = Rp${Math.floor(dailyProfit).toLocaleString('id-ID')}`,
-          },
-        });
-
-        // ★ REFERRAL BONUS: Credit on FIRST investment ★
+        // ★ REFERRAL BONUS: Credit on FIRST investment (one-time) ★
         try {
           await creditInvestmentReferralBonusesTx(tx, user.id, pkg.amount);
         } catch (referralError) {
@@ -274,7 +252,7 @@ export async function POST(request: NextRequest) {
         package: result.investment.package,
         remainingBalance: result.updatedUser.mainBalance,
       },
-      message: `Investasi ${pkg.name} berhasil! Profit harian: Rp ${Math.floor(dailyProfit).toLocaleString('id-ID')} (profit hari pertama sudah dikreditkan)`,
+      message: `Investasi ${pkg.name} berhasil! Profit harian Rp ${Math.floor(dailyProfit).toLocaleString('id-ID')} akan masuk setiap hari jam 00:00 WIB`,
     }, { status: 201 });
   } catch (error) {
     console.error('Create investment error:', error);

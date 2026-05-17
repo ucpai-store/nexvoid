@@ -90,98 +90,8 @@ const FALLBACK_PRODUCTS = [
   },
 ];
 
-// Matching rates for M.Profit (event-driven, credited when downline earns profit)
-const MATCHING_RATES: Record<number, number> = { 1: 5, 2: 4, 3: 3, 4: 2, 5: 1 };
-
 function formatRupiahSimple(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
-}
-
-/**
- * Credit matching bonus to upline when a downline earns profit.
- * Called immediately after crediting the first day's profit on purchase.
- */
-async function creditMatchingOnPurchaseProfit(
-  tx: Parameters<Parameters<typeof db.$transaction>[0]>[0],
-  earningUserId: string,
-  profitAmount: number,
-): Promise<number> {
-  let totalMatching = 0;
-
-  if (profitAmount <= 0) return 0;
-
-  const uplineRefs = await tx.referral.findMany({
-    where: { referredId: earningUserId },
-    orderBy: { level: 'asc' },
-  });
-
-  if (uplineRefs.length === 0) return 0;
-
-  const earningUser = await tx.user.findUnique({
-    where: { id: earningUserId },
-    select: { name: true, userId: true },
-  });
-  const earningUserName = earningUser?.name || earningUser?.userId || 'User';
-
-  // Get matching config
-  let rates = MATCHING_RATES;
-  const config = await tx.matchingConfig.findFirst({ where: { isActive: true } });
-  if (config) {
-    rates = {
-      1: config.level1,
-      2: config.level2,
-      3: config.level3,
-      4: config.level4,
-      5: config.level5,
-    };
-  }
-
-  for (const ref of uplineRefs) {
-    const level = ref.level;
-    if (level > 5) continue; // Level 6+ = auto disconnect
-
-    const rate = rates[level] || 0;
-    if (rate <= 0) continue;
-
-    const matchAmount = Math.floor(profitAmount * (rate / 100));
-    if (matchAmount <= 0) continue;
-
-    await tx.user.update({
-      where: { id: ref.referrerId },
-      data: {
-        mainBalance: { increment: matchAmount },
-        totalProfit: { increment: matchAmount },
-      },
-    });
-
-    await tx.matchingBonus.create({
-      data: {
-        userId: ref.referrerId,
-        leftOmzet: 0,
-        rightOmzet: 0,
-        matchedOmzet: profitAmount,
-        level,
-        rate,
-        amount: matchAmount,
-        status: 'paid',
-      },
-    });
-
-    await tx.bonusLog.create({
-      data: {
-        userId: ref.referrerId,
-        fromUserId: earningUserId,
-        type: 'matching',
-        level,
-        amount: matchAmount,
-        description: `M.Profit Level ${level} (${rate}%) dari profit ${earningUserName} — ${formatRupiahSimple(profitAmount)} × ${rate}% = ${formatRupiahSimple(matchAmount)}`,
-      },
-    });
-
-    totalMatching += matchAmount;
-  }
-
-  return totalMatching;
 }
 
 export async function GET(request: NextRequest) {
@@ -247,7 +157,7 @@ export async function POST(request: NextRequest) {
 
     const totalPrice = product.price * quantity;
 
-    // ★ Purchase with IMMEDIATE first-day profit credit ★
+    // ★ Purchase — NO immediate profit. Profit ONLY at 00:00 WIB via cron ★
     const purchase = await db.$transaction(async (tx) => {
       const currentUser = await tx.user.findUnique({ where: { id: user.id } });
       if (!currentUser) {
@@ -289,6 +199,7 @@ export async function POST(request: NextRequest) {
           totalPrice,
           status: 'active',
           profitEarned: 0,
+          dailyProfit: 0,
         },
       });
 
@@ -310,64 +221,34 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Create ONE investment per quantity with FIRST DAY PROFIT CREDITED IMMEDIATELY
+      // Create ONE investment per quantity — NO immediate profit credit
       const dailyProfit = Math.floor(product.price * (investmentPackage.profitRate / 100));
       const startDate = new Date();
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + investmentPackage.contractDays);
 
-      let totalFirstDayProfit = 0;
-
       for (let i = 0; i < quantity; i++) {
-        // Create investment with first day profit already credited
+        // Create investment WITHOUT profit — profit will come at 00:00 WIB
         await tx.investment.create({
           data: {
             userId: user.id,
             packageId: investmentPackage.id,
             amount: product.price,
             dailyProfit,
-            totalProfitEarned: dailyProfit, // First day profit earned
+            totalProfitEarned: 0, // No profit yet
             status: 'active',
             startDate,
             endDate,
-            lastProfitDate: new Date(), // Mark as credited for today
+            lastProfitDate: null, // No profit yet — cron will handle first credit
           },
         });
-
-        // Credit first day's profit to user balance
-        await tx.user.update({
-          where: { id: user.id },
-          data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
-          },
-        });
-
-        // Create BonusLog for first day's profit
-        await tx.bonusLog.create({
-          data: {
-            userId: user.id,
-            fromUserId: user.id,
-            type: 'profit',
-            level: 0,
-            amount: dailyProfit,
-            description: `Profit harian ${product.name} — ${formatRupiahSimple(product.price)} × ${investmentPackage.profitRate}% = ${formatRupiahSimple(dailyProfit)}`,
-          },
-        });
-
-        // Credit matching bonus for this profit
-        await creditMatchingOnPurchaseProfit(tx, user.id, dailyProfit);
-
-        totalFirstDayProfit += dailyProfit;
       }
 
-      // Update purchase tracking with first day profit
+      // Update purchase tracking
       await tx.purchase.update({
         where: { id: newPurchase.id },
         data: {
-          profitEarned: totalFirstDayProfit,
           dailyProfit: dailyProfit * quantity,
-          lastProfitDate: new Date(),
         },
       });
 
@@ -382,19 +263,19 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Credit referral bonuses to upline users
+      // Credit referral bonuses to upline users (one-time per downline)
       try {
         await creditInvestmentReferralBonusesTx(tx, user.id, totalPrice);
       } catch (referralError) {
         console.error(`[PRODUCT BUY] ❌ Failed to credit referral bonuses for user ${user.id}:`, referralError);
       }
 
-      return { purchase: newPurchase, totalFirstDayProfit };
+      return { purchase: newPurchase, dailyProfitTotal: dailyProfit * quantity };
     });
 
     const updatedUser = await db.user.findUnique({
       where: { id: user.id },
-      select: { mainBalance: true, profitBalance: true },
+      select: { mainBalance: true, depositBalance: true },
     });
 
     return NextResponse.json({
@@ -408,10 +289,10 @@ export async function POST(request: NextRequest) {
           status: purchase.purchase.status,
           createdAt: purchase.purchase.createdAt,
         },
-        firstDayProfit: purchase.totalFirstDayProfit,
+        dailyProfitTotal: purchase.dailyProfitTotal,
         remainingBalance: updatedUser?.mainBalance || 0,
       },
-      message: `Pembelian ${product.name} berhasil! Profit hari pertama: ${formatRupiahSimple(purchase.totalFirstDayProfit)} sudah dikreditkan`,
+      message: `Pembelian ${product.name} berhasil! Profit harian ${formatRupiahSimple(purchase.dailyProfitTotal)} akan masuk setiap hari jam 00:00 WIB`,
     });
   } catch (error: unknown) {
     console.error('Buy product error:', error);
