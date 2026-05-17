@@ -72,3 +72,4 @@ post-build-seed.sh
 deploy.sh
 ecosystem.config.js
 .github-token
+nexvo-guide-ebook.pdf
