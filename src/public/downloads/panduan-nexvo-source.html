@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panduan Pengguna NEXVO - Platform Investasi Digital</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&display=swap');
+
+  @page {
+    size: 210mm 297mm;
+    margin: 0;
+  }
+
+  :root {
+    --gold: #D4A843;
+    --gold-light: #F0D68A;
+    --gold-dark: #B8922E;
+    --dark: #1A1A2E;
+    --dark2: #16213E;
+    --dark3: #0F3460;
+    --white: #FFFFFF;
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-300: #D1D5DB;
+    --gray-500: #6B7280;
+    --gray-700: #374151;
+    --gray-800: #1F2937;
+    --gray-900: #111827;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--gray-800);
+    background: var(--white);
+    font-size: 11pt;
+    line-height: 1.7;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 0;
+    position: relative;
+    page-break-after: always;
+    overflow: hidden;
+  }
+
+  .page:last-child {
+    page-break-after: auto;
+  }
+
+  /* ===== COVER PAGE ===== */
+  .cover-page {
+    background: linear-gradient(135deg, var(--dark) 0%, var(--dark2) 40%, var(--dark3) 100%);
+    color: var(--white);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cover-page::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -30%;
+    width: 80%;
+    height: 150%;
+    background: radial-gradient(ellipse, rgba(212,168,67,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cover-page::after {
+    content: '';
+    position: absolute;
+    bottom: -20%;
+    left: -20%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(15,52,96,0.5) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cover-logo {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 3px solid var(--gold);
+    object-fit: cover;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .cover-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 48pt;
+    font-weight: 900;
+    letter-spacing: 8px;
+    color: var(--gold);
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .cover-subtitle {
+    font-size: 14pt;
+    font-weight: 300;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 40px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .cover-divider {
+    width: 80px;
+    height: 2px;
+    background: var(--gold);
+    margin: 0 auto 40px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .cover-desc {
+    font-size: 12pt;
+    font-weight: 300;
+    color: rgba(255,255,255,0.6);
+    max-width: 400px;
+    line-height: 1.8;
+    position: relative;
+    z-index: 2;
+    margin-bottom: 40px;
+  }
+
+  .cover-company-img {
+    width: 85%;
+    max-width: 600px;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid rgba(212,168,67,0.3);
+    position: relative;
+    z-index: 2;
+    margin-bottom: 30px;
+  }
+
+  .cover-footer {
+    position: absolute;
+    bottom: 30px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 9pt;
+    color: rgba(255,255,255,0.4);
+    z-index: 2;
+  }
+
+  /* ===== TOC PAGE ===== */
+  .toc-page {
+    background: var(--gray-50);
+    padding: 50px 60px;
+  }
+
+  .toc-header {
+    font-family: 'Playfair Display', serif;
+    font-size: 28pt;
+    color: var(--dark);
+    margin-bottom: 8px;
+  }
+
+  .toc-subheader {
+    font-size: 10pt;
+    color: var(--gray-500);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  .toc-list {
+    list-style: none;
+  }
+
+  .toc-list li {
+    display: flex;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px dotted var(--gray-200);
+    font-size: 11pt;
+  }
+
+  .toc-list li .toc-num {
+    font-weight: 700;
+    color: var(--gold-dark);
+    min-width: 35px;
+  }
+
+  .toc-list li .toc-title {
+    flex: 1;
+    color: var(--gray-800);
+  }
+
+  .toc-list li .toc-page {
+    color: var(--gray-500);
+    font-size: 10pt;
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* ===== CONTENT PAGES ===== */
+  .content-page {
+    padding: 45px 55px;
+    background: var(--white);
+  }
+
+  .chapter-header {
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--gold);
+  }
+
+  .chapter-num {
+    font-size: 10pt;
+    font-weight: 700;
+    color: var(--gold-dark);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .chapter-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24pt;
+    font-weight: 800;
+    color: var(--dark);
+    margin-bottom: 5px;
+  }
+
+  .chapter-desc {
+    font-size: 10pt;
+    color: var(--gray-500);
+    font-style: italic;
+  }
+
+  h3 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: var(--dark);
+    margin-top: 22px;
+    margin-bottom: 8px;
+  }
+
+  h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    color: var(--dark3);
+    margin-top: 16px;
+    margin-bottom: 6px;
+  }
+
+  p {
+    margin-bottom: 10px;
+    text-align: justify;
+  }
+
+  ul, ol {
+    margin: 8px 0 12px 25px;
+  }
+
+  li {
+    margin-bottom: 5px;
+  }
+
+  .screenshot-container {
+    margin: 18px 0;
+    text-align: center;
+  }
+
+  .screenshot-container img {
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  .screenshot-caption {
+    font-size: 9pt;
+    color: var(--gray-500);
+    margin-top: 6px;
+    font-style: italic;
+  }
+
+  .info-box {
+    background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+    border-left: 4px solid var(--gold);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+  }
+
+  .info-box-title {
+    font-size: 10pt;
+    font-weight: 700;
+    color: var(--gold-dark);
+    margin-bottom: 4px;
+  }
+
+  .info-box p {
+    font-size: 10pt;
+    color: var(--gray-700);
+    margin-bottom: 4px;
+  }
+
+  .warning-box {
+    background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+    border-left: 4px solid #EF4444;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+  }
+
+  .warning-box-title {
+    font-size: 10pt;
+    font-weight: 700;
+    color: #DC2626;
+    margin-bottom: 4px;
+  }
+
+  .warning-box p {
+    font-size: 10pt;
+    color: var(--gray-700);
+    margin-bottom: 4px;
+  }
+
+  .step-box {
+    display: flex;
+    gap: 14px;
+    margin: 12px 0;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    min-width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--dark);
+    color: var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12pt;
+    flex-shrink: 0;
+  }
+
+  .step-content {
+    flex: 1;
+    padding-top: 4px;
+  }
+
+  .step-content p {
+    margin-bottom: 4px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 10pt;
+  }
+
+  table th {
+    background: var(--dark);
+    color: var(--gold);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--gray-200);
+    color: var(--gray-800);
+  }
+
+  table tr:nth-child(even) td {
+    background: var(--gray-50);
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 16px 0;
+  }
+
+  .feature-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .feature-card-title {
+    font-weight: 700;
+    color: var(--dark);
+    font-size: 10pt;
+    margin-bottom: 6px;
+  }
+
+  .feature-card p {
+    font-size: 9pt;
+    color: var(--gray-500);
+    margin-bottom: 0;
+  }
+
+  .page-footer {
+    position: absolute;
+    bottom: 25px;
+    left: 55px;
+    right: 55px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: var(--gray-300);
+    border-top: 1px solid var(--gray-200);
+    padding-top: 8px;
+  }
+
+  .page-footer .brand {
+    font-weight: 700;
+    color: var(--gold-dark);
+    letter-spacing: 2px;
+  }
+
+  .highlight {
+    color: var(--gold-dark);
+    font-weight: 600;
+  }
+
+  strong {
+    color: var(--dark);
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 14px 0;
+  }
+
+  .two-col img {
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="page cover-page">
+  <img src="screenshots/nexvo-logo.png" class="cover-logo" alt="NEXVO Logo">
+  <div class="cover-title">NEXVO</div>
+  <div class="cover-subtitle">Digital Asset Investment</div>
+  <div class="cover-divider"></div>
+  <div class="cover-desc">
+    Panduan Lengkap Pengguna Platform Investasi Digital NEXVO.<br>
+    Pelajari cara mendaftar, login, deposit, investasi, dan withdraw dengan mudah.
+  </div>
+  <img src="nexvo-company.png" class="cover-company-img" alt="NEXVO Company">
+  <div class="cover-footer">
+    NEXVO &mdash; Modern Digital Asset Management Platform &bull; nexvo.id &bull; Edisi 2025
+  </div>
+</div>
+
+<!-- ==================== TABLE OF CONTENTS ==================== -->
+<div class="page toc-page">
+  <div class="toc-header">Daftar Isi</div>
+  <div class="toc-subheader">Panduan Pengguna NEXVO</div>
+  <ul class="toc-list">
+    <li><span class="toc-num">01</span><span class="toc-title">Tentang NEXVO</span><span class="toc-page">3</span></li>
+    <li><span class="toc-num">02</span><span class="toc-title">Cara Registrasi Akun</span><span class="toc-page">4</span></li>
+    <li><span class="toc-num">03</span><span class="toc-title">Cara Login</span><span class="toc-page">5</span></li>
+    <li><span class="toc-num">04</span><span class="toc-title">Dashboard & Beranda</span><span class="toc-page">6</span></li>
+    <li><span class="toc-num">05</span><span class="toc-title">Cara Deposit Saldo</span><span class="toc-page">7</span></li>
+    <li><span class="toc-num">06</span><span class="toc-title">Produk & Paket Investasi</span><span class="toc-page">9</span></li>
+    <li><span class="toc-num">07</span><span class="toc-title">Cara Membeli / Mengaktifkan Paket</span><span class="toc-page">11</span></li>
+    <li><span class="toc-num">08</span><span class="toc-title">Sistem Profit Harian</span><span class="toc-page">12</span></li>
+    <li><span class="toc-num">09</span><span class="toc-title">Sistem Referral / Bonus Undangan</span><span class="toc-page">13</span></li>
+    <li><span class="toc-num">10</span><span class="toc-title">M.Profit (Matching Profit)</span><span class="toc-page">14</span></li>
+    <li><span class="toc-num">11</span><span class="toc-title">Sistem Gaji (Salary)</span><span class="toc-page">15</span></li>
+    <li><span class="toc-num">12</span><span class="toc-title">Cara Withdraw (WD)</span><span class="toc-page">16</span></li>
+    <li><span class="toc-num">13</span><span class="toc-title">Riwayat Transaksi (History)</span><span class="toc-page">17</span></li>
+    <li><span class="toc-num">14</span><span class="toc-title">Profil & Keamanan Akun</span><span class="toc-page">18</span></li>
+    <li><span class="toc-num">15</span><span class="toc-title">Customer Service</span><span class="toc-page">19</span></li>
+    <li><span class="toc-num">16</span><span class="toc-title">FAQ - Pertanyaan Umum</span><span class="toc-page">20</span></li>
+  </ul>
+</div>
+
+<!-- ==================== CHAPTER 1: TENTANG NEXVO ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 01</div>
+    <div class="chapter-title">Tentang NEXVO</div>
+    <div class="chapter-desc">Mengenal platform investasi digital aset premium</div>
+  </div>
+
+  <p><strong>NEXVO</strong> adalah platform investasi digital yang menghadirkan produk <span class="highlight">Gold Premium Asset</span> dengan profit harian yang dijamin. Platform ini dirancang untuk memberikan pengalaman investasi yang mudah, transparan, dan menguntungkan bagi semua pengguna.</p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-card-title">Profit Harian Dijamin</div>
+      <p>Nikmati profit harian 5% - 10% dari paket investasi yang Anda beli, otomatis masuk setiap hari pukul 00:00 WIB.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-title">Bonus Referral 5 Level</div>
+      <p>Dapatkan bonus satu kali ketika downline pertama kali berinvestasi, hingga 5 level kedalaman.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-title">M.Profit Harian</div>
+      <p>Matching profit harian dari aktivitas jaringan Anda, mulai dari Level 1 (5%) hingga Level 5 (1%).</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-title">Sistem Gaji</div>
+      <p>Peroleh gaji harian ketika sudah memiliki minimal 10 referral aktif langsung.</p>
+    </div>
+  </div>
+
+  <h3>Keunggulan NEXVO</h3>
+  <ul>
+    <li><strong>Transparan</strong> &mdash; Semua transaksi, profit, dan bonus tercatat dan bisa dilihat kapan saja di halaman History.</li>
+    <li><strong>Aman</strong> &mdash; Sistem keamanan berlapis dengan verifikasi akun dan enkripsi data.</li>
+    <li><strong>Mudah Digunakan</strong> &mdash; Tampilan antarmuka yang intuitif, bisa diakses dari HP maupun komputer.</li>
+    <li><strong>Multi-Payment</strong> &mdash; Deposit dan withdrawal via QRIS dan USDT (BEP20).</li>
+    <li><strong>Dukungan CS 24/7</strong> &mdash; Tim Customer Service siap membantu melalui WhatsApp.</li>
+  </ul>
+
+  <div class="screenshot-container">
+    <img src="screenshots/home-page.png" alt="Tampilan Beranda NEXVO">
+    <div class="screenshot-caption">Gambar 1.1 &mdash; Tampilan beranda (home) NEXVO di browser mobile</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 01</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 2: CARA REGISTRASI ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 02</div>
+    <div class="chapter-title">Cara Registrasi Akun</div>
+    <div class="chapter-desc">Langkah-langkah membuat akun baru di NEXVO</div>
+  </div>
+
+  <p>Sebelum bisa berinvestasi dan menikmati semua fitur NEXVO, Anda perlu membuat akun terlebih dahulu. Proses registrasi sangat mudah dan cepat.</p>
+
+  <h3>Langkah Registrasi</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Buka Website NEXVO</strong></p>
+      <p>Akses website NEXVO di <strong>nexvo.id</strong> melalui browser di HP atau komputer Anda. Anda akan langsung melihat halaman login/registrasi.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Klik Tombol "Register Now"</strong></p>
+      <p>Di halaman login, klik tombol <strong>"Register Now"</strong> yang terletak di bawah form login. Anda akan diarahkan ke halaman pendaftaran.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <p><strong>Isi Form Registrasi</strong></p>
+      <p>Lengkapi data berikut:</p>
+      <ul>
+        <li><strong>Nomor WhatsApp</strong> &mdash; Masukkan nomor WhatsApp aktif Anda (format: 62xxx). Pastikan nomor sudah benar karena akan digunakan untuk login dan verifikasi.</li>
+        <li><strong>Email</strong> &mdash; Masukkan alamat email aktif Anda.</li>
+        <li><strong>Password</strong> &mdash; Buat password yang kuat (minimal 6 karakter). Disarankan kombinasi huruf besar, kecil, dan angka.</li>
+        <li><strong>Kode Referral</strong> &mdash; Jika Anda diundang oleh seseorang, masukkan kode referral mereka. Jika tidak ada, Anda bisa mengosongkannya.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <p><strong>Klik Tombol Register</strong></p>
+      <p>Setelah semua data terisi, klik tombol <strong>"Register"</strong> untuk membuat akun. Sistem akan memproses pendaftaran Anda.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <p><strong>Verifikasi OTP</strong></p>
+      <p>Jika diminta, masukkan kode OTP yang dikirim ke WhatsApp atau email Anda untuk verifikasi akun.</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-title">Tips Penting Saat Registrasi</div>
+    <p>&bull; Gunakan nomor WhatsApp yang aktif dan bisa dihubungi.</p>
+    <p>&bull; Catat password Anda di tempat yang aman. NEXVO tidak menyimpan password dalam format yang bisa dibaca.</p>
+    <p>&bull; Jika punya kode referral, jangan lupa memasukkannya untuk terhubung dengan jaringan upline Anda.</p>
+  </div>
+
+  <div class="screenshot-container">
+    <img src="screenshots/login-page.png" alt="Halaman Login & Registrasi NEXVO">
+    <div class="screenshot-caption">Gambar 2.1 &mdash; Halaman login NEXVO dengan tombol "Register Now"</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 02</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 3: CARA LOGIN ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 03</div>
+    <div class="chapter-title">Cara Login</div>
+    <div class="chapter-desc">Masuk ke akun NEXVO Anda</div>
+  </div>
+
+  <p>Setelah berhasil mendaftar, Anda bisa login ke akun NEXVO kapan saja untuk mengakses semua fitur platform.</p>
+
+  <h3>Langkah Login</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Buka nexvo.id</strong></p>
+      <p>Akses website NEXVO di browser Anda. Halaman login akan otomatis ditampilkan.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Pilih Metode Login</strong></p>
+      <p>Anda bisa login menggunakan:</p>
+      <ul>
+        <li><strong>Nomor HP</strong> &mdash; Masukkan nomor WhatsApp yang terdaftar beserta kode negara (+62 untuk Indonesia).</li>
+        <li><strong>Email</strong> &mdash; Klik tab "Email" lalu masukkan alamat email yang terdaftar.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <p><strong>Masukkan Password</strong></p>
+      <p>Ketik password Anda di kolom password. Klik ikon mata untuk menampilkan/menyembunyikan password.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <p><strong>Klik "Login"</strong></p>
+      <p>Tekan tombol <strong>"Login"</strong> untuk masuk. Jika data benar, Anda akan diarahkan ke halaman Dashboard/Beranda.</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-title">Lupa Password?</div>
+    <p>Jika Anda lupa password, klik tombol <strong>"Forgot Password?"</strong> di halaman login. Ikuti langkah verifikasi untuk mereset password Anda melalui WhatsApp atau email.</p>
+  </div>
+
+  <div class="warning-box">
+    <div class="warning-box-title">Keamanan Akun</div>
+    <p>&bull; Jangan pernah membagikan password Anda kepada siapa pun, termasuk CS NEXVO.</p>
+    <p>&bull; Selalu logout setelah selesai menggunakan akun di perangkat orang lain.</p>
+    <p>&bull; Gunakan password yang unik dan berbeda dari akun lain.</p>
+  </div>
+
+  <div class="screenshot-container">
+    <img src="screenshots/login-page.png" alt="Form Login NEXVO">
+    <div class="screenshot-caption">Gambar 3.1 &mdash; Form login NEXVO dengan pilihan Nomor HP atau Email</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 03</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 4: DASHBOARD ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 04</div>
+    <div class="chapter-title">Dashboard & Beranda</div>
+    <div class="chapter-desc">Mengenal tampilan utama setelah login</div>
+  </div>
+
+  <p>Setelah berhasil login, Anda akan melihat <strong>Dashboard</strong> sebagai halaman utama. Dashboard menampilkan ringkasan informasi penting tentang akun dan aktivitas investasi Anda.</p>
+
+  <h3>Informasi di Dashboard</h3>
+  <ul>
+    <li><strong>Saldo Utama (Main Balance)</strong> &mdash; Total saldo yang bisa Anda gunakan untuk withdraw atau membeli paket.</li>
+    <li><strong>Saldo Deposit</strong> &mdash; Saldo dari deposit yang belum dialokasikan ke paket investasi.</li>
+    <li><strong>Saldo Profit</strong> &mdash; Total profit yang telah Anda peroleh dari investasi.</li>
+    <li><strong>Total Deposit</strong> &mdash; Jumlah total deposit yang pernah Anda lakukan.</li>
+    <li><strong>Total Withdraw</strong> &mdash; Jumlah total withdrawal yang pernah Anda lakukan.</li>
+    <li><strong>Total Profit</strong> &mdash; Akumulasi semua profit yang masuk sejak bergabung.</li>
+  </ul>
+
+  <h3>Navigasi Menu</h3>
+  <p>NEXVO menyediakan navigasi yang mudah melalui sidebar (desktop) atau bottom navigation (mobile). Berikut adalah menu-menu yang tersedia:</p>
+
+  <table>
+    <tr>
+      <th>Menu</th>
+      <th>Fungsi</th>
+    </tr>
+    <tr>
+      <td><strong>Home</strong></td>
+      <td>Kembali ke beranda</td>
+    </tr>
+    <tr>
+      <td><strong>Dashboard</strong></td>
+      <td>Ringkasan akun dan saldo</td>
+    </tr>
+    <tr>
+      <td><strong>Profit</strong></td>
+      <td>Lihat riwayat profit harian</td>
+    </tr>
+    <tr>
+      <td><strong>Products</strong></td>
+      <td>Daftar produk investasi</td>
+    </tr>
+    <tr>
+      <td><strong>Packages</strong></td>
+      <td>Paket investasi aktif</td>
+    </tr>
+    <tr>
+      <td><strong>Assets</strong></td>
+      <td>Daftar aset investasi</td>
+    </tr>
+    <tr>
+      <td><strong>Deposit</strong></td>
+      <td>Isi saldo akun</td>
+    </tr>
+    <tr>
+      <td><strong>Withdraw</strong></td>
+      <td>Tarik saldo</td>
+    </tr>
+    <tr>
+      <td><strong>History</strong></td>
+      <td>Riwayat semua transaksi</td>
+    </tr>
+    <tr>
+      <td><strong>Referral</strong></td>
+      <td>Sistem undangan & bonus</td>
+    </tr>
+    <tr>
+      <td><strong>Salary</strong></td>
+      <td>Informasi gaji</td>
+    </tr>
+    <tr>
+      <td><strong>M.Profit</strong></td>
+      <td>Matching profit</td>
+    </tr>
+  </table>
+
+  <div class="screenshot-container">
+    <img src="screenshots/dashboard.png" alt="Dashboard NEXVO">
+    <div class="screenshot-caption">Gambar 4.1 &mdash; Tampilan Dashboard NEXVO dengan informasi saldo dan menu</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 04</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 5: CARA DEPOSIT ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 05</div>
+    <div class="chapter-title">Cara Deposit Saldo</div>
+    <div class="chapter-desc">Mengisi saldo akun via QRIS atau USDT (BEP20)</div>
+  </div>
+
+  <p>Sebelum bisa membeli paket investasi, Anda perlu mengisi saldo terlebih dahulu. NEXVO menyediakan <span class="highlight">2 metode deposit</span>: <strong>QRIS</strong> dan <strong>USDT (BEP20)</strong>.</p>
+
+  <h3>5.1 Deposit via QRIS</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Buka Menu Deposit</strong></p>
+      <p>Klik menu <strong>"Deposit"</strong> di sidebar atau bottom navigation.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Pilih Metode QRIS</strong></p>
+      <p>Di halaman deposit, pilih tab <strong>"QRIS"</strong>. Metode ini mendukung semua e-wallet dan mobile banking Indonesia (GoPay, OVO, DANA, ShopeePay, dll).</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <p><strong>Masukkan Jumlah Deposit</strong></p>
+      <p>Ketik nominal yang ingin Anda depositkan. Pastikan jumlah sesuai dengan kebutuhan Anda untuk membeli paket.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <p><strong>Scan QR Code</strong></p>
+      <p>Klik tombol submit, lalu scan QR Code yang muncul menggunakan aplikasi e-wallet atau mobile banking Anda. Pastikan nominal transfer sesuai dengan yang tertera.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <p><strong>Upload Bukti Transaksi</strong></p>
+      <p>Setelah melakukan pembayaran, <strong>wajib upload bukti transaksi/screenshot bukti bayar</strong> di form yang disediakan. Klik tombol upload, pilih file gambar bukti pembayaran dari HP Anda, lalu klik submit. Deposit akan diproses oleh admin setelah bukti diverifikasi.</p>
+    </div>
+  </div>
+
+  <div class="warning-box">
+    <div class="warning-box-title">Wajib Upload Bukti Transaksi!</div>
+    <p>Deposit Anda TIDAK akan diproses jika bukti transaksi tidak diupload. Pastikan screenshot bukti pembayaran jelas dan menunjukkan nominal, waktu, dan status berhasil.</p>
+  </div>
+
+  <h3>5.2 Deposit via USDT (BEP20)</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Pilih Tab USDT</strong></p>
+      <p>Di halaman deposit, pilih tab <strong>"USDT (BEP20)"</strong>. Metode ini menggunakan jaringan Binance Smart Chain (BSC).</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Masukkan Jumlah Deposit</strong></p>
+      <p>Ketik nominal dalam Rupiah. Sistem akan otomatis menghitung jumlah USDT yang perlu Anda transfer berdasarkan kurs yang berlaku.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <p><strong>Transfer USDT ke Alamat yang Ditampilkan</strong></p>
+      <p>Copy alamat wallet USDT yang ditampilkan dan lakukan transfer dari wallet crypto Anda (Trust Wallet, MetaMask, dll). <strong>Pastikan menggunakan jaringan BEP20 (BSC)</strong>. Transfer ke jaringan yang salah akan mengakibatkan kehilangan dana.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <p><strong>Upload Bukti Transaksi</strong></p>
+      <p>Sama seperti QRIS, <strong>wajib upload screenshot bukti transfer USDT</strong> yang menunjukkan hash/txid, alamat tujuan, dan jumlah USDT yang ditransfer. Klik upload dan submit.</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-title">Catatan Penting Deposit</div>
+    <p>&bull; Deposit akan diverifikasi oleh admin dalam waktu maksimal 1x24 jam.</p>
+    <p>&bull; Pastikan nominal transfer sesuai dengan yang tertera di sistem.</p>
+    <p>&bull; Untuk USDT, pastikan jaringan yang digunakan adalah BEP20 (BSC), BUKAN ERC20 atau TRC20.</p>
+    <p>&bull; Jika deposit belum masuk setelah 24 jam, hubungi CS melalui tombol CS di website.</p>
+  </div>
+
+  <div class="screenshot-container">
+    <img src="screenshots/deposit.png" alt="Halaman Deposit NEXVO">
+    <div class="screenshot-caption">Gambar 5.1 &mdash; Halaman deposit dengan pilihan QRIS dan USDT (BEP20)</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 05</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 5 continued: Deposit Screenshot 2 ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 05</div>
+    <div class="chapter-title">Deposit &mdash; Lanjutan</div>
+    <div class="chapter-desc">Detail proses upload bukti transaksi</div>
+  </div>
+
+  <h3>5.3 Panduan Upload Bukti Transaksi</h3>
+
+  <p>Upload bukti transaksi adalah langkah <strong>WAJIB</strong> dalam proses deposit. Tanpa bukti transaksi, deposit Anda tidak akan diproses oleh admin.</p>
+
+  <h4>Cara Mengupload Bukti Transaksi:</h4>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Selesaikan Pembayaran</strong></p>
+      <p>Lakukan pembayaran terlebih dahulu, baik via QRIS scan maupun transfer USDT ke alamat yang ditentukan.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Ambil Screenshot Bukti Bayar</strong></p>
+      <p>Setelah pembayaran berhasil, ambil screenshot bukti pembayaran. Untuk QRIS, screenshot halaman konfirmasi pembayaran dari e-wallet Anda. Untuk USDT, screenshot detail transaksi dari wallet crypto yang menunjukkan txid/hash, jumlah, dan alamat tujuan.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <p><strong>Upload di Form Deposit</strong></p>
+      <p>Kembali ke halaman deposit di NEXVO, klik tombol <strong>"Upload Bukti"</strong> atau area upload yang tersedia. Pilih file gambar screenshot dari galeri HP atau komputer Anda.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <p><strong>Klik Submit</strong></p>
+      <p>Setelah file terupload, klik tombol <strong>"Submit"</strong>. Status deposit Anda akan berubah menjadi "Pending" dan menunggu verifikasi admin.</p>
+    </div>
+  </div>
+
+  <div class="warning-box">
+    <div class="warning-box-title">Ketentuan Bukti Transaksi</div>
+    <p>&bull; Bukti harus berupa gambar yang jelas dan tidak buram.</p>
+    <p>&bull; Harus menunjukkan nominal, waktu transaksi, dan status BERHASIL.</p>
+    <p>&bull; Format file yang diterima: JPG, PNG, JPEG.</p>
+    <p>&bull; Ukuran file maksimal 5MB.</p>
+    <p>&bull; Hanya upload bukti transaksi yang ASLI. Bukti palsu akan mengakibatkan sanksi.</p>
+  </div>
+
+  <h3>5.4 Status Deposit</h3>
+  <table>
+    <tr>
+      <th>Status</th>
+      <th>Keterangan</th>
+    </tr>
+    <tr>
+      <td><strong>Pending</strong></td>
+      <td>Deposit baru diajukan, menunggu admin memverifikasi bukti transaksi.</td>
+    </tr>
+    <tr>
+      <td><strong>Approved</strong></td>
+      <td>Deposit berhasil diverifikasi. Saldo telah masuk ke akun Anda.</td>
+    </tr>
+    <tr>
+      <td><strong>Rejected</strong></td>
+      <td>Deposit ditolak. Kemungkinan bukti tidak valid atau nominal tidak sesuai. Ajukan kembali dengan bukti yang benar.</td>
+    </tr>
+  </table>
+
+  <div class="screenshot-container">
+    <img src="screenshots/deposit.png" alt="Form Upload Bukti Deposit">
+    <div class="screenshot-caption">Gambar 5.2 &mdash; Halaman deposit dengan form upload bukti transaksi</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 05</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 6: PRODUK & PAKET ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 06</div>
+    <div class="chapter-title">Produk & Paket Investasi</div>
+    <div class="chapter-desc">Gold Premium Asset &mdash; VIP 1 sampai VIP 6</div>
+  </div>
+
+  <p>NEXVO menyediakan 6 paket investasi <span class="highlight">Gold Premium Asset</span> dengan nominal dan profit harian yang berbeda. Setiap paket berlaku selama <strong>90 hari</strong> dan memberikan profit harian otomatis.</p>
+
+  <h3>6.1 Daftar Paket Investasi</h3>
+
+  <table>
+    <tr>
+      <th>Paket</th>
+      <th>Harga</th>
+      <th>Profit/Hari</th>
+      <th>Durasi</th>
+      <th>Total Profit (90 Hari)</th>
+    </tr>
+    <tr>
+      <td><strong>VIP 1</strong></td>
+      <td>Rp 100.000</td>
+      <td>5%</td>
+      <td>90 Hari</td>
+      <td>Rp 450.000</td>
+    </tr>
+    <tr>
+      <td><strong>VIP 2</strong></td>
+      <td>Rp 500.000</td>
+      <td>6%</td>
+      <td>90 Hari</td>
+      <td>Rp 2.700.000</td>
+    </tr>
+    <tr>
+      <td><strong>VIP 3</strong></td>
+      <td>Rp 1.000.000</td>
+      <td>7%</td>
+      <td>90 Hari</td>
+      <td>Rp 6.300.000</td>
+    </tr>
+    <tr>
+      <td><strong>VIP 4</strong></td>
+      <td>Rp 2.000.000</td>
+      <td>8%</td>
+      <td>90 Hari</td>
+      <td>Rp 14.400.000</td>
+    </tr>
+    <tr>
+      <td><strong>VIP 5</strong></td>
+      <td>Rp 5.000.000</td>
+      <td>9%</td>
+      <td>90 Hari</td>
+      <td>Rp 40.500.000</td>
+    </tr>
+    <tr>
+      <td><strong>VIP 6</strong></td>
+      <td>Rp 10.000.000</td>
+      <td>10%</td>
+      <td>90 Hari</td>
+      <td>Rp 90.000.000</td>
+    </tr>
+  </table>
+
+  <div class="info-box">
+    <div class="info-box-title">Catatan Penting</div>
+    <p>&bull; Profit harian dihitung berdasarkan harga paket, BUKAN dari total saldo akun.</p>
+    <p>&bull; Anda bisa membeli paket yang sama lebih dari satu kali. Setiap paket mendapat profit harian masing-masing.</p>
+    <p>&bull; Contoh: Jika Anda membeli 3x VIP 3, Anda akan menerima 3x profit harian 7% dari Rp 1.000.000 = Rp 210.000/hari.</p>
+    <p>&bull; Setelah 90 hari berlalu, paket berakhir secara otomatis.</p>
+  </div>
+
+  <h3>6.2 Halaman Produk</h3>
+  <p>Di halaman <strong>Products</strong>, Anda bisa melihat semua produk investasi yang tersedia beserta detail profit, durasi, dan harga. Klik pada produk untuk melihat informasi lebih detail atau langsung membeli.</p>
+
+  <div class="screenshot-container">
+    <img src="screenshots/products.png" alt="Halaman Produk NEXVO">
+    <div class="screenshot-caption">Gambar 6.1 &mdash; Daftar produk/paket investasi di NEXVO</div>
+  </div>
+
+  <h3>6.3 Halaman Packages</h3>
+  <p>Di halaman <strong>Packages</strong>, Anda bisa melihat paket investasi yang sedang aktif dan riwayat paket yang sudah berakhir.</p>
+
+  <div class="screenshot-container">
+    <img src="screenshots/packages.png" alt="Halaman Packages NEXVO">
+    <div class="screenshot-caption">Gambar 6.2 &mdash; Tampilan halaman paket investasi</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 06</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 7: CARA BELI PAKET ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 07</div>
+    <div class="chapter-title">Cara Membeli / Mengaktifkan Paket</div>
+    <div class="chapter-desc">Langkah-langkah membeli paket investasi</div>
+  </div>
+
+  <p>Setelah saldo deposit Anda terisi, Anda bisa langsung membeli paket investasi. Berikut langkah-langkahnya:</p>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Pastikan Saldo Deposit Cukup</strong></p>
+      <p>Cek saldo deposit Anda di Dashboard. Pastikan saldo mencukupi untuk membeli paket yang diinginkan. Jika belum, lakukan deposit terlebih dahulu (lihat Bab 05).</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Buka Menu Products</strong></p>
+      <p>Klik menu <strong>"Products"</strong> di navigasi untuk melihat daftar semua paket investasi yang tersedia.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <p><strong>Pilih Paket yang Diinginkan</strong></p>
+      <p>Pilih paket Gold Premium Asset yang sesuai dengan budget dan target profit Anda. Klik pada paket untuk melihat detailnya.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <p><strong>Klik "Buy" atau "Beli"</strong></p>
+      <p>Setelah memilih paket, klik tombol <strong>"Buy"</strong> untuk melakukan pembelian. Sistem akan mengurangi saldo deposit Anda sesuai harga paket.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <p><strong>Aktifkan Paket</strong></p>
+      <p>Setelah pembelian berhasil, paket perlu diaktifkan. Buka menu <strong>"Assets"</strong> atau <strong>"Packages"</strong>, lalu klik <strong>"Activate"</strong> pada paket yang baru dibeli. Setelah diaktifkan, paket akan mulai menghasilkan profit di hari berikutnya pada pukul 00:00 WIB.</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-title">Penting tentang Profit</div>
+    <p>&bull; Profit TIDAK langsung masuk saat Anda membeli paket.</p>
+    <p>&bull; Profit harian masuk setiap hari pada pukul <strong>00:00 WIB</strong> melalui sistem otomatis (cron job).</p>
+    <p>&bull; Artinya, jika Anda membeli paket hari ini, profit pertama akan masuk besok hari pada pukul 00:00 WIB.</p>
+    <p>&bull; Setiap paket yang sama yang dibeli terpisah akan menghasilkan profit masing-masing.</p>
+  </div>
+
+  <div class="screenshot-container">
+    <img src="screenshots/assets.png" alt="Halaman Assets NEXVO">
+    <div class="screenshot-caption">Gambar 7.1 &mdash; Halaman aset investasi untuk melihat dan mengaktifkan paket</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 07</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 8: SISTEM PROFIT ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 08</div>
+    <div class="chapter-title">Sistem Profit Harian</div>
+    <div class="chapter-desc">Profit otomatis setiap hari pukul 00:00 WIB</div>
+  </div>
+
+  <p>Salah satu fitur utama NEXVO adalah <span class="highlight">profit harian otomatis</span> dari setiap paket investasi yang aktif. Anda tidak perlu melakukan apapun &mdash; profit akan masuk ke saldo akun secara otomatis.</p>
+
+  <h3>8.1 Cara Kerja Profit Harian</h3>
+  <ul>
+    <li>Profit dihitung berdasarkan <strong>persentase harian</strong> dari harga paket yang Anda beli.</li>
+    <li>Profit dikreditkan secara otomatis setiap hari pada <strong>pukul 00:00 WIB</strong> (tengah malam) oleh sistem cron job.</li>
+    <li>Profit masuk ke <strong>Main Balance</strong> Anda dan bisa ditarik (withdraw) kapan saja selama jam kerja WD.</li>
+    <li>Setiap paket yang aktif menghasilkan 1x profit per hari. Jika Anda punya 3 paket VIP 3, Anda menerima 3x profit harian.</li>
+  </ul>
+
+  <h3>8.2 Contoh Perhitungan Profit</h3>
+
+  <table>
+    <tr>
+      <th>Paket</th>
+      <th>Harga</th>
+      <th>Profit/Hari</th>
+      <th>Perhitungan</th>
+    </tr>
+    <tr>
+      <td>VIP 1</td>
+      <td>Rp 100.000</td>
+      <td>Rp 5.000</td>
+      <td>100.000 x 5% = 5.000/hari</td>
+    </tr>
+    <tr>
+      <td>VIP 3 (x2)</td>
+      <td>Rp 2.000.000</td>
+      <td>Rp 140.000</td>
+      <td>(1.000.000 x 7%) x 2 = 140.000/hari</td>
+    </tr>
+    <tr>
+      <td>VIP 5</td>
+      <td>Rp 5.000.000</td>
+      <td>Rp 450.000</td>
+      <td>5.000.000 x 9% = 450.000/hari</td>
+    </tr>
+  </table>
+
+  <h3>8.3 Halaman Profit</h3>
+  <p>Anda bisa memantau riwayat profit harian di menu <strong>"Profit"</strong> (nav.profit). Halaman ini menampilkan daftar semua profit yang masuk, lengkap dengan tanggal, jumlah, dan paket asal profit.</p>
+
+  <div class="screenshot-container">
+    <img src="screenshots/profit.png" alt="Halaman Profit NEXVO">
+    <div class="screenshot-caption">Gambar 8.1 &mdash; Halaman riwayat profit harian</div>
+  </div>
+
+  <div class="warning-box">
+    <div class="warning-box-title">Penting!</div>
+    <p>&bull; Profit TIDAK masuk di hari yang sama dengan pembelian paket. Profit pertama masuk keesokan harinya pada pukul 00:00 WIB.</p>
+    <p>&bull; Pastikan paket Anda sudah diaktifkan (status Active) agar bisa menerima profit.</p>
+    <p>&bull; Profit hanya masuk selama paket masih berlaku (90 hari sejak aktivasi).</p>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 08</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 9: REFERRAL ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 09</div>
+    <div class="chapter-title">Sistem Referral / Bonus Undangan</div>
+    <div class="chapter-desc">Dapatkan bonus ketika mengundang orang berinvestasi</div>
+  </div>
+
+  <p>Sistem referral NEXVO memberikan <span class="highlight">bonus satu kali</span> ketika downline yang Anda undang pertama kali berinvestasi/mengaktifkan paket. Bonus berlaku hingga <strong>5 level kedalaman</strong>.</p>
+
+  <h3>9.1 Cara Kerja Referral</h3>
+  <ul>
+    <li>Setiap akun memiliki <strong>Kode Referral</strong> unik yang bisa dibagikan.</li>
+    <li>Ketika seseorang mendaftar menggunakan kode Anda, mereka menjadi <strong>downline Level 1</strong> Anda.</li>
+    <li>Bonus referral hanya diberikan <strong>1 KALI</strong> per downline, yaitu ketika downline tersebut <strong>pertama kali</strong> membeli/mengaktifkan paket investasi.</li>
+    <li>Yang mendapat bonus HANYA yang mengundang (upline), BUKAN yang diundang (downline).</li>
+    <li>Setelah bonus pertama diterima, downline yang sama tidak akan memberikan bonus referral lagi meskipun membeli paket tambahan.</li>
+  </ul>
+
+  <h3>9.2 Tabel Bonus Referral per Level</h3>
+
+  <table>
+    <tr>
+      <th>Level</th>
+      <th>Persentase Bonus</th>
+      <th>Keterangan</th>
+    </tr>
+    <tr>
+      <td><strong>Level 1</strong></td>
+      <td>5%</td>
+      <td>Downline langsung yang Anda undang</td>
+    </tr>
+    <tr>
+      <td><strong>Level 2</strong></td>
+      <td>4%</td>
+      <td>Downline dari downline L1 Anda</td>
+    </tr>
+    <tr>
+      <td><strong>Level 3</strong></td>
+      <td>3%</td>
+      <td>Downline dari downline L2 Anda</td>
+    </tr>
+    <tr>
+      <td><strong>Level 4</strong></td>
+      <td>2%</td>
+      <td>Downline dari downline L3 Anda</td>
+    </tr>
+    <tr>
+      <td><strong>Level 5</strong></td>
+      <td>1%</td>
+      <td>Downline dari downline L4 Anda</td>
+    </tr>
+  </table>
+
+  <h3>9.3 Contoh Bonus Referral</h3>
+  <p>Jika downline L1 Anda membeli paket VIP 4 (Rp 2.000.000) untuk pertama kalinya:</p>
+  <ul>
+    <li><strong>Anda (L1)</strong> menerima bonus: 2.000.000 x 5% = <strong>Rp 100.000</strong></li>
+    <li><strong>Upline L2 Anda</strong> menerima bonus: 2.000.000 x 4% = <strong>Rp 80.000</strong></li>
+    <li><strong>Upline L3</strong> menerima: 2.000.000 x 3% = <strong>Rp 60.000</strong></li>
+    <li>Bonus langsung masuk ke saldo akun setelah downline mengaktifkan paket.</li>
+  </ul>
+
+  <h3>9.4 Halaman Referral</h3>
+  <p>Di menu <strong>"Referral"</strong>, Anda bisa melihat kode referral Anda, daftar downline, dan riwayat bonus referral yang diterima.</p>
+
+  <div class="screenshot-container">
+    <img src="screenshots/referral.png" alt="Halaman Referral NEXVO">
+    <div class="screenshot-caption">Gambar 9.1 &mdash; Halaman referral dengan kode undangan dan daftar downline</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 09</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 10: M.PROFIT ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 10</div>
+    <div class="chapter-title">M.Profit (Matching Profit)</div>
+    <div class="chapter-desc">Profit harian dari jaringan referral Anda</div>
+  </div>
+
+  <p><span class="highlight">M.Profit (Matching Profit)</span> adalah bonus harian yang Anda terima berdasarkan profit harian yang diterima oleh downline di jaringan Anda. Semakin banyak dan semakin aktif jaringan Anda, semakin besar M.Profit yang Anda peroleh.</p>
+
+  <h3>10.1 Cara Kerja M.Profit</h3>
+  <ul>
+    <li>M.Profit dihitung setiap hari berdasarkan persentase tertentu dari <strong>profit harian</strong> yang diterima oleh downline Anda.</li>
+    <li>M.Profit dikreditkan secara otomatis setiap hari pada <strong>pukul 00:00 WIB</strong> bersamaan dengan profit investasi.</li>
+    <li>Berlaku untuk downline hingga <strong>5 level kedalaman</strong>.</li>
+  </ul>
+
+  <h3>10.2 Tabel M.Profit per Level</h3>
+
+  <table>
+    <tr>
+      <th>Level</th>
+      <th>Persentase M.Profit</th>
+      <th>Keterangan</th>
+    </tr>
+    <tr>
+      <td><strong>Level 1</strong></td>
+      <td>5%</td>
+      <td>Dari profit harian downline langsung</td>
+    </tr>
+    <tr>
+      <td><strong>Level 2</strong></td>
+      <td>4%</td>
+      <td>Dari profit harian downline L2</td>
+    </tr>
+    <tr>
+      <td><strong>Level 3</strong></td>
+      <td>3%</td>
+      <td>Dari profit harian downline L3</td>
+    </tr>
+    <tr>
+      <td><strong>Level 4</strong></td>
+      <td>2%</td>
+      <td>Dari profit harian downline L4</td>
+    </tr>
+    <tr>
+      <td><strong>Level 5</strong></td>
+      <td>1%</td>
+      <td>Dari profit harian downline L5</td>
+    </tr>
+  </table>
+
+  <h3>10.3 Contoh Perhitungan M.Profit</h3>
+  <p>Jika downline L1 Anda memiliki paket VIP 4 (Rp 2.000.000) yang profit harian 8% = Rp 160.000/hari:</p>
+  <ul>
+    <li>M.Profit L1 Anda: 160.000 x 5% = <strong>Rp 8.000/hari</strong></li>
+    <li>Bayangkan jika Anda punya 50 downline aktif &mdash; M.Profit Anda bisa sangat signifikan!</li>
+  </ul>
+
+  <h3>10.4 Halaman M.Profit</h3>
+  <p>Di menu <strong>"M.Profit"</strong>, Anda bisa melihat total M.Profit harian yang diterima dari setiap level jaringan.</p>
+
+  <div class="screenshot-container">
+    <img src="screenshots/mprofit.png" alt="Halaman M.Profit NEXVO">
+    <div class="screenshot-caption">Gambar 10.1 &mdash; Halaman M.Profit dengan rincian per level</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 10</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 11: SALARY ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 11</div>
+    <div class="chapter-title">Sistem Gaji (Salary)</div>
+    <div class="chapter-desc">Gaji harian untuk member dengan 10+ referral aktif</div>
+  </div>
+
+  <p>Sistem <span class="highlight">Gaji (Salary)</span> NEXVO memberikan penghasilan harian tambahan bagi member yang memenuhi syarat minimal referral.</p>
+
+  <h3>11.1 Syarat Mendapatkan Gaji</h3>
+
+  <div class="warning-box">
+    <div class="warning-box-title">Syarat Wajib</div>
+    <p>Anda harus memiliki <strong>minimal 10 referral langsung yang AKTIF</strong> (memiliki paket investasi aktif) untuk bisa menerima gaji harian.</p>
+    <p>Jika jumlah referral aktif Anda kurang dari 10, Anda BELUM memenuhi syarat dan tidak akan menerima gaji.</p>
+  </div>
+
+  <h3>11.2 Cara Kerja Gaji</h3>
+  <ul>
+    <li>Gaji dikreditkan secara otomatis setiap hari pada <strong>pukul 00:00 WIB</strong>.</li>
+    <li>Jumlah gaji tergantung pada jumlah dan level referral aktif yang Anda miliki.</li>
+    <li>Sistem secara otomatis mengecek apakah Anda memenuhi syarat 10 referral aktif setiap hari.</li>
+    <li>Jika referral aktif Anda turun di bawah 10, gaji akan otomatis dihentikan sampai syarat terpenuhi kembali.</li>
+  </ul>
+
+  <h3>11.3 Halaman Salary</h3>
+  <p>Di menu <strong>"Salary"</strong>, Anda bisa melihat:</p>
+  <ul>
+    <li>Status kelayakan gaji (memenuhi syarat atau belum)</li>
+    <li>Jumlah referral aktif langsung saat ini</li>
+    <li>Sisa referral yang dibutuhkan untuk memenuhi syarat</li>
+    <li>Riwayat gaji yang telah diterima</li>
+  </ul>
+
+  <div class="screenshot-container">
+    <img src="screenshots/salary.png" alt="Halaman Salary NEXVO">
+    <div class="screenshot-caption">Gambar 11.1 &mdash; Halaman Salary dengan status kelayakan dan riwayat gaji</div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-title">Tips Mencapai Syarat Gaji</div>
+    <p>&bull; Aktifkan kode referral Anda di media sosial dan grup WhatsApp/Telegram.</p>
+    <p>&bull; Bantu downline Anda untuk mulai berinvestasi sehingga mereka menjadi referral aktif.</p>
+    <p>&bull; Ingat: yang dihitung adalah referral AKTIF (yang punya paket investasi berjalan), bukan hanya yang terdaftar.</p>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 11</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 12: WITHDRAW ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 12</div>
+    <div class="chapter-title">Cara Withdraw (WD)</div>
+    <div class="chapter-desc">Menarik saldo ke rekening atau e-wallet Anda</div>
+  </div>
+
+  <p>Anda bisa menarik saldo dari akun NEXVO kapan saja selama memenuhi syarat dan berada dalam jam kerja withdrawal.</p>
+
+  <h3>12.1 Jadwal Withdrawal</h3>
+
+  <div class="warning-box">
+    <div class="warning-box-title">Jadwal WD Ketat!</div>
+    <p>&bull; Withdrawal HANYA bisa dilakukan pada <strong>Senin - Jumat</strong> (hari kerja).</p>
+    <p>&bull; Jam WD: <strong>pukul 09:00 - 16:00 WIB</strong>.</p>
+    <p>&bull; Sabtu, Minggu, dan Hari Libur Nasional = WD DITUTUP.</p>
+    <p>&bull; Jika Anda mengajukan WD di luar jam kerja, permintaan akan ditolak otomatis.</p>
+  </div>
+
+  <h3>12.2 Metode Withdrawal</h3>
+  <p>NEXVO menyediakan 2 metode withdrawal:</p>
+  <ul>
+    <li><strong>QRIS</strong> &mdash; Penarikan ke e-wallet atau rekening bank melalui QRIS.</li>
+    <li><strong>USDT (BEP20)</strong> &mdash; Penarikan ke wallet crypto Anda menggunakan jaringan BSC.</li>
+  </ul>
+
+  <h3>12.3 Langkah Withdraw</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Pastikan Waktu WD</strong></p>
+      <p>Cek apakah sekarang adalah hari kerja (Senin-Jumat) dan jam 09:00-16:00 WIB. Jika di luar jam tersebut, tunggu hingga jam kerja WD.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Buka Menu Withdraw</strong></p>
+      <p>Klik menu <strong>"Withdraw"</strong> di navigasi.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <p><strong>Pilih Metode WD</strong></p>
+      <p>Pilih antara <strong>QRIS</strong> atau <strong>USDT (BEP20)</strong>.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <p><strong>Masukkan Jumlah & Tujuan</strong></p>
+      <p>Ketik nominal yang ingin ditarik. Untuk USDT, masukkan alamat wallet tujuan. Pastikan alamat benar dan menggunakan jaringan BEP20.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <p><strong>Klik Submit</strong></p>
+      <p>Klik tombol <strong>"Submit"</strong> untuk mengajukan withdrawal. Status WD akan menjadi "Pending" dan menunggu persetujuan admin.</p>
+    </div>
+  </div>
+
+  <div class="screenshot-container">
+    <img src="screenshots/withdraw.png" alt="Halaman Withdraw NEXVO">
+    <div class="screenshot-caption">Gambar 12.1 &mdash; Halaman withdrawal NEXVO</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 12</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 13: HISTORY ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 13</div>
+    <div class="chapter-title">Riwayat Transaksi (History)</div>
+    <div class="chapter-desc">Memantau semua aktivitas keuangan akun Anda</div>
+  </div>
+
+  <p>Halaman <strong>History</strong> memungkinkan Anda memantau semua transaksi yang pernah terjadi di akun NEXVO. Semuanya tercatat secara transparan dan lengkap.</p>
+
+  <h3>13.1 Jenis Transaksi yang Tercatat</h3>
+
+  <table>
+    <tr>
+      <th>Tipe</th>
+      <th>Keterangan</th>
+    </tr>
+    <tr>
+      <td><strong>Deposit</strong></td>
+      <td>Pengisian saldo ke akun via QRIS atau USDT</td>
+    </tr>
+    <tr>
+      <td><strong>Withdraw</strong></td>
+      <td>Penarikan saldo dari akun</td>
+    </tr>
+    <tr>
+      <td><strong>Profit</strong></td>
+      <td>Profit harian dari paket investasi yang aktif</td>
+    </tr>
+    <tr>
+      <td><strong>Referral</strong></td>
+      <td>Bonus referral satu kali dari downline yang berinvestasi</td>
+    </tr>
+    <tr>
+      <td><strong>M.Profit</strong></td>
+      <td>Matching profit harian dari jaringan downline</td>
+    </tr>
+    <tr>
+      <td><strong>Salary</strong></td>
+      <td>Gaji harian (syarat: 10+ referral aktif)</td>
+    </tr>
+    <tr>
+      <td><strong>Purchase</strong></td>
+      <td>Pembelian paket investasi</td>
+    </tr>
+  </table>
+
+  <h3>13.2 Filter & Pencarian</h3>
+  <p>Anda bisa memfilter riwayat transaksi berdasarkan tipe untuk memudahkan pencarian. Misalnya, pilih filter "Profit" untuk melihat semua riwayat profit harian Anda.</p>
+
+  <div class="screenshot-container">
+    <img src="screenshots/history.png" alt="Halaman History NEXVO">
+    <div class="screenshot-caption">Gambar 13.1 &mdash; Halaman riwayat transaksi dengan filter tipe</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 13</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 14: PROFIL ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 14</div>
+    <div class="chapter-title">Profil & Keamanan Akun</div>
+    <div class="chapter-desc">Mengelola informasi akun dan menjaga keamanan</div>
+  </div>
+
+  <p>Halaman <strong>Profil</strong> memungkinkan Anda mengelola informasi akun dan menjaga keamanan akun NEXVO Anda.</p>
+
+  <h3>14.1 Informasi yang Tersedia di Profil</h3>
+  <ul>
+    <li><strong>User ID</strong> &mdash; ID unik akun Anda (format: NXV-XXXXXX)</li>
+    <li><strong>Nama</strong> &mdash; Nama yang terdaftar di akun</li>
+    <li><strong>Nomor WhatsApp</strong> &mdash; Nomor WA yang digunakan untuk login</li>
+    <li><strong>Email</strong> &mdash; Alamat email yang terdaftar</li>
+    <li><strong>Kode Referral</strong> &mdash; Kode unik untuk mengundang orang</li>
+    <li><strong>Level</strong> &mdash; Level akun Anda (Bronze, Silver, Gold, dll)</li>
+    <li><strong>Status Verifikasi</strong> &mdash; Apakah akun sudah terverifikasi</li>
+  </ul>
+
+  <h3>14.2 Tips Keamanan Akun</h3>
+  <ul>
+    <li><strong>Jangan berbagi password</strong> dengan siapa pun, termasuk CS NEXVO.</li>
+    <li><strong>Gunakan password yang kuat</strong> &mdash; kombinasi huruf besar, kecil, angka, dan simbol.</li>
+    <li><strong>Logout</strong> setelah selesai menggunakan akun di perangkat umum.</li>
+    <li><strong>Aktifkan verifikasi</strong> jika tersedia untuk perlindungan ekstra.</li>
+    <li><strong>Cek riwayat transaksi</strong> secara berkala untuk memastikan tidak ada aktivitas mencurigakan.</li>
+  </ul>
+
+  <h3>14.3 Halaman Wallet</h3>
+  <p>Menu <strong>"Wallet"</strong> di bottom navigation menampilkan ringkasan saldo dan akses cepat ke fitur deposit dan withdraw.</p>
+
+  <div class="two-col">
+    <div>
+      <img src="screenshots/profile.png" alt="Halaman Profil NEXVO">
+      <div class="screenshot-caption">Gambar 14.1 &mdash; Halaman profil</div>
+    </div>
+    <div>
+      <img src="screenshots/wallet.png" alt="Halaman Wallet NEXVO">
+      <div class="screenshot-caption">Gambar 14.2 &mdash; Halaman wallet</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 14</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 15: CUSTOMER SERVICE ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 15</div>
+    <div class="chapter-title">Customer Service</div>
+    <div class="chapter-desc">Bantuan dan dukungan dari tim CS NEXVO</div>
+  </div>
+
+  <p>Jika Anda mengalami kendala atau memiliki pertanyaan seputar NEXVO, tim Customer Service siap membantu Anda.</p>
+
+  <h3>15.1 Cara Menghubungi CS</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <p><strong>Klik Tombol CS</strong></p>
+      <p>Di website NEXVO, terdapat tombol <strong>"CS"</strong> yang terletak di pojok kanan bawah layar (di atas bottom navigation). Klik tombol tersebut untuk langsung terhubung ke CS melalui WhatsApp.</p>
+    </div>
+  </div>
+
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <p><strong>Chat via WhatsApp</strong></p>
+      <p>Anda akan diarahkan ke WhatsApp dan otomatis membuka chat dengan nomor CS NEXVO. Tulis keluhan atau pertanyaan Anda dengan jelas dan lengkap.</p>
+    </div>
+  </div>
+
+  <h3>15.2 Informasi yang Perlu Disiapkan</h3>
+  <p>Saat menghubungi CS, siapkan informasi berikut agar proses bantuan lebih cepat:</p>
+  <ul>
+    <li><strong>User ID</strong> Anda (contoh: NXV-GM61HC)</li>
+    <li><strong>Nomor WhatsApp</strong> yang terdaftar di akun</li>
+    <li>Screenshot kendala yang Anda alami</li>
+    <li>Detail transaksi yang bermasalah (jika ada)</li>
+  </ul>
+
+  <h3>15.3 Jam Operasional CS</h3>
+  <p>Tim CS NEXVO beroperasi setiap hari untuk membantu Anda. Namun, respons mungkin lebih lambat di luar jam kerja (malam hari dan hari libur).</p>
+
+  <div class="info-box">
+    <div class="info-box-title">Tips Komunikasi dengan CS</div>
+    <p>&bull; Jelaskan masalah Anda dengan detail dan jelas.</p>
+    <p>&bull; Sertakan screenshot jika memungkinkan.</p>
+    <p>&bull; Jangan pernah memberikan password Anda kepada siapa pun termasuk CS.</p>
+    <p>&bull; CS tidak akan pernah meminta password atau OTP Anda.</p>
+  </div>
+
+  <div class="screenshot-container">
+    <img src="screenshots/dashboard.png" alt="Tombol CS di Website NEXVO">
+    <div class="screenshot-caption">Gambar 15.1 &mdash; Tombol CS di pojok kanan bawah website NEXVO</div>
+  </div>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 15</span>
+  </div>
+</div>
+
+<!-- ==================== CHAPTER 16: FAQ ==================== -->
+<div class="page content-page">
+  <div class="chapter-header">
+    <div class="chapter-num">Bab 16</div>
+    <div class="chapter-title">FAQ - Pertanyaan Umum</div>
+    <div class="chapter-desc">Jawaban atas pertanyaan yang sering diajukan</div>
+  </div>
+
+  <h3>Umum</h3>
+
+  <h4>Q: Apa itu NEXVO?</h4>
+  <p>A: NEXVO adalah platform investasi digital yang menawarkan produk Gold Premium Asset dengan profit harian dijamin, sistem referral, M.Profit, dan gaji untuk member aktif.</p>
+
+  <h4>Q: Apakah NEXVO bisa diakses dari HP?</h4>
+  <p>A: Ya, NEXVO bisa diakses dari browser HP (mobile-friendly) maupun komputer. Kunjungi nexvo.id di browser Anda.</p>
+
+  <h4>Q: Bahasa apa saja yang didukung?</h4>
+  <p>A: NEXVO mendukung 3 bahasa: Indonesia (ID), English (EN), dan Mandarin (中文). Klik tombol bahasa di halaman login untuk mengganti.</p>
+
+  <h3>Deposit & Withdraw</h3>
+
+  <h4>Q: Metode pembayaran apa saja yang tersedia?</h4>
+  <p>A: NEXVO hanya menerima deposit via <strong>QRIS</strong> (semua e-wallet & mobile banking) dan <strong>USDT BEP20</strong> (crypto via jaringan BSC).</p>
+
+  <h4>Q: Kenapa deposit saya belum masuk?</h4>
+  <p>A: Pastikan Anda sudah mengupload bukti transaksi. Deposit perlu diverifikasi admin, biasanya maksimal 1x24 jam. Jika lebih dari 24 jam, hubungi CS.</p>
+
+  <h4>Q: Kapan saya bisa withdraw?</h4>
+  <p>A: Withdrawal hanya bisa dilakukan pada hari kerja (Senin-Jumat) pukul 09:00-16:00 WIB. Sabtu, Minggu, dan hari libur tutup.</p>
+
+  <h3>Profit & Investasi</h3>
+
+  <h4>Q: Kapan profit masuk?</h4>
+  <p>A: Profit masuk otomatis setiap hari pada pukul <strong>00:00 WIB</strong> (tengah malam). Profit TIDAK langsung masuk saat membeli paket &mdash; profit pertama masuk keesokan harinya.</p>
+
+  <h4>Q: Bisa beli paket yang sama lebih dari satu?</h4>
+  <p>A: Ya! Anda bisa membeli paket yang sama berapapun jumlahnya. Setiap paket menghasilkan profit harian masing-masing. Contoh: 3x VIP 3 = 3x profit harian.</p>
+
+  <h4>Q: Berapa lama paket investasi berlaku?</h4>
+  <p>A: Semua paket berlaku selama <strong>90 hari</strong> sejak diaktifkan. Setelah itu, paket berakhir otomatis.</p>
+
+  <h3>Referral & Bonus</h3>
+
+  <h4>Q: Berapa kali bonus referral diberikan per downline?</h4>
+  <p>A: Bonus referral diberikan <strong>HANYA 1 KALI</strong> per downline, yaitu saat downline pertama kali membeli/mengaktifkan paket. Pembelian paket berikutnya oleh downline yang sama tidak memberikan bonus referral lagi.</p>
+
+  <h4>Q: Siapa yang mendapat bonus referral?</h4>
+  <p>A: HANYA yang mengundang (upline) yang mendapat bonus. Yang diundang (downline) tidak mendapat bonus dari sistem referral.</p>
+
+  <h4>Q: Berapa referral minimal untuk mendapat gaji?</h4>
+  <p>A: Anda harus memiliki minimal <strong>10 referral AKTIF langsung</strong> (yang memiliki paket investasi berjalan). Jika kurang dari 10, gaji belum bisa diterima.</p>
+
+  <h4>Q: Apa bedanya Referral Bonus dan M.Profit?</h4>
+  <p>A: <strong>Referral Bonus</strong> diberikan 1 kali saja saat downline pertama kali investasi. <strong>M.Profit</strong> diberikan SETIAP HARI berdasarkan profit yang diterima downline Anda.</p>
+
+  <div class="page-footer">
+    <span class="brand">NEXVO</span>
+    <span>Panduan Pengguna &bull; Bab 16</span>
+  </div>
+</div>
+
+<!-- ==================== BACK COVER ==================== -->
+<div class="page cover-page">
+  <img src="screenshots/nexvo-logo.png" class="cover-logo" alt="NEXVO Logo">
+  <div class="cover-title" style="font-size: 32pt;">NEXVO</div>
+  <div class="cover-subtitle">Modern Digital Asset Management</div>
+  <div class="cover-divider"></div>
+  <div class="cover-desc" style="max-width: 450px;">
+    Mulai investasi Anda hari ini bersama NEXVO.<br>
+    Profit harian dijamin, sistem transparan, dan dukungan CS yang responsif.
+  </div>
+  <div style="font-size: 11pt; color: rgba(255,255,255,0.6); position: relative; z-index: 2; margin-top: 20px;">
+    <strong style="color: var(--gold);">Website:</strong> nexvo.id<br>
+    <strong style="color: var(--gold);">CS WhatsApp:</strong> Tersedia di tombol CS pada website<br>
+  </div>
+  <div class="cover-footer">
+    &copy; 2025 NEXVO. Semua hak dilindungi.
+  </div>
+</div>
+
+</body>
+</html>
