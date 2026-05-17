@@ -4,7 +4,7 @@ import { getUserFromRequest, maskWhatsApp } from '@/lib/auth';
 
 /**
  * Referral bonus percentages per level (for display purposes)
- * L1=10%, L2=5%, L3=4%, L4=3%, L5=2% of first investment amount
+ * L1=10%, L2=5%, L3=4%, L4=3%, L5=2% of downline's INVESTMENT amount (per-investment bonus)
  */
 const REFERRAL_PERCENTAGES: Record<number, number> = {
   1: 10,
@@ -39,7 +39,12 @@ export async function GET(request: NextRequest) {
     });
 
     const totalReferrals = referrals.length;
-    const totalBonus = referrals.reduce((sum, r) => sum + r.bonus, 0);
+    // Get total referral bonus from BonusLog (daily system)
+    const referralBonuses = await db.bonusLog.findMany({
+      where: { userId: user.id, type: 'referral' },
+      select: { amount: true },
+    });
+    const totalBonus = referralBonuses.reduce((sum, b) => sum + b.amount, 0);
 
     const referredUsers = referrals.map((r) => ({
       id: r.id,

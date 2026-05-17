@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // ★ REFERRAL BONUS: Credit on FIRST investment (one-time) ★
+        // ★ REFERRAL BONUS: Credit PER INVESTMENT (every time downline invests) ★
         try {
           await creditInvestmentReferralBonusesTx(tx, user.id, pkg.amount);
         } catch (referralError) {

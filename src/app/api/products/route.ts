@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Credit referral bonuses to upline users (one-time per downline)
+      // Credit referral bonuses to upline users (per investment)
       try {
         await creditInvestmentReferralBonusesTx(tx, user.id, totalPrice);
       } catch (referralError) {

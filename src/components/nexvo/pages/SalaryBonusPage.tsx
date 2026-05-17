@@ -273,7 +273,7 @@ export default function SalaryBonusPage() {
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-foreground text-sm font-medium flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-[#D4AF37]" />
-                    Min. {minDirectRefs} Referral Aktif
+                    Min. {minDirectRefs} Undangan Langsung
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {activeRefDeposits} / {minDirectRefs} (Wajib {minDirectRefs} orang)
@@ -294,7 +294,7 @@ export default function SalaryBonusPage() {
                 )}
                 {meetsMinDirectRefs && (
                   <p className="text-emerald-400 text-[10px] mt-1">
-                    ✅ Syarat {minDirectRefs} referral aktif terpenuhi
+                    ✅ Syarat {minDirectRefs} undangan langsung (Level 1) terpenuhi
                   </p>
                 )}
               </div>
@@ -364,7 +364,7 @@ export default function SalaryBonusPage() {
                     <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
                       <XCircle className="w-5 h-5 text-yellow-400" />
                       <span className="text-yellow-400 text-sm font-medium">
-                        Minimal {minDirectRefs} referral aktif diperlukan ({activeRefDeposits}/{minDirectRefs} terpenuhi)
+                        Minimal {minDirectRefs} undangan langsung diperlukan ({activeRefDeposits}/{minDirectRefs} terpenuhi)
                       </span>
                     </div>
                   )}
@@ -372,7 +372,7 @@ export default function SalaryBonusPage() {
                     <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
                       <XCircle className="w-5 h-5 text-yellow-400" />
                       <span className="text-yellow-400 text-sm font-medium">
-                        Semua referral langsung harus memiliki deposit aktif ({activeRefDeposits}/{directRefs} aktif)
+                        Semua undangan langsung (Level 1) harus memiliki investasi aktif ({activeRefDeposits}/{directRefs} aktif)
                       </span>
                     </div>
                   )}
@@ -434,7 +434,7 @@ export default function SalaryBonusPage() {
             <Users className="w-5 h-5 text-[#D4AF37]" />
           </div>
           <p className="text-foreground text-lg font-bold">{activeRefDeposits}</p>
-          <p className="text-muted-foreground text-xs">Referral Aktif</p>
+          <p className="text-muted-foreground text-xs">Undangan Langsung</p>
         </motion.div>
       </div>
 
@@ -470,7 +470,7 @@ export default function SalaryBonusPage() {
                     </Badge>
                   </div>
                   <p className="text-muted-foreground text-xs">
-                    Omzet: {formatRupiah(bonus.baseOmzet)} | Referral Aktif: {bonus.activeRefDeposits}
+                    Omzet: {formatRupiah(bonus.baseOmzet)} | Undangan Langsung: {bonus.activeRefDeposits}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

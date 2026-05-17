@@ -6,7 +6,7 @@ import {
   Shield, LayoutDashboard, Users, ShoppingBag,
   ArrowDownCircle, ArrowUpCircle, CreditCard, Smartphone,
   Image, Settings, Radio, X, Menu, ChevronRight, LogOut,
-  Database, Key, Settings2, Palette, Package
+  Database, Key, Settings2, Palette, Package, MessageCircle
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -26,6 +26,7 @@ const adminNavItems: { label: string; page: Page; icon: React.ElementType; group
   { label: 'Deposits', page: 'admin-deposits', icon: ArrowDownCircle, groupKey: 'admin.transactionGroup' },
   { label: 'Withdrawals', page: 'admin-withdrawals', icon: ArrowUpCircle, groupKey: 'admin.transactionGroup' },
   { label: 'Asset', page: 'admin-asset', icon: Database, groupKey: 'admin.systemGroup' },
+  { label: 'WhatsApp Bot', page: 'admin-whatsapp', icon: MessageCircle, groupKey: 'admin.systemGroup' },
   { label: 'Payment', page: 'admin-payment', icon: CreditCard, groupKey: 'admin.systemGroup' },
   { label: 'App', page: 'admin-app', icon: Smartphone, groupKey: 'admin.systemGroup' },
   { label: 'Tampilan', page: 'admin-appearance', icon: Palette, groupKey: 'admin.contentGroup' },

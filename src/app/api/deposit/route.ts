@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { getSetting } from '@/lib/settings';
 import { notifyBot } from '@/lib/bot-notification';
 
-/**
- * Generate a unique 6-character alphanumeric deposit ID like DP-A3F8K2
- */
 function generateDepositId(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // exclude confusing chars like O,0,I,1
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -15,9 +13,6 @@ function generateDepositId(): string {
   return `DP-${code}`;
 }
 
-/**
- * Generate a truly unique deposit ID (retry if collision)
- */
 async function getUniqueDepositId(): Promise<string> {
   let depositId = generateDepositId();
   let attempts = 0;
@@ -27,7 +22,6 @@ async function getUniqueDepositId(): Promise<string> {
     depositId = generateDepositId();
     attempts++;
   }
-  // Fallback with timestamp suffix
   return `DP-${Date.now().toString(36).toUpperCase()}`;
 }
 
@@ -37,13 +31,11 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
-
     if (user.isSuspended) {
       return NextResponse.json({ success: false, error: 'Account suspended' }, { status: 403 });
     }
-
     if (!user.isVerified) {
-      return NextResponse.json({ success: false, error: 'Email belum diverifikasi. Silakan verifikasi email terlebih dahulu.' }, { status: 403 });
+      return NextResponse.json({ success: false, error: 'Email belum diverifikasi.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -52,18 +44,22 @@ export async function POST(request: NextRequest) {
     if (!amount || amount <= 0) {
       return NextResponse.json({ success: false, error: 'Invalid deposit amount' }, { status: 400 });
     }
-
     if (amount < 100000) {
       return NextResponse.json({ success: false, error: 'Minimum deposit is Rp100,000' }, { status: 400 });
     }
 
-    // Generate unique deposit ID
     const depositId = await getUniqueDepositId();
 
-    // No admin fee for deposit — full amount credited
-    const fee = 0;
-    const netAmount = amount;
+    // Read deposit admin fee from settings (in Rupiah, flat amount)
+    const depositFeeStr = await getSetting('deposit_fee');
+    const fee = parseFloat(depositFeeStr) || 0;
+    const netAmount = amount - fee;
 
+    if (netAmount <= 0) {
+      return NextResponse.json({ success: false, error: 'Jumlah deposit terlalu kecil setelah potongan fee' }, { status: 400 });
+    }
+
+    // Deposit needs admin approval (pending status)
     const deposit = await db.deposit.create({
       data: {
         depositId,
@@ -81,21 +77,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Notify WhatsApp bot about new deposit for admin approval
+    // Notify WhatsApp bot
     await notifyBot('deposit_pending', {
       depositId: deposit.depositId,
       userId: user.id,
       userName: user.name || user.userId,
       whatsapp: user.whatsapp,
       amount,
+      fee,
+      netAmount,
       paymentMethod: paymentName || paymentType || 'N/A',
       status: 'pending',
-    });
+    }).catch(() => {});
 
-    return NextResponse.json({ success: true, data: deposit });
+    return NextResponse.json({
+      success: true,
+      data: deposit,
+      message: `Deposit ${depositId} berhasil dikirim! Menunggu persetujuan admin. Saldo Rp ${Math.floor(netAmount).toLocaleString('id-ID')} akan masuk setelah disetujui.`,
+    });
   } catch (error) {
     console.error('Create deposit error:', error);
-    return NextResponse.json({ success: false, error: 'Database belum tersedia. Silakan hubungi admin.' }, { status: 503 });
+    return NextResponse.json({ success: false, error: 'Database belum tersedia.' }, { status: 503 });
   }
 }
 
@@ -111,36 +113,21 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    const where: { userId: string; status?: string } = { userId: user.id };
+    const where = { userId: user.id };
     if (status) where.status = status;
 
     const [deposits, total] = await Promise.all([
-      db.deposit.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
+      db.deposit.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
       db.deposit.count({ where }),
     ]);
 
     return NextResponse.json({
       success: true,
       data: deposits,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
     console.error('Get deposits error:', error);
-    // Return fallback data when database is not available
-    return NextResponse.json({
-      success: true,
-      data: [],
-      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
-    });
+    return NextResponse.json({ success: true, data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } });
   }
 }

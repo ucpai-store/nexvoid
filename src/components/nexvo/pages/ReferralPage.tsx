@@ -163,10 +163,10 @@ export default function ReferralPage() {
         <Gift className="w-5 h-5 text-emerald-400 shrink-0" />
         <div className="flex-1">
           <p className="text-sm font-medium text-emerald-400">
-            Bonus Referral dari Investasi Pertama
+            Bonus Referral (Dari Investasi Downline)
           </p>
           <p className="text-muted-foreground text-xs mt-0.5">
-            Bonus diberikan saat referral pertama kali berinvestasi. Persentase dari jumlah investasi, langsung masuk ke saldo utama Anda dan semua upline hingga Level 5
+            Bonus langsung masuk saat downline berinvestasi. Contoh: downline beli 100K → Anda dapat 10K (L1). Downline beli lagi 500K → Anda dapat 50K lagi. Berlaku hingga Level 5
           </p>
         </div>
       </motion.div>
@@ -295,7 +295,7 @@ export default function ReferralPage() {
           ))}
         </div>
         <p className="text-muted-foreground/60 text-[10px] mt-3 text-center">
-          Bonus berlaku 1 kali saat referral pertama kali berinvestasi • % dari jumlah investasi • Langsung masuk ke Saldo Utama
+          Bonus dari investasi downline • % dari jumlah investasi referral • Langsung masuk ke Saldo Utama saat downline berinvestasi
         </p>
       </motion.div>
 

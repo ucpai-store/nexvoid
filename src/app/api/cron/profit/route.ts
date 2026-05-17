@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { creditDailyReferralBonuses } from '@/lib/referral-bonus';
 
 // ──────────── Constants ────────────
 
@@ -190,10 +191,11 @@ async function processDailyInvestmentProfits(): Promise<{
   processed: number;
   totalProfit: number;
   totalMatching: number;
+  totalReferral: number;
   errors: number;
   errorDetails: string[];
 }> {
-  const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0, errorDetails: [] as string[] };
+  const result = { processed: 0, totalProfit: 0, totalMatching: 0, totalReferral: 0, errors: 0, errorDetails: [] as string[] };
 
   const now = getWibNow();
   // Create WIB "today" date for comparison (just the date part)
@@ -306,6 +308,13 @@ async function processDailyInvestmentProfits(): Promise<{
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
+
+        // 6. ★ DAILY REFERRAL BONUS ★
+        // Credit referral bonus to all upline members (L1=10%, L2=5%, L3=4%, L4=3%, L5=2%)
+        const referralResult = await creditDailyReferralBonuses(tx, inv.userId, dailyProfit);
+        if (referralResult.totalReferralCredited > 0) {
+          result.totalReferral += referralResult.totalReferralCredited;
+        }
       });
 
       result.processed++;
@@ -406,6 +415,12 @@ async function processDailyInvestmentProfits(): Promise<{
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
+
+        // 6. ★ DAILY REFERRAL BONUS ★
+        const referralResult = await creditDailyReferralBonuses(tx, purchase.userId, dailyProfit);
+        if (referralResult.totalReferralCredited > 0) {
+          result.totalReferral += referralResult.totalReferralCredited;
+        }
       });
 
       result.processed++;
@@ -418,7 +433,7 @@ async function processDailyInvestmentProfits(): Promise<{
     }
   }
 
-  console.log(`[Profit Cron] Done. Processed: ${result.processed}, Total Profit: ${formatRupiahSimple(result.totalProfit)}, Total Matching: ${formatRupiahSimple(result.totalMatching)}, Errors: ${result.errors}`);
+  console.log(`[Profit Cron] Done. Processed: ${result.processed}, Total Profit: ${formatRupiahSimple(result.totalProfit)}, Total Matching: ${formatRupiahSimple(result.totalMatching)}, Total Referral: ${formatRupiahSimple(result.totalReferral)}, Errors: ${result.errors}`);
   return result;
 }
 

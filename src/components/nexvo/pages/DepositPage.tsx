@@ -141,8 +141,8 @@ export default function DepositPage() {
   const [lastDepositPayment, setLastDepositPayment] = useState<string>('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // No admin fee for deposit — full amount credited
-  const adminFee = 0;
+  // Admin fee from settings (configurable by admin)
+  const [adminFee, setAdminFee] = useState(0);
 
   // QR image error tracking
   const [qrImageError, setQrImageError] = useState<Record<string, boolean>>({});
@@ -164,7 +164,7 @@ export default function DepositPage() {
   const primaryAdminPhone = whatsappAdmins.length > 0 ? whatsappAdmins[0].phone : '';
 
   const numAmount = parseInt(amount.replace(/[^0-9]/g, '')) || 0;
-  const netAmount = numAmount; // No admin fee — full amount credited
+  const netAmount = numAmount - adminFee;
 
   const handleBuyWithBalance = async () => {
     if (!token) return;
@@ -209,10 +209,11 @@ export default function DepositPage() {
   const fetchData = useCallback(async () => {
     if (!token) return;
     try {
-      const [depositRes, paymentRes, waRes] = await Promise.all([
+      const [depositRes, paymentRes, waRes, settingsRes] = await Promise.all([
         fetch('/api/deposit', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/payment-methods'),
         fetch('/api/whatsapp'),
+        fetch('/api/settings'),
       ]);
       const depositData = await depositRes.json();
       const paymentData = await paymentRes.json();
@@ -221,6 +222,10 @@ export default function DepositPage() {
       if (depositData.success) setDeposits(depositData.data || []);
       if (paymentData.success) setPaymentMethods(paymentData.data || []);
       if (waData.success) setWhatsappAdmins(waData.data || []);
+      const settingsData = await settingsRes.json();
+      if (settingsData.success && settingsData.data) {
+        setAdminFee(parseFloat(settingsData.data.deposit_fee) || 0);
+      }
     } catch {
       setError(t('common.error'));
     } finally {
@@ -431,8 +436,8 @@ export default function DepositPage() {
                 <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-9 h-9 text-emerald-400" />
                 </div>
-                <h2 className="text-foreground text-lg font-bold mb-1">Deposit Submitted!</h2>
-                <p className="text-muted-foreground text-sm mb-4">Your deposit is waiting for admin approval.</p>
+                <h2 className="text-foreground text-lg font-bold mb-1">Deposit Dikirim!</h2>
+                <p className="text-muted-foreground text-sm mb-4">Deposit Anda sedang menunggu persetujuan admin. Saldo akan masuk setelah disetujui.</p>
 
                 <div className="glass rounded-xl p-4 mb-5 space-y-3">
                   <div>
@@ -446,10 +451,14 @@ export default function DepositPage() {
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Amount Deposited</p>
                     <p className="text-foreground text-xl font-bold">{formatRupiah(lastDepositAmount)}</p>
                   </div>
+                  {lastDepositFee > 0 && <div className="border-t border-white/5 pt-3">
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Admin Fee</p>
+                    <p className="text-yellow-400 text-lg font-bold">{formatRupiah(lastDepositFee)}</p>
+                  </div>}
                   <div className="border-t border-white/5 pt-3">
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Credited to Balance</p>
                     <p className="text-emerald-400 text-xl font-bold">{formatRupiah(lastDepositNet)}</p>
-                    <p className="text-emerald-400/70 text-[10px] mt-1">✓ Tanpa potongan admin</p>
+                    {lastDepositFee > 0 ? <p className="text-yellow-400/70 text-[10px] mt-1">⚠️ Fee admin: {formatRupiah(lastDepositFee)}</p> : <p className="text-emerald-400/70 text-[10px] mt-1">✓ Tanpa potongan admin</p>}
                   </div>
                 </div>
 
@@ -571,11 +580,15 @@ export default function DepositPage() {
                       <span className="text-muted-foreground">Deposit Amount</span>
                       <span className="text-foreground font-medium">{formatRupiah(numAmount)}</span>
                     </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Admin Fee</span>
+                      <span className="text-foreground font-medium">{adminFee > 0 ? formatRupiah(adminFee) : 'Gratis'}</span>
+                    </div>
                     <div className="border-t border-white/5 pt-2 flex justify-between text-sm">
                       <span className="text-foreground font-semibold">Credited to Balance</span>
                       <span className="text-emerald-400 font-bold">{formatRupiah(netAmount)}</span>
                     </div>
-                    <p className="text-emerald-400/70 text-[10px]">✓ Tanpa potongan admin — full amount dikreditkan</p>
+                    {adminFee > 0 && <p className="text-yellow-400/70 text-[10px]">⚠️ Saldo dikurangi fee admin Rp {adminFee.toLocaleString('id-ID')}</p>}
                   </div>
                 )}
 
@@ -792,11 +805,15 @@ export default function DepositPage() {
                     <span className="text-muted-foreground">Deposit Amount</span>
                     <span className="text-foreground font-medium">{formatRupiah(numAmount)}</span>
                   </div>
+                  {adminFee > 0 && <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Admin Fee</span>
+                    <span className="text-yellow-400 font-medium">{formatRupiah(adminFee)}</span>
+                  </div>}
                   <div className="border-t border-white/5 pt-2 flex justify-between text-sm">
                     <span className="text-foreground font-semibold">Credited to Balance</span>
                     <span className="text-emerald-400 font-bold">{formatRupiah(netAmount)}</span>
                   </div>
-                  <p className="text-emerald-400/70 text-[10px]">✓ Tanpa potongan admin</p>
+                  {adminFee > 0 ? <p className="text-yellow-400/70 text-[10px]">⚠️ Saldo dikurangi fee admin</p> : <p className="text-emerald-400/70 text-[10px]">✓ Tanpa potongan admin</p>}
                   <div className="flex justify-between text-xs text-muted-foreground pt-1">
                     <span>Payment Method</span>
                     <span>{selectedPayment?.name}</span>

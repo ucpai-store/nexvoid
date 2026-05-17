@@ -45,6 +45,7 @@ const AdminApiKeyPage = dynamic(() => import('@/components/nexvo/pages/AdminApiK
 const AdminLivePage = dynamic(() => import('@/components/nexvo/pages/AdminLivePage'), { ssr: false });
 const AdminAppearancePage = dynamic(() => import('@/components/nexvo/pages/AdminAppearancePage'), { ssr: false });
 const AdminPackagesPage = dynamic(() => import('@/components/nexvo/pages/AdminPackagesPage'), { ssr: false });
+const AdminWhatsAppPage = dynamic(() => import('@/components/nexvo/pages/AdminWhatsAppPage'), { ssr: false });
 
 /* ───────── Page Component Map ───────── */
 // Maps page key to its component — only the matched component gets rendered
@@ -91,6 +92,7 @@ const PAGE_COMPONENTS: Record<string, React.ComponentType> = {
   'admin-live': AdminLivePage,
   'admin-appearance': AdminAppearancePage,
   'admin-packages': AdminPackagesPage,
+  'admin-whatsapp': AdminWhatsAppPage,
 };
 
 /* ───────── Placeholder Page ───────── */

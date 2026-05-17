@@ -4,6 +4,7 @@
  * Runs scheduled tasks automatically:
  * - Daily Investment Profit: Every day at 00:00 WIB
  *   + Immediately credits matching profit to upline (event-driven)
+ *   + Immediately credits daily referral bonus to upline (based on investment amount)
  * - Weekly Salary Bonus: Every Monday at 00:00 WIB
  *
  * Uses Prisma directly to access the database.
@@ -34,6 +35,8 @@ const DEFAULT_MATCHING_RATES: Record<number, number> = {
   5: 1,
 };
 const MAX_MATCHING_LEVEL = 5; // Level 6+ = auto Disconnect
+
+
 
 // ──────────── Time Helpers ────────────
 
@@ -160,7 +163,7 @@ async function creditMatchingOnProfit(
         type: 'matching',
         level,
         amount: matchAmount,
-        description: `M.Profit Level ${level} (${rate}%) dari profit ${earningUserName} — ${formatRupiahSimple(profitAmount)} × ${rate}% = ${formatRupiahSimple(matchAmount)}`,
+        description: `M.Profit Level ${level} (${rate}%) dari profit ${earningUserName} — ${formatRupiahSimple(profitAmount)} x ${rate}% = ${formatRupiahSimple(matchAmount)}`,
       },
     });
 
@@ -385,6 +388,15 @@ async function processDailyInvestmentProfits(): Promise<{
         }
       }
 
+      // ★ Same-day investment check: Skip if investment was created today (WIB)
+      // Profit should ONLY start the day AFTER the investment was made.
+      // If a user buys at 23:55 WIB, they should NOT get profit at 00:00 — wait until next 00:00.
+      const investmentCreatedDate = inv.startDate ? new Date(inv.startDate) : new Date(inv.createdAt);
+      const createdWIB = getWibDateString(investmentCreatedDate);
+      if (createdWIB === todayWIB) {
+        continue; // Investment made today — skip, profit starts tomorrow
+      }
+
       // Check if investment has ended
       const wibNow = getWibNow();
       if (inv.endDate) {
@@ -440,15 +452,17 @@ async function processDailyInvestmentProfits(): Promise<{
             type: 'profit',
             level: 0,
             amount: dailyProfit,
-            description: `Profit harian ${inv.package.name} — ${formatRupiahSimple(inv.amount)} × ${inv.package.profitRate}% = ${formatRupiahSimple(dailyProfit)}`,
+            description: `Profit harian ${inv.package.name} — ${formatRupiahSimple(inv.amount)} x ${inv.package.profitRate}% = ${formatRupiahSimple(dailyProfit)}`,
           },
         });
 
-        // 4. Event-driven matching bonus
+        // 4. Event-driven matching bonus (based on PROFIT)
         const matchResult = await creditMatchingOnProfit(tx, inv.userId, dailyProfit);
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
+
+        // Referral bonus is now per-investment (credited when downline invests), NOT daily
       });
 
       result.processed++;
@@ -478,6 +492,16 @@ async function processDailyInvestmentProfits(): Promise<{
         const lastProfitWIB = getWibDateString(new Date(purchase.lastProfitDate));
         if (lastProfitWIB === todayWIB) {
           continue;
+        }
+      }
+
+      // ★ Same-day purchase check: Skip if purchase was created today (WIB)
+      // This MUST match the Investment same-day check to keep Purchase tracking in sync.
+      const purchaseCreatedDate = purchase.createdAt ? new Date(purchase.createdAt) : null;
+      if (purchaseCreatedDate) {
+        const createdWIB = getWibDateString(purchaseCreatedDate);
+        if (createdWIB === todayWIB) {
+          continue; // Purchase made today — skip, profit starts tomorrow
         }
       }
 
@@ -561,6 +585,7 @@ const server = Bun.serve({
         lastSalaryRun: lastSalaryRunDate || 'never',
         lastProfitRun: lastProfitRunDate || 'never',
         matchingMode: 'event-driven (credited with daily profit)',
+        referralMode: 'per-investment (credited when downline invests)',
       }, { headers: corsHeaders });
     }
 
@@ -571,8 +596,12 @@ const server = Bun.serve({
       return Response.json({ success: true, data: result }, { headers: corsHeaders });
     }
 
-    // Manual trigger: Daily profit + matching
+    // Manual trigger: Daily profit + matching (⚠️ Only use for testing — profit should ONLY enter at 00:00 WIB)
     if (url.pathname === '/api/trigger/profit' && req.method === 'POST') {
+      const wibHour = getWibNow().getHours();
+      if (wibHour !== 0) {
+        console.log(`\n[CRON] ⚠️ Manual profit trigger called at ${getWibNow().toISOString()} — NOT 00:00 WIB! Proceeding anyway...`);
+      }
       console.log('\n[CRON] 📌 Manual trigger: Daily profit + matching');
       const result = await processDailyInvestmentProfits();
       return Response.json({ success: true, data: result }, { headers: corsHeaders });
@@ -600,6 +629,7 @@ const server = Bun.serve({
         lastSalaryRun: lastSalaryRunDate || 'never',
         lastProfitRun: lastProfitRunDate || 'never',
         matchingMode: 'event-driven',
+        referralMode: 'per-investment (credited when downline invests)',
       }, { headers: corsHeaders });
     }
 
@@ -614,10 +644,10 @@ console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every day`);
 console.log(`  - Weekly Salary: 00:00 WIB every Monday`);
-console.log(`  - Matching: Event-driven (credited automatically with daily profit)`);
+console.log(`  - Matching: Event-driven (credited with daily profit, based on PROFIT amount)`);
+console.log(`  - Referral: Per-investment (credited when downline invests)`);
 console.log(`  - Level 6+ matching: AUTO DISCONNECT (no bonus)`);
 
 // Check every 10 seconds for precise 00:00 WIB triggers
 setInterval(checkAndRunCrons, 10000);
 checkAndRunCrons(); // Initial check
-
