@@ -1,0 +1,383 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  whatsapp      String   @unique
+  email         String   @unique
+  password      String
+  name          String   @default("")
+  avatar        String   @default("")
+  referralCode  String   @unique
+  referredBy    String?
+  level         String   @default("Bronze")
+  mainBalance    Float    @default(0)
+  depositBalance Float    @default(0)
+  profitBalance  Float    @default(0)
+  totalDeposit  Float    @default(0)
+  totalWithdraw Float    @default(0)
+  totalProfit   Float    @default(0)
+  isSuspended   Boolean  @default(false)
+  isVerified    Boolean  @default(false)
+  otpCode       String?
+  otpExpiry     DateTime?
+  emailOtpCode  String?
+  emailOtpExpiry DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  banks         BankAccount[]
+  deposits      Deposit[]
+  withdrawals   Withdrawal[]
+  purchases     Purchase[]
+  testimonials  Testimonial[]
+  referralsFrom Referral[] @relation("Referrer")
+  referralsTo   Referral[] @relation("Referred")
+  investments   Investment[]
+  bonusLogs     BonusLog[]
+  salaryBonuses  SalaryBonus[]
+  matchingBonuses MatchingBonus[]
+}
+
+model BankAccount {
+  id          String   @id @default(cuid())
+  userId      String
+  bankName    String
+  accountNo   String
+  holderName  String
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  name            String
+  price           Float
+  duration        Int
+  estimatedProfit Float
+  quota           Int
+  quotaUsed       Int      @default(0)
+  description     String
+  banner          String   @default("")
+  isActive        Boolean  @default(true)
+  isStopped       Boolean  @default(false)
+  profitRate      Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchases       Purchase[] @relation("ProductPurchases")
+}
+
+model Deposit {
+  id              String   @id @default(cuid())
+  depositId       String   @unique
+  userId          String
+  amount          Float
+  fee             Float    @default(0)
+  netAmount       Float    @default(0)
+  proofImage      String   @default("")
+  status          String   @default("pending")
+  note            String   @default("")
+  paymentMethodId String?
+  paymentType     String   @default("")
+  paymentName     String   @default("")
+  paymentAccount  String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+}
+
+model Withdrawal {
+  id          String   @id @default(cuid())
+  userId      String
+  bankId      String   @default("")
+  bankName    String
+  accountNo   String
+  holderName  String
+  paymentType String   @default("bank")
+  amount      Float
+  fee         Float
+  netAmount   Float
+  status      String   @default("pending")
+  note        String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Purchase {
+  id          String   @id @default(cuid())
+  userId      String
+  productId   String
+  quantity    Int
+  totalPrice  Float
+  status      String   @default("active")
+  profitEarned Float  @default(0)
+  dailyProfit  Float   @default(0)
+  lastProfitDate DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product     Product  @relation("ProductPurchases", fields: [productId], references: [id], onDelete: Cascade)
+  profitLogs  ProfitLog[]
+}
+
+model Banner {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String
+  description String   @default("")
+  ctaText     String   @default("")
+  ctaLink     String   @default("")
+  image       String
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Testimonial {
+  id          String   @id @default(cuid())
+  userId      String?
+  name        String
+  rating      Int
+  comment     String
+  avatar      String   @default("")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  referrerId  String
+  referredId  String
+  level       Int      @default(1)
+  bonus       Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  referrer    User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred    User     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+}
+
+model LiveActivity {
+  id          String   @id @default(cuid())
+  type        String
+  userName    String
+  amount      Float
+  productName String?
+  isFake      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model SystemSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Admin {
+  id                String    @id @default(cuid())
+  username          String    @unique
+  email             String    @unique
+  password          String
+  name              String    @default("Admin")
+  role              String    @default("admin")
+  pairingCode       String?
+  pairingCodeExpiry DateTime?
+  lastLogin         DateTime?
+  loginAttempts     Int       @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  logs              AdminLog[]
+}
+
+model AdminLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  detail    String   @default("")
+  ip        String   @default("")
+  createdAt DateTime @default(now())
+
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+model ApkFile {
+  id        String   @id @default(cuid())
+  fileName  String
+  filePath  String
+  version   String   @default("1.0.0")
+  fileSize  Float    @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProfitLog {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  userId      String
+  amount      Float
+  createdAt   DateTime @default(now())
+
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model PaymentMethod {
+  id          String   @id @default(cuid())
+  type        String
+  name        String
+  accountNo   String   @default("")
+  holderName  String   @default("")
+  qrImage     String   @default("")
+  iconUrl     String   @default("")
+  color       String   @default("")
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deposits    Deposit[]
+}
+
+model InvestmentPackage {
+  id              String   @id @default(cuid())
+  name            String
+  amount          Float
+  profitRate      Float    @default(10)
+  contractDays    Int      @default(90)
+  isActive        Boolean  @default(true)
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  investments     Investment[] @relation("PackageInvestments")
+}
+
+model Investment {
+  id              String   @id @default(cuid())
+  userId          String
+  packageId       String
+  amount          Float
+  dailyProfit     Float
+  totalProfitEarned Float  @default(0)
+  status          String   @default("active")
+  startDate       DateTime @default(now())
+  endDate         DateTime?
+  lastProfitDate  DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package         InvestmentPackage @relation("PackageInvestments", fields: [packageId], references: [id], onDelete: Cascade)
+}
+
+model BonusLog {
+  id          String   @id @default(cuid())
+  userId      String
+  fromUserId  String
+  type        String
+  level       Int      @default(0)
+  amount      Float
+  description String   @default("")
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MatchingConfig {
+  id        String   @id @default(cuid())
+  level1    Float    @default(5)
+  level2    Float    @default(4)
+  level3    Float    @default(3)
+  level4    Float    @default(2)
+  level5    Float    @default(1)
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model MatchingBonus {
+  id           String   @id @default(cuid())
+  userId       String
+  leftOmzet    Float    @default(0)
+  rightOmzet   Float    @default(0)
+  matchedOmzet Float    @default(0)
+  level        Int      @default(1)
+  rate         Float    @default(0)
+  amount       Float
+  status       String   @default("paid")
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SalaryConfig {
+  id                  String   @id @default(cuid())
+  minDirectRefs       Int      @default(10)
+  salaryRate          Float    @default(2.5)
+  maxWeeks            Int      @default(12)
+  requireActiveDeposit Boolean @default(true)
+  fixedSalaryAmount  Float    @default(25000)
+  isActive            Boolean  @default(true)
+  updatedAt           DateTime @updatedAt
+}
+
+model SalaryBonus {
+  id            String   @id @default(cuid())
+  userId        String
+  weekNumber    Int
+  year          Int
+  weekOfTotal   Int      @default(1)
+  amount        Float
+  baseOmzet     Float    @default(0)
+  salaryRate    Float    @default(2.5)
+  activeRefDeposits Int   @default(0)
+  directRefs    Int
+  groupOmzet    Float
+  status        String   @default("paid")
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekNumber, year])
+}
+
+model WhatsAppAdmin {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

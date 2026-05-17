@@ -1,0 +1,73 @@
+# dependencies
+node_modules
+
+# next.js build output
+.next
+out
+dist
+*.tgz
+
+# database
+*.db
+*.db-journal
+*.db.backup
+prisma/custom.db
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IDEs
+.idea
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db
+
+# uploads (user content)
+uploads
+
+# backups
+backups
+*.tar.gz
+public_html
+
+# deploy scripts (not needed in repo)
+deploy*.sh
+deploy*.mjs
+deploy*.js
+DEPLOY*.sh
+DEPLOY*.md
+FIX*.sh
+QUICK*.sh
+PUSH*.sh
+VPS*.sh
+FULL*.sh
+check_page.js
+seed-check.js
+seed-products.js
+comprehensive_fix.py
+fix_schema.py
+fix_schema2.py
+backfill_username.js
+post-build-seed.sh
+deploy.sh
+ecosystem.config.js
