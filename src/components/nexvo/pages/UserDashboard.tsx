@@ -358,7 +358,7 @@ export default function UserDashboard() {
           <p className="text-2xl sm:text-3xl font-bold text-gold-gradient">
             {formatRupiah(user?.mainBalance || 0)}
           </p>
-          <p className="text-muted-foreground text-[10px] mt-1">Bisa ditarik & untuk beli paket</p>
+          <p className="text-muted-foreground text-[10px] mt-1">Profit & bonus masuk sini (bisa ditarik)</p>
         </motion.div>
 
         <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden border border-blue-500/10">
@@ -486,6 +486,7 @@ export default function UserDashboard() {
                 <span className="text-[10px] text-muted-foreground">Gaji Mingguan</span>
               </div>
               <p className="text-foreground text-[10px] font-medium">Senin 00:00 WIB</p>
+              <p className="text-muted-foreground text-[9px]">Syarat: 10 undangan aktif</p>
             </div>
             <div className="bg-white/[0.02] rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-1">

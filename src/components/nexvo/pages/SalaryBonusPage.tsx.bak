@@ -299,47 +299,36 @@ export default function SalaryBonusPage() {
                 )}
               </div>
 
-              {/* Estimated Salary Info - Only show when user meets minimum requirement */}
-              {meetsMinDirectRefs && userHasActiveDeposit ? (
-                <>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-[#D4AF37]" />
-                      <span className="text-muted-foreground text-xs">Estimasi Gaji/Minggu</span>
-                    </div>
-                    <span className="text-emerald-400 font-bold text-sm">
-                      {formatRupiah(estimatedSalary)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
-                      <span className="text-muted-foreground text-xs">Omzet Grup</span>
-                    </div>
-                    <span className="text-foreground font-semibold text-sm">
-                      {formatRupiah(groupOmzet)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <Banknote className="w-4 h-4 text-[#D4AF37]" />
-                      <span className="text-muted-foreground text-xs">Rate Gaji</span>
-                    </div>
-                    <span className="text-[#D4AF37] font-bold text-sm">
-                      {salaryRate}% / minggu
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/10">
-                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span className="text-red-400 text-xs font-medium">
-                    Gaji belum tersedia. Undang minimal {minDirectRefs} orang dengan investasi aktif untuk mendapatkan gaji mingguan.
-                  </span>
+              {/* Estimated Salary Info */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-[#D4AF37]" />
+                  <span className="text-muted-foreground text-xs">Estimasi Gaji/Minggu</span>
                 </div>
-              )}
+                <span className="text-emerald-400 font-bold text-sm">
+                  {formatRupiah(estimatedSalary)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
+                  <span className="text-muted-foreground text-xs">Omzet Grup</span>
+                </div>
+                <span className="text-foreground font-semibold text-sm">
+                  {formatRupiah(groupOmzet)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
+                <div className="flex items-center gap-2">
+                  <Banknote className="w-4 h-4 text-[#D4AF37]" />
+                  <span className="text-muted-foreground text-xs">Rate Gaji</span>
+                </div>
+                <span className="text-[#D4AF37] font-bold text-sm">
+                  {salaryRate}% / minggu
+                </span>
+              </div>
             </div>
 
             {/* Claim Button / Status */}
@@ -394,62 +383,60 @@ export default function SalaryBonusPage() {
         </motion.div>
       )}
 
-      {/* Summary Stats - Only show salary-related stats when eligible or already received salary */}
-      {(meetsMinDirectRefs && userHasActiveDeposit) || (data?.totalSalaryEarned || 0) > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
-            </div>
-            <p className="text-2xl font-bold text-emerald-400">{formatRupiah(data?.totalSalaryEarned || 0)}</p>
-            <p className="text-muted-foreground text-xs">Total Gaji Diterima</p>
-          </motion.div>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="glass glow-gold rounded-2xl p-4 text-center"
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
+            <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
+          </div>
+          <p className="text-2xl font-bold text-emerald-400">{formatRupiah(data?.totalSalaryEarned || 0)}</p>
+          <p className="text-muted-foreground text-xs">Total Gaji Diterima</p>
+        </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <Clock className="w-5 h-5 text-[#D4AF37]" />
-            </div>
-            <p className="text-foreground text-lg font-bold">{weeksReceived} <span className="text-muted-foreground text-sm font-normal">/ {maxWeeks}</span></p>
-            <p className="text-muted-foreground text-xs">Minggu Diterima</p>
-          </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass glow-gold rounded-2xl p-4 text-center"
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
+            <Clock className="w-5 h-5 text-[#D4AF37]" />
+          </div>
+          <p className="text-foreground text-lg font-bold">{weeksReceived} <span className="text-muted-foreground text-sm font-normal">/ {maxWeeks}</span></p>
+          <p className="text-muted-foreground text-xs">Minggu Diterima</p>
+        </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <Zap className="w-5 h-5 text-[#D4AF37]" />
-            </div>
-            <p className="text-foreground text-lg font-bold">{salaryRate}%</p>
-            <p className="text-muted-foreground text-xs">Rate / Minggu</p>
-          </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="glass glow-gold rounded-2xl p-4 text-center"
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
+            <Zap className="w-5 h-5 text-[#D4AF37]" />
+          </div>
+          <p className="text-foreground text-lg font-bold">{salaryRate}%</p>
+          <p className="text-muted-foreground text-xs">Rate / Minggu</p>
+        </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <Users className="w-5 h-5 text-[#D4AF37]" />
-            </div>
-            <p className="text-foreground text-lg font-bold">{activeRefDeposits}</p>
-            <p className="text-muted-foreground text-xs">Undangan Langsung</p>
-          </motion.div>
-        </div>
-      ) : null}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="glass glow-gold rounded-2xl p-4 text-center"
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
+            <Users className="w-5 h-5 text-[#D4AF37]" />
+          </div>
+          <p className="text-foreground text-lg font-bold">{activeRefDeposits}</p>
+          <p className="text-muted-foreground text-xs">Undangan Langsung</p>
+        </motion.div>
+      </div>
 
       {/* Salary History */}
       <motion.div
@@ -521,19 +508,19 @@ export default function SalaryBonusPage() {
           </div>
           <div className="flex items-start gap-2">
             <span className="text-[#D4AF37] font-bold">2.</span>
-            <span>Wajib mengundang minimal <strong className="text-foreground">{minDirectRefs} orang</strong> (Level 1) dengan investasi aktif</span>
+            <span>Semua <strong className="text-foreground">referral langsung (Level 1)</strong> wajib memiliki deposit aktif</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-[#D4AF37] font-bold">3.</span>
-            <span>Setelah memenuhi syarat, gaji <strong className="text-foreground">{salaryRate}%</strong> dari omzet grup dikreditkan setiap <strong className="text-foreground\">Senin pukul 00:00 WIB</strong></span>
+            <span>Sistem otomatis mendeteksi <strong className="text-foreground">{salaryRate}%</strong> dari omzet grup setiap <strong className="text-foreground\">Senin pukul 00:00 WIB</strong></span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-[#D4AF37] font-bold">4.</span>
-            <span>Gaji berlangsung selama <strong className="text-foreground">{maxWeeks} minggu</strong> sejak syarat terpenuhi</span>
+            <span>Gaji <strong className="text-foreground">{salaryRate}%</strong> dari total omzet grup (investasi Anda + seluruh downline) dikreditkan otomatis</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-[#D4AF37] font-bold">5.</span>
-            <span>Profit & bonus gaji masuk <strong className="text-foreground">saldo utama</strong> (bisa ditarik)</span>
+            <span>Bonus gaji berlangsung selama <strong className="text-foreground">{maxWeeks} minggu</strong> (total {salaryRate * maxWeeks}% dari omzet)</span>
           </div>
         </div>
       </motion.div>
