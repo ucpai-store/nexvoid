@@ -34,7 +34,8 @@ const DEFAULT_MATCHING_RATES: Record<number, number> = {
   4: 2,
   5: 1,
 };
-const MAX_MATCHING_LEVEL = 5; // Level 6+ = auto Disconnect
+const MAX_MATCHING_LEVEL = 5;
+const HARD_MIN_DIRECT_REFS = 10; // Safety minimum - salary requires at least 10 direct refs // Level 6+ = auto Disconnect
 
 
 
@@ -268,9 +269,11 @@ async function processAllSalaryBonuses(): Promise<{
 
   for (const user of users) {
     try {
+      const minRequired = Math.max(config.minDirectRefs, HARD_MIN_DIRECT_REFS);
       const refCount = await getDirectRefCount(user.id);
-      if (refCount < config.minDirectRefs) {
+      if (refCount < minRequired) {
         result.skipped++;
+        console.log("[Salary Cron] ⏭️ " + user.userId + ": Only " + refCount + " direct refs (need " + minRequired + ")");
         continue;
       }
 
@@ -292,8 +295,9 @@ async function processAllSalaryBonuses(): Promise<{
         ? await getActiveDepositRefCount(user.id)
         : refCount;
 
-      if (effectiveRefs < config.minDirectRefs) {
+      if (effectiveRefs < minRequired) {
         result.skipped++;
+        console.log("[Salary Cron] ⏭️ " + user.userId + ": Only " + effectiveRefs + " active deposit refs (need " + minRequired + ")");
         continue;
       }
 
