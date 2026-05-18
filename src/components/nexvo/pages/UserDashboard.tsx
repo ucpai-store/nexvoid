@@ -359,6 +359,11 @@ export default function UserDashboard() {
             {formatRupiah(user?.mainBalance || 0)}
           </p>
           <p className="text-muted-foreground text-[10px] mt-1">Profit & bonus masuk sini (bisa ditarik)</p>
+          {(user?.totalProfit || 0) > (user?.mainBalance || 0) && (
+            <p className="text-muted-foreground/60 text-[9px] mt-0.5">
+              Total earn {formatRupiah(user?.totalProfit || 0)} — dipakai beli paket {formatRupiah((user?.totalProfit || 0) - (user?.mainBalance || 0))}
+            </p>
+          )}
         </motion.div>
 
         <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden border border-blue-500/10">
@@ -389,7 +394,7 @@ export default function UserDashboard() {
           <p className="text-2xl sm:text-3xl font-bold text-emerald-400">
             {formatRupiah(user?.totalProfit || 0)}
           </p>
-          <p className="text-muted-foreground text-[10px] mt-1">Akumulasi semua profit & bonus</p>
+          <p className="text-muted-foreground text-[10px] mt-1">Total akumulasi (sudah termasuk yang dipakai beli paket)</p>
         </motion.div>
       </div>
 
