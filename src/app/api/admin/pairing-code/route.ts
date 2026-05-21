@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { getAdminFromRequest, logAdminAction } from '@/lib/auth';
 import { getBotConnectionStatus } from '@/lib/bot-auth';
-import crypto from 'crypto';
 
-/**
- * GET  — Retrieve current pairing code status + bot connection status
- * POST — Generate a new pairing code
- * DELETE — Revoke the current pairing code
- */
+const BOT_PORT = 3040;
+const BOT_BASE = `http://localhost:${BOT_PORT}`;
+
+async function proxyToBot(path: string, options: RequestInit = {}) {
+  try {
+    const res = await fetch(`${BOT_BASE}${path}`, {
+      ...options,
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15000),
+    });
+    return await res.json();
+  } catch {
+    return { success: false, error: 'Bot service tidak tersedia' };
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const admin = await getAdminFromRequest(request);
@@ -16,26 +25,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminData = await db.admin.findUnique({
-      where: { id: admin.id },
-      select: { pairingCode: true, pairingCodeExpiry: true },
-    });
-
-    const isActive = adminData?.pairingCode &&
-      adminData?.pairingCodeExpiry &&
-      new Date() < adminData.pairingCodeExpiry;
-
-    // Also get bot connection status
+    const botStatus = await proxyToBot('/');
     const connectionStatus = await getBotConnectionStatus();
 
     return NextResponse.json({
       success: true,
       data: {
-        pairingCode: isActive ? adminData!.pairingCode : null,
-        expiresAt: isActive ? adminData!.pairingCodeExpiry : null,
-        isActive: !!isActive,
-        botConnected: connectionStatus.connected,
-        botNumber: connectionStatus.botNumber,
+        pairingCode: botStatus.pairingCode || null,
+        expiresAt: null,
+        isActive: !!(botStatus.pairingCode),
+        botConnected: botStatus.status === 'connected' || connectionStatus.connected,
+        botNumber: botStatus.phoneNumber || connectionStatus.botNumber,
         adminNumber: connectionStatus.adminNumber,
         lastHeartbeat: connectionStatus.lastHeartbeat,
         pairedAt: connectionStatus.pairedAt,
@@ -54,31 +54,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check role - only super_admin can generate pairing codes
     if (admin.role !== 'super_admin') {
       return NextResponse.json({ success: false, error: 'Only super admin can generate pairing codes' }, { status: 403 });
     }
 
-    // Generate a 8-character alphanumeric pairing code
-    const pairingCode = crypto.randomBytes(4).toString('hex').toUpperCase();
-    // Expires in 24 hours
-    const pairingCodeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const body = await request.json();
+    const phoneNumber = body.phoneNumber?.replace(/[^0-9]/g, '');
 
-    await db.admin.update({
-      where: { id: admin.id },
-      data: { pairingCode, pairingCodeExpiry },
+    if (!phoneNumber) {
+      return NextResponse.json({ success: false, error: 'Nomor WhatsApp wajib diisi' }, { status: 400 });
+    }
+
+    let fPhone = phoneNumber;
+    if (fPhone.startsWith('0')) fPhone = '62' + fPhone.substring(1);
+    if (!fPhone.startsWith('62')) fPhone = '62' + fPhone;
+
+    await logAdminAction(admin.id, 'PAIRING_CODE_REQUESTED', `Requesting pairing code for ${fPhone}`);
+
+    const result = await proxyToBot('/api/connect', {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumber: fPhone }),
     });
 
-    await logAdminAction(admin.id, 'PAIRING_CODE_GENERATED', 'New pairing code generated');
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        pairingCode,
-        expiresAt: pairingCodeExpiry,
-        message: 'Pairing code generated. Bot can use this code to connect.',
-      },
-    });
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          pairingCode: result.pairingCode || null,
+          phoneNumber: result.phoneNumber || fPhone,
+          connected: result.connected || false,
+          message: result.connected
+            ? 'Bot sudah terkoneksi!'
+            : result.pairingCode
+              ? 'Kode pairing dari WhatsApp siap. Masukkan kode di HP Anda.'
+              : 'Menunggu kode pairing dari WhatsApp...',
+        },
+      });
+    } else {
+      return NextResponse.json({ success: false, error: result.error || 'Gagal mendapatkan pairing code' }, { status: 500 });
+    }
   } catch (error) {
     console.error('Generate pairing code error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
@@ -92,19 +106,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    await db.admin.update({
-      where: { id: admin.id },
-      data: { pairingCode: null, pairingCodeExpiry: null },
-    });
+    const result = await proxyToBot('/api/disconnect', { method: 'POST' });
 
-    await logAdminAction(admin.id, 'PAIRING_CODE_REVOKED', 'Pairing code revoked');
+    await logAdminAction(admin.id, 'BOT_DISCONNECTED', 'Bot disconnected from admin panel');
 
     return NextResponse.json({
       success: true,
-      data: { message: 'Pairing code revoked successfully' },
+      data: { message: 'Bot disconnected, session cleared' },
     });
   } catch (error) {
-    console.error('Revoke pairing code error:', error);
+    console.error('Disconnect bot error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
   }
 }
+

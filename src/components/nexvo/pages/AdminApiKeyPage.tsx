@@ -164,22 +164,36 @@ export default function AdminApiKeyPage() {
     fetchPairingCode();
   }, [fetchPairingCode]);
 
-  /* ─── Generate Pairing Code ─── */
+  /* ─── Generate Pairing Code (request from WhatsApp via bot service) ─── */
   const handleGeneratePairingCode = async () => {
+    const phone = botConfig.bot_admin_number?.replace(/[^0-9]/g, '');
+    if (!phone) {
+      toast({ title: 'Masukkan nomor WhatsApp admin terlebih dahulu', description: 'Isi nomor di bagian Nomor WhatsApp Admin di atas', variant: 'destructive' });
+      return;
+    }
     setPairingLoading(true);
     try {
       const res = await fetch('/api/admin/pairing-code', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${adminToken}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ phoneNumber: phone }),
       });
       const data = await res.json();
       if (data.success) {
         setPairingData({
           pairingCode: data.data.pairingCode,
-          expiresAt: data.data.expiresAt,
-          isActive: true,
+          expiresAt: null,
+          isActive: !!(data.data.pairingCode),
+          botConnected: data.data.connected,
         });
-        toast({ title: 'Pairing Code Generated!', description: 'Bot can use this code to connect.' });
+        if (data.data.connected) {
+          toast({ title: 'Bot Terkoneksi!', description: 'WhatsApp bot sudah terhubung.' });
+        } else if (data.data.pairingCode) {
+          toast({ title: '📱 Kode Pairing Siap!', description: 'Masukkan kode ini di WhatsApp HP Anda: Settings {'>'} Linked Devices {'>'} Link with phone number' });
+          startPolling();
+        } else {
+          toast({ title: 'Menunggu...', description: 'Menunggu kode pairing dari WhatsApp.' });
+        }
       } else {
         toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
       }
@@ -190,7 +204,31 @@ export default function AdminApiKeyPage() {
     }
   };
 
-  /* ─── Revoke Pairing Code ─── */
+  /* ─── Polling for connection status ─── */
+  const startPolling = () => {
+    let attempts = 0;
+    const pollInterval = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch('/api/admin/pairing-code', {
+          headers: { Authorization: `Bearer ${adminToken}` },
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+          setPairingData(data.data);
+          if (data.data.botConnected) {
+            toast({ title: '✅ Bot Terkoneksi!', description: 'WhatsApp bot berhasil terhubung!' });
+            clearInterval(pollInterval);
+          }
+        }
+        if (attempts >= 60) {
+          clearInterval(pollInterval);
+        }
+      } catch {}
+    }, 3000);
+  };
+
+  /* ─── Disconnect Bot ─── */
   const handleRevokePairingCode = async () => {
     setRevokingPairing(true);
     try {
@@ -200,8 +238,9 @@ export default function AdminApiKeyPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setPairingData({ pairingCode: null, expiresAt: null, isActive: false });
-        toast({ title: 'Pairing Code Revoked' });
+        setPairingData({ pairingCode: null, expiresAt: null, isActive: false, botConnected: false });
+        toast({ title: 'Bot Terputus', description: 'Sesi WhatsApp bot telah dihapus.' });
+        fetchPairingCode();
       } else {
         toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
       }
@@ -497,7 +536,7 @@ export default function AdminApiKeyPage() {
               <div>
                 <p className="text-amber-400 text-xs font-semibold">Bot Belum Terhubung</p>
                 <p className="text-amber-400/70 text-[10px] leading-relaxed">
-                  Generate pairing code, lalu masukkan kode tersebut ke bot WhatsApp. Bot akan terhubung ke nomor admin untuk kontrol penuh — approve deposit, withdraw, dan notifikasi real-time.
+                  Masukkan nomor WhatsApp admin di bawah, lalu klik Hubungkan Bot. Bot akan request kode pairing dari WhatsApp. Masukkan kode tersebut di HP Anda: WhatsApp {'>'} Settings {'>'} Linked Devices {'>'} Link with phone number.
                 </p>
               </div>
             </div>
@@ -518,7 +557,7 @@ export default function AdminApiKeyPage() {
           </div>
           <div>
             <h2 className="text-foreground font-semibold text-base">Pairing Code</h2>
-            <p className="text-muted-foreground text-xs">Kode pairing untuk menghubungkan bot ke nomor admin — full control notifikasi</p>
+            <p className="text-muted-foreground text-xs">Request kode pairing dari WhatsApp lalu masukkan di HP Anda untuk menghubungkan bot</p>
           </div>
         </div>
 
@@ -570,7 +609,7 @@ export default function AdminApiKeyPage() {
               {savingBot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </Button>
           </div>
-          <p className="text-muted-foreground text-[10px] mt-1.5">Pairing code akan dikirim ke nomor ini. Semua notifikasi bot (deposit, withdraw, register) akan diterima di nomor admin.</p>
+          <p className="text-muted-foreground text-[10px] mt-1.5">Bot akan request kode pairing dari WhatsApp untuk nomor ini. Masukkan kode yang muncul di WhatsApp HP Anda. Semua notifikasi bot (deposit, withdraw, register) akan diterima di nomor admin.</p>
         </div>
 
         {pairingData.isActive && pairingData.pairingCode ? (
@@ -629,22 +668,25 @@ export default function AdminApiKeyPage() {
               )}
             </div>
 
-            {/* Bot Auth Example */}
+            {/* Cara Menghubungkan */}
             <div className="glass rounded-xl p-3 border border-[#D4AF37]/10 bg-[#070B14]/50">
               <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <QrCode className="w-3 h-3" />
-                Cara Koneksi Bot
+                <Smartphone className="w-3 h-3" />
+                Cara Menghubungkan ke WhatsApp
               </p>
-              <div className="font-mono text-[11px] bg-[#070B14]/80 rounded-lg p-2.5 border border-[#D4AF37]/5 space-y-1.5">
-                <p className="text-muted-foreground/60"># 1. Pairing — dapatkan token admin</p>
-                <p className="text-foreground">
-                  <span className="text-blue-400">POST</span> /api/auth/bot-pair
-                </p>
-                <p className="text-muted-foreground/50">{'{"pairingCode": "'}{pairingData.pairingCode}{'"}'}</p>
-                <p className="text-muted-foreground/60 mt-2"># 2. Gunakan token untuk semua API</p>
-                <p className="text-foreground">
-                  Authorization: <span className="text-emerald-400">Bearer {'<token>'}</span>
-                </p>
+              <div className="bg-[#070B14]/80 rounded-lg p-2.5 border border-[#D4AF37]/5 space-y-2">
+                <p className="text-foreground text-xs font-medium">📱 Langkah-langkah:</p>
+                <div className="space-y-1.5">
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">1.</span> Buka WhatsApp di HP Anda</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">2.</span> Tap ⋮ (menu) {'>'}  Perangkat Tertaut</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">3.</span> Tap "Tautkan perangkat"</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">4.</span> Pilih "Tautkan dengan nomor telepon"</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">5.</span> Masukkan kode: <span className="text-[#D4AF37] font-bold font-mono">{pairingData.pairingCode}</span></p>
+                </div>
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                  {pairingLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D4AF37]" />}
+                  <p className="text-[#D4AF37] text-[11px]">{pairingLoading ? 'Meminta kode dari WhatsApp...' : 'Menunggu kode dimasukkan di WhatsApp...'}</p>
+                </div>
               </div>
             </div>
 
@@ -657,7 +699,7 @@ export default function AdminApiKeyPage() {
                 className="rounded-xl border-violet-500/20 text-violet-400 hover:bg-violet-500/10 text-xs"
               >
                 {pairingLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
-                Regenerate
+                Hubungkan Ulang
               </Button>
               <Button
                 onClick={handleRevokePairingCode}
@@ -667,7 +709,7 @@ export default function AdminApiKeyPage() {
                 className="rounded-xl border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs"
               >
                 {revokingPairing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Unplug className="w-3.5 h-3.5 mr-1.5" />}
-                Revoke
+                Putuskan
               </Button>
             </div>
           </div>
@@ -684,7 +726,7 @@ export default function AdminApiKeyPage() {
               className="bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl"
             >
               {pairingLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
-              Generate Pairing Code
+              Hubungkan Bot
             </Button>
           </div>
         )}
@@ -696,8 +738,8 @@ export default function AdminApiKeyPage() {
             <div>
               <p className="text-amber-400 text-[11px] font-semibold">Keamanan</p>
               <p className="text-amber-400/70 text-[10px] leading-relaxed">
-                Pairing code bersifat satu kali pakai — setelah bot berhasil terhubung, kode otomatis terhapus. 
-                Masa berlaku 24 jam. Jangan bagikan kode ini ke pihak yang tidak berwenang.
+                Kode pairing ini langsung dari server WhatsApp. Setelah bot berhasil terhubung, kode otomatis terhapus. 
+                Masukkan kode di WhatsApp: Settings {'>'} Linked Devices {'>'} Link with phone number. Jangan bagikan kode ini ke pihak yang tidak berwenang.
               </p>
             </div>
           </div>
@@ -871,17 +913,17 @@ export default function AdminApiKeyPage() {
             </h4>
             <div className="space-y-2.5 text-xs font-mono">
               {[
-                { method: 'POST', endpoint: '/api/auth/bot-pair', desc: 'Hubungkan bot via pairing code → token + kontrol web', highlight: true },
+                { method: 'POST', endpoint: '/api/auth/bot-pair', desc: 'Hubungkan bot via pairing code {'>'}  token + kontrol web', highlight: true },
                 { method: 'POST', endpoint: '/api/bot/heartbeat', desc: 'Heartbeat bot (kirim tiap 1 menit)', highlight: true },
                 { method: 'POST', endpoint: '/api/bot/disconnect', desc: 'Putuskan koneksi bot' },
                 { method: 'GET', endpoint: '/api/bot/pending', desc: 'Ambil semua transaksi pending' },
                 { method: 'GET', endpoint: '/api/bot/notifications', desc: 'Poll notifikasi bot' },
                 { method: 'GET', endpoint: '/api/bot/send-otp?whatsapp=628xxx', desc: 'Ambil OTP pending' },
                 { method: 'GET', endpoint: '/api/bot/config', desc: 'Baca konfigurasi bot' },
-                { method: 'PUT', endpoint: '/api/bot/deposit/approve', desc: 'Setujui deposit → saldo otomatis masuk' },
+                { method: 'PUT', endpoint: '/api/bot/deposit/approve', desc: 'Setujui deposit {'>'}  saldo otomatis masuk' },
                 { method: 'PUT', endpoint: '/api/bot/deposit/reject', desc: 'Tolak deposit' },
                 { method: 'PUT', endpoint: '/api/bot/withdraw/approve', desc: 'Setujui withdrawal' },
-                { method: 'PUT', endpoint: '/api/bot/withdraw/reject', desc: 'Tolak withdrawal → saldo kembali' },
+                { method: 'PUT', endpoint: '/api/bot/withdraw/reject', desc: 'Tolak withdrawal {'>'}  saldo kembali' },
                 { method: 'PUT', endpoint: '/api/bot/config', desc: 'Update konfigurasi bot' },
                 { method: 'POST', endpoint: '/api/bot/deposit', desc: 'Buat deposit via bot' },
                 { method: 'POST', endpoint: '/api/bot/withdraw', desc: 'Buat withdrawal via bot' },

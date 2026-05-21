@@ -328,13 +328,23 @@ async function processDailyInvestmentProfits(): Promise<{
   }
 
   // ═══════ Purchase (Product) Profit Processing ═══════
-  // Products also generate daily profit, same as investment packages
+  // ★ FIX: Purchases that have linked Investment records are ALREADY processed above.
+  // We only update the Purchase tracking fields (profitEarned, lastProfitDate) for display.
+  // We do NOT credit profit again — that would be DOUBLE COUNTING.
+  // Purchases WITHOUT linked investments (legacy) still need profit credited here.
   const purchases = await db.purchase.findMany({
     where: { status: 'active' },
     include: { product: true },
   });
 
-  console.log(`[Profit Cron] Processing ${purchases.length} active product purchases...`);
+  // Check which purchases already have linked investment records
+  const purchaseIdsWithInvestments = new Set(
+    investments
+      .filter(inv => (inv as any).purchaseId)
+      .map(inv => (inv as any).purchaseId!)
+  );
+
+  console.log(`[Profit Cron] Updating ${purchases.length} active product purchases (${purchaseIdsWithInvestments.size} have linked investments)...`);
 
   for (const purchase of purchases) {
     try {
@@ -356,6 +366,22 @@ async function processDailyInvestmentProfits(): Promise<{
 
       if (dailyProfit <= 0) continue;
 
+      if (purchaseIdsWithInvestments.has(purchase.id)) {
+        // ★ This purchase has linked Investment records — profit was already credited above.
+        // Only update the Purchase tracking fields for display purposes.
+        await db.purchase.update({
+          where: { id: purchase.id },
+          data: {
+            profitEarned: { increment: dailyProfit },
+            dailyProfit: dailyProfit,
+            lastProfitDate: new Date(),
+          },
+        });
+        continue; // Skip profit credit — already done via Investment
+      }
+
+      // ★ LEGACY: This purchase does NOT have linked investments — credit profit here.
+      // This handles old purchases created before the Investment record linking was added.
       await db.$transaction(async (tx) => {
         // Re-check inside transaction
         const currentPurchase = await tx.purchase.findUnique({ where: { id: purchase.id } });
@@ -385,7 +411,7 @@ async function processDailyInvestmentProfits(): Promise<{
           data: {
             profitEarned: { increment: dailyProfit },
             dailyProfit: dailyProfit,
-            lastProfitDate: new Date(),  // Store real UTC time
+            lastProfitDate: new Date(),
           },
         });
 
