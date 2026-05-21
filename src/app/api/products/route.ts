@@ -94,6 +94,37 @@ function formatRupiahSimple(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
 }
 
+/**
+ * Auto-reset quota when full.
+ * If quotaUsed >= quota, reset quotaUsed to a random small number (3-12% of quota)
+ * so it looks like a fresh batch just opened with some early buyers.
+ */
+async function autoResetQuotaIfFull() {
+  try {
+    const products = await db.product.findMany({
+      where: { isActive: true, isStopped: false },
+    });
+
+    for (const product of products) {
+      if (product.quotaUsed >= product.quota) {
+        // Reset to random 3-12% of quota to look natural
+        const minUsed = Math.floor(product.quota * 0.03);
+        const maxUsed = Math.floor(product.quota * 0.12);
+        const newQuotaUsed = Math.floor(Math.random() * (maxUsed - minUsed + 1)) + minUsed;
+
+        await db.product.update({
+          where: { id: product.id },
+          data: { quotaUsed: newQuotaUsed },
+        });
+
+        console.log(`[QUOTA RESET] ${product.name}: ${product.quotaUsed}/${product.quota} → ${newQuotaUsed}/${product.quota} (batch baru)`);
+      }
+    }
+  } catch (error) {
+    console.error('[QUOTA RESET] Error:', error);
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -104,8 +135,24 @@ export async function GET(request: NextRequest) {
       if (!product || !product.isActive) {
         return NextResponse.json({ success: false, error: 'Produk tidak ditemukan' }, { status: 404 });
       }
+
+      // Auto-reset if quota full
+      if (product.quotaUsed >= product.quota) {
+        const minUsed = Math.floor(product.quota * 0.03);
+        const maxUsed = Math.floor(product.quota * 0.12);
+        const newQuotaUsed = Math.floor(Math.random() * (maxUsed - minUsed + 1)) + minUsed;
+        await db.product.update({
+          where: { id: product.id },
+          data: { quotaUsed: newQuotaUsed },
+        });
+        product.quotaUsed = newQuotaUsed;
+      }
+
       return NextResponse.json({ success: true, data: product });
     }
+
+    // Auto-reset any full quotas before returning list
+    await autoResetQuotaIfFull();
 
     const products = await db.product.findMany({
       where: { isActive: true, isStopped: false },
@@ -148,6 +195,18 @@ export async function POST(request: NextRequest) {
     const product = await db.product.findUnique({ where: { id: productId } });
     if (!product || !product.isActive || product.isStopped) {
       return NextResponse.json({ success: false, error: 'Produk tidak tersedia' }, { status: 404 });
+    }
+
+    // Auto-reset quota if full before checking
+    if (product.quotaUsed >= product.quota) {
+      const minUsed = Math.floor(product.quota * 0.03);
+      const maxUsed = Math.floor(product.quota * 0.12);
+      const newQuotaUsed = Math.floor(Math.random() * (maxUsed - minUsed + 1)) + minUsed;
+      await db.product.update({
+        where: { id: product.id },
+        data: { quotaUsed: newQuotaUsed },
+      });
+      product.quotaUsed = newQuotaUsed;
     }
 
     const remainingQuota = product.quota - product.quotaUsed;
@@ -233,6 +292,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             packageId: investmentPackage.id,
+            purchaseId: newPurchase.id, // Link to purchase to avoid double-counting in assets/transactions
             amount: product.price,
             dailyProfit,
             totalProfitEarned: 0, // No profit yet
@@ -301,4 +361,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: message }, { status });
   }
 }
-

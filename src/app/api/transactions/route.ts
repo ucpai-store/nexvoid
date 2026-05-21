@@ -113,10 +113,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch investments (paket)
+    // Fetch investments (paket) — exclude those linked to purchases to avoid double-counting
     if (type === 'all' || type === 'investment') {
       const investments = await db.investment.findMany({
-        where: { userId: user.id },
+        where: { userId: user.id, purchaseId: null },
         include: {
           package: { select: { name: true, profitRate: true, contractDays: true } },
         },
@@ -265,4 +265,5 @@ export async function GET(request: NextRequest) {
     });
   }
 }
+
 

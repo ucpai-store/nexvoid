@@ -90,7 +90,7 @@ export default function ProductDetailPage() {
   };
 
   const handleConfirmBuy = async () => {
-    if (!token || !product) return;
+    if (!token || !product || buying) return;
     setBuying(true);
 
     try {
@@ -480,3 +480,4 @@ export default function ProductDetailPage() {
     </div>
   );
 }
+

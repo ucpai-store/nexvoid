@@ -4,7 +4,10 @@ import { getUserFromRequest } from '@/lib/auth';
 
 /**
  * User Assets API
- * Returns all user assets (investments + purchases) with full contract details.
+ * Returns all user assets.
+ * - Direct investments (no purchaseId): shown as individual investment cards
+ * - Product purchases (with purchaseId): grouped by purchaseId into a single card
+ *   with quantity from the Purchase record, to match what the user actually bought.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -37,72 +40,91 @@ export async function GET(request: NextRequest) {
       createdAt: string;
     }> = [];
 
-    // Fetch investments
-    if (!type || type === 'investment') {
-      const investWhere: { userId: string; status?: string } = { userId: user.id };
-      if (status) investWhere.status = status;
+    const investWhere: { userId: string; status?: string } = { userId: user.id };
+    if (status) investWhere.status = status;
 
-      const investments = await db.investment.findMany({
-        where: investWhere,
-        include: {
-          package: { select: { name: true, profitRate: true, contractDays: true } },
-        },
-        orderBy: { createdAt: 'desc' },
+    const investments = await db.investment.findMany({
+      where: investWhere,
+      include: {
+        package: { select: { name: true, profitRate: true, contractDays: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Separate: direct investments vs product-purchase investments
+    const directInvestments = investments.filter((inv) => !inv.purchaseId);
+    const productInvestments = investments.filter((inv) => inv.purchaseId);
+
+    // 1) Add direct investments (from PaketPage) - each as its own card
+    for (const inv of directInvestments) {
+      if (type && type !== 'investment') continue;
+
+      allAssets.push({
+        id: inv.id,
+        type: 'investment',
+        name: inv.package?.name || 'Paket Investasi',
+        amount: inv.amount,
+        dailyProfit: inv.dailyProfit,
+        totalProfitEarned: inv.totalProfitEarned,
+        profitRate: inv.package?.profitRate || 0,
+        contractDays: inv.package?.contractDays || 0,
+        status: inv.status,
+        startDate: inv.startDate instanceof Date ? inv.startDate.toISOString() : String(inv.startDate),
+        endDate: inv.endDate ? (inv.endDate instanceof Date ? inv.endDate.toISOString() : String(inv.endDate)) : null,
+        lastProfitDate: inv.lastProfitDate ? (inv.lastProfitDate instanceof Date ? inv.lastProfitDate.toISOString() : String(inv.lastProfitDate)) : null,
+        quantity: 1,
+        createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
       });
-
-      for (const inv of investments) {
-        allAssets.push({
-          id: inv.id,
-          type: 'investment',
-          name: inv.package?.name || 'Paket Investasi',
-          amount: inv.amount,
-          dailyProfit: inv.dailyProfit,
-          totalProfitEarned: inv.totalProfitEarned,
-          profitRate: inv.package?.profitRate || 0,
-          contractDays: inv.package?.contractDays || 0,
-          status: inv.status,
-          startDate: inv.startDate instanceof Date ? inv.startDate.toISOString() : String(inv.startDate),
-          endDate: inv.endDate ? (inv.endDate instanceof Date ? inv.endDate.toISOString() : String(inv.endDate)) : null,
-          lastProfitDate: inv.lastProfitDate ? (inv.lastProfitDate instanceof Date ? inv.lastProfitDate.toISOString() : String(inv.lastProfitDate)) : null,
-          quantity: 1,
-          createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
-        });
-      }
     }
 
-    // Fetch purchases (product assets)
-    if (!type || type === 'product') {
-      const purchaseWhere: { userId: string; status?: string } = { userId: user.id };
-      if (status) purchaseWhere.status = status;
-
+    // 2) Group product-purchase investments by purchaseId - each group = 1 card
+    if (productInvestments.length > 0) {
+      // Fetch the Purchase records for grouping
+      const purchaseIds = [...new Set(productInvestments.map((inv) => inv.purchaseId!))];
       const purchases = await db.purchase.findMany({
-        where: purchaseWhere,
+        where: { id: { in: purchaseIds } },
         include: {
           product: { select: { name: true, price: true, duration: true, profitRate: true } },
         },
-        orderBy: { createdAt: 'desc' },
       });
+      const purchaseMap = new Map(purchases.map((p) => [p.id, p]));
 
-      for (const p of purchases) {
-        // Calculate daily profit for purchases
-        const productProfitRate = p.product?.profitRate || 0;
-        const purchaseDailyProfit = p.dailyProfit || Math.floor(p.totalPrice * (productProfitRate / 100));
-        
+      // Group by purchaseId
+      const groupMap = new Map<string, typeof productInvestments>();
+      for (const inv of productInvestments) {
+        const key = inv.purchaseId!;
+        if (!groupMap.has(key)) groupMap.set(key, []);
+        groupMap.get(key)!.push(inv);
+      }
+
+      for (const [purchaseId, group] of groupMap) {
+        const purchase = purchaseMap.get(purchaseId);
+        const firstInv = group[0];
+        const assetType = 'product';
+
+        if (type && type !== assetType) continue;
+
+        // Aggregate the group
+        const totalAmount = group.reduce((sum, inv) => sum + inv.amount, 0);
+        const totalDailyProfit = group.reduce((sum, inv) => sum + inv.dailyProfit, 0);
+        const totalProfitEarned = group.reduce((sum, inv) => sum + inv.totalProfitEarned, 0);
+        const quantity = purchase?.quantity || group.length;
+
         allAssets.push({
-          id: p.id,
-          type: 'product',
-          name: p.product?.name || 'Produk',
-          amount: p.totalPrice,
-          dailyProfit: purchaseDailyProfit,
-          totalProfitEarned: p.profitEarned,
-          profitRate: productProfitRate,
-          contractDays: p.product?.duration || 0,
-          status: p.status,
-          startDate: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
-          endDate: null,
-          lastProfitDate: p.lastProfitDate ? (p.lastProfitDate instanceof Date ? p.lastProfitDate.toISOString() : String(p.lastProfitDate)) : null,
-          quantity: p.quantity,
-          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
+          id: purchaseId, // Use purchaseId as the asset id for grouped items
+          type: assetType,
+          name: purchase?.product?.name || firstInv.package?.name || 'Produk',
+          amount: totalAmount,
+          dailyProfit: totalDailyProfit,
+          totalProfitEarned: totalProfitEarned,
+          profitRate: firstInv.package?.profitRate || 0,
+          contractDays: firstInv.package?.contractDays || purchase?.product?.duration || 0,
+          status: firstInv.status,
+          startDate: firstInv.startDate instanceof Date ? firstInv.startDate.toISOString() : String(firstInv.startDate),
+          endDate: firstInv.endDate ? (firstInv.endDate instanceof Date ? firstInv.endDate.toISOString() : String(firstInv.endDate)) : null,
+          lastProfitDate: firstInv.lastProfitDate ? (firstInv.lastProfitDate instanceof Date ? firstInv.lastProfitDate.toISOString() : String(firstInv.lastProfitDate)) : null,
+          quantity,
+          createdAt: firstInv.createdAt instanceof Date ? firstInv.createdAt.toISOString() : String(firstInv.createdAt),
         });
       }
     }
@@ -133,7 +155,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Get assets error:', error);
-    // Return fallback data when database is not available
     return NextResponse.json({
       success: true,
       data: [],

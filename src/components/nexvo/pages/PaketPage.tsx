@@ -164,7 +164,7 @@ export default function PaketPage() {
   const totalAvailableBalance = (user?.depositBalance || 0) + (user?.mainBalance || 0);
 
   const handleConfirmInvest = async () => {
-    if (!token || !confirmPkg) return;
+    if (!token || !confirmPkg || investing) return;
     const pkg = confirmPkg;
     const hasEnoughBalance = totalAvailableBalance >= pkg.amount;
 
@@ -417,3 +417,4 @@ export default function PaketPage() {
     </div>
   );
 }
+

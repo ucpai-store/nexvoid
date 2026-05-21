@@ -124,8 +124,13 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
           <div>
             <h3 className="text-foreground font-semibold text-sm">{asset.name}</h3>
             <p className="text-muted-foreground text-xs">
-              {isInvestment ? t('assets.investmentPackage') : t('assets.product')} • {asset.quantity && asset.quantity > 1 ? `${asset.quantity}x ` : ''}{formatDate(asset.startDate)}
+              {isInvestment ? t('assets.investmentPackage') : t('assets.product')} • {formatDate(asset.startDate)}
             </p>
+            {!isInvestment && asset.quantity && asset.quantity > 1 && (
+              <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[9px] font-semibold mt-0.5">
+                {asset.quantity}x
+              </Badge>
+            )}
           </div>
         </div>
         <Badge className={`${statusCfg.bg} ${statusCfg.color} border-0 text-[10px] font-semibold flex items-center gap-1`}>
@@ -409,3 +414,4 @@ export default function AssetPage() {
     </div>
   );
 }
+
