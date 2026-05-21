@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   MessageCircle, Phone, Link2, Unlink, Send, Settings,
@@ -45,6 +45,7 @@ export default function AdminWhatsAppPage() {
   const [sendPhone, setSendPhone] = useState('');
   const [sendMessage, setSendMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'connect' | 'config' | 'send'>('connect');
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const { adminToken } = useAuthStore();
   const { toast } = useToast();
 
@@ -86,6 +87,11 @@ export default function AdminWhatsAppPage() {
     return () => clearInterval(interval);
   }, [loadData, fetchStatus]);
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, []);
+
   const handleConnect = async () => {
     if (!phoneNumber || !adminToken) return;
     setConnecting(true);
@@ -97,15 +103,60 @@ export default function AdminWhatsAppPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Kode pairing dibuat!', description: 'Cek pairing code di bawah' });
-        setTimeout(fetchStatus, 2000);
-        setTimeout(fetchStatus, 5000);
+        if (data.connected) {
+          // Already connected
+          setBotStatus(prev => prev ? { ...prev, status: 'connected', phoneNumber: data.phoneNumber } : prev);
+          toast({ title: '✅ Bot Terkoneksi!', description: 'WhatsApp bot berhasil terhubung' });
+          setConnecting(false);
+          return;
+        }
+        
+        toast({ title: 'Menghubungkan...', description: 'Menunggu kode pairing' });
+        
+        // Start continuous polling - will detect both pairing code and connection
+        let attempts = 0;
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        
+        pollingRef.current = setInterval(async () => {
+          attempts++;
+          try {
+            const statusRes = await fetch('/api/admin/whatsapp?action=status', {
+              headers: { Authorization: 'Bearer ' + adminToken },
+            });
+            const statusData = await statusRes.json();
+            
+            if (statusData.status === 'connected') {
+              setBotStatus(statusData);
+              toast({ title: '✅ Bot Terkoneksi!', description: 'WhatsApp bot berhasil terhubung' });
+              setConnecting(false);
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              return;
+            }
+            
+            if (statusData.pairingCode) {
+              setBotStatus(statusData);
+            }
+            
+            // Stop after 2 minutes of polling
+            if (attempts > 60) {
+              setConnecting(false);
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              toast({ title: '⏰ Timeout', description: 'Kode pairing expired. Coba hubungkan ulang.', variant: 'destructive' });
+            }
+          } catch {}
+        }, 2000);
+        
+        // Also set the initial data from the connect response
+        if (data.pairingCode) {
+          setBotStatus(prev => prev ? { ...prev, pairingCode: data.pairingCode } : prev);
+          toast({ title: '📱 Kode Pairing Siap!', description: 'Masukkan kode di WhatsApp Anda' });
+        }
       } else {
         toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        setConnecting(false);
       }
     } catch {
       toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
-    } finally {
       setConnecting(false);
     }
   };
@@ -216,16 +267,30 @@ export default function AdminWhatsAppPage() {
 
         {/* Pairing Code Display */}
         {botStatus?.pairingCode && !isConnected && (
-          <div className="mt-4 p-4 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
-            <p className="text-muted-foreground text-xs mb-1">Kode Tautan / Pairing Code:</p>
-            <div className="flex items-center gap-3">
-              <p className="text-[#D4AF37] font-bold text-2xl tracking-[0.3em]">{botStatus.pairingCode}</p>
-              <Button size="sm" variant="outline" className="rounded-lg border-[#D4AF37]/20 text-[#D4AF37] h-8"
+          <div className="mt-4 p-5 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
+            <p className="text-foreground text-sm font-semibold mb-2">📱 Kode Pairing WhatsApp:</p>
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-[#D4AF37] font-bold text-3xl tracking-[0.3em] font-mono">{botStatus.pairingCode}</p>
+              <Button size="sm" variant="outline" className="rounded-lg border-[#D4AF37]/20 text-[#D4AF37] h-9"
                 onClick={() => { navigator.clipboard.writeText(botStatus.pairingCode!); toast({ title: 'Kode disalin!' }); }}>
                 Copy
               </Button>
             </div>
-            <p className="text-muted-foreground text-xs mt-2">Buka WhatsApp → Perangkat tertaut → Tautkan perangkat → Masukkan kode</p>
+            <div className="bg-black/20 rounded-lg p-3 space-y-1.5">
+              <p className="text-muted-foreground text-xs font-semibold">📌 Cara Menghubungkan:</p>
+              <p className="text-muted-foreground text-xs">1. Buka WhatsApp di HP Anda</p>
+              <p className="text-muted-foreground text-xs">2. Tap ⋮ (menu) → Perangkat tertaut</p>
+              <p className="text-muted-foreground text-xs">3. Tap "Tautkan perangkat"</p>
+              <p className="text-muted-foreground text-xs">4. Pilih "Tautkan dengan nomor telepon"</p>
+              <p className="text-muted-foreground text-xs">5. Masukkan kode: <span className="text-[#D4AF37] font-bold">{botStatus.pairingCode}</span></p>
+            </div>
+            <p className="text-yellow-400 text-xs mt-2">⚠️ Kode berlaku sementara. Jika expired, hubungkan ulang.</p>
+            {connecting && (
+              <div className="flex items-center gap-2 mt-3">
+                <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
+                <p className="text-[#D4AF37] text-xs">Menunggu kode dimasukkan di WhatsApp...</p>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
@@ -260,7 +325,7 @@ export default function AdminWhatsAppPage() {
                 <Button onClick={handleConnect} disabled={connecting || !phoneNumber}
                   className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
                   {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                  <span className="ml-1.5">Hubungkan</span>
+                  <span className="ml-1.5">{connecting ? 'Menunggu...' : 'Hubungkan'}</span>
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs mt-1">Format: 628xxxxxxxxxx (tanpa + atau spasi)</p>
@@ -366,3 +431,4 @@ export default function AdminWhatsAppPage() {
     </div>
   );
 }
+

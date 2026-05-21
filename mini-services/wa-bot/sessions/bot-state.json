@@ -1,0 +1,10 @@
+{
+  "config": {
+    "welcomeMessage": "👋 Halo! Saya *Nexvo Bot* — asisten digital Anda.\n\nKetik *menu* untuk melihat daftar fitur yang tersedia.",
+    "menuHeader": "📋 *MENU NEXVO BOT*",
+    "menuFooter": "💡 Ketik nomor atau perintah untuk menggunakan fitur.\n📱 Contoh: *saldo*, *produk*, *1*",
+    "autoReply": true,
+    "onlyRegistered": true
+  },
+  "phoneNumber": "6287892614294"
+}
