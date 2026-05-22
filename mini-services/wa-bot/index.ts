@@ -1,12 +1,7 @@
 /**
- * NEXVO WhatsApp Bot Service - v3.0 STABLE
+ * NEXVO WhatsApp Bot Service - v4.0.1 PRODUCTION
  * 
- * Uses @whiskeysockets/baileys STABLE (6.7.22) instead of RC.
- * Proper pairing code flow:
- * 1. Admin enters bot phone number
- * 2. Bot connects and requests REAL pairing code from WhatsApp
- * 3. Pairing code displayed in admin panel
- * 4. User enters code on phone → bot connected
+ * Uses @whiskeysockets/baileys STABLE (6.7.22) with proper pairing code flow.
  */
 
 import {
@@ -24,6 +19,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, readdirSync
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,28 +29,22 @@ const DB_PATH = '/home/nexvo/prisma/custom.db';
 const SESSION_DIR = join(__dirname, 'sessions');
 const BOT_STATE_FILE = join(SESSION_DIR, 'bot-state.json');
 
-// Prevent crashes
-process.on('uncaughtException', (err) => {
-  console.error('[Bot] Uncaught:', err.message);
-  // Don't exit - keep running
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('[Bot] Unhandled:', reason);
-  // Don't exit - keep running
-});
+process.on('uncaughtException', (err) => { console.error('[Bot] Uncaught:', err.message); });
+process.on('unhandledRejection', (reason) => { console.error('[Bot] Unhandled:', reason); });
 
 const logger = P({ level: 'silent' });
 
 let sock: WASocket | null = null;
 let connectionState: ConnectionState = { connection: 'close' };
-let pairingCode: string | null = null;
+let currentPairingCode: string | null = null;
 let qrCode: string | null = null;
 let botPhoneNumber: string | null = null;
 let botConnected = false;
 let isConnecting = false;
 let reconnectAttempts = 0;
 let pairingCodeRequested = false;
-const MAX_RECONNECT = 5;
+let pairingCodeExpiry: number = 0;
+const MAX_RECONNECT = 3;
 
 interface BotConfig {
   welcomeMessage: string;
@@ -87,7 +77,11 @@ function loadBotConfig() {
 function saveBotConfig() {
   try {
     mkdirSync(SESSION_DIR, { recursive: true });
-    writeFileSync(BOT_STATE_FILE, JSON.stringify({ config: botConfig, phoneNumber: botPhoneNumber }, null, 2));
+    writeFileSync(BOT_STATE_FILE, JSON.stringify({
+      config: botConfig,
+      phoneNumber: botPhoneNumber,
+      pairingCode: currentPairingCode,
+    }, null, 2));
   } catch (e) { console.error('[Bot] Error saving config:', e); }
 }
 
@@ -100,7 +94,7 @@ function clearSession() {
           rmSync(join(SESSION_DIR, file), { recursive: true, force: true });
         }
       }
-      console.log('[Bot] 🗑️ Session cleared');
+      console.log('[Bot] 🗑️ Session files cleared');
     }
   } catch (e) { console.error('[Bot] Error clearing session:', e); }
 }
@@ -111,7 +105,6 @@ function hasValidSession(): boolean {
 
 function queryDb(sql: string): any[] {
   try {
-    const { execSync } = require('child_process');
     const result = execSync(`sqlite3 -json "${DB_PATH}" "${sql}"`, { encoding: 'utf-8', timeout: 5000 });
     return result.trim() ? JSON.parse(result) : [];
   } catch (e: any) {
@@ -131,6 +124,21 @@ function findUserByPhone(phone: string): any | null {
 
 function formatRupiah(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
+}
+
+function getAdminNumber(): string {
+  const setting = queryDb("SELECT value FROM SystemSettings WHERE key = 'bot_admin_number'");
+  return setting.length > 0 ? setting[0].value : '6281234567890';
+}
+
+function getDepositAdminNumber(): string {
+  const setting = queryDb("SELECT value FROM SystemSettings WHERE key = 'deposit_admin_number'");
+  return setting.length > 0 ? setting[0].value : getAdminNumber();
+}
+
+function getCSNumbers(): Array<{name: string; phone: string}> {
+  const admins = queryDb("SELECT name, phone FROM WhatsAppAdmin WHERE isActive = 1 ORDER BY \`order\` ASC");
+  return admins.length > 0 ? admins : [{ name: 'CS NEXVO', phone: getAdminNumber() }];
 }
 
 const COMMANDS: Record<string, { name: string; description: string; aliases: string[] }> = {
@@ -184,31 +192,40 @@ function handleCommand(command: string, phone: string): string {
       products.forEach((p: any, i: number) => {
         text += `*${i + 1}. ${p.name}*\n💰 Harga: ${formatRupiah(p.price)}\n📈 Profit: ${p.profitRate}%/hari\n⏰ Durasi: ${p.duration} hari\n\n`;
       });
-      text += `💡 Beli produk di: https://nexvo.id/#paket`;
+      text += `💡 Beli produk di: https://nexvo.id`;
       return text;
     }
     case 'aset': {
       const invs = queryDb(`SELECT i.amount, i.dailyProfit, i.totalProfitEarned, p.name as pkgName FROM Investment i LEFT JOIN InvestmentPackage p ON i.packageId = p.id WHERE i.userId = '${user.id}' AND i.status = 'active' ORDER BY i.createdAt DESC`);
-      if (!invs.length) return `📊 *ASET SAYA*\n\nAnda belum memiliki aset aktif.\n\n💡 Beli produk di: https://nexvo.id/#paket`;
+      if (!invs.length) return `📊 *ASET SAYA*\n\nAnda belum memiliki aset aktif.\n\n💡 Beli produk di: https://nexvo.id`;
       let text = `📊 *ASET SAYA*\n\n`;
+      let totalDaily = 0;
       invs.forEach((inv: any, i: number) => {
         text += `*${i + 1}. ${inv.pkgName || 'Paket'}*\n💰 Modal: ${formatRupiah(inv.amount)}\n📈 +${formatRupiah(inv.dailyProfit)}/hari\n💵 Profit: ${formatRupiah(inv.totalProfitEarned)}\n\n`;
+        totalDaily += inv.dailyProfit || 0;
       });
+      text += `💵 *Total Profit/Hari: ${formatRupiah(totalDaily)}*`;
       return text;
     }
     case 'deposit': {
+      const csList = getCSNumbers();
       let text = `💸 *DEPOSIT*\n\n`;
       if (user) text += `💵 Saldo Deposit: ${formatRupiah(user.depositBalance || 0)}\n\n`;
-      text += `📌 *Cara Deposit:*\n1. Buka aplikasi Nexvo\n2. Pilih Wallet → Deposit\n3. Scan QRIS & bayar\n4. Tunggu konfirmasi admin\n\n🔗 Deposit di: https://nexvo.id/#wallet`;
+      text += `📌 *Cara Deposit:*\n1. Buka aplikasi Nexvo\n2. Pilih Wallet → Deposit\n3. Scan QRIS & bayar\n4. Tunggu konfirmasi admin\n\n🔗 Deposit di: https://nexvo.id`;
+      if (csList.length > 0) {
+        text += `\n\n💬 Butuh bantuan? Hubungi:`;
+        csList.forEach(cs => { text += `\n👤 ${cs.name}: wa.me/${cs.phone}`; });
+      }
       return text;
     }
     case 'withdraw': {
-      return `🏦 *WITHDRAW*\n\n💵 Saldo tersedia: ${formatRupiah(user.mainBalance || 0)}\n\n📌 *Cara Withdraw:*\n1. Buka aplikasi Nexvo\n2. Pilih Wallet → Withdraw\n3. Masukkan jumlah & bank\n4. Tunggu persetujuan admin\n\n⏰ Jam WD: 09:00-16:00 WIB (Sen-Jum)\n🔗 Withdraw di: https://nexvo.id/#wallet`;
+      return `🏦 *WITHDRAW*\n\n💵 Saldo tersedia: ${formatRupiah(user.mainBalance || 0)}\n\n📌 *Cara Withdraw:*\n1. Buka aplikasi Nexvo\n2. Pilih Wallet → Withdraw\n3. Masukkan jumlah & bank\n4. Tunggu persetujuan admin\n\n⏰ Jam WD: 09:00-16:00 WIB (Sen-Jum)\n🔗 Withdraw di: https://nexvo.id`;
     }
     case 'referral': {
       const code = user.referralCode || '-';
       const link = `https://nexvo.id?ref=${code}`;
-      return `🔗 *REFERRAL*\n\n🏷️ Kode: *${code}*\n🔗 Link: ${link}\n\n📊 Rate Bonus:\nL1: 10% | L2: 5% | L3: 4%\nL4: 3% | L5: 2%\n\n💡 Bagikan link untuk mendapat bonus!`;
+      const refCount = queryDb(`SELECT COUNT(*) as cnt FROM Referral WHERE referrerId = '${user.id}' AND level = 1`)[0]?.cnt || 0;
+      return `🔗 *REFERRAL*\n\n🏷️ Kode: *${code}*\n🔗 Link: ${link}\n👥 Downline: ${refCount} orang\n\n📊 Rate Bonus Referral:\nL1: 10% | L2: 5% | L3: 4%\nL4: 3% | L5: 2%\n\n📊 Rate M.Profit:\nL1: 5% | L2: 4% | L3: 3%\nL4: 2% | L5: 1%\n\n💡 Bagikan link untuk mendapat bonus!`;
     }
     case 'bonus': {
       const bonuses = queryDb(`SELECT type, SUM(amount) as total, COUNT(*) as cnt FROM BonusLog WHERE userId = '${user.id}' GROUP BY type`);
@@ -221,10 +238,9 @@ function handleCommand(command: string, phone: string): string {
       return text;
     }
     case 'bantuan': {
-      const admins = queryDb(`SELECT name, phone FROM WhatsAppAdmin WHERE isActive = 1 ORDER BY \`order\` ASC`);
+      const csList = getCSNumbers();
       let text = `❓ *BANTUAN*\n\nHubungi:\n\n`;
-      if (admins.length) admins.forEach((a: any) => { text += `👤 ${a.name}\n📱 wa.me/${a.phone}\n\n`; });
-      else text += `👤 CS NEXVO\n📱 wa.me/6281234567890\n\n`;
+      csList.forEach(cs => { text += `👤 ${cs.name}\n📱 wa.me/${cs.phone}\n\n`; });
       text += `🌐 Website: https://nexvo.id`;
       return text;
     }
@@ -232,7 +248,7 @@ function handleCommand(command: string, phone: string): string {
   }
 }
 
-// ──────────── WhatsApp Connection ────────────
+// ──── WhatsApp Connection ────
 async function connectToWhatsApp(phoneNumber?: string) {
   if (isConnecting) {
     console.log('[Bot] Already connecting, skipping...');
@@ -240,7 +256,6 @@ async function connectToWhatsApp(phoneNumber?: string) {
   }
   isConnecting = true;
   reconnectAttempts = 0;
-  pairingCodeRequested = false;
 
   try {
     const { version } = await fetchLatestBaileysVersion();
@@ -258,9 +273,9 @@ async function connectToWhatsApp(phoneNumber?: string) {
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
-      connectTimeoutMs: 120_000,      // ★ Increased timeout
+      connectTimeoutMs: 60_000,
       keepAliveIntervalMs: 25_000,
-      defaultQueryTimeoutMs: 120_000,  // ★ Increased timeout
+      defaultQueryTimeoutMs: 60_000,
       retryRequestDelayMs: 2000,
     });
 
@@ -274,28 +289,25 @@ async function connectToWhatsApp(phoneNumber?: string) {
         qrCode = qr;
         console.log('[Bot] 📱 QR Code generated');
 
-        // ★ Request pairing code ONCE when we have QR and phone number
-        if (needsPairingCode && phoneNumber && !pairingCodeRequested && !pairingCode) {
+        if (needsPairingCode && phoneNumber && !pairingCodeRequested) {
           pairingCodeRequested = true;
           try {
             console.log(`[Bot] 🔗 Requesting pairing code for ${phoneNumber}...`);
             const code = await sock!.requestPairingCode(phoneNumber);
             if (code) {
-              pairingCode = code;
+              currentPairingCode = code;
+              pairingCodeExpiry = Date.now() + (5 * 60 * 1000);
               botPhoneNumber = phoneNumber;
               saveBotConfig();
               console.log(`[Bot] ✅ REAL Pairing code from WhatsApp: ${code}`);
-              console.log(`[Bot] 📱 Enter this code in WhatsApp: Settings > Linked Devices > Link with phone number`);
             } else {
-              console.error('[Bot] ❌ Pairing code returned null - retrying...');
+              console.error('[Bot] ❌ Pairing code returned null');
               pairingCodeRequested = false;
             }
           } catch (e: any) {
             console.error('[Bot] ❌ Pairing code error:', e.message?.substring(0, 200));
             pairingCodeRequested = false;
           }
-        } else if (pairingCode) {
-          console.log('[Bot] 📱 QR refreshed, keeping existing pairing code: ' + pairingCode);
         }
       }
 
@@ -308,32 +320,30 @@ async function connectToWhatsApp(phoneNumber?: string) {
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 403) {
           console.log('[Bot] 🗑️ Session invalid. Clearing...');
           clearSession();
-          pairingCode = null;
+          currentPairingCode = null;
           pairingCodeRequested = false;
           return;
         }
 
-        // ★ Auto-reconnect with delay
         if (reconnectAttempts < MAX_RECONNECT) {
           reconnectAttempts++;
-          const delay = statusCode === 408 ? 15000 : 5000;
+          const delay = statusCode === 408 ? 10000 : 5000;
           console.log(`[Bot] 🔄 Reconnecting in ${delay/1000}s (attempt ${reconnectAttempts}/${MAX_RECONNECT})...`);
           setTimeout(() => connectToWhatsApp(phoneNumber || botPhoneNumber || undefined), delay);
         } else {
           console.log('[Bot] ❌ Max reconnect attempts reached. Use /api/connect to retry.');
-          pairingCode = null;
-          pairingCodeRequested = false;
         }
       }
 
       if (connection === 'open') {
         botConnected = true;
         qrCode = null;
-        pairingCode = null;  // ★ Clear pairing code after successful connection
+        currentPairingCode = null;
         pairingCodeRequested = false;
         isConnecting = false;
         reconnectAttempts = 0;
         console.log('[Bot] ✅ CONNECTED to WhatsApp!');
+        saveBotConfig();
         
         try {
           const meId = sock?.user?.id;
@@ -372,7 +382,7 @@ async function connectToWhatsApp(phoneNumber?: string) {
   }
 }
 
-// ──────────── HTTP API ────────────
+// ──── HTTP API ────
 function parseBody(req: any): Promise<any> {
   return new Promise((resolve, reject) => {
     let d = '';
@@ -389,20 +399,19 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
 
-  // Status endpoint
   if (url.pathname === '/') {
     json({
       service: 'NEXVO WhatsApp Bot',
-      status: botConnected ? 'connected' : (pairingCode ? 'pairing' : (isConnecting ? 'connecting' : 'disconnected')),
+      status: botConnected ? 'connected' : (currentPairingCode ? 'pairing' : (isConnecting ? 'connecting' : 'disconnected')),
       phoneNumber: botPhoneNumber,
-      pairingCode,
+      pairingCode: currentPairingCode,
+      pairingCodeExpiry: pairingCodeExpiry ? new Date(pairingCodeExpiry).toISOString() : null,
       hasQR: !!qrCode,
       autoReply: botConfig.autoReply,
     });
     return;
   }
 
-  // ★ Connect - MUST provide phone number
   if (url.pathname === '/api/connect' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
@@ -414,37 +423,29 @@ const server = createServer(async (req, res) => {
       if (!fPhone.startsWith('62')) fPhone = '62' + fPhone;
 
       botPhoneNumber = fPhone;
-      saveBotConfig();
 
       console.log('[Bot] 🔄 Starting fresh pairing code connection for', fPhone);
       
-      // Stop existing connection
       if (sock) { 
         try { sock.end(undefined); } catch {} 
         sock = null; 
       }
       botConnected = false;
-      pairingCode = null;
+      currentPairingCode = null;
       qrCode = null;
       isConnecting = false;
       pairingCodeRequested = false;
-      reconnectAttempts = MAX_RECONNECT;  // ★ Prevent auto-reconnect from old session
+      reconnectAttempts = MAX_RECONNECT;
       
-      // Clear old session for fresh start
       clearSession();
-
-      // Wait for session cleanup
       await new Promise(r => setTimeout(r, 2000));
-
-      // Start new connection
       await connectToWhatsApp(fPhone);
 
-      // ★ Wait for pairing code (up to 30 seconds)
       console.log('[Bot] ⏳ Waiting for pairing code from WhatsApp...');
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 45; i++) {
         await new Promise(r => setTimeout(r, 1000));
-        if (pairingCode) {
-          console.log('[Bot] ✅ Pairing code received:', pairingCode);
+        if (currentPairingCode) {
+          console.log('[Bot] ✅ Pairing code received:', currentPairingCode);
           break;
         }
         if (botConnected) {
@@ -453,11 +454,19 @@ const server = createServer(async (req, res) => {
         }
       }
 
+      // Save admin number to DB (fixed SQL)
+      try {
+        const nowMs = Date.now();
+        execSync(`sqlite3 "${DB_PATH}" "INSERT OR REPLACE INTO SystemSettings (id, key, value, updatedAt) VALUES ('bot_admin_number_auto', 'bot_admin_number', '${fPhone}', ${nowMs});"`, { timeout: 3000 });
+      } catch (e: any) {
+        console.error('[Bot] DB save error:', e.message?.substring(0, 100));
+      }
+
       json({
         success: true,
-        message: botConnected ? 'Bot terkoneksi!' : pairingCode ? `Kode pairing: ${pairingCode}. Masukkan kode di WhatsApp Anda (Settings > Linked Devices > Link with phone number)` : 'Menunggu kode pairing dari WhatsApp...',
+        message: botConnected ? 'Bot terkoneksi!' : currentPairingCode ? `Kode pairing: ${currentPairingCode}. Masukkan kode di WhatsApp Anda (Settings > Linked Devices > Link with phone number)` : 'Menunggu kode pairing dari WhatsApp...',
         phoneNumber: fPhone,
-        pairingCode,
+        pairingCode: currentPairingCode,
         connected: botConnected,
       });
     } catch (e: any) {
@@ -466,34 +475,37 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Get pairing code
   if (url.pathname === '/api/pairing-code') {
-    json({ success: true, pairingCode, phoneNumber: botPhoneNumber, connected: botConnected });
+    json({ 
+      success: true, 
+      pairingCode: currentPairingCode, 
+      phoneNumber: botPhoneNumber, 
+      connected: botConnected,
+      expired: pairingCodeExpiry ? Date.now() > pairingCodeExpiry : false,
+    });
     return;
   }
 
-  // Get QR code
   if (url.pathname === '/api/qr') {
     if (!qrCode) { json({ success: false, error: 'QR code belum tersedia' }, 404); return; }
     json({ success: true, qr: qrCode });
     return;
   }
 
-  // Disconnect
   if (url.pathname === '/api/disconnect' && req.method === 'POST') {
     if (sock) { try { sock.end(undefined); } catch {} sock = null; }
     botConnected = false;
-    pairingCode = null;
+    currentPairingCode = null;
     qrCode = null;
     isConnecting = false;
     pairingCodeRequested = false;
     reconnectAttempts = MAX_RECONNECT;
     clearSession();
+    saveBotConfig();
     json({ success: true, message: 'Bot disconnected, session cleared' });
     return;
   }
 
-  // Update config
   if (url.pathname === '/api/config' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
@@ -508,13 +520,11 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Get config
   if (url.pathname === '/api/config') {
     json({ success: true, config: botConfig });
     return;
   }
 
-  // Send message
   if (url.pathname === '/api/send' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
@@ -533,6 +543,15 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   loadBotConfig();
+  if (existsSync(BOT_STATE_FILE)) {
+    try {
+      const data = JSON.parse(readFileSync(BOT_STATE_FILE, 'utf-8'));
+      if (data.pairingCode && !botConnected) {
+        currentPairingCode = data.pairingCode;
+        console.log(`[WA Bot] Restored pairing code: ${currentPairingCode}`);
+      }
+    } catch {}
+  }
   console.log(`[WA Bot] 🚀 Running on port ${PORT} (Node.js + baileys stable)`);
   console.log(`[WA Bot] Auto-reply: ${botConfig.autoReply}`);
 

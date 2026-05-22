@@ -12,6 +12,8 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   total_transactions: '0',
   uptime: '99.9',
   satisfaction: '98',
+  bot_admin_number: '',
+  deposit_admin_number: '',
 };
 
 export async function getSetting(key: string): Promise<string> {
@@ -129,4 +131,3 @@ export function getWorkingHoursInfo(settings: Record<string, string>): {
     wibTime: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} WIB`,
   };
 }
-

@@ -4,12 +4,12 @@ import { getAdminFromRequest } from '@/lib/auth';
 const BOT_PORT = 3040;
 const BOT_BASE = `http://localhost:${BOT_PORT}`;
 
-async function proxyToBot(path: string, options: RequestInit = {}) {
+async function proxyToBot(path: string, options: RequestInit = {}, timeout = 10000) {
   try {
     const res = await fetch(`${BOT_BASE}${path}`, {
       ...options,
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(timeout),
     });
     return await res.json();
   } catch {
@@ -51,10 +51,11 @@ export async function POST(request: NextRequest) {
 
   switch (action) {
     case 'connect': {
+      // Use 60s timeout for connect (bot waits up to 45s for pairing code)
       const result = await proxyToBot('/api/connect', {
         method: 'POST',
         body: JSON.stringify({ phoneNumber: body.phoneNumber }),
-      });
+      }, 60000);
       return NextResponse.json(result);
     }
     case 'disconnect': {

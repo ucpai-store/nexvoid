@@ -93,6 +93,11 @@ export default function AdminSettingsPage() {
   const [depositFee, setDepositFee] = useState('500');
   const [withdrawFee, setWithdrawFee] = useState('10');
   const [savingFees, setSavingFees] = useState(false);
+
+  // Important Numbers state
+  const [adminNumber, setAdminNumber] = useState('');
+  const [depositAdminNumber, setDepositAdminNumber] = useState('');
+  const [savingNumbers, setSavingNumbers] = useState(false);
   const [waOrder, setWaOrder] = useState(0);
   const [waSaving, setWaSaving] = useState(false);
   const [waDeleteTarget, setWaDeleteTarget] = useState<WhatsAppAdmin | null>(null);
@@ -132,6 +137,8 @@ export default function AdminSettingsPage() {
       if (settingsData.success && settingsData.data) {
         if (settingsData.data.deposit_fee) setDepositFee(settingsData.data.deposit_fee);
         if (settingsData.data.withdraw_fee) setWithdrawFee(settingsData.data.withdraw_fee);
+        if (settingsData.data.bot_admin_number) setAdminNumber(settingsData.data.bot_admin_number);
+        if (settingsData.data.deposit_admin_number) setDepositAdminNumber(settingsData.data.deposit_admin_number);
       }
 
       // Fetch salary config
@@ -441,6 +448,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="whatsapp" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
             <MessageCircle className="w-4 h-4 mr-2" />
             WhatsApp
+          </TabsTrigger>
+          <TabsTrigger value="numbers" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
+            <Phone className="w-4 h-4 mr-2" />
+            Nomor Penting
           </TabsTrigger>
           <TabsTrigger value="fees" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
             <DollarSign className="w-4 h-4 mr-2" />
@@ -822,6 +833,93 @@ export default function AdminSettingsPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </motion.div>
+        </TabsContent>
+
+        {/* Important Numbers Tab */}
+        <TabsContent value="numbers">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-lg">
+            <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
+              <Phone className="w-5 h-5 text-[#D4AF37]" />
+              Nomor Penting Admin
+            </h3>
+
+            <div className="glass rounded-xl p-5 space-y-5">
+              {/* Admin Number */}
+              <div className="space-y-2">
+                <Label className="text-foreground text-sm font-medium">📱 Nomor Admin (Bot WhatsApp)</Label>
+                <p className="text-muted-foreground text-xs">Nomor WhatsApp yang digunakan sebagai bot/admin utama. Digunakan untuk koneksi WhatsApp Bot.</p>
+                <Input
+                  value={adminNumber}
+                  onChange={(e) => setAdminNumber(e.target.value)}
+                  placeholder="628xxxxxxxxxx"
+                  className="h-12 bg-input/50 border-border/50 rounded-xl text-foreground font-semibold"
+                />
+                <p className="text-muted-foreground text-[10px]">Format: 628xxxxxxxxxx (tanpa + atau spasi)</p>
+              </div>
+
+              {/* Deposit Admin Number */}
+              <div className="space-y-2">
+                <Label className="text-foreground text-sm font-medium">💰 Nomor Admin Deposit</Label>
+                <p className="text-muted-foreground text-xs">Nomor WhatsApp admin yang menerima notifikasi deposit. Jika kosong, menggunakan Nomor Admin.</p>
+                <Input
+                  value={depositAdminNumber}
+                  onChange={(e) => setDepositAdminNumber(e.target.value)}
+                  placeholder="628xxxxxxxxxx (kosongkan = sama dengan admin)"
+                  className="h-12 bg-input/50 border-border/50 rounded-xl text-foreground font-semibold"
+                />
+              </div>
+
+              {/* Info Box */}
+              <div className="p-3 rounded-xl bg-[#D4AF37]/5 border border-[#D4AF37]/10">
+                <p className="text-[#D4AF37] text-xs font-medium mb-1">📌 Informasi:</p>
+                <p className="text-muted-foreground text-xs">
+                  • Nomor Admin = nomor untuk koneksi WhatsApp Bot (pairing code)
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  • Nomor Admin Deposit = menerima notifikasi deposit baru
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  • Nomor CS (Customer Service) dikelola di tab WhatsApp
+                </p>
+              </div>
+
+              {/* Save Button */}
+              <Button
+                onClick={async () => {
+                  setSavingNumbers(true);
+                  try {
+                    const updates: Record<string, string> = {};
+                    if (adminNumber) updates.bot_admin_number = adminNumber;
+                    if (depositAdminNumber) updates.deposit_admin_number = depositAdminNumber;
+                    
+                    const res = await fetch('/api/admin/settings', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+                      body: JSON.stringify(updates),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      toast({ title: '✅ Berhasil', description: 'Nomor penting berhasil disimpan' });
+                    } else {
+                      toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+                    }
+                  } catch {
+                    toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
+                  } finally {
+                    setSavingNumbers(false);
+                  }
+                }}
+                disabled={savingNumbers}
+                className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all"
+              >
+                {savingNumbers ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Menyimpan...</>
+                ) : (
+                  <><Phone className="w-4 h-4 mr-2" />Simpan Nomor Penting</>
+                )}
+              </Button>
+            </div>
           </motion.div>
         </TabsContent>
 
