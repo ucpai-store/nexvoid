@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   satisfaction: '98',
   bot_admin_number: '',
   deposit_admin_number: '',
+  cs_admin_number: '',
 };
 
 export async function getSetting(key: string): Promise<string> {

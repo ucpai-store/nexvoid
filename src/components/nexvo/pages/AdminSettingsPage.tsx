@@ -97,6 +97,7 @@ export default function AdminSettingsPage() {
   // Important Numbers state
   const [adminNumber, setAdminNumber] = useState('');
   const [depositAdminNumber, setDepositAdminNumber] = useState('');
+  const [csAdminNumber, setCsAdminNumber] = useState('');
   const [savingNumbers, setSavingNumbers] = useState(false);
   const [waOrder, setWaOrder] = useState(0);
   const [waSaving, setWaSaving] = useState(false);
@@ -139,6 +140,7 @@ export default function AdminSettingsPage() {
         if (settingsData.data.withdraw_fee) setWithdrawFee(settingsData.data.withdraw_fee);
         if (settingsData.data.bot_admin_number) setAdminNumber(settingsData.data.bot_admin_number);
         if (settingsData.data.deposit_admin_number) setDepositAdminNumber(settingsData.data.deposit_admin_number);
+        if (settingsData.data.cs_admin_number) setCsAdminNumber(settingsData.data.cs_admin_number);
       }
 
       // Fetch salary config
@@ -870,6 +872,18 @@ export default function AdminSettingsPage() {
                 />
               </div>
 
+              {/* CS Admin Number */}
+              <div className="space-y-2">
+                <Label className="text-foreground text-sm font-medium">🎧 Nomor CS Admin</Label>
+                <p className="text-muted-foreground text-xs">Nomor WhatsApp Customer Service utama. Ditampilkan di bot dan halaman bantuan.</p>
+                <Input
+                  value={csAdminNumber}
+                  onChange={(e) => setCsAdminNumber(e.target.value)}
+                  placeholder="628xxxxxxxxxx (kosongkan = sama dengan admin)"
+                  className="h-12 bg-input/50 border-border/50 rounded-xl text-foreground font-semibold"
+                />
+              </div>
+
               {/* Info Box */}
               <div className="p-3 rounded-xl bg-[#D4AF37]/5 border border-[#D4AF37]/10">
                 <p className="text-[#D4AF37] text-xs font-medium mb-1">📌 Informasi:</p>
@@ -880,7 +894,7 @@ export default function AdminSettingsPage() {
                   • Nomor Admin Deposit = menerima notifikasi deposit baru
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  • Nomor CS (Customer Service) dikelola di tab WhatsApp
+                  • Nomor CS Admin = Customer Service utama yang ditampilkan ke user
                 </p>
               </div>
 
@@ -892,6 +906,7 @@ export default function AdminSettingsPage() {
                     const updates: Record<string, string> = {};
                     if (adminNumber) updates.bot_admin_number = adminNumber;
                     if (depositAdminNumber) updates.deposit_admin_number = depositAdminNumber;
+                    if (csAdminNumber) updates.cs_admin_number = csAdminNumber;
                     
                     const res = await fetch('/api/admin/settings', {
                       method: 'PUT',

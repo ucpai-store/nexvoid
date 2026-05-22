@@ -457,7 +457,7 @@ const server = createServer(async (req, res) => {
       // Save admin number to DB (fixed SQL)
       try {
         const nowMs = Date.now();
-        execSync(`sqlite3 "${DB_PATH}" "INSERT OR REPLACE INTO SystemSettings (id, key, value, updatedAt) VALUES ('bot_admin_number_auto', 'bot_admin_number', '${fPhone}', ${nowMs});"`, { timeout: 3000 });
+        execSync(`sqlite3 "${DB_PATH}" "INSERT OR REPLACE INTO SystemSettings (id, key, value, updatedAt) VALUES ('bot_admin_number_auto', 'bot_admin_number', '${fPhone}', ${nowMs})"`, { timeout: 3000 });
       } catch (e: any) {
         console.error('[Bot] DB save error:', e.message?.substring(0, 100));
       }
