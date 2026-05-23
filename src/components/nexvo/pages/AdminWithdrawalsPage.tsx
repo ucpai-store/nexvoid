@@ -70,7 +70,7 @@ export default function AdminWithdrawalsPage() {
     fetch('/api/admin/withdrawals?limit=100', { headers: { Authorization: `Bearer ${adminToken}` } })
       .then((r) => r.json())
       .then((res) => res.success && setWithdrawals(res.data))
-      .catch(() => { toast({ title: 'Error', description: 'Gagal memuat data', variant: 'destructive' }); })
+      .catch(() => { toast({ title: 'Error', description: 'Failed to load data', variant: 'destructive' }); })
       .finally(() => setLoading(false));
    
   }, [adminToken]);
@@ -108,7 +108,7 @@ export default function AdminWithdrawalsPage() {
         toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setProcessing((p) => ({ ...p, [id]: false }));
     }

@@ -1,11 +1,11 @@
 /**
- * NEXVO WhatsApp Bot Service - v6.0.0
+ * NEXVO WhatsApp Bot Service - v7.0.0
  * 
- * Features:
- * - Dual connection: Pairing Code + QR Scan Code (with base64 QR image)
- * - English bot messages matching platform features
- * - Auto-reply commands: balance, products, assets, deposit, withdraw, referral, bonus, help
- * - Deposit ID notification to admin
+ * Dual connection: Pairing Code + QR Scan Code
+ * - Pairing Code: Enter bot phone number -> get code -> enter in WhatsApp Linked Devices
+ * - QR Scan: Generate QR -> scan with WhatsApp Linked Devices
+ * 
+ * Auto-reply commands in English
  */
 
 import {
@@ -43,15 +43,16 @@ let sock: WASocket | null = null;
 let connectionState: ConnectionState = { connection: 'close' };
 let currentPairingCode: string | null = null;
 let qrCode: string | null = null;
-let qrCodeImage: string | null = null; // base64 QR image
+let qrCodeImage: string | null = null;
 let botPhoneNumber: string | null = null;
 let botConnected = false;
 let isConnecting = false;
 let reconnectAttempts = 0;
 let pairingCodeRequested = false;
 let pairingCodeExpiry: number = 0;
-let connectionMode: 'pairing' | 'qr' = 'pairing';
-const MAX_RECONNECT = 3;
+let connectionMode: 'pairing' | 'qr' = 'qr';
+let shouldReconnect = false;
+const MAX_RECONNECT = 5;
 
 interface BotConfig {
   welcomeMessage: string;
@@ -87,7 +88,6 @@ function saveBotConfig() {
     writeFileSync(BOT_STATE_FILE, JSON.stringify({
       config: botConfig,
       phoneNumber: botPhoneNumber,
-      pairingCode: currentPairingCode,
     }, null, 2));
   } catch (e) { console.error('[Bot] Error saving config:', e); }
 }
@@ -149,7 +149,7 @@ function getCSNumbers(): Array<{name: string; phone: string}> {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  BOT COMMANDS - ENGLISH
+//  BOT COMMANDS
 // ═══════════════════════════════════════════════════════════
 
 const COMMANDS: Record<string, { name: string; description: string; aliases: string[] }> = {
@@ -263,7 +263,7 @@ function handleCommand(command: string, phone: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  GENERATE QR CODE IMAGE (base64)
+//  QR CODE IMAGE GENERATOR
 // ═══════════════════════════════════════════════════════════
 
 async function generateQRImage(data: string): Promise<string> {
@@ -282,10 +282,10 @@ async function generateQRImage(data: string): Promise<string> {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  WHATSAPP CONNECTION - Dual Mode (Pairing Code + QR Scan)
+//  WHATSAPP CONNECTION
 // ═══════════════════════════════════════════════════════════
 
-async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 'pairing') {
+async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 'qr') {
   if (isConnecting) {
     console.log('[Bot] Already connecting, skipping...');
     return;
@@ -293,12 +293,19 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
   isConnecting = true;
   reconnectAttempts = 0;
   connectionMode = mode;
+  shouldReconnect = true;
 
   try {
     const { version } = await fetchLatestBaileysVersion();
     console.log(`[Bot] WA web version: ${version.join('.')}`);
 
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
+
+    // Reset per-connection state
+    currentPairingCode = null;
+    qrCode = null;
+    qrCodeImage = null;
+    pairingCodeRequested = false;
 
     sock = makeWASocket({
       version,
@@ -309,10 +316,11 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
-      connectTimeoutMs: 60_000,
+      connectTimeoutMs: 120_000,  // 2 minutes - give more time for user to scan/enter code
       keepAliveIntervalMs: 25_000,
       defaultQueryTimeoutMs: 60_000,
       retryRequestDelayMs: 2000,
+      qrTimeout: 120_000,  // QR code valid for 2 minutes
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -324,10 +332,10 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
       if (qr) {
         qrCode = qr;
         qrCodeImage = await generateQRImage(qr);
-        console.log('[Bot] QR Code generated (scan mode available)');
+        console.log('[Bot] QR Code generated - ready for scan');
 
-        // Only request pairing code if mode is 'pairing' and phone provided
-        if (mode === 'pairing' && phoneNumber && !state.creds.registered && !pairingCodeRequested) {
+        // In pairing mode: request pairing code ONCE after first QR appears
+        if (mode === 'pairing' && phoneNumber && !pairingCodeRequested) {
           pairingCodeRequested = true;
           try {
             console.log(`[Bot] Requesting pairing code for ${phoneNumber}...`);
@@ -337,7 +345,8 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
               pairingCodeExpiry = Date.now() + (5 * 60 * 1000);
               botPhoneNumber = phoneNumber;
               saveBotConfig();
-              console.log(`[Bot] REAL Pairing code from WhatsApp: ${code}`);
+              console.log(`[Bot] Pairing code from WhatsApp: ${code}`);
+              console.log(`[Bot] >>> ENTER THIS CODE IN WHATSAPP: Settings > Linked Devices > Link with phone number <<<`);
             } else {
               console.error('[Bot] Pairing code returned null');
               pairingCodeRequested = false;
@@ -346,8 +355,6 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
             console.error('[Bot] Pairing code error:', e.message?.substring(0, 200));
             pairingCodeRequested = false;
           }
-        } else {
-          console.log('[Bot] QR scan mode - waiting for scan...');
         }
       }
 
@@ -356,24 +363,46 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
         isConnecting = false;
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
         console.log(`[Bot] Connection closed. Code: ${statusCode}`);
-        
+
+        // 401/403/loggedOut = session truly invalid, must start fresh
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 403) {
-          console.log('[Bot] Session invalid. Clearing...');
+          console.log('[Bot] Session invalid/expired. Clearing session...');
           clearSession();
           currentPairingCode = null;
           qrCode = null;
           qrCodeImage = null;
           pairingCodeRequested = false;
+          // Don't auto-reconnect - user must manually reconnect
           return;
         }
 
-        if (reconnectAttempts < MAX_RECONNECT) {
+        // 408 = timeout (user didn't scan/enter code in time)
+        // 428 = connection replaced
+        // 440 = stale session
+        // 515 = restart required
+        // For these, try to reconnect
+        if (shouldReconnect && reconnectAttempts < MAX_RECONNECT) {
           reconnectAttempts++;
-          const delay = statusCode === 408 ? 10000 : 5000;
+          const delay = statusCode === 408 ? 5000 : (statusCode === 515 ? 3000 : 5000);
           console.log(`[Bot] Reconnecting in ${delay/1000}s (attempt ${reconnectAttempts}/${MAX_RECONNECT})...`);
-          setTimeout(() => connectToWhatsApp(phoneNumber || botPhoneNumber || undefined, connectionMode), delay);
+          
+          // For 408, clear the invalid session and start fresh
+          if (statusCode === 408) {
+            console.log('[Bot] Connection timed out - starting fresh...');
+            clearSession();
+            currentPairingCode = null;
+            qrCode = null;
+            qrCodeImage = null;
+            pairingCodeRequested = false;
+          }
+          
+          setTimeout(() => {
+            if (shouldReconnect) {
+              connectToWhatsApp(phoneNumber || botPhoneNumber || undefined, connectionMode);
+            }
+          }, delay);
         } else {
-          console.log('[Bot] Max reconnect attempts reached. Use /api/connect to retry.');
+          console.log('[Bot] Max reconnect attempts reached or stopped. Use /api/connect to retry.');
         }
       }
 
@@ -385,9 +414,9 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
         pairingCodeRequested = false;
         isConnecting = false;
         reconnectAttempts = 0;
-        console.log('[Bot] CONNECTED to WhatsApp!');
+        console.log('[Bot] ✅ CONNECTED to WhatsApp!');
         saveBotConfig();
-        
+
         try {
           const meId = sock?.user?.id;
           if (meId) {
@@ -406,11 +435,11 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
         if (!msg.message) continue;
         const from = msg.key.remoteJid || '';
         const phone = from.replace('@s.whatsapp.net', '');
-        const text = msg.message?.conversation || 
-                     msg.message?.extendedTextMessage?.text || 
+        const text = msg.message?.conversation ||
+                     msg.message?.extendedTextMessage?.text ||
                      msg.message?.imageMessage?.caption || '';
         if (!text) continue;
-        console.log(`[Bot] ${phone}: ${text.substring(0, 50)}`);
+        console.log(`[Bot] Message from ${phone}: ${text.substring(0, 50)}`);
         if (botConfig.autoReply && text.trim()) {
           const reply = handleCommand(text, phone);
           try { await sock!.sendMessage(from, { text: reply }, { quoted: msg }); } catch (e) { console.error('[Bot] Reply error:', e); }
@@ -446,10 +475,11 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
 
-  // Status endpoint
+  // ── Status ──
   if (url.pathname === '/') {
     json({
       service: 'NEXVO WhatsApp Bot',
+      version: '7.0.0',
       status: botConnected ? 'connected' : (currentPairingCode ? 'pairing' : (qrCode ? 'qr_ready' : (isConnecting ? 'connecting' : 'disconnected'))),
       phoneNumber: botPhoneNumber,
       pairingCode: currentPairingCode,
@@ -462,7 +492,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Connect endpoint - supports both pairing and QR modes
+  // ── Connect ──
   if (url.pathname === '/api/connect' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
@@ -480,12 +510,17 @@ const server = createServer(async (req, res) => {
 
       botPhoneNumber = fPhone || botPhoneNumber;
 
-      console.log(`[Bot] Starting ${mode} connection...`);
-      
-      if (sock) { 
-        try { sock.end(undefined); } catch {} 
-        sock = null; 
+      console.log(`[Bot] Starting ${mode} connection for ${fPhone || 'QR scan'}...`);
+
+      // Stop existing connection
+      shouldReconnect = false;
+      if (sock) {
+        try { sock.end(undefined); } catch {}
+        sock = null;
       }
+      await new Promise(r => setTimeout(r, 1000));
+
+      // Clear state
       botConnected = false;
       currentPairingCode = null;
       qrCode = null;
@@ -493,26 +528,29 @@ const server = createServer(async (req, res) => {
       isConnecting = false;
       pairingCodeRequested = false;
       reconnectAttempts = MAX_RECONNECT;
-      
+
+      // Always clear old session for a fresh connection attempt
       clearSession();
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 1500));
+
+      // Start new connection
       await connectToWhatsApp(fPhone || undefined, mode);
 
+      // Wait for result
       if (mode === 'pairing') {
         console.log('[Bot] Waiting for pairing code from WhatsApp...');
-        for (let i = 0; i < 45; i++) {
+        for (let i = 0; i < 60; i++) {
           await new Promise(r => setTimeout(r, 1000));
           if (currentPairingCode) {
             console.log('[Bot] Pairing code received:', currentPairingCode);
             break;
           }
           if (botConnected) {
-            console.log('[Bot] Bot connected!');
+            console.log('[Bot] Bot connected via pairing code!');
             break;
           }
         }
       } else {
-        // QR mode - wait for QR code
         console.log('[Bot] Waiting for QR code...');
         for (let i = 0; i < 30; i++) {
           await new Promise(r => setTimeout(r, 1000));
@@ -521,7 +559,7 @@ const server = createServer(async (req, res) => {
             break;
           }
           if (botConnected) {
-            console.log('[Bot] Bot connected!');
+            console.log('[Bot] Bot connected via QR scan!');
             break;
           }
         }
@@ -539,13 +577,13 @@ const server = createServer(async (req, res) => {
 
       json({
         success: true,
-        message: botConnected 
-          ? 'Bot connected successfully!' 
-          : currentPairingCode 
-            ? `Pairing code: ${currentPairingCode}. Enter this code in WhatsApp (Settings > Linked Devices > Link with phone number)`
-            : qrCode 
-              ? 'QR Code ready. Scan with WhatsApp (Settings > Linked Devices > Scan QR code)'
-              : 'Waiting for connection...',
+        message: botConnected
+          ? 'Bot connected successfully!'
+          : currentPairingCode
+            ? `Pairing code generated: ${currentPairingCode}. Open WhatsApp on your phone > Settings > Linked Devices > Link with phone number > Enter this code`
+            : qrCode
+              ? 'QR Code ready. Open WhatsApp > Settings > Linked Devices > Link a device > Scan the QR code'
+              : 'Connecting... Check status endpoint for updates',
         phoneNumber: fPhone,
         pairingCode: currentPairingCode,
         hasQR: !!qrCode,
@@ -559,46 +597,46 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Pairing code endpoint
+  // ── Pairing Code ──
   if (url.pathname === '/api/pairing-code') {
-    json({ 
-      success: true, 
-      pairingCode: currentPairingCode, 
-      phoneNumber: botPhoneNumber, 
+    json({
+      success: true,
+      pairingCode: currentPairingCode,
+      phoneNumber: botPhoneNumber,
       connected: botConnected,
       expired: pairingCodeExpiry ? Date.now() > pairingCodeExpiry : false,
     });
     return;
   }
 
-  // QR Code endpoint - returns the QR string for frontend to render
+  // ── QR String ──
   if (url.pathname === '/api/qr') {
-    if (!qrCode) { json({ success: false, error: 'QR code not available yet' }, 404); return; }
+    if (!qrCode) { json({ success: false, error: 'QR code not available. Start a connection first.' }, 404); return; }
     json({ success: true, qr: qrCode });
     return;
   }
 
-  // QR Code Image endpoint - returns base64 PNG image
+  // ── QR Image (base64) ──
   if (url.pathname === '/api/qr-image') {
-    if (!qrCodeImage) { json({ success: false, error: 'QR image not available yet' }, 404); return; }
-    // Return as JSON with base64 data
+    if (!qrCodeImage) { json({ success: false, error: 'QR image not available. Start a QR connection first.' }, 404); return; }
     json({ success: true, image: qrCodeImage });
     return;
   }
 
-  // QR Code as direct PNG image
+  // ── QR PNG direct ──
   if (url.pathname === '/api/qr-png') {
-    if (!qrCodeImage) { 
-      res.writeHead(404, { 'Content-Type': 'text/plain', ...cors }); 
-      res.end('QR not available'); 
-      return; 
+    if (!qrCodeImage) {
+      res.writeHead(404, { 'Content-Type': 'text/plain', ...cors });
+      res.end('QR not available');
+      return;
     }
     img(qrCodeImage);
     return;
   }
 
-  // Disconnect endpoint
+  // ── Disconnect ──
   if (url.pathname === '/api/disconnect' && req.method === 'POST') {
+    shouldReconnect = false;
     if (sock) { try { sock.end(undefined); } catch {} sock = null; }
     botConnected = false;
     currentPairingCode = null;
@@ -613,7 +651,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Config endpoints
+  // ── Config ──
   if (url.pathname === '/api/config' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
@@ -633,7 +671,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Send message endpoint
+  // ── Send Message ──
   if (url.pathname === '/api/send' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
@@ -652,10 +690,10 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   loadBotConfig();
-  console.log(`[WA Bot] Running on port ${PORT}`);
+  console.log(`[WA Bot] v7.0.0 running on port ${PORT}`);
   console.log(`[WA Bot] Connection modes: Pairing Code + QR Scan`);
   console.log(`[WA Bot] Auto-reply: ${botConfig.autoReply}`);
-  
+
   // Try to reconnect with saved session
   if (hasValidSession()) {
     console.log('[WA Bot] Found saved session, reconnecting...');

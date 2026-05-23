@@ -273,7 +273,7 @@ export default function SalaryBonusPage() {
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-foreground text-sm font-medium flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-[#D4AF37]" />
-                    Min. {minDirectRefs} Undangan Langsung
+                    Min. {minDirectRefs} Direct Invites
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {activeRefDeposits} / {minDirectRefs} (Wajib {minDirectRefs} orang)
@@ -446,7 +446,7 @@ export default function SalaryBonusPage() {
               <Users className="w-5 h-5 text-[#D4AF37]" />
             </div>
             <p className="text-foreground text-lg font-bold">{activeRefDeposits}</p>
-            <p className="text-muted-foreground text-xs">Undangan Langsung</p>
+            <p className="text-muted-foreground text-xs">Direct Invites</p>
           </motion.div>
         </div>
       ) : null}
@@ -483,7 +483,7 @@ export default function SalaryBonusPage() {
                     </Badge>
                   </div>
                   <p className="text-muted-foreground text-xs">
-                    Omzet: {formatRupiah(bonus.baseOmzet)} | Undangan Langsung: {bonus.activeRefDeposits}
+                    Omzet: {formatRupiah(bonus.baseOmzet)} | Direct Invites: {bonus.activeRefDeposits}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

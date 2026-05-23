@@ -92,7 +92,7 @@ export default function AdminBannersPage() {
     fetch('/api/admin/banners', { headers: { Authorization: `Bearer ${adminToken}` } })
       .then((r) => r.json())
       .then((res) => res.success && setBanners(res.data))
-      .catch(() => { toast({ title: 'Error', description: 'Gagal memuat data', variant: 'destructive' }); })
+      .catch(() => { toast({ title: 'Error', description: 'Failed to load data', variant: 'destructive' }); })
       .finally(() => setLoading(false));
    
   }, [adminToken]);
@@ -114,12 +114,12 @@ export default function AdminBannersPage() {
       const data = await res.json();
       if (data.success) {
         setForm((f) => ({ ...f, image: data.data.url || data.data.filePath }));
-        toast({ title: 'Gambar berhasil diupload' });
+        toast({ title: 'Image uploaded successfully' });
       } else {
-        toast({ title: 'Gagal upload gambar', variant: 'destructive' });
+        toast({ title: 'Image upload failed', variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -154,16 +154,16 @@ export default function AdminBannersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: editId ? 'Banner diperbarui' : 'Banner ditambahkan' });
+        toast({ title: editId ? 'Banner updated' : 'Banner added' });
         setFormOpen(false);
         setEditId(null);
         setForm(emptyForm);
         fetchBanners();
       } else {
-        toast({ title: 'Gagal menyimpan', description: data.error, variant: 'destructive' });
+        toast({ title: 'Save failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -190,7 +190,7 @@ export default function AdminBannersPage() {
         toast({ title: 'Gagal menghapus', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setDeleting(false);
     }

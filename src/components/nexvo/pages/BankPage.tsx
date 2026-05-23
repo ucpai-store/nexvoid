@@ -102,11 +102,11 @@ export default function BankPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast({ title: 'Berhasil', description: editingBank ? t('bank.updated') : t('bank.added') });
+        toast({ title: 'Success', description: editingBank ? t('bank.updated') : t('bank.added') });
         setDialogOpen(false);
         fetchBanks();
       } else {
-        toast({ title: 'Gagal', description: data.error || t('common.operationFailed'), variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || t('common.operationFailed'), variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: t('common.error'), variant: 'destructive' });
@@ -130,12 +130,12 @@ export default function BankPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast({ title: 'Berhasil', description: t('bank.deleted') });
+        toast({ title: 'Success', description: t('bank.deleted') });
         setDeleteDialogOpen(false);
         setDeletingBank(null);
         fetchBanks();
       } else {
-        toast({ title: 'Gagal', description: data.error || t('common.operationFailed'), variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || t('common.operationFailed'), variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: t('common.error'), variant: 'destructive' });

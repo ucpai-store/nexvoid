@@ -60,7 +60,7 @@ export default function ReferralPage() {
     try {
       await navigator.clipboard.writeText(referralLink);
       setCopied(true);
-      toast({ title: 'Berhasil', description: t('referral.copied') });
+      toast({ title: 'Success', description: t('referral.copied') });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast({ title: 'Gagal', description: t('referral.copyFailed'), variant: 'destructive' });
@@ -82,9 +82,9 @@ export default function ReferralPage() {
     } else {
       try {
         await navigator.clipboard.writeText(shareText);
-        toast({ title: 'Berhasil', description: t('referral.copied') });
+        toast({ title: 'Success', description: t('referral.copied') });
       } catch {
-        toast({ title: 'Gagal', description: 'Gagal menyalin', variant: 'destructive' });
+        toast({ title: 'Failed', description: 'Failed to copy', variant: 'destructive' });
       }
     }
   };
@@ -96,11 +96,11 @@ export default function ReferralPage() {
 
   // Referral level info - Percentage display matching screenshot
   const referralLevels = [
-    { level: 1, label: 'Level 1', desc: 'Undangan langsung', bonus: '10%', color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
-    { level: 2, label: 'Level 2', desc: 'Undangan dari Level 1', bonus: '5%', color: 'text-blue-400', bg: 'bg-blue-400/10' },
-    { level: 3, label: 'Level 3', desc: 'Undangan dari Level 2', bonus: '4%', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-    { level: 4, label: 'Level 4', desc: 'Undangan dari Level 3', bonus: '3%', color: 'text-purple-400', bg: 'bg-purple-400/10' },
-    { level: 5, label: 'Level 5', desc: 'Undangan dari Level 4', bonus: '2%', color: 'text-rose-400', bg: 'bg-rose-400/10' },
+    { level: 1, label: 'Level 1', desc: 'Direct invite', bonus: '10%', color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
+    { level: 2, label: 'Level 2', desc: 'Invite from Level 1', bonus: '5%', color: 'text-blue-400', bg: 'bg-blue-400/10' },
+    { level: 3, label: 'Level 3', desc: 'Invite from Level 2', bonus: '4%', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    { level: 4, label: 'Level 4', desc: 'Invite from Level 3', bonus: '3%', color: 'text-purple-400', bg: 'bg-purple-400/10' },
+    { level: 5, label: 'Level 5', desc: 'Invite from Level 4', bonus: '2%', color: 'text-rose-400', bg: 'bg-rose-400/10' },
   ];
 
   // Count total referrals (all levels)

@@ -72,7 +72,7 @@ export default function BonusPage() {
         }
         setSummary(s);
       } else {
-        setError(data.error || 'Gagal memuat data');
+        setError(data.error || 'Failed to load data');
       }
     } catch {
       setError('Terjadi kesalahan jaringan');
@@ -128,7 +128,7 @@ export default function BonusPage() {
           <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-7 h-7 text-red-400" />
           </div>
-          <h3 className="text-foreground font-semibold mb-1">Gagal Memuat Data</h3>
+          <h3 className="text-foreground font-semibold mb-1">Failed to Load Data</h3>
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button onClick={retry} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
             <RefreshCw className="w-4 h-4 mr-2" />Coba Lagi

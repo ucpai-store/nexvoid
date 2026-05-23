@@ -80,7 +80,7 @@ export default function AdminPaymentPage() {
         setPaymentMethods(data.data || []);
       }
     } catch {
-      toast({ title: 'Error', description: 'Gagal memuat metode pembayaran', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to load payment methods', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -129,13 +129,13 @@ export default function AdminPaymentPage() {
       if (data.success) {
         const url = data.data.url || data.data.filePath;
         setForm((prev) => ({ ...prev, [field]: url }));
-        toast({ title: 'Gambar berhasil diupload' });
+        toast({ title: 'Image uploaded successfully' });
       } else {
-        toast({ title: 'Gagal upload gambar', description: data.error || 'Terjadi kesalahan', variant: 'destructive' });
+        toast({ title: 'Image upload failed', description: data.error || 'An error occurred', variant: 'destructive' });
       }
     } catch (err) {
       console.error('Upload error:', err);
-      toast({ title: 'Kesalahan Jaringan', description: 'Gagal mengunggah file, coba lagi', variant: 'destructive' });
+      toast({ title: 'Network Error', description: 'Failed to upload file, please try again', variant: 'destructive' });
     } finally {
       setUploading(false);
       setUploadField(null);
@@ -144,7 +144,7 @@ export default function AdminPaymentPage() {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      toast({ title: 'Error', description: 'Nama metode pembayaran wajib diisi', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Payment method name is required', variant: 'destructive' });
       return;
     }
 
@@ -162,13 +162,13 @@ export default function AdminPaymentPage() {
         });
         const data = await res.json();
         if (data.success) {
-          toast({ title: 'Berhasil', description: 'Metode pembayaran berhasil diperbarui' });
+          toast({ title: 'Success', description: 'Payment method updated successfully' });
           setShowForm(false);
           setEditingId(null);
           setForm(emptyForm);
           fetchPaymentMethods();
         } else {
-          toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+          toast({ title: 'Failed', description: data.error, variant: 'destructive' });
         }
       } else {
         // Create
@@ -182,12 +182,12 @@ export default function AdminPaymentPage() {
         });
         const data = await res.json();
         if (data.success) {
-          toast({ title: 'Berhasil', description: 'Metode pembayaran berhasil ditambahkan' });
+          toast({ title: 'Success', description: 'Payment method added successfully' });
           setShowForm(false);
           setForm(emptyForm);
           fetchPaymentMethods();
         } else {
-          toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+          toast({ title: 'Failed', description: data.error, variant: 'destructive' });
         }
       }
     } catch {
@@ -205,14 +205,14 @@ export default function AdminPaymentPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: 'Metode pembayaran berhasil dihapus' });
+        toast({ title: 'Success', description: 'Payment method deleted successfully' });
         setDeleteConfirm(null);
         fetchPaymentMethods();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' });
+      toast({ title: 'Error', description: 'An error occurred', variant: 'destructive' });
     }
   };
 
@@ -229,13 +229,13 @@ export default function AdminPaymentPage() {
       const data = await res.json();
       if (data.success) {
         toast({
-          title: 'Berhasil',
+          title: 'Success',
           description: `${pm.name} ${!pm.isActive ? 'diaktifkan' : 'dinonaktifkan'}`,
         });
         fetchPaymentMethods();
       }
     } catch {
-      toast({ title: 'Error', description: 'Gagal mengubah status', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to change status', variant: 'destructive' });
     }
   };
 
@@ -252,12 +252,12 @@ export default function AdminPaymentPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: 'Pengaturan pembayaran disimpan' });
+        toast({ title: 'Success', description: 'Payment settings saved' });
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Error', description: 'Gagal menyimpan pengaturan', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' });
     } finally {
       setSavingSettings(false);
     }
@@ -821,7 +821,7 @@ export default function AdminPaymentPage() {
                   </div>
                   <h3 className="text-foreground font-semibold text-lg mb-2">Hapus Metode?</h3>
                   <p className="text-muted-foreground text-sm mb-6">
-                    Metode pembayaran ini akan dinonaktifkan. Tindakan ini bisa dibatalkan nanti.
+                    This payment method will be disabled. This action can be reversed later.
                   </p>
                   <div className="flex items-center gap-3">
                     <Button

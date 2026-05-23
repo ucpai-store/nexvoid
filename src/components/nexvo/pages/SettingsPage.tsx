@@ -92,12 +92,12 @@ export default function SettingsPage() {
         if (data.success) {
           setUser(data.data);
           setAvatarPreview(null);
-          toast({ title: 'Berhasil', description: t('settings.avatarUpdated') });
+          toast({ title: 'Success', description: t('settings.avatarUpdated') });
         } else {
-          toast({ title: 'Gagal', description: data.error || t('settings.avatarUploadFailed'), variant: 'destructive' });
+          toast({ title: 'Failed', description: data.error || t('settings.avatarUploadFailed'), variant: 'destructive' });
         }
       } else {
-        toast({ title: 'Gagal Upload', description: t('settings.avatarUploadFailed'), variant: 'destructive' });
+        toast({ title: 'Upload Failed', description: t('settings.avatarUploadFailed'), variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: t('common.error'), variant: 'destructive' });
@@ -127,9 +127,9 @@ export default function SettingsPage() {
 
       if (data.success) {
         setUser(data.data);
-        toast({ title: 'Berhasil', description: t('settings.nameUpdated') });
+        toast({ title: 'Success', description: t('settings.nameUpdated') });
       } else {
-        toast({ title: 'Gagal', description: data.error || t('common.error'), variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || t('common.error'), variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: t('common.error'), variant: 'destructive' });
@@ -160,9 +160,9 @@ export default function SettingsPage() {
       if (data.success) {
         setUser(data.data);
         setEditingWhatsapp(false);
-        toast({ title: 'Berhasil', description: t('settings.whatsappUpdated') });
+        toast({ title: 'Success', description: t('settings.whatsappUpdated') });
       } else {
-        toast({ title: 'Gagal', description: data.error || t('common.error'), variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || t('common.error'), variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: t('common.error'), variant: 'destructive' });
@@ -203,9 +203,9 @@ export default function SettingsPage() {
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        toast({ title: 'Berhasil', description: t('settings.passwordUpdated') });
+        toast({ title: 'Success', description: t('settings.passwordUpdated') });
       } else {
-        toast({ title: 'Gagal', description: data.error || t('common.error'), variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || t('common.error'), variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: t('common.error'), variant: 'destructive' });
@@ -217,7 +217,7 @@ export default function SettingsPage() {
   const handleLogout = () => {
     logout();
     navigate('login');
-    toast({ title: 'Berhasil', description: t('auth.logout') });
+    toast({ title: 'Success', description: t('auth.logout') });
   };
 
   const levelConfig: Record<string, { color: string; bg: string }> = {

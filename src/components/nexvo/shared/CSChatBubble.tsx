@@ -11,7 +11,13 @@ interface CSAdmin {
   order: number;
 }
 
-export default function CSChatBubble() {
+interface CSChatBubbleProps {
+  context?: 'general' | 'deposit' | 'withdraw' | 'help' | 'asset' | 'referral';
+  userId?: string;
+  userName?: string;
+}
+
+export default function CSChatBubble({ context = 'general', userId, userName }: CSChatBubbleProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [admins, setAdmins] = useState<CSAdmin[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,10 +45,41 @@ export default function CSChatBubble() {
     fetchAdmins();
   };
 
+  const getContextMessage = (phone: string): string => {
+    const idPart = userId ? ` | User ID: ${userId}` : '';
+    const namePart = userName ? ` | Name: ${userName}` : '';
+    
+    switch (context) {
+      case 'deposit':
+        return encodeURIComponent(`Request Deposit Assistance${idPart}${namePart}\n\nI need help with my deposit. Please assist.`);
+      case 'withdraw':
+        return encodeURIComponent(`Request Withdrawal Assistance${idPart}${namePart}\n\nI need help with my withdrawal. Please assist.`);
+      case 'help':
+        return encodeURIComponent(`Request General Assistance${idPart}${namePart}\n\nI need help with my account. Please assist.`);
+      case 'asset':
+        return encodeURIComponent(`Request Asset Assistance${idPart}${namePart}\n\nI need help with my investment/asset. Please assist.`);
+      case 'referral':
+        return encodeURIComponent(`Request Referral Assistance${idPart}${namePart}\n\nI need help with my referral. Please assist.`);
+      default:
+        return encodeURIComponent(`Hello NEXVO Support${idPart}${namePart}\n\nI need assistance. Please help.`);
+    }
+  };
+
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
-    const message = encodeURIComponent('Hello NEXVO Support, I need help.');
+    const message = getContextMessage(phone);
     window.open('https://wa.me/' + cleanPhone + '?text=' + message, '_blank');
+  };
+
+  const getContextLabel = () => {
+    switch (context) {
+      case 'deposit': return 'Deposit Support';
+      case 'withdraw': return 'Withdrawal Support';
+      case 'help': return 'General Support';
+      case 'asset': return 'Asset Support';
+      case 'referral': return 'Referral Support';
+      default: return 'Customer Service';
+    }
   };
 
   return (
@@ -57,13 +94,13 @@ export default function CSChatBubble() {
             transition={{ duration: 0.2 }}
             className="fixed bottom-[88px] sm:bottom-20 right-3 sm:right-5 z-[60] w-[280px] flex flex-col rounded-2xl overflow-hidden shadow-2xl"
           >
-            {/* Header - Solid Gold */}
+            {/* Header */}
             <div className="bg-[#D4AF37] px-4 py-3 flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-[#070B14] flex items-center justify-center overflow-hidden shrink-0">
                 <img src="/cs-chat-icon.png" alt="CS" className="w-full h-full object-cover rounded-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-[#070B14] text-sm leading-tight">Customer Service</h3>
+                <h3 className="font-bold text-[#070B14] text-sm leading-tight">{getContextLabel()}</h3>
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-700" />
                   <span className="text-[#070B14]/70 text-[11px]">Online</span>
@@ -77,10 +114,10 @@ export default function CSChatBubble() {
               </button>
             </div>
 
-            {/* Body - Solid Dark */}
+            {/* Body */}
             <div className="bg-[#0c1222] p-4 space-y-3">
               <p className="text-center text-gray-400 text-[11px]">
-                Chat directly with CS Admin via WhatsApp
+                Chat directly with our support team via WhatsApp
               </p>
 
               {loading ? (
@@ -112,7 +149,7 @@ export default function CSChatBubble() {
         )}
       </AnimatePresence>
 
-      {/* Floating Button - Solid, Clean, No transparency */}
+      {/* Floating Button */}
       {!isOpen && (
         <motion.button
           onClick={handleOpen}
@@ -122,10 +159,10 @@ export default function CSChatBubble() {
           whileTap={{ scale: 0.95 }}
           className="fixed bottom-[88px] sm:bottom-5 right-3 sm:right-5 z-50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg overflow-hidden group bg-[#D4AF37] hover:bg-[#c9a22e] transition-colors"
         >
-          <img 
-            src="/cs-chat-icon.png" 
-            alt="CS" 
-            className="w-8 h-8 rounded-full object-cover group-hover:scale-105 transition-transform" 
+          <img
+            src="/cs-chat-icon.png"
+            alt="CS"
+            className="w-8 h-8 rounded-full object-cover group-hover:scale-105 transition-transform"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';

@@ -221,7 +221,7 @@ export default function AdminApiKeyPage() {
         if (data.success && data.data) {
           setPairingData(data.data);
           if (data.data.botConnected) {
-            toast({ title: '✅ Bot Connected!', description: 'WhatsApp bot berhasil terhubung!' });
+            toast({ title: '✅ Bot Connected!', description: 'WhatsApp bot connected successfully!' });
             clearInterval(pollInterval);
           }
         }
@@ -894,7 +894,7 @@ export default function AdminApiKeyPage() {
             <div>
               <p className="text-amber-400 text-[11px] font-semibold">Security</p>
               <p className="text-amber-400/70 text-[10px] leading-relaxed">
-                Kode pairing ini langsung dari server WhatsApp. Setelah bot berhasil terhubung, kode otomatis terhapus. 
+                This pairing code is directly from WhatsApp servers. After the bot is connected, the code is automatically removed. 
                 Masukkan kode di WhatsApp: Settings {'>'} Linked Devices {'>'} Link with phone number. Jangan bagikan kode ini ke pihak yang tidak berwenang.
               </p>
             </div>
@@ -1378,7 +1378,7 @@ export default function AdminApiKeyPage() {
               Delete API Key
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Tindakan ini tidak dapat dibatalkan. API key akan dihapus secara permanen dan semua layanan yang menggunakannya akan kehilangan akses.
+              This action cannot be undone. The API key will be permanently deleted and all services using it will lose access.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
