@@ -337,6 +337,13 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
       connectionState = update;
 
       if (qr) {
+        // In pairing mode: once pairing code is requested, ignore QR refreshes
+        // to prevent session replacement (code 428)
+        if (mode === 'pairing' && pairingCodeRequested) {
+          console.log('[Bot] QR refresh ignored (pairing code already requested)');
+          return;
+        }
+        
         qrCode = qr;
         qrCodeImage = await generateQRImage(qr);
         console.log('[Bot] QR Code generated - ready for scan');
@@ -381,6 +388,13 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
           qrCodeImage = null;
           pairingCodeRequested = false;
           return; // Don't auto-reconnect
+        }
+
+        // 428 = connection replaced by new connection (another QR/pairing attempt)
+        // This is normal when QR refreshes, just stop reconnecting
+        if (statusCode === 428) {
+          console.log('[Bot] Connection replaced by new session. Stopping.');
+          return;
         }
 
         // For other errors, try reconnecting
