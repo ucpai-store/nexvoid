@@ -1,11 +1,12 @@
 /**
- * NEXVO WhatsApp Bot Service - v7.0.0
+ * NEXVO WhatsApp Bot Service - v8.0.0
+ * 
+ * CRITICAL FIX: Use Browsers.windows('Chrome') instead of Browsers.ubuntu('Desktop')
+ * WhatsApp was detecting the bot and showing "Cannot link device" error
  * 
  * Dual connection: Pairing Code + QR Scan Code
- * - Pairing Code: Enter bot phone number -> get code -> enter in WhatsApp Linked Devices
- * - QR Scan: Generate QR -> scan with WhatsApp Linked Devices
- * 
- * Auto-reply commands in English
+ * - Pairing Code: Enter bot phone number → get code → enter in WhatsApp Linked Devices
+ * - QR Scan: Generate QR → scan with WhatsApp Linked Devices
  */
 
 import {
@@ -50,9 +51,10 @@ let isConnecting = false;
 let reconnectAttempts = 0;
 let pairingCodeRequested = false;
 let pairingCodeExpiry: number = 0;
-let connectionMode: 'pairing' | 'qr' = 'qr';
+let connectionMode: 'pairing' | 'qr' = 'pairing';
 let shouldReconnect = false;
-const MAX_RECONNECT = 5;
+let savedPhoneNumber: string | null = null;
+const MAX_RECONNECT = 3;
 
 interface BotConfig {
   welcomeMessage: string;
@@ -78,6 +80,7 @@ function loadBotConfig() {
       const data = JSON.parse(readFileSync(BOT_STATE_FILE, 'utf-8'));
       botConfig = { ...defaultConfig, ...(data.config || {}) };
       botPhoneNumber = data.phoneNumber || null;
+      savedPhoneNumber = data.phoneNumber || null;
     }
   } catch (e) { console.error('[Bot] Error loading config:', e); }
 }
@@ -136,11 +139,6 @@ function formatRupiah(amount: number): string {
 function getAdminNumber(): string {
   const setting = queryDb("SELECT value FROM SystemSettings WHERE key = 'bot_admin_number'");
   return setting.length > 0 ? setting[0].value : '6281234567890';
-}
-
-function getDepositAdminNumber(): string {
-  const setting = queryDb("SELECT value FROM SystemSettings WHERE key = 'deposit_admin_number'");
-  return setting.length > 0 ? setting[0].value : getAdminNumber();
 }
 
 function getCSNumbers(): Array<{name: string; phone: string}> {
@@ -224,7 +222,7 @@ function handleCommand(command: string, phone: string): string {
       let text = `💸 *DEPOSIT*\n\n`;
       if (user) text += `💵 Deposit Balance: ${formatRupiah(user.depositBalance || 0)}\n🆔 Your ID: *${user.userId}*\n\n`;
       text += `📌 *How to Deposit:*\n1. Open Nexvo app\n2. Go to Wallet → Deposit\n3. Enter amount & select payment\n4. Upload payment proof\n5. Wait for admin confirmation\n\n`;
-      text += `⚠️ *Important:* Include your Deposit ID *${user?.userId || 'NXV-XXXXX'}* in the payment notes.\n\n`;
+      text += `⚠️ *Important:* Include your ID *${user?.userId || 'NXV-XXXXX'}* in the payment notes.\n\n`;
       text += `🔗 Deposit at: https://nexvo.id`;
       if (csList.length > 0) {
         text += `\n\n💬 Need help? Contact:`;
@@ -239,7 +237,7 @@ function handleCommand(command: string, phone: string): string {
       const code = user.referralCode || '-';
       const link = `https://nexvo.id?ref=${code}`;
       const refCount = queryDb(`SELECT COUNT(*) as cnt FROM Referral WHERE referrerId = '${user.id}' AND level = 1`)[0]?.cnt || 0;
-      return `🔗 *REFERRAL*\n\n🏷️ Code: *${code}*\n🔗 Link: ${link}\n👥 Downlines: ${refCount} people\n\n📊 Referral Bonus Rates:\nL1: 10% | L2: 5% | L3: 4%\nL4: 3% | L5: 2%\n\n📊 M.Profit Rates:\nL1: 5% | L2: 4% | L3: 3%\nL4: 2% | L5: 1%\n\n💡 Share your link to earn bonuses!`;
+      return `🔗 *REFERRAL*\n\n🏷️ Code: *${code}*\n🔗 Link: ${link}\n👥 Downlines: ${refCount} people\n\n📊 Referral Bonus Rates:\nL1: 10% | L2: 5% | L3: 4%\nL4: 3% | L5: 2%\n\n💡 Share your link to earn bonuses!`;
     }
     case 'bonus': {
       const bonuses = queryDb(`SELECT type, SUM(amount) as total, COUNT(*) as cnt FROM BonusLog WHERE userId = '${user.id}' GROUP BY type`);
@@ -283,9 +281,11 @@ async function generateQRImage(data: string): Promise<string> {
 
 // ═══════════════════════════════════════════════════════════
 //  WHATSAPP CONNECTION
+//  KEY FIX: Use Browsers.windows('Chrome') to avoid
+//  WhatsApp "Cannot link device" rejection
 // ═══════════════════════════════════════════════════════════
 
-async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 'qr') {
+async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 'pairing') {
   if (isConnecting) {
     console.log('[Bot] Already connecting, skipping...');
     return;
@@ -307,20 +307,27 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
     qrCodeImage = null;
     pairingCodeRequested = false;
 
+    // ★★★ CRITICAL FIX ★★★
+    // Use Windows Chrome browser identification
+    // Ubuntu Desktop was being detected and blocked by WhatsApp
+    // showing "Cannot link device - Try again later"
+    const browserIdent = Browsers.windows('Chrome');
+    console.log(`[Bot] Browser ID: ${browserIdent.join(' / ')}`);
+
     sock = makeWASocket({
       version,
       logger,
       auth: state,
-      browser: Browsers.ubuntu('Desktop'),
+      browser: browserIdent,  // ← THIS IS THE KEY FIX
       printQRInTerminal: false,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
-      connectTimeoutMs: 120_000,  // 2 minutes - give more time for user to scan/enter code
+      connectTimeoutMs: 120_000,
       keepAliveIntervalMs: 25_000,
       defaultQueryTimeoutMs: 60_000,
       retryRequestDelayMs: 2000,
-      qrTimeout: 120_000,  // QR code valid for 2 minutes
+      qrTimeout: 120_000,
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -334,7 +341,7 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
         qrCodeImage = await generateQRImage(qr);
         console.log('[Bot] QR Code generated - ready for scan');
 
-        // In pairing mode: request pairing code ONCE after first QR appears
+        // In pairing mode: request pairing code after first QR appears
         if (mode === 'pairing' && phoneNumber && !pairingCodeRequested) {
           pairingCodeRequested = true;
           try {
@@ -345,8 +352,9 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
               pairingCodeExpiry = Date.now() + (5 * 60 * 1000);
               botPhoneNumber = phoneNumber;
               saveBotConfig();
-              console.log(`[Bot] Pairing code from WhatsApp: ${code}`);
-              console.log(`[Bot] >>> ENTER THIS CODE IN WHATSAPP: Settings > Linked Devices > Link with phone number <<<`);
+              console.log(`[Bot] ✅ REAL Pairing code from WhatsApp: ${code}`);
+              console.log(`[Bot] >>> ENTER THIS CODE IN WHATSAPP <<<`);
+              console.log(`[Bot] >>> WhatsApp > Settings > Linked Devices > Link with phone number <<<`);
             } else {
               console.error('[Bot] Pairing code returned null');
               pairingCodeRequested = false;
@@ -364,45 +372,39 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
         console.log(`[Bot] Connection closed. Code: ${statusCode}`);
 
-        // 401/403/loggedOut = session truly invalid, must start fresh
+        // 401/403/loggedOut = session truly invalid
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 403) {
-          console.log('[Bot] Session invalid/expired. Clearing session...');
+          console.log('[Bot] Session invalid/expired. Clearing...');
           clearSession();
           currentPairingCode = null;
           qrCode = null;
           qrCodeImage = null;
           pairingCodeRequested = false;
-          // Don't auto-reconnect - user must manually reconnect
-          return;
+          return; // Don't auto-reconnect
         }
 
-        // 408 = timeout (user didn't scan/enter code in time)
-        // 428 = connection replaced
-        // 440 = stale session
-        // 515 = restart required
-        // For these, try to reconnect
+        // For other errors, try reconnecting
         if (shouldReconnect && reconnectAttempts < MAX_RECONNECT) {
           reconnectAttempts++;
-          const delay = statusCode === 408 ? 5000 : (statusCode === 515 ? 3000 : 5000);
+          const delay = statusCode === 408 ? 5000 : 3000;
           console.log(`[Bot] Reconnecting in ${delay/1000}s (attempt ${reconnectAttempts}/${MAX_RECONNECT})...`);
-          
-          // For 408, clear the invalid session and start fresh
+
           if (statusCode === 408) {
-            console.log('[Bot] Connection timed out - starting fresh...');
+            // Timeout - user didn't scan/enter code in time
+            console.log('[Bot] Connection timed out. User must reconnect.');
             clearSession();
             currentPairingCode = null;
             qrCode = null;
             qrCodeImage = null;
             pairingCodeRequested = false;
+            return; // Don't auto-reconnect on timeout - user must retry
           }
-          
+
           setTimeout(() => {
             if (shouldReconnect) {
               connectToWhatsApp(phoneNumber || botPhoneNumber || undefined, connectionMode);
             }
           }, delay);
-        } else {
-          console.log('[Bot] Max reconnect attempts reached or stopped. Use /api/connect to retry.');
         }
       }
 
@@ -414,7 +416,7 @@ async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 
         pairingCodeRequested = false;
         isConnecting = false;
         reconnectAttempts = 0;
-        console.log('[Bot] ✅ CONNECTED to WhatsApp!');
+        console.log('[Bot] ✅✅✅ CONNECTED to WhatsApp! ✅✅✅');
         saveBotConfig();
 
         try {
@@ -479,7 +481,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname === '/') {
     json({
       service: 'NEXVO WhatsApp Bot',
-      version: '7.0.0',
+      version: '8.0.0',
       status: botConnected ? 'connected' : (currentPairingCode ? 'pairing' : (qrCode ? 'qr_ready' : (isConnecting ? 'connecting' : 'disconnected'))),
       phoneNumber: botPhoneNumber,
       pairingCode: currentPairingCode,
@@ -529,7 +531,7 @@ const server = createServer(async (req, res) => {
       pairingCodeRequested = false;
       reconnectAttempts = MAX_RECONNECT;
 
-      // Always clear old session for a fresh connection attempt
+      // Always clear old session for a fresh connection
       clearSession();
       await new Promise(r => setTimeout(r, 1500));
 
@@ -546,7 +548,7 @@ const server = createServer(async (req, res) => {
             break;
           }
           if (botConnected) {
-            console.log('[Bot] Bot connected via pairing code!');
+            console.log('[Bot] Bot connected!');
             break;
           }
         }
@@ -559,7 +561,7 @@ const server = createServer(async (req, res) => {
             break;
           }
           if (botConnected) {
-            console.log('[Bot] Bot connected via QR scan!');
+            console.log('[Bot] Bot connected!');
             break;
           }
         }
@@ -580,7 +582,7 @@ const server = createServer(async (req, res) => {
         message: botConnected
           ? 'Bot connected successfully!'
           : currentPairingCode
-            ? `Pairing code generated: ${currentPairingCode}. Open WhatsApp on your phone > Settings > Linked Devices > Link with phone number > Enter this code`
+            ? `Pairing code: ${currentPairingCode}. Open WhatsApp > Settings > Linked Devices > Link with phone number > Enter this code`
             : qrCode
               ? 'QR Code ready. Open WhatsApp > Settings > Linked Devices > Link a device > Scan the QR code'
               : 'Connecting... Check status endpoint for updates',
@@ -690,7 +692,8 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   loadBotConfig();
-  console.log(`[WA Bot] v7.0.0 running on port ${PORT}`);
+  console.log(`[WA Bot] v8.0.0 running on port ${PORT}`);
+  console.log(`[WA Bot] Browser: Windows Chrome (fix for "Cannot link device")`);
   console.log(`[WA Bot] Connection modes: Pairing Code + QR Scan`);
   console.log(`[WA Bot] Auto-reply: ${botConfig.autoReply}`);
 
