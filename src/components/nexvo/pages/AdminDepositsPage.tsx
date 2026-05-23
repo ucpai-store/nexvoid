@@ -72,7 +72,7 @@ export default function AdminDepositsPage() {
     fetch('/api/admin/deposits?limit=100', { headers: { Authorization: `Bearer ${adminToken}` } })
       .then((r) => r.json())
       .then((res) => res.success && setDeposits(res.data))
-      .catch(() => { toast({ title: 'Error', description: 'Gagal memuat data', variant: 'destructive' }); })
+      .catch(() => { toast({ title: 'Error', description: 'Failed to load data', variant: 'destructive' }); })
       .finally(() => setLoading(false));
    
   }, [adminToken]);
@@ -107,10 +107,10 @@ export default function AdminDepositsPage() {
           prev.map((d) => (d.id === id ? { ...d, status } : d))
         );
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setProcessing((p) => ({ ...p, [id]: false }));
     }

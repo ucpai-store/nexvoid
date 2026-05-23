@@ -62,12 +62,12 @@ export default function ProductDetailPage() {
           if (res.success && res.data) {
             setProduct(res.data);
           } else {
-            toast({ title: 'Produk tidak ditemukan', variant: 'destructive' });
+            toast({ title: 'Product not found', variant: 'destructive' });
             navigate('products');
           }
         })
         .catch(() => {
-          toast({ title: 'Gagal memuat produk', variant: 'destructive' });
+          toast({ title: 'Failed to load produk', variant: 'destructive' });
         })
         .finally(() => setLoading(false));
     } else {
@@ -115,7 +115,7 @@ export default function ProductDetailPage() {
           setConfirmOpen(false);
           setSuccessOpen(true);
         } else {
-          toast({ title: 'Gagal', description: data.error || 'Pembelian gagal', variant: 'destructive' });
+          toast({ title: 'Failed', description: data.error || 'Pembelian gagal', variant: 'destructive' });
           setConfirmOpen(false);
         }
       } else {
@@ -348,7 +348,7 @@ export default function ProductDetailPage() {
           ) : hasEnoughBalance ? (
             <>
               <ShoppingBag className="w-5 h-5 mr-2" />
-              Beli Sekarang - {formatRupiah(totalPrice)}
+              Buy Now - {formatRupiah(totalPrice)}
             </>
           ) : (
             <>

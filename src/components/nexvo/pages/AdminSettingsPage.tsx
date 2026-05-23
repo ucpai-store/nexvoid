@@ -205,12 +205,12 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: 'Password berhasil diubah' });
+        toast({ title: 'Success', description: 'Password berhasil diubah' });
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -239,7 +239,7 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: `Admin ${addUsername} berhasil ditambahkan` });
+        toast({ title: 'Success', description: `Admin ${addUsername} berhasil ditambahkan` });
         setAddUsername('');
         setAddEmail('');
         setAddName('');
@@ -247,7 +247,7 @@ export default function AdminSettingsPage() {
         setAddDialogOpen(false);
         fetchData();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -265,10 +265,10 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: `Admin ${targetAdmin.username} berhasil di-unlock` });
+        toast({ title: 'Success', description: `Admin ${targetAdmin.username} berhasil di-unlock` });
         fetchData();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -289,11 +289,11 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: `Admin ${targetUsername} berhasil dihapus` });
+        toast({ title: 'Success', description: `Admin ${targetUsername} berhasil dihapus` });
         setDeleteTarget(null);
         fetchData();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -324,12 +324,12 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: waEditMode ? 'WhatsApp admin berhasil diperbarui' : 'WhatsApp admin berhasil ditambahkan' });
+        toast({ title: 'Success', description: waEditMode ? 'WhatsApp admin berhasil diperbarui' : 'WhatsApp admin berhasil ditambahkan' });
         setWaDialogOpen(false);
         resetWaForm();
         fetchWhatsAppAdmins();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -347,10 +347,10 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: `WhatsApp admin ${wa.isActive ? 'dinonaktifkan' : 'diaktifkan'}` });
+        toast({ title: 'Success', description: `WhatsApp admin ${wa.isActive ? 'dinonaktifkan' : 'diaktifkan'}` });
         fetchWhatsAppAdmins();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -378,11 +378,11 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Berhasil', description: 'WhatsApp admin berhasil dihapus' });
+        toast({ title: 'Success', description: 'WhatsApp admin berhasil dihapus' });
         setWaDeleteTarget(null);
         fetchWhatsAppAdmins();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -917,7 +917,7 @@ export default function AdminSettingsPage() {
                     if (data.success) {
                       toast({ title: '✅ Berhasil', description: 'Nomor penting berhasil disimpan' });
                     } else {
-                      toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+                      toast({ title: 'Failed', description: data.error, variant: 'destructive' });
                     }
                   } catch {
                     toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -997,9 +997,9 @@ export default function AdminSettingsPage() {
                     });
                     const data = await res.json();
                     if (data.success) {
-                      toast({ title: 'Berhasil', description: 'Fee configuration berhasil disimpan' });
+                      toast({ title: 'Success', description: 'Fee configuration berhasil disimpan' });
                     } else {
-                      toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+                      toast({ title: 'Failed', description: data.error, variant: 'destructive' });
                     }
                   } catch {
                     toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -1123,10 +1123,10 @@ export default function AdminSettingsPage() {
                         });
                         const data = await res.json();
                         if (data.success) {
-                          toast({ title: 'Berhasil', description: 'Konfigurasi gaji mingguan berhasil disimpan' });
+                          toast({ title: 'Success', description: 'Konfigurasi gaji mingguan berhasil disimpan' });
                           setSalaryConfig(data.data);
                         } else {
-                          toast({ title: 'Gagal', description: data.error || 'Gagal menyimpan konfigurasi', variant: 'destructive' });
+                          toast({ title: 'Failed', description: data.error || 'Gagal menyimpan konfigurasi', variant: 'destructive' });
                         }
                       } catch {
                         toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });

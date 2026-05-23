@@ -97,7 +97,7 @@ export default function ProfilePage() {
         const data = await res.json();
         if (data.success) {
           setUser(data.data);
-          toast({ title: 'Berhasil', description: 'Avatar berhasil diperbarui' });
+          toast({ title: 'Success', description: 'Avatar berhasil diperbarui' });
         }
       }
     } catch {
@@ -120,9 +120,9 @@ export default function ProfilePage() {
       const data = await res.json();
       if (data.success) {
         setUser(data.data);
-        toast({ title: 'Berhasil', description: 'Nama berhasil diperbarui' });
+        toast({ title: 'Success', description: 'Nama berhasil diperbarui' });
       } else {
-        toast({ title: 'Gagal', description: data.error || 'Gagal memperbarui', variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || 'Gagal memperbarui', variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -154,9 +154,9 @@ export default function ProfilePage() {
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        toast({ title: 'Berhasil', description: 'Password berhasil diperbarui' });
+        toast({ title: 'Success', description: 'Password berhasil diperbarui' });
       } else {
-        toast({ title: 'Gagal', description: data.error || 'Gagal memperbarui password', variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || 'Gagal memperbarui password', variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -194,9 +194,9 @@ export default function ProfilePage() {
       if (data.success) {
         setBankDialog(false);
         fetchBanks();
-        toast({ title: 'Berhasil', description: editBank ? 'Rekening diperbarui' : 'Rekening ditambahkan' });
+        toast({ title: 'Success', description: editBank ? 'Rekening diperbarui' : 'Rekening ditambahkan' });
       } else {
-        toast({ title: 'Gagal', description: data.error || 'Gagal menyimpan', variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || 'Gagal menyimpan', variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });
@@ -216,9 +216,9 @@ export default function ProfilePage() {
       if (data.success) {
         setDeleteDialog(null);
         fetchBanks();
-        toast({ title: 'Berhasil', description: 'Rekening dihapus' });
+        toast({ title: 'Success', description: 'Rekening dihapus' });
       } else {
-        toast({ title: 'Gagal', description: data.error || 'Gagal menghapus', variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error || 'Gagal menghapus', variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Error', description: 'Kesalahan jaringan', variant: 'destructive' });

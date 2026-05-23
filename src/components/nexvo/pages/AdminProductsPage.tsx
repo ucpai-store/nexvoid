@@ -131,7 +131,7 @@ export default function AdminProductsPage() {
       }
     } catch (err) {
       console.error('Upload error:', err);
-      toast({ title: 'Kesalahan Jaringan', description: 'Gagal mengunggah file, coba lagi', variant: 'destructive' });
+      toast({ title: 'Network Error', description: 'Gagal mengunggah file, coba lagi', variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -176,7 +176,7 @@ export default function AdminProductsPage() {
       }
       const data = await res.json();
       if (data.success) {
-        toast({ title: editId ? 'Produk diperbarui' : 'Produk ditambahkan' });
+        toast({ title: editId ? 'Product updated' : 'Product added' });
         setFormOpen(false);
         setEditId(null);
         setForm(emptyForm);
@@ -186,7 +186,7 @@ export default function AdminProductsPage() {
       }
     } catch (err) {
       console.error('Save error:', err);
-      toast({ title: 'Kesalahan Jaringan', description: 'Gagal menyimpan, coba lagi', variant: 'destructive' });
+      toast({ title: 'Network Error', description: 'Gagal menyimpan, coba lagi', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -206,15 +206,15 @@ export default function AdminProductsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Produk dihapus', description: `${currentDeleteName} berhasil dihapus beserta data terkait` });
+        toast({ title: 'Product deleted', description: `${currentDeleteName} berhasil dihapus beserta data terkait` });
         setProducts((prev) => prev.filter((p) => p.id !== currentDeleteId));
         setDeleteId(null);
         setDeleteName('');
       } else {
-        toast({ title: 'Gagal menghapus', description: data.error, variant: 'destructive' });
+        toast({ title: 'Delete failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setDeleting(false);
     }
@@ -233,10 +233,10 @@ export default function AdminProductsPage() {
         toast({ title: product.isStopped ? 'Produk diaktifkan kembali' : 'Produk dihentikan' });
         setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, isStopped: !p.isStopped } : p));
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     }
   };
 
@@ -253,10 +253,10 @@ export default function AdminProductsPage() {
         toast({ title: product.isActive ? 'Produk dinonaktifkan' : 'Produk diaktifkan' });
         setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, isActive: !p.isActive } : p));
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     }
   };
 
@@ -296,7 +296,7 @@ export default function AdminProductsPage() {
           <p className="text-muted-foreground text-sm">{products.length} produk terdaftar</p>
         </div>
         <Button onClick={openAdd} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
-          <Plus className="w-4 h-4 mr-2" /> Tambah Produk
+          <Plus className="w-4 h-4 mr-2" /> Add Product
         </Button>
       </motion.div>
 
@@ -319,12 +319,12 @@ export default function AdminProductsPage() {
                 )}
                 <div className="absolute top-2 right-2 flex gap-1">
                   <Badge className={`text-[10px] border-0 ${product.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {product.isActive ? 'Aktif' : 'Nonaktif'}
+                    {product.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 {product.isStopped && (
                   <div className="absolute top-2 left-2">
-                    <Badge className="bg-orange-500/20 text-orange-400 border-0 text-[10px]">Dihentikan</Badge>
+                    <Badge className="bg-orange-500/20 text-orange-400 border-0 text-[10px]">Stopped</Badge>
                   </div>
                 )}
               </div>
@@ -334,7 +334,7 @@ export default function AdminProductsPage() {
                 <div className="grid grid-cols-3 gap-2 text-xs mb-3">
                   <div className="text-center">
                     <p className="text-foreground font-medium">{product.duration}h</p>
-                    <p className="text-muted-foreground">Durasi</p>
+                    <p className="text-muted-foreground">Duration</p>
                   </div>
                   <div className="text-center">
                     <p className="text-emerald-400 font-medium">{product.profitRate}%</p>
@@ -342,13 +342,13 @@ export default function AdminProductsPage() {
                   </div>
                   <div className="text-center">
                     <p className="text-foreground font-medium">{product.quotaUsed}/{product.quota}</p>
-                    <p className="text-muted-foreground">Kuota</p>
+                    <p className="text-muted-foreground">Quota</p>
                   </div>
                 </div>
                 {/* Auto-calculated daily profit */}
                 {product.profitRate > 0 && (
                   <div className="glass rounded-lg p-2 mb-3 text-center">
-                    <p className="text-muted-foreground text-[10px]">Profit Harian</p>
+                    <p className="text-muted-foreground text-[10px]">Daily Profit</p>
                     <p className="text-emerald-400 font-bold text-sm">{formatRupiah(Math.floor(product.price * product.profitRate / 100))}</p>
                   </div>
                 )}
@@ -359,12 +359,12 @@ export default function AdminProductsPage() {
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => handleToggleStop(product)}
                     className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${product.isStopped ? 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10' : 'border-orange-500/20 text-orange-400 hover:bg-orange-500/10'}`}
-                    title={product.isStopped ? 'Aktifkan' : 'Hentikan'}>
+                    title={product.isStopped ? 'Activekan' : 'Hentikan'}>
                     {product.isStopped ? <Play className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => handleToggleActive(product)}
                     className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${product.isActive ? 'border-red-500/20 text-red-400 hover:bg-red-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'}`}
-                    title={product.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
+                    title={product.isActive ? 'Inactivekan' : 'Activekan'}>
                     {product.isActive ? <Ban className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => confirmDelete(product)}
@@ -393,25 +393,25 @@ export default function AdminProductsPage() {
       }}>
         <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-gold-gradient">{editId ? 'Edit Produk' : 'Tambah Produk Baru'}</DialogTitle>
+            <DialogTitle className="text-gold-gradient">{editId ? 'Edit Product' : 'Add Product Baru'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">{editId ? 'Perbarui informasi produk' : 'Isi detail produk baru'}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-muted-foreground text-xs">Nama Produk *</Label>
+              <Label className="text-muted-foreground text-xs">Product Name *</Label>
               <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Contoh: Paket Emas Premium" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-muted-foreground text-xs">Harga (Rp) *</Label>
+                <Label className="text-muted-foreground text-xs">Price (Rp) *</Label>
                 <Input type="number" value={form.price} onChange={(e) => {
                   const val = e.target.value;
                   setForm((f) => ({ ...f, price: val, estimatedProfit: autoCalcProfit(val, f.profitRate) }));
                 }} placeholder="100000" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
               </div>
               <div>
-                <Label className="text-muted-foreground text-xs">Durasi (Hari) *</Label>
+                <Label className="text-muted-foreground text-xs">Duration (Hari) *</Label>
                 <Input type="number" value={form.duration} onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value }))}
                   placeholder="30" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
               </div>
@@ -425,14 +425,14 @@ export default function AdminProductsPage() {
                 }} placeholder="10" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
               </div>
               <div>
-                <Label className="text-muted-foreground text-xs">Est. Profit Harian (Rp) <span className="text-emerald-400">Auto</span></Label>
+                <Label className="text-muted-foreground text-xs">Est. Daily Profit (Rp) <span className="text-emerald-400">Auto</span></Label>
                 <Input type="number" value={form.estimatedProfit} readOnly
                   className="glass rounded-xl border-[#D4AF37]/20 bg-[#D4AF37]/5 text-emerald-400 mt-1 cursor-not-allowed" />
-                <p className="text-muted-foreground text-[10px] mt-1">Harga × Profit% = {form.estimatedProfit ? formatRupiah(parseFloat(form.estimatedProfit)) : '-'}</p>
+                <p className="text-muted-foreground text-[10px] mt-1">Price × Profit% = {form.estimatedProfit ? formatRupiah(parseFloat(form.estimatedProfit)) : '-'}</p>
               </div>
             </div>
             <div>
-              <Label className="text-muted-foreground text-xs">Kuota *</Label>
+              <Label className="text-muted-foreground text-xs">Quota *</Label>
               <Input type="number" value={form.quota} onChange={(e) => setForm((f) => ({ ...f, quota: e.target.value }))}
                 placeholder="100" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
             </div>
@@ -463,7 +463,7 @@ export default function AdminProductsPage() {
               </div>
             </div>
             <div className="flex items-center justify-between glass rounded-xl p-3">
-              <Label className="text-foreground text-sm">Produk Aktif</Label>
+              <Label className="text-foreground text-sm">Produk Active</Label>
               <Switch checked={form.isActive} onCheckedChange={(checked) => setForm((f) => ({ ...f, isActive: checked }))} />
             </div>
           </div>
@@ -480,7 +480,7 @@ export default function AdminProductsPage() {
         <AlertDialogContent className="glass-strong border-[#D4AF37]/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400" /> Hapus Produk
+              <AlertTriangle className="w-5 h-5 text-red-400" /> Delete Product
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               Apakah Anda yakin ingin menghapus <strong className="text-foreground">{deleteName}</strong>? 

@@ -87,7 +87,7 @@ export default function AdminPackagesPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: editId ? 'Paket diperbarui' : 'Paket ditambahkan' });
+        toast({ title: editId ? 'Package updated' : 'Package added' });
         setFormOpen(false);
         setEditId(null);
         setForm(emptyForm);
@@ -96,7 +96,7 @@ export default function AdminPackagesPage() {
         toast({ title: 'Gagal menyimpan', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -114,15 +114,15 @@ export default function AdminPackagesPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Paket dihapus', description: `${currentDeleteName} berhasil dihapus beserta data terkait` });
+        toast({ title: 'Package deleted', description: `${currentDeleteName} berhasil dihapus beserta data terkait` });
         setPackages((prev) => prev.filter((p) => p.id !== currentDeleteId));
         setDeleteId(null);
         setDeleteName('');
       } else {
-        toast({ title: 'Gagal menghapus', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed to delete', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setDeleting(false);
     }
@@ -141,10 +141,10 @@ export default function AdminPackagesPage() {
         toast({ title: pkg.isActive ? 'Paket dinonaktifkan' : 'Paket diaktifkan' });
         setPackages((prev) => prev.map((p) => p.id === pkg.id ? { ...p, isActive: !p.isActive } : p));
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     }
   };
 

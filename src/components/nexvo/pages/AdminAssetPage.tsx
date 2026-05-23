@@ -124,10 +124,10 @@ export default function AdminAssetPage() {
         setProfitDialog(null);
         setProfitAmount('');
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setAddingProfit(false);
     }
@@ -148,10 +148,10 @@ export default function AdminAssetPage() {
         toast({ title: action === 'stop' ? 'Aset berhasil dihentikan' : 'Aset berhasil diselesaikan' });
         setAssets((prev) => prev.map((a) => (a.id === assetId ? { ...a, status: newStatus } : a)));
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setActionLoading((prev) => ({ ...prev, [assetId]: false }));
     }

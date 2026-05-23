@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
         }
       })
       .catch(() => {
-        toast({ title: 'Gagal memuat data dashboard', variant: 'destructive' });
+        toast({ title: 'Failed to load data dashboard', variant: 'destructive' });
       })
       .finally(() => setLoading(false));
    
@@ -151,7 +151,7 @@ export default function AdminDashboardPage() {
         toast({ title: `Deposit ${action === 'approve' ? 'disetujui' : 'ditolak'}` });
         fetchData();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
@@ -173,7 +173,7 @@ export default function AdminDashboardPage() {
         toast({ title: `Withdrawal ${action === 'approve' ? 'disetujui' : 'ditolak'}` });
         fetchData();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });

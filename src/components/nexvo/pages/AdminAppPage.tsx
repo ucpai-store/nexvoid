@@ -72,13 +72,13 @@ export default function AdminAppPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'APK berhasil diupload' });
+        toast({ title: 'APK uploaded successfully' });
         if (data.data) setApkInfo(data.data);
       } else {
-        toast({ title: 'Gagal upload APK', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed to upload APK', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -145,7 +145,7 @@ export default function AdminAppPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">Pengaturan Aplikasi</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">App Settings</h1>
         <p className="text-muted-foreground text-sm">Kelola APK dan versi aplikasi</p>
       </motion.div>
 
@@ -255,7 +255,7 @@ export default function AdminAppPage() {
         >
           <div className="flex items-center gap-2 mb-4">
             <Download className="w-5 h-5 text-[#D4AF37]" />
-            <h3 className="text-foreground font-semibold">Link Download</h3>
+            <h3 className="text-foreground font-semibold">Download Link</h3>
           </div>
           <div>
             <Label className="text-muted-foreground text-xs mb-2 block">URL Download APK</Label>
