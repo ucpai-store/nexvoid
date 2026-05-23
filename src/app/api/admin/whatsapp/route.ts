@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       // Use 60s timeout for connect (bot waits up to 45s for pairing code)
       const result = await proxyToBot('/api/connect', {
         method: 'POST',
-        body: JSON.stringify({ phoneNumber: body.phoneNumber }),
+        body: JSON.stringify({ phoneNumber: body.phoneNumber, mode: body.mode || 'pairing' }),
       }, 60000);
       return NextResponse.json(result);
     }

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Account suspended' }, { status: 403 });
     }
     if (!user.isVerified) {
-      return NextResponse.json({ success: false, error: 'Email belum diverifikasi.' }, { status: 403 });
+      return NextResponse.json({ success: false, error: 'Email not verified yet.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const netAmount = amount - fee;
 
     if (netAmount <= 0) {
-      return NextResponse.json({ success: false, error: 'Jumlah deposit terlalu kecil setelah potongan fee' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Deposit amount too small after fee deduction' }, { status: 400 });
     }
 
     // Deposit needs admin approval (pending status)
@@ -93,11 +93,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: deposit,
-      message: `Deposit ${depositId} berhasil dikirim! Menunggu persetujuan admin. Saldo Rp ${Math.floor(netAmount).toLocaleString('id-ID')} akan masuk setelah disetujui.`,
+      message: `Deposit ${depositId} submitted successfully! Waiting for admin approval. Deposit ID: ${depositId}. Amount Rp ${Math.floor(netAmount).toLocaleString('id-ID')} will be credited after approval.`,
     });
   } catch (error) {
     console.error('Create deposit error:', error);
-    return NextResponse.json({ success: false, error: 'Database belum tersedia.' }, { status: 503 });
+    return NextResponse.json({ success: false, error: 'Service temporarily unavailable.' }, { status: 503 });
   }
 }
 

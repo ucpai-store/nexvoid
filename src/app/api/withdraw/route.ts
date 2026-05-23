@@ -8,35 +8,35 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request);
     if (!user) {
-      return NextResponse.json({ success: false, error: 'Tidak terautentikasi' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
 
     if (user.isSuspended) {
-      return NextResponse.json({ success: false, error: 'Akun ditangguhkan' }, { status: 403 });
+      return NextResponse.json({ success: false, error: 'Account suspended' }, { status: 403 });
     }
 
     if (!user.isVerified) {
-      return NextResponse.json({ success: false, error: 'Email belum diverifikasi. Silakan verifikasi email terlebih dahulu.' }, { status: 403 });
+      return NextResponse.json({ success: false, error: 'Email not verified. Please verify your email first.' }, { status: 403 });
     }
 
     const body = await request.json();
     const { paymentType, paymentMethod, accountNo, holderName, amount } = body;
 
     if (!paymentType || !paymentMethod || !accountNo || !holderName || !amount || amount <= 0) {
-      return NextResponse.json({ success: false, error: 'Semua field wajib diisi (metode pembayaran, nomor akun, nama pemilik, jumlah)' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'All fields are required (payment method, account number, holder name, amount)' }, { status: 400 });
     }
 
     const settings = await getAllSettings();
 
     // Check working hours
     if (!isWithinWorkingHours(settings)) {
-      return NextResponse.json({ success: false, error: 'Penarikan hanya bisa dilakukan pada jam kerja (Senin-Jumat, 08:00-17:00)' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Withdrawals can only be made during working hours (Mon-Fri, 09:00-16:00 WIB)' }, { status: 400 });
     }
 
     // Check minimum withdrawal
     const minWithdraw = parseFloat(settings.min_withdraw || '50000');
     if (amount < minWithdraw) {
-      return NextResponse.json({ success: false, error: `Minimum penarikan Rp ${minWithdraw.toLocaleString('id-ID')}` }, { status: 400 });
+      return NextResponse.json({ success: false, error: `Minimum withdrawal is Rp ${minWithdraw.toLocaleString('id-ID')}` }, { status: 400 });
     }
 
     // Calculate fee
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       });
     } catch (txError: unknown) {
       if (txError instanceof Error && txError.message === 'INSUFFICIENT_BALANCE') {
-        return NextResponse.json({ success: false, error: 'Saldo tidak mencukupi' }, { status: 400 });
+        return NextResponse.json({ success: false, error: 'Insufficient balance' }, { status: 400 });
       }
       throw txError;
     }
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: withdrawal });
   } catch (error) {
     console.error('Create withdrawal error:', error);
-    return NextResponse.json({ success: false, error: 'Database belum tersedia. Silakan hubungi admin.' }, { status: 503 });
+    return NextResponse.json({ success: false, error: 'Service temporarily unavailable. Please contact admin.' }, { status: 503 });
   }
 }
 
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request);
     if (!user) {
-      return NextResponse.json({ success: false, error: 'Tidak terautentikasi' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);

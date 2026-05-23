@@ -1,7 +1,11 @@
 /**
- * NEXVO WhatsApp Bot Service - v4.0.1 PRODUCTION
+ * NEXVO WhatsApp Bot Service - v5.0.0
  * 
- * Uses @whiskeysockets/baileys STABLE (6.7.22) with proper pairing code flow.
+ * Features:
+ * - Dual connection: Pairing Code + QR Scan Code
+ * - English bot messages matching platform features
+ * - Auto-reply commands: balance, products, assets, deposit, withdraw, referral, bonus, help
+ * - Deposit ID notification to admin
  */
 
 import {
@@ -44,6 +48,7 @@ let isConnecting = false;
 let reconnectAttempts = 0;
 let pairingCodeRequested = false;
 let pairingCodeExpiry: number = 0;
+let connectionMode: 'pairing' | 'qr' = 'pairing'; // Default to pairing
 const MAX_RECONNECT = 3;
 
 interface BotConfig {
@@ -55,9 +60,9 @@ interface BotConfig {
 }
 
 const defaultConfig: BotConfig = {
-  welcomeMessage: '👋 Halo! Saya *Nexvo Bot* — asisten digital Anda.\n\nKetik *menu* untuk melihat daftar fitur yang tersedia.',
-  menuHeader: '📋 *MENU NEXVO BOT*',
-  menuFooter: '💡 Ketik nomor atau perintah untuk menggunakan fitur.\n📱 Contoh: *saldo*, *produk*, *1*',
+  welcomeMessage: '👋 Hello! I\'m *Nexvo Bot* — your digital assistant.\n\nType *menu* to see available features.',
+  menuHeader: '📋 *NEXVO BOT MENU*',
+  menuFooter: '💡 Type a number or command to use a feature.\n📱 Example: *balance*, *products*, *1*',
   autoReply: true,
   onlyRegistered: true,
 };
@@ -137,20 +142,24 @@ function getDepositAdminNumber(): string {
 }
 
 function getCSNumbers(): Array<{name: string; phone: string}> {
-  const admins = queryDb("SELECT name, phone FROM WhatsAppAdmin WHERE isActive = 1 ORDER BY \`order\` ASC");
+  const admins = queryDb("SELECT name, phone FROM WhatsAppAdmin WHERE isActive = 1 ORDER BY `order` ASC");
   return admins.length > 0 ? admins : [{ name: 'CS NEXVO', phone: getAdminNumber() }];
 }
 
+// ═══════════════════════════════════════════════════════════
+//  BOT COMMANDS - ENGLISH
+// ═══════════════════════════════════════════════════════════
+
 const COMMANDS: Record<string, { name: string; description: string; aliases: string[] }> = {
-  menu: { name: '📋 Menu', description: 'Tampilkan menu utama', aliases: ['menu', 'm', '0'] },
-  saldo: { name: '💰 Cek Saldo', description: 'Cek saldo & balance akun', aliases: ['saldo', 'balance', '1'] },
-  produk: { name: '📦 Info Produk', description: 'Lihat daftar produk investasi', aliases: ['produk', 'product', '2'] },
-  aset: { name: '📊 Aset Saya', description: 'Lihat aset investasi aktif', aliases: ['aset', 'assets', '3'] },
-  deposit: { name: '💸 Deposit', description: 'Info cara deposit', aliases: ['deposit', 'dep', 'topup', '4'] },
-  withdraw: { name: '🏦 Withdraw', description: 'Info cara withdraw', aliases: ['withdraw', 'wd', 'tarik', '5'] },
-  referral: { name: '🔗 Referral', description: 'Lihat kode & link referral', aliases: ['referral', 'ref', 'invite', '6'] },
-  bonus: { name: '🎁 Bonus Saya', description: 'Lihat riwayat bonus', aliases: ['bonus', '7'] },
-  bantuan: { name: '❓ Bantuan', description: 'Hubungi customer service', aliases: ['bantuan', 'help', 'cs', '8'] },
+  menu: { name: '📋 Menu', description: 'Show main menu', aliases: ['menu', 'm', '0'] },
+  balance: { name: '💰 Check Balance', description: 'Check your account balance', aliases: ['balance', 'saldo', '1'] },
+  products: { name: '📦 Products', description: 'View investment products', aliases: ['products', 'produk', '2'] },
+  assets: { name: '📊 My Assets', description: 'View active investments', aliases: ['assets', 'aset', '3'] },
+  deposit: { name: '💸 Deposit', description: 'How to add deposit', aliases: ['deposit', 'dep', 'topup', '4'] },
+  withdraw: { name: '🏦 Withdraw', description: 'How to withdraw', aliases: ['withdraw', 'wd', '5'] },
+  referral: { name: '🔗 Referral', description: 'View referral code & link', aliases: ['referral', 'ref', '6'] },
+  bonus: { name: '🎁 My Bonuses', description: 'View bonus history', aliases: ['bonus', '7'] },
+  help: { name: '❓ Help', description: 'Contact customer service', aliases: ['help', 'bantuan', 'cs', '8'] },
 };
 
 function getMenuText(): string {
@@ -171,98 +180,105 @@ function handleCommand(command: string, phone: string): string {
   }
   if (!matchedCmd) {
     if (['hi', 'halo', 'hai', 'hello', 'hey', 'hola'].includes(c)) return botConfig.welcomeMessage;
-    return `🤖 Perintah tidak dikenali.\n\nKetik *menu* untuk melihat daftar fitur.`;
+    return `🤖 Command not recognized.\n\nType *menu* to see available features.`;
   }
   if (matchedCmd === 'menu') return getMenuText();
   const user = findUserByPhone(phone);
-  if (!user && matchedCmd !== 'bantuan' && matchedCmd !== 'produk' && matchedCmd !== 'deposit') {
-    return `❌ Nomor WhatsApp Anda belum terdaftar di Nexvo.\n\n📱 Daftar di: https://nexvo.id\n💬 Atau hubungi CS untuk bantuan.`;
+  if (!user && matchedCmd !== 'help' && matchedCmd !== 'products' && matchedCmd !== 'deposit') {
+    return `❌ Your WhatsApp number is not registered on Nexvo.\n\n📱 Register at: https://nexvo.id\n💬 Or contact CS for help.`;
   }
-  if (user?.isSuspended) return `⚠️ Akun Anda ditangguhkan. Hubungi CS untuk informasi lebih lanjut.`;
+  if (user?.isSuspended) return `⚠️ Your account has been suspended. Contact CS for more info.`;
 
   switch (matchedCmd) {
-    case 'saldo': {
+    case 'balance': {
       const total = (user.mainBalance || 0) + (user.depositBalance || 0);
-      return `💰 *SALDO AKUN*\n\n👤 Nama: ${user.name || user.userId}\n🆔 ID: ${user.userId}\n\n💵 Saldo Utama: ${formatRupiah(user.mainBalance || 0)}\n🏦 Saldo Deposit: ${formatRupiah(user.depositBalance || 0)}\n📊 Total Saldo: *${formatRupiah(total)}*\n\n📈 Total Profit: ${formatRupiah(user.totalProfit || 0)}`;
+      return `💰 *ACCOUNT BALANCE*\n\n👤 Name: ${user.name || user.userId}\n🆔 ID: ${user.userId}\n\n💵 Main Balance: ${formatRupiah(user.mainBalance || 0)}\n🏦 Deposit Balance: ${formatRupiah(user.depositBalance || 0)}\n📊 Total Balance: *${formatRupiah(total)}*\n\n📈 Total Profit: ${formatRupiah(user.totalProfit || 0)}`;
     }
-    case 'produk': {
+    case 'products': {
       const products = queryDb(`SELECT name, price, profitRate, duration, quota, quotaUsed FROM Product WHERE isActive = 1 AND isStopped = 0 ORDER BY price ASC`);
-      if (!products.length) return `📦 *PRODUK INVESTASI*\n\nMaaf, belum ada produk tersedia saat ini.`;
-      let text = `📦 *PRODUK INVESTASI*\n\n`;
+      if (!products.length) return `📦 *INVESTMENT PRODUCTS*\n\nSorry, no products available at the moment.`;
+      let text = `📦 *INVESTMENT PRODUCTS*\n\n`;
       products.forEach((p: any, i: number) => {
-        text += `*${i + 1}. ${p.name}*\n💰 Harga: ${formatRupiah(p.price)}\n📈 Profit: ${p.profitRate}%/hari\n⏰ Durasi: ${p.duration} hari\n\n`;
+        const pct = p.quota > 0 ? Math.round(p.quotaUsed / p.quota * 100) : 0;
+        text += `*${i + 1}. ${p.name}*\n💰 Price: ${formatRupiah(p.price)}\n📈 Profit: ${p.profitRate}%/day\n⏰ Duration: ${p.duration} days\n📊 Quota: ${pct}% filled\n\n`;
       });
-      text += `💡 Beli produk di: https://nexvo.id`;
+      text += `💡 Buy products at: https://nexvo.id`;
       return text;
     }
-    case 'aset': {
+    case 'assets': {
       const invs = queryDb(`SELECT i.amount, i.dailyProfit, i.totalProfitEarned, p.name as pkgName FROM Investment i LEFT JOIN InvestmentPackage p ON i.packageId = p.id WHERE i.userId = '${user.id}' AND i.status = 'active' ORDER BY i.createdAt DESC`);
-      if (!invs.length) return `📊 *ASET SAYA*\n\nAnda belum memiliki aset aktif.\n\n💡 Beli produk di: https://nexvo.id`;
-      let text = `📊 *ASET SAYA*\n\n`;
+      if (!invs.length) return `📊 *MY ASSETS*\n\nYou don't have any active investments.\n\n💡 Buy products at: https://nexvo.id`;
+      let text = `📊 *MY ASSETS*\n\n`;
       let totalDaily = 0;
       invs.forEach((inv: any, i: number) => {
-        text += `*${i + 1}. ${inv.pkgName || 'Paket'}*\n💰 Modal: ${formatRupiah(inv.amount)}\n📈 +${formatRupiah(inv.dailyProfit)}/hari\n💵 Profit: ${formatRupiah(inv.totalProfitEarned)}\n\n`;
+        text += `*${i + 1}. ${inv.pkgName || 'Package'}*\n💰 Capital: ${formatRupiah(inv.amount)}\n📈 +${formatRupiah(inv.dailyProfit)}/day\n💵 Profit: ${formatRupiah(inv.totalProfitEarned)}\n\n`;
         totalDaily += inv.dailyProfit || 0;
       });
-      text += `💵 *Total Profit/Hari: ${formatRupiah(totalDaily)}*`;
+      text += `💵 *Total Daily Profit: ${formatRupiah(totalDaily)}*`;
       return text;
     }
     case 'deposit': {
       const csList = getCSNumbers();
       let text = `💸 *DEPOSIT*\n\n`;
-      if (user) text += `💵 Saldo Deposit: ${formatRupiah(user.depositBalance || 0)}\n\n`;
-      text += `📌 *Cara Deposit:*\n1. Buka aplikasi Nexvo\n2. Pilih Wallet → Deposit\n3. Scan QRIS & bayar\n4. Tunggu konfirmasi admin\n\n🔗 Deposit di: https://nexvo.id`;
+      if (user) text += `💵 Deposit Balance: ${formatRupiah(user.depositBalance || 0)}\n🆔 Your ID: *${user.userId}*\n\n`;
+      text += `📌 *How to Deposit:*\n1. Open Nexvo app\n2. Go to Wallet → Deposit\n3. Enter amount & select payment\n4. Upload payment proof\n5. Wait for admin confirmation\n\n`;
+      text += `⚠️ *Important:* Include your Deposit ID *${user?.userId || 'NXV-XXXXX'}* in the payment notes.\n\n`;
+      text += `🔗 Deposit at: https://nexvo.id`;
       if (csList.length > 0) {
-        text += `\n\n💬 Butuh bantuan? Hubungi:`;
+        text += `\n\n💬 Need help? Contact:`;
         csList.forEach(cs => { text += `\n👤 ${cs.name}: wa.me/${cs.phone}`; });
       }
       return text;
     }
     case 'withdraw': {
-      return `🏦 *WITHDRAW*\n\n💵 Saldo tersedia: ${formatRupiah(user.mainBalance || 0)}\n\n📌 *Cara Withdraw:*\n1. Buka aplikasi Nexvo\n2. Pilih Wallet → Withdraw\n3. Masukkan jumlah & bank\n4. Tunggu persetujuan admin\n\n⏰ Jam WD: 09:00-16:00 WIB (Sen-Jum)\n🔗 Withdraw di: https://nexvo.id`;
+      return `🏦 *WITHDRAW*\n\n💵 Available Balance: ${formatRupiah(user.mainBalance || 0)}\n\n📌 *How to Withdraw:*\n1. Open Nexvo app\n2. Go to Wallet → Withdraw\n3. Enter amount & bank details\n4. Wait for admin approval\n\n⏰ WD Hours: 09:00-16:00 WIB (Mon-Fri)\n🔗 Withdraw at: https://nexvo.id`;
     }
     case 'referral': {
       const code = user.referralCode || '-';
       const link = `https://nexvo.id?ref=${code}`;
       const refCount = queryDb(`SELECT COUNT(*) as cnt FROM Referral WHERE referrerId = '${user.id}' AND level = 1`)[0]?.cnt || 0;
-      return `🔗 *REFERRAL*\n\n🏷️ Kode: *${code}*\n🔗 Link: ${link}\n👥 Downline: ${refCount} orang\n\n📊 Rate Bonus Referral:\nL1: 10% | L2: 5% | L3: 4%\nL4: 3% | L5: 2%\n\n📊 Rate M.Profit:\nL1: 5% | L2: 4% | L3: 3%\nL4: 2% | L5: 1%\n\n💡 Bagikan link untuk mendapat bonus!`;
+      return `🔗 *REFERRAL*\n\n🏷️ Code: *${code}*\n🔗 Link: ${link}\n👥 Downlines: ${refCount} people\n\n📊 Referral Bonus Rates:\nL1: 10% | L2: 5% | L3: 4%\nL4: 3% | L5: 2%\n\n📊 M.Profit Rates:\nL1: 5% | L2: 4% | L3: 3%\nL4: 2% | L5: 1%\n\n💡 Share your link to earn bonuses!`;
     }
     case 'bonus': {
       const bonuses = queryDb(`SELECT type, SUM(amount) as total, COUNT(*) as cnt FROM BonusLog WHERE userId = '${user.id}' GROUP BY type`);
-      if (!bonuses.length) return `🎁 *BONUS SAYA*\n\nBelum ada bonus yang diterima.`;
-      let text = `🎁 *BONUS SAYA*\n\n`;
-      const labels: Record<string, string> = { referral: '🤝 Referral', matching: '🔄 M.Profit', profit: '💰 Profit', salary: '🏆 Gaji' };
+      if (!bonuses.length) return `🎁 *MY BONUSES*\n\nNo bonuses received yet.`;
+      let text = `🎁 *MY BONUSES*\n\n`;
+      const labels: Record<string, string> = { referral: '🤝 Referral', matching: '🔄 M.Profit', profit: '💰 Profit', salary: '🏆 Salary' };
       let grand = 0;
       bonuses.forEach((b: any) => { text += `${labels[b.type] || b.type}: ${formatRupiah(b.total)} (${b.cnt}x)\n`; grand += b.total || 0; });
       text += `\n💵 *Total: ${formatRupiah(grand)}*`;
       return text;
     }
-    case 'bantuan': {
+    case 'help': {
       const csList = getCSNumbers();
-      let text = `❓ *BANTUAN*\n\nHubungi:\n\n`;
+      let text = `❓ *HELP & SUPPORT*\n\nContact us:\n\n`;
       csList.forEach(cs => { text += `👤 ${cs.name}\n📱 wa.me/${cs.phone}\n\n`; });
-      text += `🌐 Website: https://nexvo.id`;
+      text += `🌐 Website: https://nexvo.id\n📧 Email: adminnexvo@nexvo.id`;
       return text;
     }
     default: return getMenuText();
   }
 }
 
-// ──── WhatsApp Connection ────
-async function connectToWhatsApp(phoneNumber?: string) {
+// ═══════════════════════════════════════════════════════════
+//  WHATSAPP CONNECTION - Dual Mode (Pairing Code + QR Scan)
+// ═══════════════════════════════════════════════════════════
+
+async function connectToWhatsApp(phoneNumber?: string, mode: 'pairing' | 'qr' = 'pairing') {
   if (isConnecting) {
     console.log('[Bot] Already connecting, skipping...');
     return;
   }
   isConnecting = true;
   reconnectAttempts = 0;
+  connectionMode = mode;
 
   try {
     const { version } = await fetchLatestBaileysVersion();
     console.log(`[Bot] WA web version: ${version.join('.')}`);
 
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
-    const needsPairingCode = phoneNumber && !state.creds.registered;
+    const shouldRequestPairingCode = mode === 'pairing' && phoneNumber && !state.creds.registered;
 
     sock = makeWASocket({
       version,
@@ -287,9 +303,10 @@ async function connectToWhatsApp(phoneNumber?: string) {
 
       if (qr) {
         qrCode = qr;
-        console.log('[Bot] 📱 QR Code generated');
+        console.log('[Bot] 📱 QR Code generated (scan mode available)');
 
-        if (needsPairingCode && phoneNumber && !pairingCodeRequested) {
+        // Only request pairing code if mode is 'pairing' and phone provided
+        if (shouldRequestPairingCode && phoneNumber && !pairingCodeRequested) {
           pairingCodeRequested = true;
           try {
             console.log(`[Bot] 🔗 Requesting pairing code for ${phoneNumber}...`);
@@ -308,6 +325,8 @@ async function connectToWhatsApp(phoneNumber?: string) {
             console.error('[Bot] ❌ Pairing code error:', e.message?.substring(0, 200));
             pairingCodeRequested = false;
           }
+        } else {
+          console.log('[Bot] 📱 QR scan mode - waiting for scan...');
         }
       }
 
@@ -329,7 +348,7 @@ async function connectToWhatsApp(phoneNumber?: string) {
           reconnectAttempts++;
           const delay = statusCode === 408 ? 10000 : 5000;
           console.log(`[Bot] 🔄 Reconnecting in ${delay/1000}s (attempt ${reconnectAttempts}/${MAX_RECONNECT})...`);
-          setTimeout(() => connectToWhatsApp(phoneNumber || botPhoneNumber || undefined), delay);
+          setTimeout(() => connectToWhatsApp(phoneNumber || botPhoneNumber || undefined, connectionMode), delay);
         } else {
           console.log('[Bot] ❌ Max reconnect attempts reached. Use /api/connect to retry.');
         }
@@ -382,7 +401,10 @@ async function connectToWhatsApp(phoneNumber?: string) {
   }
 }
 
-// ──── HTTP API ────
+// ═══════════════════════════════════════════════════════════
+//  HTTP API
+// ═══════════════════════════════════════════════════════════
+
 function parseBody(req: any): Promise<any> {
   return new Promise((resolve, reject) => {
     let d = '';
@@ -399,6 +421,7 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
 
+  // Status endpoint
   if (url.pathname === '/') {
     json({
       service: 'NEXVO WhatsApp Bot',
@@ -407,24 +430,31 @@ const server = createServer(async (req, res) => {
       pairingCode: currentPairingCode,
       pairingCodeExpiry: pairingCodeExpiry ? new Date(pairingCodeExpiry).toISOString() : null,
       hasQR: !!qrCode,
+      connectionMode,
       autoReply: botConfig.autoReply,
     });
     return;
   }
 
+  // Connect endpoint - supports both pairing and QR modes
   if (url.pathname === '/api/connect' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
       const phone = body.phoneNumber?.replace(/[^0-9]/g, '');
-      if (!phone) { json({ success: false, error: 'Nomor telepon wajib diisi' }, 400); return; }
+      const mode: 'pairing' | 'qr' = body.mode === 'qr' ? 'qr' : 'pairing';
 
-      let fPhone = phone;
+      if (mode === 'pairing' && !phone) {
+        json({ success: false, error: 'Phone number is required for pairing code mode' }, 400);
+        return;
+      }
+
+      let fPhone = phone || '';
       if (fPhone.startsWith('0')) fPhone = '62' + fPhone.substring(1);
-      if (!fPhone.startsWith('62')) fPhone = '62' + fPhone;
+      if (fPhone && !fPhone.startsWith('62')) fPhone = '62' + fPhone;
 
-      botPhoneNumber = fPhone;
+      botPhoneNumber = fPhone || botPhoneNumber;
 
-      console.log('[Bot] 🔄 Starting fresh pairing code connection for', fPhone);
+      console.log(`[Bot] 🔄 Starting ${mode} connection...`);
       
       if (sock) { 
         try { sock.end(undefined); } catch {} 
@@ -439,35 +469,61 @@ const server = createServer(async (req, res) => {
       
       clearSession();
       await new Promise(r => setTimeout(r, 2000));
-      await connectToWhatsApp(fPhone);
+      await connectToWhatsApp(fPhone || undefined, mode);
 
-      console.log('[Bot] ⏳ Waiting for pairing code from WhatsApp...');
-      for (let i = 0; i < 45; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        if (currentPairingCode) {
-          console.log('[Bot] ✅ Pairing code received:', currentPairingCode);
-          break;
+      if (mode === 'pairing') {
+        console.log('[Bot] ⏳ Waiting for pairing code from WhatsApp...');
+        for (let i = 0; i < 45; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          if (currentPairingCode) {
+            console.log('[Bot] ✅ Pairing code received:', currentPairingCode);
+            break;
+          }
+          if (botConnected) {
+            console.log('[Bot] ✅ Bot connected!');
+            break;
+          }
         }
-        if (botConnected) {
-          console.log('[Bot] ✅ Bot connected!');
-          break;
+      } else {
+        // QR mode - wait for QR code
+        console.log('[Bot] ⏳ Waiting for QR code...');
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          if (qrCode) {
+            console.log('[Bot] ✅ QR Code ready for scanning');
+            break;
+          }
+          if (botConnected) {
+            console.log('[Bot] ✅ Bot connected!');
+            break;
+          }
         }
       }
 
-      // Save admin number to DB (fixed SQL)
-      try {
-        const nowMs = Date.now();
-        execSync(`sqlite3 "${DB_PATH}" "INSERT OR REPLACE INTO SystemSettings (id, key, value, updatedAt) VALUES ('bot_admin_number_auto', 'bot_admin_number', '${fPhone}', ${nowMs})"`, { timeout: 3000 });
-      } catch (e: any) {
-        console.error('[Bot] DB save error:', e.message?.substring(0, 100));
+      // Save admin number to DB
+      if (fPhone) {
+        try {
+          const nowMs = Date.now();
+          execSync(`sqlite3 "${DB_PATH}" "INSERT OR REPLACE INTO SystemSettings (id, key, value, updatedAt) VALUES ('bot_admin_number_auto', 'bot_admin_number', '${fPhone}', ${nowMs})"`, { timeout: 3000 });
+        } catch (e: any) {
+          console.error('[Bot] DB save error:', e.message?.substring(0, 100));
+        }
       }
 
       json({
         success: true,
-        message: botConnected ? 'Bot terkoneksi!' : currentPairingCode ? `Kode pairing: ${currentPairingCode}. Masukkan kode di WhatsApp Anda (Settings > Linked Devices > Link with phone number)` : 'Menunggu kode pairing dari WhatsApp...',
+        message: botConnected 
+          ? 'Bot connected successfully!' 
+          : currentPairingCode 
+            ? `Pairing code: ${currentPairingCode}. Enter this code in WhatsApp (Settings > Linked Devices > Link with phone number)`
+            : qrCode 
+              ? 'QR Code ready. Scan with WhatsApp (Settings > Linked Devices > Scan QR code)'
+              : 'Waiting for connection...',
         phoneNumber: fPhone,
         pairingCode: currentPairingCode,
+        hasQR: !!qrCode,
         connected: botConnected,
+        mode,
       });
     } catch (e: any) {
       json({ success: false, error: e.message }, 500);
@@ -475,6 +531,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Pairing code endpoint
   if (url.pathname === '/api/pairing-code') {
     json({ 
       success: true, 
@@ -486,12 +543,14 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // QR Code endpoint - returns the QR string for frontend to render
   if (url.pathname === '/api/qr') {
-    if (!qrCode) { json({ success: false, error: 'QR code belum tersedia' }, 404); return; }
+    if (!qrCode) { json({ success: false, error: 'QR code not available yet' }, 404); return; }
     json({ success: true, qr: qrCode });
     return;
   }
 
+  // Disconnect endpoint
   if (url.pathname === '/api/disconnect' && req.method === 'POST') {
     if (sock) { try { sock.end(undefined); } catch {} sock = null; }
     botConnected = false;
@@ -506,6 +565,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Config endpoints
   if (url.pathname === '/api/config' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
@@ -525,15 +585,16 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Send message endpoint
   if (url.pathname === '/api/send' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
-      if (!body.phone || !body.message) { json({ success: false, error: 'Phone dan message wajib diisi' }, 400); return; }
-      if (!sock || !botConnected) { json({ success: false, error: 'Bot belum terkoneksi' }, 400); return; }
+      if (!body.phone || !body.message) { json({ success: false, error: 'Phone and message are required' }, 400); return; }
+      if (!sock || !botConnected) { json({ success: false, error: 'Bot is not connected' }, 400); return; }
       let jid = body.phone.replace(/[^0-9]/g, '');
       if (!jid.includes('@')) jid += '@s.whatsapp.net';
       await sock.sendMessage(jid, { text: body.message });
-      json({ success: true, message: 'Pesan terkirim' });
+      json({ success: true, message: 'Message sent' });
     } catch (e: any) { json({ success: false, error: e.message }, 500); }
     return;
   }
@@ -543,22 +604,13 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   loadBotConfig();
-  if (existsSync(BOT_STATE_FILE)) {
-    try {
-      const data = JSON.parse(readFileSync(BOT_STATE_FILE, 'utf-8'));
-      if (data.pairingCode && !botConnected) {
-        currentPairingCode = data.pairingCode;
-        console.log(`[WA Bot] Restored pairing code: ${currentPairingCode}`);
-      }
-    } catch {}
-  }
   console.log(`[WA Bot] 🚀 Running on port ${PORT} (Node.js + baileys stable)`);
+  console.log(`[WA Bot] Connection modes: Pairing Code + QR Scan`);
   console.log(`[WA Bot] Auto-reply: ${botConfig.autoReply}`);
-
+  
+  // Try to reconnect with saved session
   if (hasValidSession()) {
     console.log('[WA Bot] Found saved session, reconnecting...');
-    connectToWhatsApp();
-  } else {
-    console.log('[WA Bot] No saved session. Use /api/connect with phone number to start pairing.');
+    connectToWhatsApp(botPhoneNumber || undefined, connectionMode).catch(console.error);
   }
 });

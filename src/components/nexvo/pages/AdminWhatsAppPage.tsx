@@ -18,10 +18,11 @@ import { useToast } from '@/hooks/use-toast';
 
 interface BotStatus {
   service: string;
-  status: 'connected' | 'disconnected';
+  status: 'connected' | 'disconnected' | 'pairing' | 'connecting';
   phoneNumber: string | null;
   pairingCode: string | null;
   hasQR: boolean;
+  connectionMode?: 'pairing' | 'qr';
   autoReply: boolean;
 }
 
@@ -53,6 +54,8 @@ export default function AdminWhatsAppPage() {
   const [sendPhone, setSendPhone] = useState('');
   const [sendMessage, setSendMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'connect' | 'cs' | 'config' | 'send'>('connect');
+  const [connectionMode, setConnectionMode] = useState<'pairing' | 'qr'>('pairing');
+  const [qrData, setQrData] = useState<string | null>(null);
 
   // WhatsApp Admin (CS) state
   const [waAdmins, setWaAdmins] = useState<WAAdmin[]>([]);
@@ -135,7 +138,7 @@ export default function AdminWhatsAppPage() {
       const res = await fetch('/api/admin/whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + adminToken },
-        body: JSON.stringify({ action: 'connect', phoneNumber }),
+        body: JSON.stringify({ action: 'connect', phoneNumber, mode: connectionMode }),
       });
       const data = await res.json();
       if (data.success) {
@@ -163,6 +166,16 @@ export default function AdminWhatsAppPage() {
               return;
             }
             if (statusData.pairingCode) setBotStatus(statusData);
+            // Also fetch QR data if in QR mode
+            if (statusData.hasQR && connectionMode === 'qr') {
+              try {
+                const qrRes = await fetch('/api/admin/whatsapp?action=qr', {
+                  headers: { Authorization: 'Bearer ' + adminToken },
+                });
+                const qrDataRes = await qrRes.json();
+                if (qrDataRes.success && qrDataRes.qr) setQrData(qrDataRes.qr);
+              } catch {}
+            }
             if (attempts > 60) {
               setConnecting(false);
               if (pollingRef.current) clearInterval(pollingRef.current);
@@ -313,6 +326,10 @@ export default function AdminWhatsAppPage() {
   };
 
   const isConnected = botStatus?.status === 'connected';
+  // Also update QR data from status
+  useEffect(() => { if (botStatus?.hasQR && connectionMode === 'qr' && !qrData) { fetchQR(); } }, [botStatus?.hasQR]);
+
+  const fetchQR = async () => { try { const res = await fetch('/api/admin/whatsapp?action=qr', { headers: { Authorization: 'Bearer ' + adminToken } }); const data = await res.json(); if (data.success && data.qr) setQrData(data.qr); } catch {} };
 
   return (
     <div className="p-3 sm:p-5 lg:p-6 pb-4 sm:pb-6">
@@ -398,28 +415,110 @@ export default function AdminWhatsAppPage() {
       {activeTab === 'connect' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-            <Phone className="w-5 h-5 text-[#D4AF37]" /> Hubungkan Bot
+            <Phone className="w-5 h-5 text-[#D4AF37]" /> Connect Bot
           </h3>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-muted-foreground text-xs mb-2 block">Nomor WhatsApp Bot</Label>
-              <div className="flex items-center gap-2">
-                <Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="628xxxxxxxxxx" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground flex-1" />
-                <Button onClick={handleConnect} disabled={connecting || !phoneNumber}
-                  className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
-                  {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                  <span className="ml-1.5">{connecting ? 'Menunggu...' : 'Hubungkan'}</span>
-                </Button>
+          
+          {/* Connection Mode Selection */}
+          {!isConnected && (
+            <div className="mb-5">
+              <Label className="text-muted-foreground text-xs mb-3 block">Connection Method</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setConnectionMode('pairing')}
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${connectionMode === 'pairing' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20'}`}
+                >
+                  <Key className={`w-6 h-6 mb-2 ${connectionMode === 'pairing' ? 'text-[#D4AF37]' : 'text-muted-foreground'}`} />
+                  <p className={`font-semibold text-sm ${connectionMode === 'pairing' ? 'text-[#D4AF37]' : 'text-foreground'}`}>Pairing Code</p>
+                  <p className="text-muted-foreground text-[10px] mt-1">Enter bot number, get code to input in WhatsApp</p>
+                </button>
+                <button
+                  onClick={() => setConnectionMode('qr')}
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${connectionMode === 'qr' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20'}`}
+                >
+                  <QrCode className={`w-6 h-6 mb-2 ${connectionMode === 'qr' ? 'text-[#D4AF37]' : 'text-muted-foreground'}`} />
+                  <p className={`font-semibold text-sm ${connectionMode === 'qr' ? 'text-[#D4AF37]' : 'text-foreground'}`}>Scan QR Code</p>
+                  <p className="text-muted-foreground text-[10px] mt-1">Scan QR code with WhatsApp like WhatsApp Web</p>
+                </button>
               </div>
-              <p className="text-muted-foreground text-xs mt-1">Format: 628xxxxxxxxxx (tanpa + atau spasi)</p>
             </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Pairing Code Mode - Phone Input */}
+            {connectionMode === 'pairing' && !isConnected && (
+              <div>
+                <Label className="text-muted-foreground text-xs mb-2 block">Bot WhatsApp Number</Label>
+                <div className="flex items-center gap-2">
+                  <Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="628xxxxxxxxxx" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground flex-1" />
+                  <Button onClick={handleConnect} disabled={connecting || !phoneNumber}
+                    className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+                    {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                    <span className="ml-1.5">{connecting ? 'Connecting...' : 'Connect'}</span>
+                  </Button>
+                </div>
+                <p className="text-muted-foreground text-xs mt-1">Format: 628xxxxxxxxxx (no + or spaces)</p>
+              </div>
+            )}
+
+            {/* QR Code Mode - Scan Button */}
+            {connectionMode === 'qr' && !isConnected && (
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <Button onClick={handleConnect} disabled={connecting}
+                    className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+                    {connecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <QrCode className="w-4 h-4 mr-2" />}
+                    {connecting ? 'Generating QR...' : 'Generate QR Code'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Pairing Code Display */}
+            {botStatus?.pairingCode && !isConnected && connectionMode === 'pairing' && (
+              <div className="p-4 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-center">
+                <p className="text-[#D4AF37] text-xs font-semibold mb-2">📱 Your Pairing Code</p>
+                <p className="text-3xl font-bold text-foreground tracking-[0.3em] font-mono">{botStatus.pairingCode}</p>
+                <p className="text-muted-foreground text-xs mt-2">Open WhatsApp → Settings → Linked Devices → Link with phone number</p>
+                <p className="text-muted-foreground text-[10px] mt-1">Enter this code in your WhatsApp app</p>
+              </div>
+            )}
+
+            {/* QR Code Display */}
+            {qrData && !isConnected && connectionMode === 'qr' && (
+              <div className="p-4 rounded-xl bg-white text-center">
+                <p className="text-black text-xs font-semibold mb-2">📱 Scan this QR Code</p>
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}`} 
+                  alt="WhatsApp QR Code"
+                  className="mx-auto rounded-lg"
+                  width={256}
+                  height={256}
+                />
+                <p className="text-gray-600 text-xs mt-2">Open WhatsApp → Settings → Linked Devices → Scan QR code</p>
+              </div>
+            )}
+
+            {/* Connected State */}
+            {isConnected && (
+              <div className="p-4 rounded-xl bg-emerald-400/10 border border-emerald-400/30">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                  <div>
+                    <p className="text-emerald-400 font-semibold text-sm">Bot Connected!</p>
+                    <p className="text-muted-foreground text-xs">Number: +{botStatus?.phoneNumber}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Disconnect Button */}
             {isConnected && (
               <div className="pt-4 border-t border-white/5">
                 <Button onClick={handleDisconnect} disabled={disconnecting}
                   variant="outline" className="rounded-xl border-red-400/30 text-red-400 hover:bg-red-500/10">
                   {disconnecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Unlink className="w-4 h-4 mr-2" />}
-                  Putuskan Koneksi
+                  Disconnect
                 </Button>
               </div>
             )}
