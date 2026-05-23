@@ -321,7 +321,7 @@ export default function AdminPaymentPage() {
       >
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">Pengaturan Pembayaran</h1>
-          <p className="text-muted-foreground text-sm">Kelola metode dan pengaturan pembayaran</p>
+          <p className="text-muted-foreground text-sm">Manage payment methods and settings</p>
         </div>
         <Button
           onClick={openNewForm}

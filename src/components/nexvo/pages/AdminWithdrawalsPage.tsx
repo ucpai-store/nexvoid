@@ -105,7 +105,7 @@ export default function AdminWithdrawalsPage() {
           prev.map((w) => (w.id === id ? { ...w, status } : w))
         );
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Network Error', variant: 'destructive' });

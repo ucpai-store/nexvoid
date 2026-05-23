@@ -183,11 +183,11 @@ export default function AdminBannersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Banner dihapus' });
+        toast({ title: 'Banner deleted' });
         setBanners((prev) => prev.filter((b) => b.id !== currentDeleteId));
         setDeleteId(null);
       } else {
-        toast({ title: 'Gagal menghapus', description: data.error, variant: 'destructive' });
+        toast({ title: 'Delete failed', description: data.error, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Network Error', variant: 'destructive' });
@@ -215,7 +215,7 @@ export default function AdminBannersPage() {
         toast({ title: `Banner ${banner.isActive ? 'dinonaktifkan' : 'diaktifkan'}` });
       }
     } catch {
-      toast({ title: 'Gagal mengubah status', variant: 'destructive' });
+      toast({ title: 'Failed to change status', variant: 'destructive' });
     }
   };
 
@@ -556,7 +556,7 @@ export default function AdminBannersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Hapus Banner</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Banner akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.
+              The banner will be permanently deleted. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

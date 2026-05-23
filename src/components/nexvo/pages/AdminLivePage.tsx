@@ -114,15 +114,15 @@ export default function AdminLivePage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Aktivitas ditambahkan' });
+        toast({ title: 'Activity added' });
         setFormOpen(false);
         setFormData({ type: 'deposit', userName: '', amount: '', productName: '' });
         fetchActivities();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -152,10 +152,10 @@ export default function AdminLivePage() {
       const data = await res.json();
       if (data.success) {
         fetchActivities();
-        toast({ title: 'Aktivitas acak ditambahkan' });
+        toast({ title: 'Random activities added' });
       }
     } catch {
-      toast({ title: 'Gagal generate aktivitas', variant: 'destructive' });
+      toast({ title: 'Failed to generate activities', variant: 'destructive' });
     } finally {
       setAutoGenerating(false);
     }
@@ -177,7 +177,7 @@ export default function AdminLivePage() {
         setActivities((prev) => prev.filter((a) => a.id !== id));
       }
     } catch {
-      toast({ title: 'Gagal menghapus', variant: 'destructive' });
+      toast({ title: 'Delete failed', variant: 'destructive' });
     }
   };
 

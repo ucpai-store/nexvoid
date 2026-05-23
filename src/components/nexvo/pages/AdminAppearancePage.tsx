@@ -99,14 +99,14 @@ export default function AdminAppearancePage() {
         setLogoUrl(data.data.url);
         setPreviewUrl(null);
         setSelectedFile(null);
-        setMessage({ type: 'success', text: 'Logo website berhasil diperbarui!' });
+        setMessage({ type: 'success', text: 'Website logo updated successfully!' });
 
         // Reset file input
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
       } else {
-        setMessage({ type: 'error', text: data.error || 'Gagal mengunggah logo' });
+        setMessage({ type: 'error', text: data.error || 'Failed to upload logo' });
       }
     } catch {
       setMessage({ type: 'error', text: 'Terjadi kesalahan saat mengunggah logo' });
@@ -153,9 +153,9 @@ export default function AdminAppearancePage() {
             });
           }
         }
-        setMessage({ type: 'success', text: data.message || 'Logo berhasil dihapus dan dikembalikan ke default!' });
+        setMessage({ type: 'success', text: data.message || 'Logo deleted and restored to default!' });
       } else {
-        setMessage({ type: 'error', text: data.error || 'Gagal menghapus logo' });
+        setMessage({ type: 'error', text: data.error || 'Failed to delete logo' });
       }
     } catch {
       setMessage({ type: 'error', text: 'Terjadi kesalahan saat menghapus logo' });

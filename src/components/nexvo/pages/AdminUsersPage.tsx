@@ -62,7 +62,7 @@ export default function AdminUsersPage() {
       const data = await res.json();
       if (data.success) setUsers(data.data);
     } catch {
-      toast({ title: 'Error', description: 'Gagal memuat data', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to load data', variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
@@ -90,11 +90,11 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: `Saldo berhasil ${saldoDialog.type === 'add' ? 'ditambah' : 'dikurangi'}` });
+        toast({ title: `Balance successfully ${saldoDialog.type === 'add' ? 'added' : 'deducted'}` });
         fetchUsers();
         setSaldoDialog(null); setSaldoAmount('');
-      } else { toast({ title: 'Gagal', description: data.error, variant: 'destructive' }); }
-    } catch { toast({ title: 'Kesalahan Jaringan', variant: 'destructive' }); }
+      } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
+    } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
     finally { setProcessing(false); }
   };
 
@@ -109,8 +109,8 @@ export default function AdminUsersPage() {
       if (data.success) {
         toast({ title: `User ${isSuspended ? 'diaktifkan' : 'disuspend'}` });
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, isSuspended: !isSuspended } : u)));
-      } else { toast({ title: 'Gagal', description: data.error, variant: 'destructive' }); }
-    } catch { toast({ title: 'Kesalahan Jaringan', variant: 'destructive' }); }
+      } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
+    } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
   };
 
   const handleVerify = async (userId: string, isVerified: boolean) => {
@@ -124,8 +124,8 @@ export default function AdminUsersPage() {
       if (data.success) {
         toast({ title: `User ${isVerified ? 'unverifikasi' : 'verifikasi'}` });
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, isVerified: !isVerified } : u)));
-      } else { toast({ title: 'Gagal', description: data.error, variant: 'destructive' }); }
-    } catch { toast({ title: 'Kesalahan Jaringan', variant: 'destructive' }); }
+      } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
+    } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
   };
 
   const openEditDialog = (user: User) => {
@@ -143,11 +143,11 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'User berhasil diperbarui' });
+        toast({ title: 'User updated successfully' });
         setUsers((prev) => prev.map((u) => u.id === editDialog.id ? { ...u, name: editForm.name, whatsapp: editForm.whatsapp, email: editForm.email, level: editForm.level } : u));
         setEditDialog(null);
-      } else { toast({ title: 'Gagal memperbarui', description: data.error, variant: 'destructive' }); }
-    } catch { toast({ title: 'Kesalahan Jaringan', variant: 'destructive' }); }
+      } else { toast({ title: 'Update failed', description: data.error, variant: 'destructive' }); }
+    } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
     finally { setSavingEdit(false); }
   };
 
@@ -165,11 +165,11 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'User berhasil dihapus' });
+        toast({ title: 'User deleted successfully' });
         setUsers((prev) => prev.filter((u) => u.id !== currentDeleteId));
         setDeleteUserId(null);
-      } else { toast({ title: 'Gagal menghapus', description: data.error, variant: 'destructive' }); }
-    } catch { toast({ title: 'Kesalahan Jaringan', variant: 'destructive' }); }
+      } else { toast({ title: 'Delete failed', description: data.error, variant: 'destructive' }); }
+    } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
     finally { setDeletingUser(false); }
   };
 
