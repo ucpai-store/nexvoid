@@ -104,10 +104,10 @@ function isWorkingHours(t: (key: string) => string): { isWorking: boolean; messa
   const currentTime = hours * 60 + minutes;
 
   if (day === 0 || day === 6) {
-    return { isWorking: false, message: 'Penarikan hanya bisa dilakukan pada hari kerja (Senin-Jumat), jam 09:00-16:00 WIB' };
+    return { isWorking: false, message: 'Withdrawal can only be done on weekdays (Monday-Friday), 09:00-16:00 WIB' };
   }
   if (currentTime < 9 * 60 || currentTime > 16 * 60) {
-    return { isWorking: false, message: 'Penarikan hanya bisa dilakukan jam 09:00-16:00 WIB (hari kerja)' };
+    return { isWorking: false, message: 'Withdrawal can only be done 09:00-16:00 WIB (weekdays)' };
   }
   return { isWorking: true, message: '' };
 }
@@ -193,17 +193,17 @@ export default function WithdrawPage() {
   // Get the account number/label
   const getAccountLabel = (): string => {
     switch (selectedCategory) {
-      case 'bank': return 'Nomor Rekening';
-      case 'ewallet': return 'Nomor HP / ID E-Wallet';
+      case 'bank': return 'Account Number';
+      case 'ewallet': return 'Phone Number / E-Wallet ID';
       case 'usdt': return 'Wallet Address (BEP20)';
-      default: return 'Nomor Akun';
+      default: return 'Account Number';
     }
   };
 
   const getAccountPlaceholder = (): string => {
     switch (selectedCategory) {
-      case 'bank': return 'Contoh: 1234567890';
-      case 'ewallet': return 'Contoh: 081234567890';
+      case 'bank': return 'Example: 1234567890';
+      case 'ewallet': return 'Example: 081234567890';
       case 'usdt': return '0x...';
       default: return '';
     }
@@ -224,7 +224,7 @@ export default function WithdrawPage() {
     e.preventDefault();
 
     if (!isFormValid()) {
-      toast({ title: 'Error', description: 'Lengkapi semua field', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
       return;
     }
 
@@ -251,7 +251,7 @@ export default function WithdrawPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast({ title: 'Berhasil', description: t('withdraw.withdrawSuccess') });
+        toast({ title: 'Success', description: t('withdraw.withdrawSuccess') });
         setAmount('');
         setAccountNo('');
         setHolderName('');
@@ -259,10 +259,10 @@ export default function WithdrawPage() {
         await hydrateUser();
         fetchData();
       } else {
-        toast({ title: 'Gagal', description: data.error || 'Withdraw gagal', variant: 'destructive' });
+        toast({ title: 'Gagal', description: data.error || 'Withdrawal failed', variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Error', description: 'Terjadi kesalahan jaringan', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Network error occurred', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -336,7 +336,7 @@ export default function WithdrawPage() {
           <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
             <Wallet className="w-5 h-5 text-[#D4AF37]" />
           </div>
-          <span className="text-muted-foreground text-sm">Saldo Tersedia</span>
+          <span className="text-muted-foreground text-sm">Available Balance</span>
         </div>
         <p className="text-2xl sm:text-3xl font-bold text-gold-gradient">{formatRupiah(mainBalance)}</p>
       </motion.div>
@@ -348,7 +348,7 @@ export default function WithdrawPage() {
 
           {/* Payment Category Tabs */}
           <div className="space-y-2">
-            <Label className="text-foreground text-sm font-medium">Metode Penarikan</Label>
+            <Label className="text-foreground text-sm font-medium">Withdrawal Method</Label>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {WITHDRAW_PAYMENT_CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
@@ -375,7 +375,7 @@ export default function WithdrawPage() {
           {/* ── Bank Transfer Options ── */}
           {selectedCategory === 'bank' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-              <Label className="text-foreground text-sm font-medium">Pilih Bank</Label>
+              <Label className="text-foreground text-sm font-medium">Select Bank</Label>
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
                 {BANK_OPTIONS.map((bank) => {
                   const isSelected = selectedBank === bank.value;
@@ -405,7 +405,7 @@ export default function WithdrawPage() {
           {/* ── E-Wallet Options ── */}
           {selectedCategory === 'ewallet' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-              <Label className="text-foreground text-sm font-medium">Pilih E-Wallet</Label>
+              <Label className="text-foreground text-sm font-medium">Select E-Wallet</Label>
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
                 {EWALLET_OPTIONS.map((ew) => {
                   const isSelected = selectedEwallet === ew.value;
@@ -455,11 +455,11 @@ export default function WithdrawPage() {
                   />
                 </div>
                 <div className="mt-3 p-2 rounded-lg bg-[#26A17B]/5 border border-[#26A17B]/10">
-                  <p className="text-[#26A17B] text-[10px] font-medium mb-1">⚠️ Penting:</p>
+                  <p className="text-[#26A17B] text-[10px] font-medium mb-1">⚠️ Important:</p>
                   <ul className="text-muted-foreground text-[10px] space-y-0.5">
-                    <li>• Kirim hanya USDT via jaringan BEP20 (BSC)</li>
-                    <li>• Pastikan alamat wallet benar sebelum submit</li>
-                    <li>• Jangan kirim aset selain USDT</li>
+                    <li>• Send only USDT via BEP20 (BSC) network</li>
+                    <li>• Make sure wallet address is correct before submitting</li>
+                    <li>• Do not send assets other than USDT</li>
                   </ul>
                 </div>
               </div>
@@ -481,10 +481,10 @@ export default function WithdrawPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground text-sm font-medium">Nama Pemilik</Label>
+                <Label className="text-foreground text-sm font-medium">Account Holder</Label>
                 <Input
                   type="text"
-                  placeholder="Nama sesuai buku rekening / akun"
+                  placeholder="Name as per bank book / account"
                   value={holderName}
                   onChange={(e) => setHolderName(e.target.value)}
                   className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
@@ -511,7 +511,7 @@ export default function WithdrawPage() {
               />
             </div>
             <p className="text-muted-foreground text-xs">
-              Minimal: {formatRupiah(minWithdraw)} • Saldo: {formatRupiah(mainBalance)}
+              Minimum: {formatRupiah(minWithdraw)} • Balance: {formatRupiah(mainBalance)}
             </p>
           </div>
 

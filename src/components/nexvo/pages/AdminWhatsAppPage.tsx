@@ -144,11 +144,11 @@ export default function AdminWhatsAppPage() {
       if (data.success) {
         if (data.connected) {
           setBotStatus(prev => prev ? { ...prev, status: 'connected', phoneNumber: data.phoneNumber } : prev);
-          toast({ title: '✅ Bot Terkoneksi!' });
+          toast({ title: '✅ Bot Connected!' });
           setConnecting(false);
           return;
         }
-        toast({ title: 'Menghubungkan...', description: 'Menunggu kode pairing' });
+        toast({ title: 'Connecting...', description: 'Waiting for pairing code' });
         let attempts = 0;
         if (pollingRef.current) clearInterval(pollingRef.current);
         pollingRef.current = setInterval(async () => {
@@ -160,7 +160,7 @@ export default function AdminWhatsAppPage() {
             const statusData = await statusRes.json();
             if (statusData.status === 'connected') {
               setBotStatus(statusData);
-              toast({ title: '✅ Bot Terkoneksi!' });
+              toast({ title: '✅ Bot Connected!' });
               setConnecting(false);
               if (pollingRef.current) clearInterval(pollingRef.current);
               return;
@@ -169,23 +169,33 @@ export default function AdminWhatsAppPage() {
             // Also fetch QR data if in QR mode
             if (statusData.hasQR && connectionMode === 'qr') {
               try {
-                const qrRes = await fetch('/api/admin/whatsapp?action=qr', {
+                // Try to get base64 image first
+                const imgRes = await fetch('/api/admin/whatsapp?action=qr-image', {
                   headers: { Authorization: 'Bearer ' + adminToken },
                 });
-                const qrDataRes = await qrRes.json();
-                if (qrDataRes.success && qrDataRes.qr) setQrData(qrDataRes.qr);
+                const imgData = await imgRes.json();
+                if (imgData.success && imgData.image) {
+                  setQrImageBase64(imgData.image);
+                } else {
+                  // Fallback to QR string
+                  const qrRes = await fetch('/api/admin/whatsapp?action=qr', {
+                    headers: { Authorization: 'Bearer ' + adminToken },
+                  });
+                  const qrDataRes = await qrRes.json();
+                  if (qrDataRes.success && qrDataRes.qr) setQrData(qrDataRes.qr);
+                }
               } catch {}
             }
             if (attempts > 60) {
               setConnecting(false);
               if (pollingRef.current) clearInterval(pollingRef.current);
-              toast({ title: '⏰ Timeout', description: 'Coba hubungkan ulang.', variant: 'destructive' });
+              toast({ title: '⏰ Timeout', description: 'Try reconnecting.', variant: 'destructive' });
             }
           } catch {}
         }, 2000);
         if (data.pairingCode) {
           setBotStatus(prev => prev ? { ...prev, pairingCode: data.pairingCode } : prev);
-          toast({ title: '📱 Kode Pairing Siap!', description: 'Masukkan kode di WhatsApp Anda' });
+          toast({ title: '📱 Pairing Code Ready!', description: 'Enter the code in your WhatsApp' });
         }
       } else {
         toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
@@ -222,7 +232,7 @@ export default function AdminWhatsAppPage() {
         body: JSON.stringify({ action: 'config', ...config }),
       });
       const data = await res.json();
-      if (data.success) toast({ title: 'Konfigurasi disimpan!' });
+      if (data.success) toast({ title: 'Configuration saved!' });
       else toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
     } catch { toast({ title: 'Kesalahan Jaringan', variant: 'destructive' }); }
     finally { setSaving(false); }
@@ -238,7 +248,7 @@ export default function AdminWhatsAppPage() {
         body: JSON.stringify({ action: 'send', phone: sendPhone, message: sendMessage }),
       });
       const data = await res.json();
-      if (data.success) { toast({ title: 'Pesan terkirim!' }); setSendPhone(''); setSendMessage(''); }
+      if (data.success) { toast({ title: 'Message terkirim!' }); setSendPhone(''); setSendMessage(''); }
       else toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
     } catch { toast({ title: 'Kesalahan Jaringan', variant: 'destructive' }); }
     finally { setSending(false); }
@@ -256,7 +266,7 @@ export default function AdminWhatsAppPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: '✅ Nomor CS ditambahkan!' });
+        toast({ title: '✅ CS Numbers ditambahkan!' });
         setNewName(''); setNewPhone(''); setAddingAdmin(false);
         fetchWaAdmins();
       } else {
@@ -277,7 +287,7 @@ export default function AdminWhatsAppPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: '✅ Nomor CS diperbarui!' });
+        toast({ title: '✅ CS Numbers diperbarui!' });
         setEditingAdmin(null);
         fetchWaAdmins();
       } else {
@@ -297,7 +307,7 @@ export default function AdminWhatsAppPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: admin.isActive ? 'CS dinonaktifkan' : '✅ CS diaktifkan' });
+        toast({ title: admin.isActive ? 'CS disabled' : '✅ CS enabled' });
         fetchWaAdmins();
       }
     } catch {}
@@ -305,7 +315,7 @@ export default function AdminWhatsAppPage() {
 
   const handleDeleteAdmin = async (id: string) => {
     if (!adminToken) return;
-    if (!confirm('Hapus nomor CS ini?')) return;
+    if (!confirm('Delete this CS number?')) return;
     try {
       const res = await fetch(`/api/admin/whatsapp-admins?id=${id}`, {
         method: 'DELETE',
@@ -313,7 +323,7 @@ export default function AdminWhatsAppPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Nomor CS dihapus' });
+        toast({ title: 'CS Numbers dihapus' });
         fetchWaAdmins();
       }
     } catch {}
@@ -329,7 +339,21 @@ export default function AdminWhatsAppPage() {
   // Also update QR data from status
   useEffect(() => { if (botStatus?.hasQR && connectionMode === 'qr' && !qrData) { fetchQR(); } }, [botStatus?.hasQR]);
 
-  const fetchQR = async () => { try { const res = await fetch('/api/admin/whatsapp?action=qr', { headers: { Authorization: 'Bearer ' + adminToken } }); const data = await res.json(); if (data.success && data.qr) setQrData(data.qr); } catch {} };
+  const fetchQR = async () => { 
+    try { 
+      // First try to get base64 image from bot
+      const imgRes = await fetch('/api/admin/whatsapp?action=qr-image', { headers: { Authorization: 'Bearer ' + adminToken } }); 
+      const imgData = await imgRes.json(); 
+      if (imgData.success && imgData.image) { 
+        setQrImageBase64(imgData.image); 
+      } else {
+        // Fallback to QR string
+        const res = await fetch('/api/admin/whatsapp?action=qr', { headers: { Authorization: 'Bearer ' + adminToken } }); 
+        const data = await res.json(); 
+        if (data.success && data.qr) setQrData(data.qr); 
+      }
+    } catch {} 
+  };
 
   return (
     <div className="p-3 sm:p-5 lg:p-6 pb-4 sm:pb-6">
@@ -339,7 +363,7 @@ export default function AdminWhatsAppPage() {
             <MessageCircle className="w-6 h-6 text-[#D4AF37]" />
             WhatsApp Bot
           </h1>
-          <p className="text-muted-foreground text-sm">Kelola bot WhatsApp & nomor CS</p>
+          <p className="text-muted-foreground text-sm">Manage WhatsApp bot & CS numbers</p>
         </div>
         <Button variant="outline" size="sm" onClick={loadData} className="rounded-xl border-[#D4AF37]/20">
           <RefreshCw className="w-4 h-4 mr-1" /> Refresh
@@ -355,9 +379,9 @@ export default function AdminWhatsAppPage() {
               {isConnected ? <CheckCircle2 className="w-6 h-6 text-emerald-400" /> : <XCircle className="w-6 h-6 text-red-400" />}
             </div>
             <div>
-              <h3 className="text-foreground font-semibold">{isConnected ? 'Bot Terkoneksi' : 'Bot Tidak Aktif'}</h3>
+              <h3 className="text-foreground font-semibold">{isConnected ? 'Bot Connected' : 'Bot Inactive'}</h3>
               <p className="text-muted-foreground text-sm">
-                {botStatus?.phoneNumber ? `+${botStatus.phoneNumber}` : 'Belum ada nomor'}
+                {botStatus?.phoneNumber ? `+${botStatus.phoneNumber}` : 'No number yet'}
               </p>
             </div>
           </div>
@@ -368,27 +392,27 @@ export default function AdminWhatsAppPage() {
 
         {botStatus?.pairingCode && !isConnected && (
           <div className="mt-4 p-5 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
-            <p className="text-foreground text-sm font-semibold mb-2">📱 Kode Pairing WhatsApp:</p>
+            <p className="text-foreground text-sm font-semibold mb-2">📱 WhatsApp Pairing Code:</p>
             <div className="flex items-center gap-3 mb-3">
               <p className="text-[#D4AF37] font-bold text-3xl tracking-[0.3em] font-mono">{botStatus.pairingCode}</p>
               <Button size="sm" variant="outline" className="rounded-lg border-[#D4AF37]/20 text-[#D4AF37] h-9"
-                onClick={() => { navigator.clipboard.writeText(botStatus.pairingCode!); toast({ title: 'Kode disalin!' }); }}>
+                onClick={() => { navigator.clipboard.writeText(botStatus.pairingCode!); toast({ title: 'Code copied!' }); }}>
                 Copy
               </Button>
             </div>
             <div className="bg-black/20 rounded-lg p-3 space-y-1.5">
-              <p className="text-muted-foreground text-xs font-semibold">📌 Cara Menghubungkan:</p>
-              <p className="text-muted-foreground text-xs">1. Buka WhatsApp di HP Anda</p>
-              <p className="text-muted-foreground text-xs">2. Tap ⋮ (menu) → Perangkat tertaut</p>
-              <p className="text-muted-foreground text-xs">3. Tap "Tautkan perangkit"</p>
-              <p className="text-muted-foreground text-xs">4. Pilih "Tautkan dengan nomor telepon"</p>
-              <p className="text-muted-foreground text-xs">5. Masukkan kode: <span className="text-[#D4AF37] font-bold">{botStatus.pairingCode}</span></p>
+              <p className="text-muted-foreground text-xs font-semibold">📌 How to Connect:</p>
+              <p className="text-muted-foreground text-xs">1. Open WhatsApp on your phone</p>
+              <p className="text-muted-foreground text-xs">2. Tap ⋮ (menu) → Linked Devices</p>
+              <p className="text-muted-foreground text-xs">3. Tap "Link a device"</p>
+              <p className="text-muted-foreground text-xs">4. Select "Link with phone number"</p>
+              <p className="text-muted-foreground text-xs">5. Enter code: <span className="text-[#D4AF37] font-bold">{botStatus.pairingCode}</span></p>
             </div>
-            <p className="text-yellow-400 text-xs mt-2">⚠️ Kode berlaku sementara. Jika expired, hubungkan ulang.</p>
+            <p className="text-yellow-400 text-xs mt-2">⚠️ Code is temporary. If expired, reconnect.</p>
             {connecting && (
               <div className="flex items-center gap-2 mt-3">
                 <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
-                <p className="text-[#D4AF37] text-xs">Menunggu kode dimasukkan di WhatsApp...</p>
+                <p className="text-[#D4AF37] text-xs">Waiting for code to be entered on WhatsApp...</p>
               </div>
             )}
           </div>
@@ -399,10 +423,10 @@ export default function AdminWhatsAppPage() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
         className="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar">
         {[
-          { key: 'connect' as const, label: 'Koneksi', icon: Link2 },
-          { key: 'cs' as const, label: 'Nomor CS', icon: Users },
-          { key: 'config' as const, label: 'Pengaturan', icon: Settings },
-          { key: 'send' as const, label: 'Kirim Pesan', icon: Send },
+          { key: 'connect' as const, label: 'Connection', icon: Link2 },
+          { key: 'cs' as const, label: 'CS Numbers', icon: Users },
+          { key: 'config' as const, label: 'Settings', icon: Settings },
+          { key: 'send' as const, label: 'Send Message', icon: Send },
         ].map((tab) => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${activeTab === tab.key ? 'bg-[#D4AF37]/15 text-[#D4AF37] glow-gold' : 'glass text-foreground/60 hover:text-foreground hover:bg-white/5'}`}>
@@ -489,7 +513,7 @@ export default function AdminWhatsAppPage() {
               <div className="p-4 rounded-xl bg-white text-center">
                 <p className="text-black text-xs font-semibold mb-2">📱 Scan this QR Code</p>
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}`} 
+                  src={qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}`} 
                   alt="WhatsApp QR Code"
                   className="mx-auto rounded-lg"
                   width={256}
@@ -531,16 +555,16 @@ export default function AdminWhatsAppPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-foreground font-semibold flex items-center gap-2">
-              <Users className="w-5 h-5 text-[#D4AF37]" /> Nomor WhatsApp CS
+              <Users className="w-5 h-5 text-[#D4AF37]" /> CS WhatsApp Numbers
             </h3>
             <Button onClick={() => setAddingAdmin(true)} disabled={addingAdmin}
               className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 h-9 text-sm">
-              <Plus className="w-4 h-4 mr-1" /> Tambah CS
+              <Plus className="w-4 h-4 mr-1" /> Add CS
             </Button>
           </div>
 
           <p className="text-muted-foreground text-xs mb-4">
-            Nomor CS ini ditampilkan ke user saat mereka membutuhkan bantuan (menu Bantuan di bot & halaman kontak).
+            CS Numbers ini ditampilkan ke user saat mereka membutuhkan bantuan (menu Bantuan di bot & halaman kontak).
           </p>
 
           {/* Add New Admin Form */}
@@ -548,15 +572,15 @@ export default function AdminWhatsAppPage() {
             {addingAdmin && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                 className="mb-4 p-4 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20 overflow-hidden">
-                <h4 className="text-foreground text-sm font-semibold mb-3">Tambah Nomor CS Baru</h4>
+                <h4 className="text-foreground text-sm font-semibold mb-3">Add CS Numbers Baru</h4>
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-muted-foreground text-xs mb-1 block">Nama CS</Label>
+                    <Label className="text-muted-foreground text-xs mb-1 block">CS Name</Label>
                     <Input value={newName} onChange={(e) => setNewName(e.target.value)}
-                      placeholder="Contoh: CS NEXVO" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+                      placeholder="Example: CS NEXVO" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-xs mb-1 block">Nomor WhatsApp</Label>
+                    <Label className="text-muted-foreground text-xs mb-1 block">WhatsApp Number</Label>
                     <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
                       placeholder="628xxxxxxxxxx" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
                   </div>
@@ -564,11 +588,11 @@ export default function AdminWhatsAppPage() {
                     <Button onClick={handleAddAdmin} disabled={savingAdmin || !newName || !newPhone}
                       className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
                       {savingAdmin ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                      Simpan
+                      Save
                     </Button>
                     <Button onClick={() => { setAddingAdmin(false); setNewName(''); setNewPhone(''); }}
                       variant="outline" className="rounded-xl border-white/10 text-foreground">
-                      <X className="w-4 h-4 mr-1" /> Batal
+                      <X className="w-4 h-4 mr-1" /> Cancel
                     </Button>
                   </div>
                 </div>
@@ -584,8 +608,8 @@ export default function AdminWhatsAppPage() {
           ) : waAdmins.length === 0 ? (
             <div className="text-center py-8">
               <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">Belum ada nomor CS</p>
-              <p className="text-muted-foreground text-xs">Tambahkan nomor WhatsApp CS di atas</p>
+              <p className="text-muted-foreground text-sm">No number yet CS</p>
+              <p className="text-muted-foreground text-xs">Add a CS WhatsApp number above</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -604,11 +628,11 @@ export default function AdminWhatsAppPage() {
                         <Button onClick={() => handleUpdateAdmin(admin.id)} disabled={savingAdmin}
                           className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 h-8 text-xs">
                           {savingAdmin ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
-                          Simpan
+                          Save
                         </Button>
                         <Button onClick={() => setEditingAdmin(null)} variant="outline"
                           className="rounded-xl border-white/10 text-foreground h-8 text-xs">
-                          Batal
+                          Cancel
                         </Button>
                       </div>
                     </div>
@@ -626,7 +650,7 @@ export default function AdminWhatsAppPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => handleToggleAdmin(admin)}
-                          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title={admin.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
+                          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title={admin.isActive ? 'Disable' : 'Enable'}>
                           {admin.isActive
                             ? <ToggleRight className="w-6 h-6 text-emerald-400" />
                             : <ToggleLeft className="w-6 h-6 text-gray-400" />}
@@ -653,13 +677,13 @@ export default function AdminWhatsAppPage() {
       {activeTab === 'config' && config && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-            <Settings className="w-5 h-5 text-[#D4AF37]" /> Pengaturan Bot
+            <Settings className="w-5 h-5 text-[#D4AF37]" /> Settings Bot
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-white/[0.02] rounded-xl">
               <div>
                 <p className="text-foreground text-sm font-medium">Auto Reply</p>
-                <p className="text-muted-foreground text-xs">Bot otomatis membalas pesan</p>
+                <p className="text-muted-foreground text-xs">Bot automatically replies to messages</p>
               </div>
               <button onClick={() => setConfig({ ...config, autoReply: !config.autoReply })} className="text-foreground">
                 {config.autoReply ? <ToggleRight className="w-8 h-8 text-emerald-400" /> : <ToggleLeft className="w-8 h-8 text-muted-foreground" />}
@@ -667,32 +691,32 @@ export default function AdminWhatsAppPage() {
             </div>
             <div className="flex items-center justify-between p-3 bg-white/[0.02] rounded-xl">
               <div>
-                <p className="text-foreground text-sm font-medium">Hanya User Terdaftar</p>
-                <p className="text-muted-foreground text-xs">Hanya balas nomor yang terdaftar</p>
+                <p className="text-foreground text-sm font-medium">Registered Users Only</p>
+                <p className="text-muted-foreground text-xs">Only reply to registered numbers</p>
               </div>
               <button onClick={() => setConfig({ ...config, onlyRegistered: !config.onlyRegistered })} className="text-foreground">
                 {config.onlyRegistered ? <ToggleRight className="w-8 h-8 text-emerald-400" /> : <ToggleLeft className="w-8 h-8 text-muted-foreground" />}
               </button>
             </div>
             <div>
-              <Label className="text-muted-foreground text-xs mb-2 block">Pesan Selamat Datang</Label>
+              <Label className="text-muted-foreground text-xs mb-2 block">Welcome Message</Label>
               <Textarea value={config.welcomeMessage} onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
                 className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground min-h-[80px]" />
             </div>
             <div>
-              <Label className="text-muted-foreground text-xs mb-2 block">Header Menu</Label>
+              <Label className="text-muted-foreground text-xs mb-2 block">Menu Header</Label>
               <Input value={config.menuHeader} onChange={(e) => setConfig({ ...config, menuHeader: e.target.value })}
                 className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
             </div>
             <div>
-              <Label className="text-muted-foreground text-xs mb-2 block">Footer Menu</Label>
+              <Label className="text-muted-foreground text-xs mb-2 block">Menu Footer</Label>
               <Input value={config.menuFooter} onChange={(e) => setConfig({ ...config, menuFooter: e.target.value })}
                 className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
             </div>
             <Button onClick={handleSaveConfig} disabled={saving}
               className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 w-full">
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Simpan Pengaturan
+              Save Settings
             </Button>
           </div>
         </motion.div>
@@ -702,26 +726,26 @@ export default function AdminWhatsAppPage() {
       {activeTab === 'send' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-            <Send className="w-5 h-5 text-[#D4AF37]" /> Kirim Pesan Manual
+            <Send className="w-5 h-5 text-[#D4AF37]" /> Send Message Manual
           </h3>
           <div className="space-y-4">
             <div>
-              <Label className="text-muted-foreground text-xs mb-2 block">Nomor WhatsApp</Label>
+              <Label className="text-muted-foreground text-xs mb-2 block">WhatsApp Number</Label>
               <Input value={sendPhone} onChange={(e) => setSendPhone(e.target.value)}
                 placeholder="628xxxxxxxxxx" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
             </div>
             <div>
-              <Label className="text-muted-foreground text-xs mb-2 block">Pesan</Label>
+              <Label className="text-muted-foreground text-xs mb-2 block">Message</Label>
               <Textarea value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
-                placeholder="Tulis pesan..." className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground min-h-[120px]" />
+                placeholder="Write message..." className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground min-h-[120px]" />
             </div>
             <Button onClick={handleSendMessage} disabled={sending || !sendPhone || !sendMessage || !isConnected}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl w-full">
               {sending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-              Kirim Pesan
+              Send Message
             </Button>
             {!isConnected && (
-              <p className="text-red-400 text-xs text-center">Hubungkan bot terlebih dahulu untuk mengirim pesan</p>
+              <p className="text-red-400 text-xs text-center">Connect the bot first to send messages</p>
             )}
           </div>
         </motion.div>

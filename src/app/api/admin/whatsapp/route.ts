@@ -13,14 +13,14 @@ async function proxyToBot(path: string, options: RequestInit = {}, timeout = 100
     });
     return await res.json();
   } catch {
-    return { success: false, error: 'Bot service tidak tersedia' };
+    return { success: false, error: 'Bot service unavailable' };
   }
 }
 
 export async function GET(request: NextRequest) {
   const admin = await getAdminFromRequest(request);
   if (!admin) {
-    return NextResponse.json({ success: false, error: 'Tidak terautentikasi' }, { status: 401 });
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -33,17 +33,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(await proxyToBot('/api/pairing-code'));
     case 'qr':
       return NextResponse.json(await proxyToBot('/api/qr'));
+    case 'qr-image':
+      return NextResponse.json(await proxyToBot('/api/qr-image'));
     case 'config':
       return NextResponse.json(await proxyToBot('/api/config'));
     default:
-      return NextResponse.json({ success: false, error: 'Action tidak valid' });
+      return NextResponse.json({ success: false, error: 'Invalid action' });
   }
 }
 
 export async function POST(request: NextRequest) {
   const admin = await getAdminFromRequest(request);
   if (!admin) {
-    return NextResponse.json({ success: false, error: 'Tidak terautentikasi' }, { status: 401 });
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
   const body = await request.json();
@@ -83,6 +85,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result);
     }
     default:
-      return NextResponse.json({ success: false, error: 'Action tidak valid' });
+      return NextResponse.json({ success: false, error: 'Invalid action' });
   }
 }

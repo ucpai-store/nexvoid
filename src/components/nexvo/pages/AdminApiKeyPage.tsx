@@ -98,6 +98,10 @@ export default function AdminApiKeyPage() {
   const [pairingCopied, setPairingCopied] = useState(false);
   const [revokingPairing, setRevokingPairing] = useState(false);
   const [pairingCodeVisible, setPairingCodeVisible] = useState(false);
+  // QR Code State
+  const [connectMode, setConnectMode] = useState<'pairing' | 'qr'>('pairing');
+  const [qrImage, setQrImage] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
 
   /* ─── Fetch API Keys ─── */
   const fetchKeys = useCallback(() => {
@@ -110,7 +114,7 @@ export default function AdminApiKeyPage() {
         if (res.success) setApiKeys(res.data);
       })
       .catch(() => {
-        toast({ title: 'Gagal memuat API keys', variant: 'destructive' });
+        toast({ title: 'Failed to load API keys', variant: 'destructive' });
       })
       .finally(() => setLoading(false));
   }, [adminToken]);
@@ -168,7 +172,7 @@ export default function AdminApiKeyPage() {
   const handleGeneratePairingCode = async () => {
     const phone = botConfig.bot_admin_number?.replace(/[^0-9]/g, '');
     if (!phone) {
-      toast({ title: 'Masukkan nomor WhatsApp admin terlebih dahulu', description: 'Isi nomor di bagian Nomor WhatsApp Admin di atas', variant: 'destructive' });
+      toast({ title: 'Enter admin WhatsApp number first', description: 'Isi nomor di bagian Admin WhatsApp Number di atas', variant: 'destructive' });
       return;
     }
     setPairingLoading(true);
@@ -187,18 +191,18 @@ export default function AdminApiKeyPage() {
           botConnected: data.data.connected,
         });
         if (data.data.connected) {
-          toast({ title: 'Bot Terkoneksi!', description: 'WhatsApp bot sudah terhubung.' });
+          toast({ title: 'Bot Connected!', description: 'WhatsApp bot is connected.' });
         } else if (data.data.pairingCode) {
-          toast({ title: '📱 Kode Pairing Siap!', description: 'Masukkan kode ini di WhatsApp HP Anda: Settings {'>'} Linked Devices {'>'} Link with phone number' });
+          toast({ title: '📱 Pairing Code Ready!', description: 'Masukkan kode ini di WhatsApp HP Anda: Settings {'>'} Linked Devices {'>'} Link with phone number' });
           startPolling();
         } else {
-          toast({ title: 'Menunggu...', description: 'Menunggu kode pairing dari WhatsApp.' });
+          toast({ title: 'Waiting...', description: 'Waiting for pairing code from WhatsApp.' });
         }
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setPairingLoading(false);
     }
@@ -217,7 +221,7 @@ export default function AdminApiKeyPage() {
         if (data.success && data.data) {
           setPairingData(data.data);
           if (data.data.botConnected) {
-            toast({ title: '✅ Bot Terkoneksi!', description: 'WhatsApp bot berhasil terhubung!' });
+            toast({ title: '✅ Bot Connected!', description: 'WhatsApp bot berhasil terhubung!' });
             clearInterval(pollInterval);
           }
         }
@@ -239,13 +243,13 @@ export default function AdminApiKeyPage() {
       const data = await res.json();
       if (data.success) {
         setPairingData({ pairingCode: null, expiresAt: null, isActive: false, botConnected: false });
-        toast({ title: 'Bot Terputus', description: 'Sesi WhatsApp bot telah dihapus.' });
+        toast({ title: 'Bot Disconnected', description: 'WhatsApp bot session has been cleared.' });
         fetchPairingCode();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setRevokingPairing(false);
     }
@@ -256,7 +260,7 @@ export default function AdminApiKeyPage() {
     try {
       await navigator.clipboard.writeText(code);
       setPairingCopied(true);
-      toast({ title: 'Pairing code disalin!' });
+      toast({ title: 'Pairing code copied!' });
       setTimeout(() => setPairingCopied(false), 3000);
     } catch {
       const textArea = document.createElement('textarea');
@@ -266,11 +270,80 @@ export default function AdminApiKeyPage() {
       document.execCommand('copy');
       document.body.removeChild(textArea);
       setPairingCopied(true);
-      toast({ title: 'Pairing code disalin!' });
+      toast({ title: 'Pairing code copied!' });
       setTimeout(() => setPairingCopied(false), 3000);
     }
   };
 
+
+  /* --- Fetch QR Image --- */
+  const fetchQRImage = async () => {
+    setQrLoading(true);
+    try {
+      const res = await fetch('/api/admin/whatsapp?action=qr-image', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const data = await res.json();
+      if (data.success && data.image) {
+        setQrImage(data.image);
+      }
+    } catch {}
+    setQrLoading(false);
+  };
+
+  /* --- Connect Bot via QR --- */
+  const handleConnectQR = async () => {
+    setPairingLoading(true);
+    setQrImage(null);
+    try {
+      const res = await fetch('/api/admin/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ action: 'connect', mode: 'qr' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: 'Generating QR Code...', description: 'Please wait.' });
+        let attempts = 0;
+        const pollInterval = setInterval(async () => {
+          attempts++;
+          try {
+            const statusRes = await fetch('/api/admin/whatsapp?action=status', {
+              headers: { Authorization: `Bearer ${adminToken}` },
+            });
+            const statusData = await statusRes.json();
+            if (statusData.hasQRImage || statusData.hasQR) {
+              const qrRes = await fetch('/api/admin/whatsapp?action=qr-image', {
+                headers: { Authorization: `Bearer ${adminToken}` },
+              });
+              const qrDataRes = await qrRes.json();
+              if (qrDataRes.success && qrDataRes.image) {
+                setQrImage(qrDataRes.image);
+                setPairingLoading(false);
+                clearInterval(pollInterval);
+              }
+            }
+            if (statusData.status === 'connected') {
+              setPairingData({ pairingCode: null, expiresAt: null, isActive: false, botConnected: true });
+              toast({ title: 'Bot Connected!', description: 'WhatsApp bot is now connected.' });
+              setPairingLoading(false);
+              clearInterval(pollInterval);
+            }
+            if (attempts >= 60) {
+              clearInterval(pollInterval);
+              setPairingLoading(false);
+            }
+          } catch {}
+        }, 3000);
+      } else {
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Network Error', variant: 'destructive' });
+    } finally {
+      setPairingLoading(false);
+    }
+  };
   /* ─── Save Bot Config ─── */
   const handleSaveBotConfig = async () => {
     setSavingBot(true);
@@ -285,12 +358,12 @@ export default function AdminApiKeyPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Konfigurasi bot berhasil disimpan!' });
+        toast({ title: 'Bot configuration saved!' });
       } else {
-        toast({ title: 'Gagal menyimpan', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed to save', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setSavingBot(false);
     }
@@ -299,7 +372,7 @@ export default function AdminApiKeyPage() {
   /* ─── Generate New Key ─── */
   const handleGenerate = async () => {
     if (!keyName.trim()) {
-      toast({ title: 'Nama API key wajib diisi', variant: 'destructive' });
+      toast({ title: 'API key name is required', variant: 'destructive' });
       return;
     }
     setGenerating(true);
@@ -321,10 +394,10 @@ export default function AdminApiKeyPage() {
         setCustomApiKey('');
         fetchKeys();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setGenerating(false);
     }
@@ -345,14 +418,14 @@ export default function AdminApiKeyPage() {
       const data = await res.json();
       if (data.success) {
         toast({
-          title: currentActive ? 'API key dinonaktifkan' : 'API key diaktifkan',
+          title: currentActive ? 'API key disabled' : 'API key enabled',
         });
         fetchKeys();
       } else {
-        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setTogglingId(null);
     }
@@ -375,14 +448,14 @@ export default function AdminApiKeyPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'API key berhasil dihapus' });
+        toast({ title: 'API key deleted' });
         setApiKeys((prev) => prev.filter((k) => k.id !== currentDeleteId));
         setDeleteId(null);
       } else {
-        toast({ title: 'Gagal menghapus', description: data.error, variant: 'destructive' });
+        toast({ title: 'Failed menghapus', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+      toast({ title: 'Network Error', variant: 'destructive' });
     } finally {
       setDeleting(false);
     }
@@ -393,7 +466,7 @@ export default function AdminApiKeyPage() {
     try {
       await navigator.clipboard.writeText(key);
       setKeyCopied(true);
-      toast({ title: 'API key berhasil disalin!' });
+      toast({ title: 'API key copied!' });
       setTimeout(() => setKeyCopied(false), 3000);
     } catch {
       const textArea = document.createElement('textarea');
@@ -403,14 +476,14 @@ export default function AdminApiKeyPage() {
       document.execCommand('copy');
       document.body.removeChild(textArea);
       setKeyCopied(true);
-      toast({ title: 'API key berhasil disalin!' });
+      toast({ title: 'API key copied!' });
       setTimeout(() => setKeyCopied(false), 3000);
     }
   };
 
   /* ─── Format date helper ─── */
   const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'Belum pernah';
+    if (!dateStr) return 'Never';
     return new Date(dateStr).toLocaleDateString('id-ID', {
       day: 'numeric',
       month: 'short',
@@ -450,7 +523,7 @@ export default function AdminApiKeyPage() {
       >
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">Bot & Pairing</h1>
-          <p className="text-muted-foreground text-sm">Hubungkan bot WhatsApp via pairing code untuk kontrol penuh</p>
+          <p className="text-muted-foreground text-sm">Connect WhatsApp bot via pairing code or QR scan for full control</p>
         </div>
         <Button
           onClick={() => {
@@ -489,8 +562,8 @@ export default function AdminApiKeyPage() {
               )}
             </div>
             <div>
-              <h2 className="text-foreground font-semibold text-base">Status Koneksi Bot</h2>
-              <p className="text-muted-foreground text-xs">Hubungkan bot WhatsApp untuk kontrol web</p>
+              <h2 className="text-foreground font-semibold text-base">Bot Connection Status</h2>
+              <p className="text-muted-foreground text-xs">Connect WhatsApp bot for web control</p>
             </div>
           </div>
           <Badge className={`text-[10px] border-0 ${
@@ -499,9 +572,9 @@ export default function AdminApiKeyPage() {
               : 'bg-red-500/20 text-red-400'
           }`}>
             {pairingData.botConnected ? (
-              <><Activity className="w-3 h-3 mr-1" /> Terhubung</>
+              <><Activity className="w-3 h-3 mr-1" /> Connected</>
             ) : (
-              <><WifiOff className="w-3 h-3 mr-1" /> Terputus</>
+              <><WifiOff className="w-3 h-3 mr-1" /> Disconnected</>
             )}
           </Badge>
         </div>
@@ -518,11 +591,11 @@ export default function AdminApiKeyPage() {
               <p className="text-foreground text-xs font-mono mt-0.5">{pairingData.adminNumber || '-'}</p>
             </div>
             <div className="glass rounded-xl p-3">
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Terakhir Aktif</p>
+              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Last Active</p>
               <p className="text-foreground text-xs mt-0.5">{pairingData.lastHeartbeat ? formatDate(pairingData.lastHeartbeat) : '-'}</p>
             </div>
             <div className="glass rounded-xl p-3">
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Terhubung Sejak</p>
+              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Connected Since</p>
               <p className="text-foreground text-xs mt-0.5">{pairingData.pairedAt ? formatDate(pairingData.pairedAt) : '-'}</p>
             </div>
           </div>
@@ -534,9 +607,9 @@ export default function AdminApiKeyPage() {
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-amber-400 text-xs font-semibold">Bot Belum Terhubung</p>
+                <p className="text-amber-400 text-xs font-semibold">Bot Not Connected</p>
                 <p className="text-amber-400/70 text-[10px] leading-relaxed">
-                  Masukkan nomor WhatsApp admin di bawah, lalu klik Hubungkan Bot. Bot akan request kode pairing dari WhatsApp. Masukkan kode tersebut di HP Anda: WhatsApp {'>'} Settings {'>'} Linked Devices {'>'} Link with phone number.
+                  Masukkan nomor WhatsApp admin di bawah, lalu klik Connect Bot. Bot akan request kode pairing dari WhatsApp. Masukkan kode tersebut di HP Anda: WhatsApp {'>'} Settings {'>'} Linked Devices {'>'} Link with phone number.
                 </p>
               </div>
             </div>
@@ -557,7 +630,31 @@ export default function AdminApiKeyPage() {
           </div>
           <div>
             <h2 className="text-foreground font-semibold text-base">Pairing Code</h2>
-            <p className="text-muted-foreground text-xs">Request kode pairing dari WhatsApp lalu masukkan di HP Anda untuk menghubungkan bot</p>
+            <p className="text-muted-foreground text-xs">Request pairing code from WhatsApp then enter it on your phone to connect</p>
+          </div>
+        </div>
+
+
+        {/* Connection Mode Selection */}
+        <div className="mb-5">
+          <Label className="text-muted-foreground text-xs mb-3 block">Connection Method</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setConnectMode('pairing')}
+              className={"p-4 rounded-xl border-2 transition-all text-left " + (connectMode === 'pairing' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}
+            >
+              <Smartphone className={"w-5 h-5 mb-1.5 " + (connectMode === 'pairing' ? 'text-[#D4AF37]' : 'text-muted-foreground')} />
+              <p className={"font-semibold text-xs " + (connectMode === 'pairing' ? 'text-[#D4AF37]' : 'text-foreground')}>Pairing Code</p>
+              <p className="text-muted-foreground text-[9px] mt-0.5">Enter bot number, get code</p>
+            </button>
+            <button
+              onClick={() => setConnectMode('qr')}
+              className={"p-4 rounded-xl border-2 transition-all text-left " + (connectMode === 'qr' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}
+            >
+              <QrCode className={"w-5 h-5 mb-1.5 " + (connectMode === 'qr' ? 'text-[#D4AF37]' : 'text-muted-foreground')} />
+              <p className={"font-semibold text-xs " + (connectMode === 'qr' ? 'text-[#D4AF37]' : 'text-foreground')}>QR Scan Code</p>
+              <p className="text-muted-foreground text-[9px] mt-0.5">Scan QR like WhatsApp Web</p>
+            </button>
           </div>
         </div>
 
@@ -565,7 +662,7 @@ export default function AdminApiKeyPage() {
         <div className="mb-5 p-3 rounded-xl border border-[#D4AF37]/10 bg-[#D4AF37]/[0.02]">
           <Label className="text-muted-foreground text-xs flex items-center gap-1.5 mb-2">
             <MessageSquare className="w-3 h-3" />
-            Nomor WhatsApp Admin (Pemilik)
+            Admin WhatsApp Number (Owner)
           </Label>
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -592,12 +689,12 @@ export default function AdminApiKeyPage() {
                   });
                   const data = await res.json();
                   if (data.success) {
-                    toast({ title: 'Nomor admin disimpan!' });
+                    toast({ title: 'Admin number saved!' });
                   } else {
-                    toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+                    toast({ title: 'Failed', description: data.error, variant: 'destructive' });
                   }
                 } catch {
-                  toast({ title: 'Kesalahan Jaringan', variant: 'destructive' });
+                  toast({ title: 'Network Error', variant: 'destructive' });
                 } finally {
                   setSavingBot(false);
                 }
@@ -609,7 +706,7 @@ export default function AdminApiKeyPage() {
               {savingBot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </Button>
           </div>
-          <p className="text-muted-foreground text-[10px] mt-1.5">Bot akan request kode pairing dari WhatsApp untuk nomor ini. Masukkan kode yang muncul di WhatsApp HP Anda. Semua notifikasi bot (deposit, withdraw, register) akan diterima di nomor admin.</p>
+          <p className="text-muted-foreground text-[10px] mt-1.5">Bot will request pairing code from WhatsApp for this number. Enter the code on your WhatsApp. All bot notifications (deposit, withdraw, register) will be received on the admin number.</p>
         </div>
 
         {pairingData.isActive && pairingData.pairingCode ? (
@@ -623,7 +720,7 @@ export default function AdminApiKeyPage() {
                 </div>
                 <Badge className="bg-emerald-500/20 text-emerald-400 border-0 text-[10px]">
                   <CheckCircle2 className="w-3 h-3 mr-1" />
-                  Aktif
+                  Active
                 </Badge>
               </div>
 
@@ -672,20 +769,20 @@ export default function AdminApiKeyPage() {
             <div className="glass rounded-xl p-3 border border-[#D4AF37]/10 bg-[#070B14]/50">
               <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Smartphone className="w-3 h-3" />
-                Cara Menghubungkan ke WhatsApp
+                How to Connect to WhatsApp
               </p>
               <div className="bg-[#070B14]/80 rounded-lg p-2.5 border border-[#D4AF37]/5 space-y-2">
-                <p className="text-foreground text-xs font-medium">📱 Langkah-langkah:</p>
+                <p className="text-foreground text-xs font-medium">📱 Steps:</p>
                 <div className="space-y-1.5">
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">1.</span> Buka WhatsApp di HP Anda</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">2.</span> Tap ⋮ (menu) {'>'}  Perangkat Tertaut</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">3.</span> Tap "Tautkan perangkat"</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">4.</span> Pilih "Tautkan dengan nomor telepon"</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">5.</span> Masukkan kode: <span className="text-[#D4AF37] font-bold font-mono">{pairingData.pairingCode}</span></p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">1.</span> Open WhatsApp on your phone</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">2.</span> Tap ⋮ (menu) {'>'}  Linked Devices</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">3.</span> Tap "Link a device"</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">4.</span> Pilih "Link with phone number"</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">5.</span> Enter code: <span className="text-[#D4AF37] font-bold font-mono">{pairingData.pairingCode}</span></p>
                 </div>
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
                   {pairingLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D4AF37]" />}
-                  <p className="text-[#D4AF37] text-[11px]">{pairingLoading ? 'Meminta kode dari WhatsApp...' : 'Menunggu kode dimasukkan di WhatsApp...'}</p>
+                  <p className="text-[#D4AF37] text-[11px]">{pairingLoading ? 'Requesting code from WhatsApp...' : 'Waiting for code to be entered on WhatsApp...'}</p>
                 </div>
               </div>
             </div>
@@ -699,7 +796,7 @@ export default function AdminApiKeyPage() {
                 className="rounded-xl border-violet-500/20 text-violet-400 hover:bg-violet-500/10 text-xs"
               >
                 {pairingLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
-                Hubungkan Ulang
+                Reconnect
               </Button>
               <Button
                 onClick={handleRevokePairingCode}
@@ -709,7 +806,7 @@ export default function AdminApiKeyPage() {
                 className="rounded-xl border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs"
               >
                 {revokingPairing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Unplug className="w-3.5 h-3.5 mr-1.5" />}
-                Putuskan
+                Disconnect
               </Button>
             </div>
           </div>
@@ -719,15 +816,74 @@ export default function AdminApiKeyPage() {
             <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mx-auto mb-3">
               <Link2 className="w-6 h-6 text-violet-400/40" />
             </div>
-            <p className="text-muted-foreground text-sm mb-3">Belum ada pairing code aktif</p>
+            <p className="text-muted-foreground text-sm mb-3">No active pairing code</p>
             <Button
               onClick={handleGeneratePairingCode}
               disabled={pairingLoading}
               className="bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl"
             >
               {pairingLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
-              Hubungkan Bot
+              Connect Bot
             </Button>
+          </div>
+        )}
+
+
+        {/* QR Code Display Section */}
+        {connectMode === 'qr' && !pairingData.botConnected && (
+          <div className="space-y-4">
+            {qrImage ? (
+              <div className="glass rounded-xl p-4 border border-[#D4AF37]/20 bg-[#D4AF37]/[0.02]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-[#D4AF37]" />
+                    <span className="text-[#D4AF37] text-xs font-semibold uppercase tracking-wider">WhatsApp QR Code</span>
+                  </div>
+                  <Badge className="bg-amber-500/20 text-amber-400 border-0 text-[10px]">Ready to Scan</Badge>
+                </div>
+                <div className="flex justify-center">
+                  <div className="bg-white rounded-xl p-3 shadow-lg">
+                    <img src={qrImage} alt="WhatsApp QR Code" className="w-56 h-56 object-contain" />
+                  </div>
+                </div>
+                <div className="glass rounded-xl p-3 mt-3 border border-[#D4AF37]/10 bg-[#070B14]/50">
+                  <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Smartphone className="w-3 h-3" />
+                    How to Scan QR Code
+                  </p>
+                  <div className="bg-[#070B14]/80 rounded-lg p-2.5 border border-[#D4AF37]/5 space-y-1.5">
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">1.</span> Open WhatsApp on your phone</p>
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">2.</span> Tap menu {'>'} Linked Devices</p>
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">3.</span> Tap &quot;Link a device&quot;</p>
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">4.</span> Scan the QR code above</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-3">
+                  <Button onClick={fetchQRImage} variant="outline" size="sm" className="rounded-xl border-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/10 text-xs">
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Refresh QR
+                  </Button>
+                  <Button onClick={handleRevokePairingCode} disabled={revokingPairing} variant="outline" size="sm" className="rounded-xl border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs">
+                    {revokingPairing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Unplug className="w-3.5 h-3.5 mr-1.5" />}Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-3">
+                  <QrCode className="w-6 h-6 text-[#D4AF37]/40" />
+                </div>
+                <p className="text-muted-foreground text-sm mb-3">Click below to generate a QR code</p>
+                <Button onClick={handleConnectQR} disabled={pairingLoading} className="bg-[#D4AF37] hover:bg-[#c9a22e] text-[#070B14] font-semibold rounded-xl">
+                  {pairingLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <QrCode className="w-4 h-4 mr-2" />}Generate QR Code
+                </Button>
+                {pairingLoading && !qrImage && (
+                  <div className="flex items-center justify-center gap-2 mt-3">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
+                    <p className="text-[#D4AF37] text-xs">Generating QR code from WhatsApp...</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -736,7 +892,7 @@ export default function AdminApiKeyPage() {
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-amber-400 text-[11px] font-semibold">Keamanan</p>
+              <p className="text-amber-400 text-[11px] font-semibold">Security</p>
               <p className="text-amber-400/70 text-[10px] leading-relaxed">
                 Kode pairing ini langsung dari server WhatsApp. Setelah bot berhasil terhubung, kode otomatis terhapus. 
                 Masukkan kode di WhatsApp: Settings {'>'} Linked Devices {'>'} Link with phone number. Jangan bagikan kode ini ke pihak yang tidak berwenang.
@@ -758,8 +914,8 @@ export default function AdminApiKeyPage() {
             <Bot className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
-            <h2 className="text-foreground font-semibold text-base">Konfigurasi WhatsApp Bot</h2>
-            <p className="text-muted-foreground text-xs">Atur bot WhatsApp untuk OTP otomatis & notifikasi deposit/withdraw</p>
+            <h2 className="text-foreground font-semibold text-base">WhatsApp Bot Configuration</h2>
+            <p className="text-muted-foreground text-xs">Configure WhatsApp bot for automatic OTP & deposit/withdraw notifications</p>
           </div>
         </div>
 
@@ -768,7 +924,7 @@ export default function AdminApiKeyPage() {
           <div>
             <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
               <Smartphone className="w-3 h-3" />
-              Nomor WhatsApp Bot
+              Bot WhatsApp Number
             </Label>
             <Input
               value={botConfig.bot_whatsapp_number}
@@ -776,14 +932,14 @@ export default function AdminApiKeyPage() {
               placeholder="6281234567890"
               className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1 font-mono text-sm"
             />
-            <p className="text-muted-foreground text-[10px] mt-1">Nomor bot yang terkoneksi dengan API key</p>
+            <p className="text-muted-foreground text-[10px] mt-1">Bot number connected with API key</p>
           </div>
 
           {/* Admin WhatsApp Number */}
           <div>
             <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
               <MessageSquare className="w-3 h-3" />
-              Nomor WhatsApp Admin
+              Admin WhatsApp Number
             </Label>
             <Input
               value={botConfig.bot_admin_number}
@@ -791,7 +947,7 @@ export default function AdminApiKeyPage() {
               placeholder="6281234567890"
               className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1 font-mono text-sm"
             />
-            <p className="text-muted-foreground text-[10px] mt-1">Nomor admin untuk menerima notifikasi persetujuan</p>
+            <p className="text-muted-foreground text-[10px] mt-1">Admin number for receiving approval notifications</p>
           </div>
         </div>
 
@@ -816,7 +972,7 @@ export default function AdminApiKeyPage() {
         <div className="space-y-3 mb-5">
           <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
             <Bell className="w-3 h-3" />
-            Notifikasi Bot
+            Bot Notifications
           </h3>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -828,8 +984,8 @@ export default function AdminApiKeyPage() {
                   <BellOff className="w-4 h-4 text-muted-foreground" />
                 )}
                 <div>
-                  <p className="text-foreground text-xs font-medium">Deposit Baru</p>
-                  <p className="text-muted-foreground text-[10px]">Notif ke admin saat ada deposit</p>
+                  <p className="text-foreground text-xs font-medium">New Deposit</p>
+                  <p className="text-muted-foreground text-[10px]">Notify admin on new deposit</p>
                 </div>
               </div>
               <Switch
@@ -846,8 +1002,8 @@ export default function AdminApiKeyPage() {
                   <BellOff className="w-4 h-4 text-muted-foreground" />
                 )}
                 <div>
-                  <p className="text-foreground text-xs font-medium">Withdraw Baru</p>
-                  <p className="text-muted-foreground text-[10px]">Notif ke admin saat ada withdraw</p>
+                  <p className="text-foreground text-xs font-medium">New Withdraw</p>
+                  <p className="text-muted-foreground text-[10px]">Notify admin on new withdraw</p>
                 </div>
               </div>
               <Switch
@@ -864,8 +1020,8 @@ export default function AdminApiKeyPage() {
                   <BellOff className="w-4 h-4 text-muted-foreground" />
                 )}
                 <div>
-                  <p className="text-foreground text-xs font-medium">Registrasi Baru</p>
-                  <p className="text-muted-foreground text-[10px]">Notif saat ada user baru</p>
+                  <p className="text-foreground text-xs font-medium">New Registration</p>
+                  <p className="text-muted-foreground text-[10px]">Notify on new user registration</p>
                 </div>
               </div>
               <Switch
@@ -884,7 +1040,7 @@ export default function AdminApiKeyPage() {
             className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             {savingBot ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-            Simpan Konfigurasi Bot
+            Save Bot Configuration
           </Button>
 
           <Button
@@ -915,7 +1071,7 @@ export default function AdminApiKeyPage() {
               {[
                 { method: 'POST', endpoint: '/api/auth/bot-pair', desc: 'Hubungkan bot via pairing code {'>'}  token + kontrol web', highlight: true },
                 { method: 'POST', endpoint: '/api/bot/heartbeat', desc: 'Heartbeat bot (kirim tiap 1 menit)', highlight: true },
-                { method: 'POST', endpoint: '/api/bot/disconnect', desc: 'Putuskan koneksi bot' },
+                { method: 'POST', endpoint: '/api/bot/disconnect', desc: 'Disconnect koneksi bot' },
                 { method: 'GET', endpoint: '/api/bot/pending', desc: 'Ambil semua transaksi pending' },
                 { method: 'GET', endpoint: '/api/bot/notifications', desc: 'Poll notifikasi bot' },
                 { method: 'GET', endpoint: '/api/bot/send-otp?whatsapp=628xxx', desc: 'Ambil OTP pending' },
@@ -928,7 +1084,7 @@ export default function AdminApiKeyPage() {
                 { method: 'POST', endpoint: '/api/bot/deposit', desc: 'Buat deposit via bot' },
                 { method: 'POST', endpoint: '/api/bot/withdraw', desc: 'Buat withdrawal via bot' },
                 { method: 'POST', endpoint: '/api/bot/send-otp', desc: 'Generate & simpan OTP baru' },
-                { method: 'DELETE', endpoint: '/api/bot/notifications', desc: 'Hapus notifikasi yang sudah dibaca' },
+                { method: 'DELETE', endpoint: '/api/bot/notifications', desc: 'Delete notifikasi yang sudah dibaca' },
               ].map((api) => (
                 <div key={api.endpoint} className={`flex items-start gap-2 text-[11px] ${api.highlight ? 'bg-violet-500/5 -mx-1 px-1 py-0.5 rounded' : ''}`}>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -994,17 +1150,17 @@ export default function AdminApiKeyPage() {
                       ) : (
                         <ShieldOff className="w-3 h-3 mr-1" />
                       )}
-                      {apiKey.isActive ? 'Aktif' : 'Nonaktif'}
+                      {apiKey.isActive ? 'Active' : 'Inactive'}
                     </Badge>
 
                     <div className="flex items-center gap-1 text-muted-foreground text-[11px]">
                       <Clock className="w-3 h-3" />
-                      <span>Terakhir: {formatDate(apiKey.lastUsedAt)}</span>
+                      <span>Last used: {formatDate(apiKey.lastUsedAt)}</span>
                     </div>
 
                     <div className="flex items-center gap-1 text-muted-foreground text-[11px]">
                       <Calendar className="w-3 h-3" />
-                      <span>Dibuat: {formatDate(apiKey.createdAt)}</span>
+                      <span>Created: {formatDate(apiKey.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -1013,7 +1169,7 @@ export default function AdminApiKeyPage() {
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="flex items-center gap-2 glass rounded-xl p-2">
                     <Label className="text-xs text-muted-foreground hidden sm:inline">
-                      {apiKey.isActive ? 'Aktif' : 'Nonaktif'}
+                      {apiKey.isActive ? 'Active' : 'Inactive'}
                     </Label>
                     <Switch
                       checked={apiKey.isActive}
@@ -1032,7 +1188,7 @@ export default function AdminApiKeyPage() {
                     className="rounded-xl border-red-500/20 text-red-400 hover:bg-red-500/10 h-10 sm:h-9 text-xs px-3"
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    Hapus
+                    Delete
                   </Button>
                 </div>
               </div>
@@ -1049,7 +1205,7 @@ export default function AdminApiKeyPage() {
           <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-4">
             <Key className="w-8 h-8 text-[#D4AF37]/40" />
           </div>
-          <h3 className="text-foreground font-semibold mb-2">Belum Ada API Key</h3>
+          <h3 className="text-foreground font-semibold mb-2">No API Keys Yet</h3>
           <p className="text-muted-foreground text-sm mb-4 max-w-sm mx-auto">
             Buat API key baru untuk menghubungkan layanan eksternal seperti WhatsApp bot atau integrasi lainnya.
           </p>
@@ -1062,7 +1218,7 @@ export default function AdminApiKeyPage() {
             className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Generate Key Pertama
+            Generate First Key
           </Button>
         </motion.div>
       )}
@@ -1081,18 +1237,18 @@ export default function AdminApiKeyPage() {
       >
         <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-gold-gradient">Generate API Key Baru</DialogTitle>
+            <DialogTitle className="text-gold-gradient">Generate New API Key</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {generatedKey
                 ? 'Salin API key sekarang — ini satu-satunya kesempatan Anda!'
-                : 'Buat kunci API baru untuk integrasi eksternal'}
+                : 'Create new API key for external integration'}
             </DialogDescription>
           </DialogHeader>
 
           {!generatedKey ? (
             <div className="space-y-4 py-2">
               <div>
-                <Label className="text-muted-foreground text-xs">Nama API Key *</Label>
+                <Label className="text-muted-foreground text-xs">API Key Name *</Label>
                 <Input
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
@@ -1104,7 +1260,7 @@ export default function AdminApiKeyPage() {
                 />
               </div>
               <div>
-                <Label className="text-muted-foreground text-xs">Custom API Key (opsional)</Label>
+                <Label className="text-muted-foreground text-xs">Custom API Key (optional)</Label>
                 <Input
                   value={customApiKey}
                   onChange={(e) => setCustomApiKey(e.target.value)}
@@ -1219,7 +1375,7 @@ export default function AdminApiKeyPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-400" />
-              Hapus API Key
+              Delete API Key
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               Tindakan ini tidak dapat dibatalkan. API key akan dihapus secara permanen dan semua layanan yang menggunakannya akan kehilangan akses.
@@ -1237,7 +1393,7 @@ export default function AdminApiKeyPage() {
               disabled={deleting}
               className="rounded-xl bg-red-600 hover:bg-red-700 text-white" forceMount
             >
-              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Hapus'}
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

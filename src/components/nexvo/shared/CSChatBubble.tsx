@@ -41,7 +41,7 @@ export default function CSChatBubble() {
 
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
-    const message = encodeURIComponent('Halo CS NEXVO, saya butuh bantuan.');
+    const message = encodeURIComponent('Hello NEXVO Support, I need help.');
     window.open('https://wa.me/' + cleanPhone + '?text=' + message, '_blank');
   };
 
@@ -80,7 +80,7 @@ export default function CSChatBubble() {
             {/* Body - Solid Dark */}
             <div className="bg-[#0c1222] p-4 space-y-3">
               <p className="text-center text-gray-400 text-[11px]">
-                Chat langsung dengan Admin CS via WhatsApp
+                Chat directly with CS Admin via WhatsApp
               </p>
 
               {loading ? (

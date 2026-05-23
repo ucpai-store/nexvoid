@@ -875,7 +875,7 @@ export default function AdminSettingsPage() {
               {/* CS Admin Number */}
               <div className="space-y-2">
                 <Label className="text-foreground text-sm font-medium">🎧 Nomor CS Admin</Label>
-                <p className="text-muted-foreground text-xs">Nomor WhatsApp Customer Service utama. Ditampilkan di bot dan halaman bantuan.</p>
+                <p className="text-muted-foreground text-xs">Main Customer Service WhatsApp number. Displayed in bot and help page.</p>
                 <Input
                   value={csAdminNumber}
                   onChange={(e) => setCsAdminNumber(e.target.value)}

@@ -375,7 +375,7 @@ export default function DepositPage() {
     const amt = depositAmount || lastDepositAmount || 0;
     const pay = paymentName || lastDepositPayment || '-';
     const msg = encodeURIComponent(
-      `Hello NEXVO Admin,\n\nI would like to confirm my deposit:\n\n🆔 Deposit ID: ${id}\n💰 Amount: ${formatRupiah(amt)}\n📋 Payment Method: ${pay}\n\nI will attach my transfer proof here. Please process ASAP. Thank you!`
+      `Request Deposit Add\n\nDeposit ID: ${id}\nAmount: ${formatRupiah(amt)}\nPayment: ${pay}\n\nPlease process my deposit. Thank you.`
     );
     const phone = primaryAdminPhone.replace(/[^0-9]/g, '');
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
@@ -436,8 +436,8 @@ export default function DepositPage() {
                 <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-9 h-9 text-emerald-400" />
                 </div>
-                <h2 className="text-foreground text-lg font-bold mb-1">Deposit Dikirim!</h2>
-                <p className="text-muted-foreground text-sm mb-4">Deposit Anda sedang menunggu persetujuan admin. Saldo akan masuk setelah disetujui.</p>
+                <h2 className="text-foreground text-lg font-bold mb-1">Deposit Submitted!</h2>
+                <p className="text-muted-foreground text-sm mb-4">Your deposit is waiting for admin approval. Balance will be credited after approval.</p>
 
                 <div className="glass rounded-xl p-4 mb-5 space-y-3">
                   <div>
@@ -458,7 +458,7 @@ export default function DepositPage() {
                   <div className="border-t border-white/5 pt-3">
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Credited to Balance</p>
                     <p className="text-emerald-400 text-xl font-bold">{formatRupiah(lastDepositNet)}</p>
-                    {lastDepositFee > 0 ? <p className="text-yellow-400/70 text-[10px] mt-1">⚠️ Fee admin: {formatRupiah(lastDepositFee)}</p> : <p className="text-emerald-400/70 text-[10px] mt-1">✓ Tanpa potongan admin</p>}
+                    {lastDepositFee > 0 ? <p className="text-yellow-400/70 text-[10px] mt-1">⚠️ Admin fee: {formatRupiah(lastDepositFee)}</p> : <p className="text-emerald-400/70 text-[10px] mt-1">✓ No admin fee deduction</p>}
                   </div>
                 </div>
 
@@ -582,13 +582,13 @@ export default function DepositPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Admin Fee</span>
-                      <span className="text-foreground font-medium">{adminFee > 0 ? formatRupiah(adminFee) : 'Gratis'}</span>
+                      <span className="text-foreground font-medium">{adminFee > 0 ? formatRupiah(adminFee) : 'Free'}</span>
                     </div>
                     <div className="border-t border-white/5 pt-2 flex justify-between text-sm">
                       <span className="text-foreground font-semibold">Credited to Balance</span>
                       <span className="text-emerald-400 font-bold">{formatRupiah(netAmount)}</span>
                     </div>
-                    {adminFee > 0 && <p className="text-yellow-400/70 text-[10px]">⚠️ Saldo dikurangi fee admin Rp {adminFee.toLocaleString('id-ID')}</p>}
+                    {adminFee > 0 && <p className="text-yellow-400/70 text-[10px]">⚠️ Balance deducted by admin fee Rp {adminFee.toLocaleString('id-ID')}</p>}
                   </div>
                 )}
 
@@ -813,7 +813,7 @@ export default function DepositPage() {
                     <span className="text-foreground font-semibold">Credited to Balance</span>
                     <span className="text-emerald-400 font-bold">{formatRupiah(netAmount)}</span>
                   </div>
-                  {adminFee > 0 ? <p className="text-yellow-400/70 text-[10px]">⚠️ Saldo dikurangi fee admin</p> : <p className="text-emerald-400/70 text-[10px]">✓ Tanpa potongan admin</p>}
+                  {adminFee > 0 ? <p className="text-yellow-400/70 text-[10px]">⚠️ Balance deducted by admin fee</p> : <p className="text-emerald-400/70 text-[10px]">✓ No admin fee deduction</p>}
                   <div className="flex justify-between text-xs text-muted-foreground pt-1">
                     <span>Payment Method</span>
                     <span>{selectedPayment?.name}</span>
