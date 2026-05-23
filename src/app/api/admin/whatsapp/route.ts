@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
 
   switch (action) {
     case 'connect': {
-      // Use 60s timeout for connect (bot waits up to 45s for pairing code)
       const result = await proxyToBot('/api/connect', {
         method: 'POST',
         body: JSON.stringify({ phoneNumber: body.phoneNumber, mode: body.mode || 'pairing' }),
@@ -73,6 +72,7 @@ export async function POST(request: NextRequest) {
           welcomeMessage: body.welcomeMessage,
           menuHeader: body.menuHeader,
           menuFooter: body.menuFooter,
+          ownerNumber: body.ownerNumber,
         }),
       });
       return NextResponse.json(result);
@@ -81,6 +81,20 @@ export async function POST(request: NextRequest) {
       const result = await proxyToBot('/api/send', {
         method: 'POST',
         body: JSON.stringify({ phone: body.phone, message: body.message }),
+      });
+      return NextResponse.json(result);
+    }
+    case 'broadcast': {
+      const result = await proxyToBot('/api/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({ message: body.message, phones: body.phones }),
+      }, 120000);
+      return NextResponse.json(result);
+    }
+    case 'notify': {
+      const result = await proxyToBot('/api/notify', {
+        method: 'POST',
+        body: JSON.stringify({ event: body.event, data: body.data }),
       });
       return NextResponse.json(result);
     }
