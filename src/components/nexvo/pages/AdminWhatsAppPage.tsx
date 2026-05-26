@@ -398,12 +398,12 @@ export default function AdminWhatsAppPage() {
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient flex items-center gap-2">
-            <MessageCircle className="w-6 h-6 text-[#D4AF37]" />
+            <MessageCircle className="w-6 h-6 text-primary" />
             WhatsApp Bot
           </h1>
           <p className="text-muted-foreground text-sm">Manage WhatsApp bot connection & CS numbers</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadData} className="rounded-xl border-[#D4AF37]/20">
+        <Button variant="outline" size="sm" onClick={loadData} className="rounded-xl border-primary/20">
           <RefreshCw className="w-4 h-4 mr-1" /> Refresh
         </Button>
       </motion.div>
@@ -413,7 +413,7 @@ export default function AdminWhatsAppPage() {
         className="glass glow-gold rounded-2xl p-4 sm:p-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isConnected ? 'bg-emerald-400/10' : 'bg-red-400/10'}`}>
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isConnected ? 'bg-cardmerald-400/10' : 'bg-red-400/10'}`}>
               {isConnected ? <CheckCircle2 className="w-6 h-6 text-emerald-400" /> : <XCircle className="w-6 h-6 text-red-400" />}
             </div>
             <div>
@@ -423,38 +423,38 @@ export default function AdminWhatsAppPage() {
               </p>
             </div>
           </div>
-          <Badge className={`${isConnected ? 'bg-emerald-400/10 text-emerald-400' : 'bg-red-400/10 text-red-400'} border-0`}>
+          <Badge className={`${isConnected ? 'bg-cardmerald-400/10 text-emerald-400' : 'bg-red-400/10 text-red-400'} border-border`}>
             {isConnected ? 'Online' : 'Offline'}
           </Badge>
         </div>
 
         {/* Pairing Code Display in Status Card */}
         {botStatus?.pairingCode && !isConnected && connectionMode === 'pairing' && (
-          <div className="mt-4 p-5 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
+          <div className="mt-4 p-5 bg-primary/5 rounded-xl border border-primary/20">
             <p className="text-foreground text-sm font-semibold mb-2 flex items-center gap-2">
-              <Key className="w-4 h-4 text-[#D4AF37]" /> Your WhatsApp Pairing Code:
+              <Key className="w-4 h-4 text-primary" /> Your WhatsApp Pairing Code:
             </p>
             <div className="flex items-center gap-3 mb-3">
-              <p className="text-[#D4AF37] font-bold text-3xl tracking-[0.3em] font-mono">{botStatus.pairingCode}</p>
-              <Button size="sm" variant="outline" className="rounded-lg border-[#D4AF37]/20 text-[#D4AF37] h-9"
+              <p className="text-primary font-bold text-3xl tracking-[0.3em] font-mono">{botStatus.pairingCode}</p>
+              <Button size="sm" variant="outline" className="rounded-lg border-primary/20 text-primary h-9"
                 onClick={() => { navigator.clipboard.writeText(botStatus.pairingCode!); toast({ title: 'Code Copied!' }); }}>
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
             <div className="bg-black/20 rounded-lg p-3 space-y-1.5">
-              <p className="text-[#D4AF37] text-xs font-bold mb-1">📌 HOW TO CONNECT (Step by Step):</p>
+              <p className="text-primary text-xs font-bold mb-1">📌 HOW TO CONNECT (Step by Step):</p>
               <p className="text-muted-foreground text-xs">1. Open <span className="text-foreground font-semibold">WhatsApp</span> on your phone</p>
               <p className="text-muted-foreground text-xs">2. Tap <span className="text-foreground font-semibold">⋮ menu</span> (3 dots, top right)</p>
               <p className="text-muted-foreground text-xs">3. Tap <span className="text-foreground font-semibold">Linked devices</span></p>
               <p className="text-muted-foreground text-xs">4. Tap <span className="text-foreground font-semibold">Link a device</span></p>
               <p className="text-muted-foreground text-xs">5. Select <span className="text-foreground font-semibold">"Link with phone number"</span></p>
-              <p className="text-muted-foreground text-xs">6. Enter this code: <span className="text-[#D4AF37] font-bold text-sm">{botStatus.pairingCode}</span></p>
+              <p className="text-muted-foreground text-xs">6. Enter this code: <span className="text-primary font-bold text-sm">{botStatus.pairingCode}</span></p>
             </div>
             <p className="text-yellow-400 text-xs mt-2">⚠️ This code is temporary and will expire in a few minutes. If expired, click Connect again.</p>
             {connecting && (
               <div className="flex items-center gap-2 mt-3">
-                <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
-                <p className="text-[#D4AF37] text-xs">Waiting for you to enter the code in WhatsApp...</p>
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <p className="text-primary text-xs">Waiting for you to enter the code in WhatsApp...</p>
               </div>
             )}
           </div>
@@ -477,11 +477,11 @@ export default function AdminWhatsAppPage() {
             </div>
             <div className="bg-gray-100 rounded-lg p-3 space-y-1.5">
               <p className="text-gray-800 text-xs font-bold mb-1">📌 HOW TO SCAN (Step by Step):</p>
-              <p className="text-gray-600 text-xs">1. Open <span className="text-gray-900 font-semibold">WhatsApp</span> on your phone</p>
-              <p className="text-gray-600 text-xs">2. Tap <span className="text-gray-900 font-semibold">⋮ menu</span> (3 dots, top right)</p>
-              <p className="text-gray-600 text-xs">3. Tap <span className="text-gray-900 font-semibold">Linked devices</span></p>
-              <p className="text-gray-600 text-xs">4. Tap <span className="text-gray-900 font-semibold">Link a device</span></p>
-              <p className="text-gray-600 text-xs">5. <span className="text-gray-900 font-semibold">Point your camera</span> at the QR code above</p>
+              <p className="text-muted-foreground text-xs">1. Open <span className="text-gray-900 font-semibold">WhatsApp</span> on your phone</p>
+              <p className="text-muted-foreground text-xs">2. Tap <span className="text-gray-900 font-semibold">⋮ menu</span> (3 dots, top right)</p>
+              <p className="text-muted-foreground text-xs">3. Tap <span className="text-gray-900 font-semibold">Linked devices</span></p>
+              <p className="text-muted-foreground text-xs">4. Tap <span className="text-gray-900 font-semibold">Link a device</span></p>
+              <p className="text-muted-foreground text-xs">5. <span className="text-gray-900 font-semibold">Point your camera</span> at the QR code above</p>
             </div>
             <p className="text-amber-600 text-xs mt-2">⚠️ QR code refreshes automatically. If expired, click Generate QR Code again.</p>
             {connecting && (
@@ -504,7 +504,7 @@ export default function AdminWhatsAppPage() {
           { key: 'send' as const, label: 'Send Message', icon: Send },
         ].map((tab) => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${activeTab === tab.key ? 'bg-[#D4AF37]/15 text-[#D4AF37] glow-gold' : 'glass text-foreground/60 hover:text-foreground hover:bg-white/5'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${activeTab === tab.key ? 'bg-primary/15 text-primary glow-gold' : 'glass text-foreground/60 hover:text-foreground hover:bg-foreground/5'}`}>
             <tab.icon className="w-4 h-4" /> {tab.label}
           </button>
         ))}
@@ -514,7 +514,7 @@ export default function AdminWhatsAppPage() {
       {activeTab === 'connect' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-            <Phone className="w-5 h-5 text-[#D4AF37]" /> Connect Bot to WhatsApp
+            <Phone className="w-5 h-5 text-primary" /> Connect Bot to WhatsApp
           </h3>
 
           {/* Info Box */}
@@ -535,18 +535,18 @@ export default function AdminWhatsAppPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setConnectionMode('pairing')}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${connectionMode === 'pairing' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20'}`}
+                  className={`p-4 rounded-xl border-border transition-all text-left ${connectionMode === 'pairing' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20'}`}
                 >
-                  <Key className={`w-6 h-6 mb-2 ${connectionMode === 'pairing' ? 'text-[#D4AF37]' : 'text-muted-foreground'}`} />
-                  <p className={`font-semibold text-sm ${connectionMode === 'pairing' ? 'text-[#D4AF37]' : 'text-foreground'}`}>Pairing Code</p>
+                  <Key className={`w-6 h-6 mb-2 ${connectionMode === 'pairing' ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <p className={`font-semibold text-sm ${connectionMode === 'pairing' ? 'text-primary' : 'text-foreground'}`}>Pairing Code</p>
                   <p className="text-muted-foreground text-[10px] mt-1">Get a code, enter it in your WhatsApp Linked Devices</p>
                 </button>
                 <button
                   onClick={() => setConnectionMode('qr')}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${connectionMode === 'qr' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20'}`}
+                  className={`p-4 rounded-xl border-border transition-all text-left ${connectionMode === 'qr' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20'}`}
                 >
-                  <QrCode className={`w-6 h-6 mb-2 ${connectionMode === 'qr' ? 'text-[#D4AF37]' : 'text-muted-foreground'}`} />
-                  <p className={`font-semibold text-sm ${connectionMode === 'qr' ? 'text-[#D4AF37]' : 'text-foreground'}`}>Scan QR Code</p>
+                  <QrCode className={`w-6 h-6 mb-2 ${connectionMode === 'qr' ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <p className={`font-semibold text-sm ${connectionMode === 'qr' ? 'text-primary' : 'text-foreground'}`}>Scan QR Code</p>
                   <p className="text-muted-foreground text-[10px] mt-1">Scan QR code with WhatsApp, just like WhatsApp Web</p>
                 </button>
               </div>
@@ -560,9 +560,9 @@ export default function AdminWhatsAppPage() {
                 <Label className="text-muted-foreground text-xs mb-2 block">Your WhatsApp Phone Number</Label>
                 <div className="flex items-center gap-2">
                   <Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="628xxxxxxxxxx" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground flex-1" />
+                    placeholder="628xxxxxxxxxx" className="glass rounded-xl border-primary/20 bg-transparent text-foreground flex-1" />
                   <Button onClick={handleConnect} disabled={connecting || !phoneNumber}
-                    className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+                    className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
                     {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
                     <span className="ml-1.5">{connecting ? 'Connecting...' : 'Connect'}</span>
                   </Button>
@@ -576,7 +576,7 @@ export default function AdminWhatsAppPage() {
               <div>
                 <div className="flex items-center gap-3 mb-3">
                   <Button onClick={handleConnect} disabled={connecting}
-                    className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+                    className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
                     {connecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <QrCode className="w-4 h-4 mr-2" />}
                     {connecting ? 'Generating QR...' : 'Generate QR Code'}
                   </Button>
@@ -587,7 +587,7 @@ export default function AdminWhatsAppPage() {
 
             {/* Connected State */}
             {isConnected && (
-              <div className="p-4 rounded-xl bg-emerald-400/10 border border-emerald-400/30">
+              <div className="p-4 rounded-xl bg-cardmerald-400/10 border border-emerald-400/30">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                   <div>
@@ -617,10 +617,10 @@ export default function AdminWhatsAppPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-foreground font-semibold flex items-center gap-2">
-              <Users className="w-5 h-5 text-[#D4AF37]" /> CS WhatsApp Numbers
+              <Users className="w-5 h-5 text-primary" /> CS WhatsApp Numbers
             </h3>
             <Button onClick={() => setAddingAdmin(true)} disabled={addingAdmin}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 h-9 text-sm">
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 h-9 text-sm">
               <Plus className="w-4 h-4 mr-1" /> Add CS
             </Button>
           </div>
@@ -633,22 +633,22 @@ export default function AdminWhatsAppPage() {
           <AnimatePresence>
             {addingAdmin && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                className="mb-4 p-4 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20 overflow-hidden">
+                className="mb-4 p-4 bg-primary/5 rounded-xl border border-primary/20 overflow-hidden">
                 <h4 className="text-foreground text-sm font-semibold mb-3">Add New CS Number</h4>
                 <div className="space-y-3">
                   <div>
                     <Label className="text-muted-foreground text-xs mb-1 block">CS Name</Label>
                     <Input value={newName} onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. CS NEXVO" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+                      placeholder="e.g. CS NEXVO" className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs mb-1 block">WhatsApp Number</Label>
                     <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
-                      placeholder="628xxxxxxxxxx" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+                      placeholder="628xxxxxxxxxx" className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
                   </div>
                   <div className="flex items-center gap-2">
                     <Button onClick={handleAddAdmin} disabled={savingAdmin || !newName || !newPhone}
-                      className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+                      className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
                       {savingAdmin ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                       Save
                     </Button>
@@ -681,13 +681,13 @@ export default function AdminWhatsAppPage() {
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Input value={editName} onChange={(e) => setEditName(e.target.value)}
-                          className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground flex-1" placeholder="Name" />
+                          className="glass rounded-xl border-primary/20 bg-transparent text-foreground flex-1" placeholder="Name" />
                         <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)}
-                          className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground flex-1" placeholder="628xxx" />
+                          className="glass rounded-xl border-primary/20 bg-transparent text-foreground flex-1" placeholder="628xxx" />
                       </div>
                       <div className="flex items-center gap-2">
                         <Button onClick={() => handleUpdateAdmin(admin.id)} disabled={savingAdmin}
-                          className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 h-8 text-xs">
+                          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 h-8 text-xs">
                           {savingAdmin ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
                           Save
                         </Button>
@@ -700,8 +700,8 @@ export default function AdminWhatsAppPage() {
                   ) : (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${admin.isActive ? 'bg-emerald-400/10' : 'bg-gray-400/10'}`}>
-                          <Phone className={`w-5 h-5 ${admin.isActive ? 'text-emerald-400' : 'text-gray-400'}`} />
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${admin.isActive ? 'bg-cardmerald-400/10' : 'bg-gray-400/10'}`}>
+                          <Phone className={`w-5 h-5 ${admin.isActive ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                         </div>
                         <div>
                           <h4 className="text-foreground text-sm font-semibold">{admin.name}</h4>
@@ -710,13 +710,13 @@ export default function AdminWhatsAppPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => handleToggleAdmin(admin)}
-                          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title={admin.isActive ? 'Disable' : 'Enable'}>
+                          className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors" title={admin.isActive ? 'Disable' : 'Enable'}>
                           {admin.isActive
                             ? <ToggleRight className="w-6 h-6 text-emerald-400" />
-                            : <ToggleLeft className="w-6 h-6 text-gray-400" />}
+                            : <ToggleLeft className="w-6 h-6 text-muted-foreground" />}
                         </button>
                         <button onClick={() => startEdit(admin)}
-                          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors text-foreground/50 hover:text-[#D4AF37]" title="Edit">
+                          className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors text-foreground/50 hover:text-primary" title="Edit">
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button onClick={() => handleDeleteAdmin(admin.id)}
@@ -737,7 +737,7 @@ export default function AdminWhatsAppPage() {
       {activeTab === 'config' && config && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-            <Settings className="w-5 h-5 text-[#D4AF37]" /> Bot Settings
+            <Settings className="w-5 h-5 text-primary" /> Bot Settings
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-white/[0.02] rounded-xl">
@@ -761,20 +761,20 @@ export default function AdminWhatsAppPage() {
             <div>
               <Label className="text-muted-foreground text-xs mb-2 block">Welcome Message</Label>
               <Textarea value={config.welcomeMessage} onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground min-h-[80px]" />
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground min-h-[80px]" />
             </div>
             <div>
               <Label className="text-muted-foreground text-xs mb-2 block">Menu Header</Label>
               <Input value={config.menuHeader} onChange={(e) => setConfig({ ...config, menuHeader: e.target.value })}
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
             </div>
             <div>
               <Label className="text-muted-foreground text-xs mb-2 block">Menu Footer</Label>
               <Input value={config.menuFooter} onChange={(e) => setConfig({ ...config, menuFooter: e.target.value })}
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
             </div>
             <Button onClick={handleSaveConfig} disabled={saving}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 w-full">
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 w-full">
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Save Settings
             </Button>
@@ -786,21 +786,21 @@ export default function AdminWhatsAppPage() {
       {activeTab === 'send' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
           <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-            <Send className="w-5 h-5 text-[#D4AF37]" /> Send Manual Message
+            <Send className="w-5 h-5 text-primary" /> Send Manual Message
           </h3>
           <div className="space-y-4">
             <div>
               <Label className="text-muted-foreground text-xs mb-2 block">WhatsApp Number</Label>
               <Input value={sendPhone} onChange={(e) => setSendPhone(e.target.value)}
-                placeholder="628xxxxxxxxxx" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+                placeholder="628xxxxxxxxxx" className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
             </div>
             <div>
               <Label className="text-muted-foreground text-xs mb-2 block">Message</Label>
               <Textarea value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
-                placeholder="Type your message..." className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground min-h-[120px]" />
+                placeholder="Type your message..." className="glass rounded-xl border-primary/20 bg-transparent text-foreground min-h-[120px]" />
             </div>
             <Button onClick={handleSendMessage} disabled={sending || !sendPhone || !sendMessage || !isConnected}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl w-full">
+              className="bg-cardmerald-600 hover:bg-cardmerald-700 text-white font-semibold rounded-xl w-full">
               {sending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
               Send Message
             </Button>

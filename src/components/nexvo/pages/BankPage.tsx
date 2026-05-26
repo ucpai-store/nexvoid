@@ -173,7 +173,7 @@ export default function BankPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('dashboard.tryAgain')}</Button>
@@ -192,7 +192,7 @@ export default function BankPage() {
         </div>
         <Button
           onClick={openAddDialog}
-          className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
         >
           <Plus className="w-4 h-4 mr-2" />
           {t('bank.addBtn')}</Button>
@@ -213,14 +213,14 @@ export default function BankPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center shrink-0">
-                      <Landmark className="w-6 h-6 text-[#D4AF37]" />
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Landmark className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-foreground font-semibold text-base truncate">{bank.bankName}</h3>
                         {bank.isPrimary && (
-                          <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px]">
+                          <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px]">
                             <Star className="w-3 h-3 mr-0.5 fill-[#D4AF37]" />
                             {t('bank.primary')}</Badge>
                         )}
@@ -233,7 +233,7 @@ export default function BankPage() {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => openEditDialog(bank)}
-                      className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-[#D4AF37] transition-colors"
+                      className="p-2 rounded-xl hover:bg-foreground/5 text-muted-foreground hover:text-primary transition-colors"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
@@ -265,7 +265,7 @@ export default function BankPage() {
           </p>
           <Button
             onClick={openAddDialog}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <Plus className="w-4 h-4 mr-2" />
             {t('bank.addBank')}</Button>
@@ -334,7 +334,7 @@ export default function BankPage() {
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
             >
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />

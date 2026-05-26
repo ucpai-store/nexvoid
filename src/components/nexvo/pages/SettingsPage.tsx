@@ -221,9 +221,9 @@ export default function SettingsPage() {
   };
 
   const levelConfig: Record<string, { color: string; bg: string }> = {
-    Bronze: { color: 'text-amber-600', bg: 'bg-amber-600/10' },
-    Silver: { color: 'text-gray-300', bg: 'bg-gray-300/10' },
-    Gold: { color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
+    Bronze: { color: 'text-amber-600', bg: 'bg-cardmber-600/10' },
+    Silver: { color: 'text-foreground/70', bg: 'bg-gray-300/10' },
+    Gold: { color: 'text-primary', bg: 'bg-primary/10' },
     Platinum: { color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
   };
 
@@ -270,7 +270,7 @@ export default function SettingsPage() {
                   className="w-16 h-16 rounded-2xl object-cover ring-2 ring-[#D4AF37]/30 group-hover:ring-[#D4AF37]/60 transition-all"
                 />
               ) : (
-                <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center text-2xl font-bold text-[#070B14] ring-2 ring-transparent group-hover:ring-[#D4AF37]/60 transition-all">
+                <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center text-2xl font-bold text-primary-foreground ring-2 ring-transparent group-hover:ring-[#D4AF37]/60 transition-all">
                   {user?.name?.charAt(0) || 'U'}
                 </div>
               )}
@@ -289,7 +289,7 @@ export default function SettingsPage() {
             <h2 className="text-foreground font-semibold text-base truncate">{user?.name || 'User'}</h2>
             <p className="text-muted-foreground text-sm">{user?.userId || '-'}</p>
             <div className="flex items-center gap-2 mt-1">
-              <Badge className={`${level.bg} ${level.color} border-0 text-[10px] font-semibold`}>
+              <Badge className={`${level.bg} ${level.color} border-border text-[10px] font-semibold`}>
                 <Crown className="w-3 h-3 mr-0.5" />
                 {user?.level || 'Bronze'}
               </Badge>
@@ -314,7 +314,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <p className="text-muted-foreground text-xs mb-0.5">{t('settings.totalProfit')}</p>
-            <p className="text-[#D4AF37] font-medium">{formatRupiah(user?.totalProfit || 0)}</p>
+            <p className="text-primary font-medium">{formatRupiah(user?.totalProfit || 0)}</p>
           </div>
         </div>
       </motion.div>
@@ -327,7 +327,7 @@ export default function SettingsPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <div className="flex items-center gap-2 mb-4">
-          <User className="w-5 h-5 text-[#D4AF37]" />
+          <User className="w-5 h-5 text-primary" />
           <h3 className="text-foreground font-semibold text-sm">{t('settings.changeName')}</h3>
         </div>
         <form onSubmit={handleUpdateName} className="space-y-3">
@@ -342,7 +342,7 @@ export default function SettingsPage() {
           <Button
             type="submit"
             disabled={nameLoading || name === user?.name}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
           >
             {nameLoading ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -361,7 +361,7 @@ export default function SettingsPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <div className="flex items-center gap-2 mb-4">
-          <Phone className="w-5 h-5 text-[#D4AF37]" />
+          <Phone className="w-5 h-5 text-primary" />
           <h3 className="text-foreground font-semibold text-sm">{t('settings.changeWhatsapp')}</h3>
         </div>
 
@@ -382,7 +382,7 @@ export default function SettingsPage() {
                 setEditingWhatsapp(true);
               }}
               variant="outline"
-              className="border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/5 rounded-xl text-xs"
+              className="border-primary/30 text-primary hover:bg-primary/5 rounded-xl text-xs"
             >
               Ubah
             </Button>
@@ -403,7 +403,7 @@ export default function SettingsPage() {
               <Button
                 type="submit"
                 disabled={whatsappLoading}
-                className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
+                className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
               >
                 {whatsappLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -435,7 +435,7 @@ export default function SettingsPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <div className="flex items-center gap-2 mb-4">
-          <Lock className="w-5 h-5 text-[#D4AF37]" />
+          <Lock className="w-5 h-5 text-primary" />
           <h3 className="text-foreground font-semibold text-sm">{t('settings.changePassword')}</h3>
         </div>
         <form onSubmit={handleUpdatePassword} className="space-y-3">
@@ -498,7 +498,7 @@ export default function SettingsPage() {
           <Button
             type="submit"
             disabled={passwordLoading}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
           >
             {passwordLoading ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -527,7 +527,7 @@ export default function SettingsPage() {
               i > 0 ? 'border-t border-border/20' : ''
             }`}
           >
-            <item.icon className="w-4 h-4 text-[#D4AF37]" />
+            <item.icon className="w-4 h-4 text-primary" />
             <span className="flex-1 text-left text-foreground">{item.label}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>

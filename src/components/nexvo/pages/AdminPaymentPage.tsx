@@ -325,7 +325,7 @@ export default function AdminPaymentPage() {
         </div>
         <Button
           onClick={openNewForm}
-          className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
         >
           <Plus className="w-4 h-4 mr-2" />
           Tambah Metode
@@ -352,7 +352,7 @@ export default function AdminPaymentPage() {
                   <Icon className="w-4 h-4" style={{ color: config.color }} />
                 </div>
                 <h3 className="text-foreground font-semibold">{config.label}</h3>
-                <Badge className="bg-white/5 text-muted-foreground text-[10px] border-0 ml-auto">
+                <Badge className="bg-foreground/5 text-muted-foreground text-[10px] border-border ml-auto">
                   {category.methods.length} metode
                 </Badge>
               </div>
@@ -385,7 +385,7 @@ export default function AdminPaymentPage() {
                         <div className="flex items-center gap-2">
                           <p className="text-foreground text-sm font-medium truncate">{pm.name}</p>
                           {!pm.isActive && (
-                            <Badge className="bg-red-500/10 text-red-400 text-[9px] border-0">Nonaktif</Badge>
+                            <Badge className="bg-red-500/10 text-red-400 text-[9px] border-border">Nonaktif</Badge>
                           )}
                         </div>
                         {pm.accountNo && (
@@ -404,7 +404,7 @@ export default function AdminPaymentPage() {
                         />
                         <button
                           onClick={() => openEditForm(pm)}
-                          className="p-2.5 sm:p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-[#D4AF37] transition-colors"
+                          className="p-2.5 sm:p-1.5 rounded-lg hover:bg-foreground/5 text-muted-foreground hover:text-primary transition-colors"
                           title="Edit"
                         >
                           <Edit3 className="w-4 h-4" />
@@ -426,7 +426,7 @@ export default function AdminPaymentPage() {
                   <p className="text-muted-foreground text-sm">Belum ada metode {config.label.toLowerCase()}</p>
                   <button
                     onClick={openNewForm}
-                    className="text-[#D4AF37] text-xs mt-2 hover:underline"
+                    className="text-primary text-xs mt-2 hover:underline"
                   >
                     + Tambah Sekarang
                   </button>
@@ -445,7 +445,7 @@ export default function AdminPaymentPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Settings className="w-5 h-5 text-[#D4AF37]" />
+                <Settings className="w-5 h-5 text-primary" />
                 <h3 className="text-foreground font-semibold">Auto Payment</h3>
               </div>
               <p className="text-muted-foreground text-sm">
@@ -458,7 +458,7 @@ export default function AdminPaymentPage() {
             />
           </div>
           {autoPayment && (
-            <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+            <div className="mt-4 p-3 rounded-xl bg-cardmerald-500/10 border border-emerald-500/20">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div>
@@ -473,7 +473,7 @@ export default function AdminPaymentPage() {
           <Button
             onClick={handleSaveSettings}
             disabled={savingSettings}
-            className="mt-4 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
+            className="mt-4 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50"
           >
             {savingSettings ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
             Simpan Pengaturan
@@ -517,7 +517,7 @@ export default function AdminPaymentPage() {
                       setShowForm(false);
                       setEditingId(null);
                     }}
-                    className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                    className="p-2 rounded-xl hover:bg-foreground/5 text-muted-foreground hover:text-foreground"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -537,7 +537,7 @@ export default function AdminPaymentPage() {
                             onClick={() => setForm((prev) => ({ ...prev, type: key }))}
                             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all ${
                               form.type === key
-                                ? 'bg-gold-gradient text-[#070B14] glow-gold'
+                                ? 'bg-gold-gradient text-primary-foreground glow-gold'
                                 : 'glass text-muted-foreground hover:text-foreground'
                             }`}
                           >
@@ -624,7 +624,7 @@ export default function AdminPaymentPage() {
                     />
                     {form.iconUrl ? (
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-white/5 p-2 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-foreground/5 p-2 flex items-center justify-center">
                           <img src={getFileUrl(form.iconUrl)} alt="Icon" className="w-full h-full object-contain" />
                         </div>
                         <div className="flex-1">
@@ -633,7 +633,7 @@ export default function AdminPaymentPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => iconInputRef.current?.click()}
-                            className="rounded-xl border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/5 text-xs"
+                            className="rounded-xl border-primary/30 text-primary hover:bg-primary/5 text-xs"
                             disabled={uploading && uploadField === 'iconUrl'}
                           >
                             {uploading && uploadField === 'iconUrl' ? (
@@ -660,9 +660,9 @@ export default function AdminPaymentPage() {
                         disabled={uploading && uploadField === 'iconUrl'}
                       >
                         {uploading && uploadField === 'iconUrl' ? (
-                          <Loader2 className="w-6 h-6 text-[#D4AF37] animate-spin" />
+                          <Loader2 className="w-6 h-6 text-primary animate-spin" />
                         ) : (
-                          <ImageIcon className="w-6 h-6 text-[#D4AF37]" />
+                          <ImageIcon className="w-6 h-6 text-primary" />
                         )}
                         <p className="text-muted-foreground text-xs">Upload Icon / Logo</p>
                       </button>
@@ -687,7 +687,7 @@ export default function AdminPaymentPage() {
                       />
                       {form.qrImage ? (
                         <div className="space-y-2">
-                          <div className="rounded-xl bg-white/5 p-3 flex justify-center max-w-xs mx-auto">
+                          <div className="rounded-xl bg-foreground/5 p-3 flex justify-center max-w-xs mx-auto">
                             <img src={getFileUrl(form.qrImage)} alt="QR Code" className="max-w-full max-h-48 object-contain" />
                           </div>
                           <div className="flex items-center gap-2 justify-center">
@@ -696,7 +696,7 @@ export default function AdminPaymentPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => qrInputRef.current?.click()}
-                              className="rounded-xl border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/5 text-xs"
+                              className="rounded-xl border-primary/30 text-primary hover:bg-primary/5 text-xs"
                               disabled={uploading && uploadField === 'qrImage'}
                             >
                               {uploading && uploadField === 'qrImage' ? (
@@ -722,12 +722,12 @@ export default function AdminPaymentPage() {
                           className="w-full"
                           disabled={uploading && uploadField === 'qrImage'}
                         >
-                          <div className="glass rounded-2xl border-2 border-dashed border-[#D4AF37]/20 p-6 text-center hover:border-[#D4AF37]/40 transition-colors">
+                          <div className="glass rounded-2xl border-border border-dashed border-primary/20 p-6 text-center hover:border-primary/40 transition-colors">
                             {uploading && uploadField === 'qrImage' ? (
-                              <Loader2 className="w-8 h-8 text-[#D4AF37] mx-auto animate-spin" />
+                              <Loader2 className="w-8 h-8 text-primary mx-auto animate-spin" />
                             ) : (
                               <>
-                                <QrCode className="w-8 h-8 text-[#D4AF37] mx-auto mb-2" />
+                                <QrCode className="w-8 h-8 text-primary mx-auto mb-2" />
                                 <p className="text-foreground font-medium text-sm">Upload Gambar QR Code</p>
                                 <p className="text-muted-foreground text-xs">Klik untuk memilih file</p>
                               </>
@@ -781,7 +781,7 @@ export default function AdminPaymentPage() {
                     type="button"
                     onClick={handleSave}
                     disabled={saving || !form.name.trim()}
-                    className="flex-1 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold disabled:opacity-50"
+                    className="flex-1 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold disabled:opacity-50"
                   >
                     {saving ? (
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />

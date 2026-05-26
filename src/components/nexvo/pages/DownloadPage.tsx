@@ -125,7 +125,7 @@ export default function DownloadPage() {
         animate={{ opacity: 1, y: 0 }}
         className="glass-gold glow-gold-strong rounded-2xl p-4 sm:p-6 lg:p-10 text-center relative overflow-hidden"
       >
-        <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+        <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-[#1E3A5F]/10 blur-3xl" />
 
         <div className="relative z-10">
@@ -135,7 +135,7 @@ export default function DownloadPage() {
             className="mx-auto mb-6"
           >
             <div className="relative inline-block">
-              <div className="absolute inset-0 blur-[20px] bg-[#D4AF37]/10 rounded-full scale-110" />
+              <div className="absolute inset-0 blur-[20px] bg-primary/10 rounded-full scale-110" />
               <img
                 src={useSiteStore.getState().logoUrl}
                 alt="NEXVO"
@@ -148,7 +148,7 @@ export default function DownloadPage() {
           <p className="text-muted-foreground text-sm mb-4">Digital Asset Management</p>
 
           <div className="flex items-center justify-center gap-3 mb-6">
-            <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-xs">
+            <Badge className="bg-primary/10 text-primary border border-primary/20 text-xs">
               v1.0.0
             </Badge>
           </div>
@@ -158,13 +158,13 @@ export default function DownloadPage() {
             <Button
               onClick={handleInstall}
               disabled={installing}
-              className="bg-gold-gradient text-[#070B14] font-bold rounded-xl hover:opacity-90 glow-gold-strong h-14 px-8 text-base w-full"
+              className="bg-gold-gradient text-primary-foreground font-bold rounded-xl hover:opacity-90 glow-gold-strong h-14 px-8 text-base w-full"
             >
               {installing ? (
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                  className="w-5 h-5 border-2 border-[#070B14]/30 border-t-[#070B14] rounded-full mr-2"
+                  className="w-5 h-5 border-border border-primary-foreground/30 border-t-primary-foreground rounded-full mr-2"
                 />
               ) : (
                 <Download className="w-5 h-5 mr-2" />
@@ -192,7 +192,7 @@ export default function DownloadPage() {
             className="fixed inset-x-0 bottom-0 z-[91] p-4 pb-8"
           >
             <div className="max-w-sm mx-auto">
-              <div className="relative bg-gradient-to-b from-[#1a1f2e] to-[#0F172A] border border-[#D4AF37]/30 rounded-2xl p-6 shadow-[0_0_40px_rgba(212,175,55,0.15)]">
+              <div className="relative bg-gradient-to-b from-card to-secondary border border-primary/30 rounded-2xl p-6 shadow-[0_0_40px_rgba(184,150,15,0.1)]">
                 <div className="flex flex-col items-center text-center mb-4">
                   <motion.div
                     animate={{ y: [0, -8, 0] }}
@@ -203,21 +203,21 @@ export default function DownloadPage() {
                       <path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </motion.div>
-                  <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center mb-3">
-                    <Share className="w-8 h-8 text-[#D4AF37]" />
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
+                    <Share className="w-8 h-8 text-primary" />
                   </div>
                   <h3 className="text-white font-bold text-lg mb-1">Install NEXVO</h3>
-                  <p className="text-white/50 text-sm">Tap <Share className="w-4 h-4 inline text-[#D4AF37]" /> lalu <strong className="text-white/80">"Add to Home Screen"</strong></p>
+                  <p className="text-white/50 text-sm">Tap <Share className="w-4 h-4 inline text-primary" /> lalu <strong className="text-white/80">"Add to Home Screen"</strong></p>
                 </div>
                 <div className="flex items-center justify-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                    <Share className="w-4 h-4 text-[#D4AF37]" />
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-foreground/5 border border-white/10">
+                    <Share className="w-4 h-4 text-primary" />
                     <span className="text-white/70 text-xs font-medium">Share</span>
                   </div>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white/30 shrink-0">
                     <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-foreground/5 border border-white/10">
                     <Plus className="w-4 h-4 text-emerald-400" />
                     <span className="text-white/70 text-xs font-medium">Add to Home Screen</span>
                   </div>
@@ -235,7 +235,7 @@ export default function DownloadPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-4 flex items-center gap-2">
-          <Star className="w-4 h-4 text-[#D4AF37]" />
+          <Star className="w-4 h-4 text-primary" />
           Fitur Unggulan
         </h3>
         <div className="grid grid-cols-2 gap-4">
@@ -247,8 +247,8 @@ export default function DownloadPage() {
               transition={{ delay: 0.15 + i * 0.05 }}
               className="glass rounded-xl p-4 text-center hover:glow-gold transition-all group"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                <feature.icon className="w-5 h-5 text-[#D4AF37]" />
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+                <feature.icon className="w-5 h-5 text-primary" />
               </div>
               <p className="text-foreground text-sm font-medium">{feature.title}</p>
               <p className="text-muted-foreground text-xs mt-0.5">{feature.desc}</p>
@@ -264,7 +264,7 @@ export default function DownloadPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-4 flex items-center gap-2">
-          <Smartphone className="w-4 h-4 text-[#D4AF37]" />
+          <Smartphone className="w-4 h-4 text-primary" />
           Kompatibilitas
         </h3>
         <div className="space-y-2">

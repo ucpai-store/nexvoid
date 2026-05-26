@@ -151,19 +151,19 @@ function getProfitTypeConfig(type: string) {
   switch (type) {
     case 'profit':
     case 'reward':
-      return { label: 'Profit Harian', color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: TrendingUp };
+      return { label: 'Profit Harian', color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', icon: TrendingUp };
     case 'matching':
       return { label: 'Matching Profit', color: 'text-purple-400', bg: 'bg-purple-400/10', icon: Users };
     case 'salary':
       return { label: 'Gaji Mingguan', color: 'text-blue-400', bg: 'bg-blue-400/10', icon: Award };
     case 'sponsor':
-      return { label: 'Bonus Sponsor', color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', icon: Gift };
+      return { label: 'Bonus Sponsor', color: 'text-primary', bg: 'bg-primary/10', icon: Gift };
     case 'level':
       return { label: 'Bonus Level', color: 'text-orange-400', bg: 'bg-orange-400/10', icon: Zap };
     case 'referral':
       return { label: 'Bonus Referral', color: 'text-pink-400', bg: 'bg-pink-400/10', icon: ShoppingBag };
     default:
-      return { label: type, color: 'text-muted-foreground', bg: 'bg-white/5', icon: Coins };
+      return { label: type, color: 'text-muted-foreground', bg: 'bg-foreground/5', icon: Coins };
   }
 }
 
@@ -279,7 +279,7 @@ export default function ProfitPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('dashboard.tryAgain')}
@@ -303,7 +303,7 @@ export default function ProfitPage() {
       <motion.div variants={itemVariants} className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gold-gradient flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-[#070B14]" />
+            <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
           </div>
           <div>
             <h1 className="text-foreground font-bold text-lg sm:text-xl">Profit Center</h1>
@@ -312,7 +312,7 @@ export default function ProfitPage() {
         </div>
         <button
           onClick={handleRefresh}
-          className="p-2.5 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+          className="p-2.5 rounded-xl hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
         </button>
@@ -320,14 +320,14 @@ export default function ProfitPage() {
 
       {/* ── Profit Schedule Card ── Countdown to 00:00 WIB */}
       <motion.div variants={itemVariants} className="glass glow-gold rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/3 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-emerald-500/3 blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/3 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-cardmerald-500/3 blur-3xl" />
 
         <div className="relative z-10">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-cardmerald-500/10 flex items-center justify-center">
                 <Timer className="w-4 h-4 text-emerald-400" />
               </div>
               <div>
@@ -337,13 +337,13 @@ export default function ProfitPage() {
             </div>
             <div className="flex items-center gap-2">
               <div className="glass rounded-lg px-2 py-1 flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${profitStatus?.todayProfitCredited ? 'bg-emerald-400' : 'bg-yellow-400'} animate-pulse`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${profitStatus?.todayProfitCredited ? 'bg-cardmerald-400' : 'bg-yellow-400'} animate-pulse`} />
                 <span className="text-[10px] text-muted-foreground">
                   WIB: {wibTime}
                 </span>
               </div>
               {profitStatus?.todayProfitCredited && (
-                <Badge className="bg-emerald-400/10 text-emerald-400 border-0 text-[9px] px-1.5 py-0">
+                <Badge className="bg-cardmerald-400/10 text-emerald-400 border-border text-[9px] px-1.5 py-0">
                   <CheckCircle2 className="w-3 h-3 mr-0.5" />
                   Hari ini sudah
                 </Badge>
@@ -357,12 +357,12 @@ export default function ProfitPage() {
               <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.hours)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">JAM</p>
             </div>
-            <span className="text-lg sm:text-xl font-bold text-[#D4AF37] animate-pulse">:</span>
+            <span className="text-lg sm:text-xl font-bold text-primary animate-pulse">:</span>
             <div className="glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px]">
               <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.minutes)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">MENIT</p>
             </div>
-            <span className="text-lg sm:text-xl font-bold text-[#D4AF37] animate-pulse">:</span>
+            <span className="text-lg sm:text-xl font-bold text-primary animate-pulse">:</span>
             <div className="glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px]">
               <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.seconds)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">DETIK</p>
@@ -371,7 +371,7 @@ export default function ProfitPage() {
 
           {/* Estimasi profit */}
           {hasActiveInvestments && (
-            <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 mb-3">
+            <div className="bg-cardmerald-500/5 border border-emerald-500/10 rounded-xl p-3 mb-3">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-emerald-400 text-xs font-medium">Estimasi Profit Berikutnya</span>
@@ -397,7 +397,7 @@ export default function ProfitPage() {
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white/[0.02] rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-1">
-                <Zap className="w-3 h-3 text-[#D4AF37]" />
+                <Zap className="w-3 h-3 text-primary" />
                 <span className="text-[10px] text-muted-foreground">Profit Harian</span>
               </div>
               <p className="text-foreground text-[10px] font-medium">00:00 WIB setiap hari</p>
@@ -418,7 +418,7 @@ export default function ProfitPage() {
             </div>
             <div className="bg-white/[0.02] rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-1">
-                <Gift className="w-3 h-3 text-[#D4AF37]" />
+                <Gift className="w-3 h-3 text-primary" />
                 <span className="text-[10px] text-muted-foreground">Bonus Sponsor</span>
               </div>
               <p className="text-foreground text-[10px] font-medium">Saat downline daftar</p>
@@ -431,8 +431,8 @@ export default function ProfitPage() {
       <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5 lg:p-6">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-              <Coins className="w-4 h-4 text-[#D4AF37]" />
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Coins className="w-4 h-4 text-primary" />
             </div>
             <div>
               <h3 className="text-foreground font-semibold text-sm">Pendapatan Hari Ini</h3>
@@ -445,10 +445,10 @@ export default function ProfitPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {[
-            { label: 'Profit Harian', value: todayEarnings?.profit || 0, color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: TrendingUp },
+            { label: 'Profit Harian', value: todayEarnings?.profit || 0, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', icon: TrendingUp },
             { label: 'Matching', value: todayEarnings?.matching || 0, color: 'text-purple-400', bg: 'bg-purple-400/10', icon: Users },
             { label: 'Gaji', value: todayEarnings?.salary || 0, color: 'text-blue-400', bg: 'bg-blue-400/10', icon: Award },
-            { label: 'Sponsor', value: todayEarnings?.sponsor || 0, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', icon: Gift },
+            { label: 'Sponsor', value: todayEarnings?.sponsor || 0, color: 'text-primary', bg: 'bg-primary/10', icon: Gift },
           ].map((item) => (
             <div key={item.label} className="bg-white/[0.02] rounded-xl p-3 text-center">
               <div className={`inline-flex items-center justify-center w-7 h-7 rounded-lg ${item.bg} mb-1.5`}>
@@ -464,8 +464,8 @@ export default function ProfitPage() {
       {/* ── Earnings Summary Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { icon: Wallet, label: 'Saldo Utama', value: user?.mainBalance || 0, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
-          { icon: TrendingUp, label: t('dashboard.totalProfit'), value: user?.totalProfit || 0, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+          { icon: Wallet, label: 'Saldo Utama', value: user?.mainBalance || 0, color: 'text-primary', bg: 'bg-primary/10' },
+          { icon: TrendingUp, label: t('dashboard.totalProfit'), value: user?.totalProfit || 0, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10' },
           { icon: ArrowDownCircle, label: t('dashboard.totalDeposit'), value: user?.totalDeposit || 0, color: 'text-blue-400', bg: 'bg-blue-400/10' },
           { icon: ArrowUpCircle, label: t('dashboard.totalWithdraw'), value: user?.totalWithdraw || 0, color: 'text-orange-400', bg: 'bg-orange-400/10' },
         ].map((item) => (
@@ -489,8 +489,8 @@ export default function ProfitPage() {
       <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5 lg:p-6">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-              <Package className="w-4 h-4 text-[#D4AF37]" />
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Package className="w-4 h-4 text-primary" />
             </div>
             <div>
               <h3 className="text-foreground font-semibold text-sm sm:text-base">Investasi Aktif</h3>
@@ -499,7 +499,7 @@ export default function ProfitPage() {
           </div>
           <button
             onClick={() => navigate('assets')}
-            className="text-[#D4AF37] text-xs font-medium hover:underline flex items-center gap-1"
+            className="text-primary text-xs font-medium hover:underline flex items-center gap-1"
           >
             Lihat Semua
             <ChevronRight className="w-3 h-3" />
@@ -537,7 +537,7 @@ export default function ProfitPage() {
                         <p className="text-foreground text-sm font-medium truncate">
                           {inv.package?.name || 'Paket Investasi'}
                         </p>
-                        <Badge className="bg-emerald-400/10 text-emerald-400 border-0 text-[9px] px-1.5 py-0">
+                        <Badge className="bg-cardmerald-400/10 text-emerald-400 border-border text-[9px] px-1.5 py-0">
                           {t('dashboard.active')}
                         </Badge>
                       </div>
@@ -567,7 +567,7 @@ export default function ProfitPage() {
                         <span className="text-[9px] text-muted-foreground">Progress Kontrak</span>
                         <span className="text-[9px] text-muted-foreground">{progressPct}%</span>
                       </div>
-                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${progressPct}%` }}
@@ -588,7 +588,7 @@ export default function ProfitPage() {
             <p className="text-muted-foreground/60 text-xs mb-4">Mulai investasi untuk mendapatkan profit harian</p>
             <Button
               onClick={() => navigate('paket')}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-xs"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-xs"
             >
               <Sparkles className="w-3.5 h-3.5 mr-1.5" />
               Mulai Investasi
@@ -601,7 +601,7 @@ export default function ProfitPage() {
       <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5 lg:p-6">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-cardmerald-500/10 flex items-center justify-center">
               <BarChart3 className="w-4 h-4 text-emerald-400" />
             </div>
             <div>
@@ -613,7 +613,7 @@ export default function ProfitPage() {
             variant="ghost"
             size="sm"
             onClick={() => navigate('history')}
-            className="text-[#D4AF37] text-xs hover:text-[#F0D060] hover:bg-[#D4AF37]/10 rounded-xl"
+            className="text-primary text-xs hover:text-primary/80 hover:bg-primary/10 rounded-xl"
           >
             {t('dashboard.viewAll')}
             <ChevronRight className="w-3 h-3 ml-1" />
@@ -640,7 +640,7 @@ export default function ProfitPage() {
                     <div className="flex items-center gap-1.5">
                       <p className="text-foreground text-sm font-medium">{typeCfg.label}</p>
                       {entry.level && (
-                        <Badge className="bg-white/5 text-muted-foreground border-0 text-[8px] px-1 py-0">
+                        <Badge className="bg-foreground/5 text-muted-foreground border-border text-[8px] px-1 py-0">
                           L{entry.level}
                         </Badge>
                       )}
@@ -677,16 +677,16 @@ export default function ProfitPage() {
       <div className="grid grid-cols-2 gap-4">
         <Button
           onClick={() => navigate('paket')}
-          className="h-14 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold-strong text-sm"
+          className="h-14 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold-strong text-sm"
         >
           <Sparkles className="w-5 h-5 mr-2" />
           Investasi Baru
         </Button>
         <Button
           onClick={() => navigate('withdraw')}
-          className="h-14 bg-card-gradient border border-[#D4AF37]/20 text-foreground font-semibold rounded-xl hover:bg-white/5 hover:border-[#D4AF37]/40 transition-all text-sm"
+          className="h-14 bg-card-gradient border border-primary/20 text-foreground font-semibold rounded-xl hover:bg-foreground/5 hover:border-primary/40 transition-all text-sm"
         >
-          <ArrowUpCircle className="w-5 h-5 mr-2 text-[#D4AF37]" />
+          <ArrowUpCircle className="w-5 h-5 mr-2 text-primary" />
           {t('dashboard.withdrawBtn')}
         </Button>
       </div>

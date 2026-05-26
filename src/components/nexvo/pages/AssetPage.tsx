@@ -85,7 +85,7 @@ function getProgress(startDate: string, contractDays: number): number {
 function getStatusConfig(status: string, t: (key: string) => string) {
   switch (status) {
     case 'active':
-      return { label: t('assets.statusActive'), color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: CheckCircle2 };
+      return { label: t('assets.statusActive'), color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', icon: CheckCircle2 };
     case 'completed':
       return { label: t('assets.statusCompleted'), color: 'text-blue-400', bg: 'bg-blue-400/10', icon: CheckCircle2 };
     case 'stopped':
@@ -93,7 +93,7 @@ function getStatusConfig(status: string, t: (key: string) => string) {
     case 'cancelled':
       return { label: t('assets.statusCancelled'), color: 'text-red-400', bg: 'bg-red-400/10', icon: XCircle };
     default:
-      return { label: status, color: 'text-muted-foreground', bg: 'bg-white/5', icon: Clock };
+      return { label: status, color: 'text-muted-foreground', bg: 'bg-foreground/5', icon: Clock };
   }
 }
 
@@ -113,13 +113,13 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
       className="glass-strong rounded-2xl p-4 sm:p-5 relative overflow-hidden hover:glow-gold transition-all"
     >
       {/* Status indicator bar */}
-      <div className={`absolute top-0 left-0 right-0 h-1 ${asset.status === 'active' ? 'bg-emerald-400' : asset.status === 'completed' ? 'bg-blue-400' : 'bg-orange-400'}`} />
+      <div className={`absolute top-0 left-0 right-0 h-1 ${asset.status === 'active' ? 'bg-cardmerald-400' : asset.status === 'completed' ? 'bg-blue-400' : 'bg-orange-400'}`} />
 
       {/* Header */}
       <div className="flex items-start justify-between mb-3 pt-1">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isInvestment ? 'bg-purple-400/10' : 'bg-[#D4AF37]/10'}`}>
-            <Package className={`w-5 h-5 ${isInvestment ? 'text-purple-400' : 'text-[#D4AF37]'}`} />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isInvestment ? 'bg-purple-400/10' : 'bg-primary/10'}`}>
+            <Package className={`w-5 h-5 ${isInvestment ? 'text-purple-400' : 'text-primary'}`} />
           </div>
           <div>
             <h3 className="text-foreground font-semibold text-sm">{asset.name}</h3>
@@ -127,13 +127,13 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
               {isInvestment ? t('assets.investmentPackage') : t('assets.product')} • {formatDate(asset.startDate)}
             </p>
             {!isInvestment && asset.quantity && asset.quantity > 1 && (
-              <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[9px] font-semibold mt-0.5">
+              <Badge className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-semibold mt-0.5">
                 {asset.quantity}x
               </Badge>
             )}
           </div>
         </div>
-        <Badge className={`${statusCfg.bg} ${statusCfg.color} border-0 text-[10px] font-semibold flex items-center gap-1`}>
+        <Badge className={`${statusCfg.bg} ${statusCfg.color} border-border text-[10px] font-semibold flex items-center gap-1`}>
           <StatusIcon className="w-3 h-3" />
           {statusCfg.label}
         </Badge>
@@ -174,7 +174,7 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
             <Coins className="w-3.5 h-3.5" />
             <span>{t('assets.totalProfit')}</span>
           </div>
-          <span className="text-[#D4AF37] font-bold">{formatRupiah(asset.totalProfitEarned)}</span>
+          <span className="text-primary font-bold">{formatRupiah(asset.totalProfitEarned)}</span>
         </div>
 
         {asset.endDate && (
@@ -197,7 +197,7 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
               {daysElapsed}/{asset.contractDays} hari • <span className="text-emerald-400">{daysRemaining} hari tersisa</span>
             </span>
           </div>
-          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-foreground/5 rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
@@ -330,7 +330,7 @@ export default function AssetPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('dashboard.tryAgain')}</Button>
@@ -345,13 +345,13 @@ export default function AssetPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-            <Package className="w-5 h-5 text-[#D4AF37]" />
+            <Package className="w-5 h-5 text-primary" />
             {t('assets.myAssets')}</h1>
           <p className="text-muted-foreground text-sm">{t('assets.myAssets')}</p>
         </div>
         <Button
           onClick={() => navigate('paket')}
-          className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-xs sm:text-sm"
+          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-xs sm:text-sm"
         >
           <TrendingUp className="w-4 h-4 mr-1.5" />
           {t('assets.investNew')}</Button>
@@ -359,10 +359,10 @@ export default function AssetPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryCard icon={Package} label="Aset Aktif" value={`${activeCount}`} color="text-emerald-400" bgColor="bg-emerald-400/10" />
-        <SummaryCard icon={Coins} label="Total Modal" value={formatRupiah(totalActiveAmount)} color="text-[#D4AF37]" bgColor="bg-[#D4AF37]/10" />
-        <SummaryCard icon={TrendingUp} label="Profit/Hari" value={formatRupiah(totalDailyProfit)} color="text-emerald-400" bgColor="bg-emerald-400/10" />
-        <SummaryCard icon={Coins} label="Total Profit" value={formatRupiah(totalProfitEarned)} color="text-[#D4AF37]" bgColor="bg-[#D4AF37]/10" />
+        <SummaryCard icon={Package} label="Aset Aktif" value={`${activeCount}`} color="text-emerald-400" bgColor="bg-cardmerald-400/10" />
+        <SummaryCard icon={Coins} label="Total Modal" value={formatRupiah(totalActiveAmount)} color="text-primary" bgColor="bg-primary/10" />
+        <SummaryCard icon={TrendingUp} label="Profit/Hari" value={formatRupiah(totalDailyProfit)} color="text-emerald-400" bgColor="bg-cardmerald-400/10" />
+        <SummaryCard icon={Coins} label="Total Profit" value={formatRupiah(totalProfitEarned)} color="text-primary" bgColor="bg-primary/10" />
       </div>
 
       {/* Tabs */}
@@ -370,19 +370,19 @@ export default function AssetPage() {
         <TabsList className="glass rounded-xl p-1 h-auto flex-wrap">
           <TabsTrigger
             value="all"
-            className="rounded-lg text-xs px-3 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-[#070B14] data-[state=active]:font-semibold"
+            className="rounded-lg text-xs px-3 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-primary-foreground data-[state=active]:font-semibold"
           >
             Semua ({assets.length})
           </TabsTrigger>
           <TabsTrigger
             value="investment"
-            className="rounded-lg text-xs px-3 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-[#070B14] data-[state=active]:font-semibold"
+            className="rounded-lg text-xs px-3 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-primary-foreground data-[state=active]:font-semibold"
           >
             Investasi ({assets.filter((a) => a.type === 'investment').length})
           </TabsTrigger>
           <TabsTrigger
             value="product"
-            className="rounded-lg text-xs px-3 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-[#070B14] data-[state=active]:font-semibold"
+            className="rounded-lg text-xs px-3 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-primary-foreground data-[state=active]:font-semibold"
           >
             Produk ({assets.filter((a) => a.type === 'product').length})
           </TabsTrigger>
@@ -402,7 +402,7 @@ export default function AssetPage() {
               <p className="text-muted-foreground text-sm mb-4">{t('assets.startInvesting')}</p>
               <Button
                 onClick={() => navigate('paket')}
-                className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+                className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
               >
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Lihat Paket Investasi

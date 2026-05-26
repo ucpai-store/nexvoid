@@ -72,14 +72,14 @@ function getStatusBadge(status: string, t: (key: string) => string) {
   switch (status) {
     case 'success':
     case 'approved':
-      return <Badge className="bg-emerald-400/10 text-emerald-400 border border-emerald-400/20 text-[10px]"><CheckCircle2 className="w-3 h-3 mr-0.5" />{t('dashboard.success')}</Badge>;
+      return <Badge className="bg-cardmerald-400/10 text-emerald-400 border border-emerald-400/20 text-[10px]"><CheckCircle2 className="w-3 h-3 mr-0.5" />{t('dashboard.success')}</Badge>;
     case 'pending':
       return <Badge className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 text-[10px]"><Clock className="w-3 h-3 mr-0.5" />{t('dashboard.pending')}</Badge>;
     case 'failed':
     case 'rejected':
       return <Badge className="bg-red-400/10 text-red-400 border border-red-400/20 text-[10px]"><XCircle className="w-3 h-3 mr-0.5" />{t('dashboard.failed')}</Badge>;
     default:
-      return <Badge className="bg-white/5 text-muted-foreground text-[10px]">{status}</Badge>;
+      return <Badge className="bg-foreground/5 text-muted-foreground text-[10px]">{status}</Badge>;
   }
 }
 
@@ -102,7 +102,7 @@ function CopyButton({ text, t, onCopied }: { text: string; t: (key: string) => s
     }
   };
   return (
-    <button type="button" onClick={handleCopy} className="p-1.5 rounded-lg bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] transition-colors" title="Copy">
+    <button type="button" onClick={handleCopy} className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors" title="Copy">
       {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
     </button>
   );
@@ -409,7 +409,7 @@ export default function DepositPage() {
           </div>
           <h3 className="text-foreground font-semibold mb-1">{t('dashboard.loadFailed')}</h3>
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
-          <Button onClick={retry} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
+          <Button onClick={retry} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold">
             <RefreshCw className="w-4 h-4 mr-2" />Try Again
           </Button>
         </div>
@@ -433,7 +433,7 @@ export default function DepositPage() {
               className="glass-strong rounded-3xl p-4 sm:p-6 lg:p-8 max-w-sm w-full glow-gold-strong"
             >
               <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-full bg-cardmerald-500/15 flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-9 h-9 text-emerald-400" />
                 </div>
                 <h2 className="text-foreground text-lg font-bold mb-1">Deposit Submitted!</h2>
@@ -501,14 +501,14 @@ export default function DepositPage() {
         {[1, 2, 3].map((s) => (
           <div key={s} className="flex items-center gap-2 flex-1">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
-              step >= s ? 'bg-gold-gradient text-[#070B14]' : 'bg-white/5 text-muted-foreground'
+              step >= s ? 'bg-gold-gradient text-primary-foreground' : 'bg-foreground/5 text-muted-foreground'
             }`}>
               {step > s ? <Check className="w-4 h-4" /> : s}
             </div>
             <span className={`text-xs font-medium hidden sm:block ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}>
               {s === 1 ? 'Amount' : s === 2 ? 'Payment' : 'Proof'}
             </span>
-            {s < 3 && <div className={`flex-1 h-0.5 rounded-full ${step > s ? 'bg-[#D4AF37]' : 'bg-white/10'}`} />}
+            {s < 3 && <div className={`flex-1 h-0.5 rounded-full ${step > s ? 'bg-primary' : 'bg-foreground/10'}`} />}
           </div>
         ))}
       </div>
@@ -518,7 +518,7 @@ export default function DepositPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-gold glow-gold-strong rounded-2xl p-3 sm:p-5 lg:p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-gold-gradient flex items-center justify-center shrink-0">
-              {isProductPurchase ? <ShoppingBag className="w-5 h-5 text-[#070B14]" /> : <Wallet className="w-5 h-5 text-[#070B14]" />}
+              {isProductPurchase ? <ShoppingBag className="w-5 h-5 text-primary-foreground" /> : <Wallet className="w-5 h-5 text-primary-foreground" />}
             </div>
             <div>
               <h3 className="text-foreground font-semibold text-sm">{isProductPurchase ? productName : packageName}</h3>
@@ -530,13 +530,13 @@ export default function DepositPage() {
             <span className="text-gold-gradient text-xl font-bold">{formatRupiah(prefillAmount || 0)}</span>
           </div>
           {hasEnoughBalance && (
-            <div className="mt-4 p-4 rounded-xl bg-emerald-400/5 border border-emerald-400/20">
+            <div className="mt-4 p-4 rounded-xl bg-cardmerald-400/5 border border-emerald-400/20">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 <span className="text-emerald-400 text-sm font-medium">{t('deposit.balanceSufficient')}</span>
               </div>
               <p className="text-muted-foreground text-xs mb-3">Your balance {formatRupiah(user?.mainBalance || 0)} is sufficient.</p>
-              <Button onClick={handleBuyWithBalance} disabled={submitting} className="w-full h-11 bg-emerald-500 text-white font-semibold rounded-xl hover:bg-emerald-600 transition-all text-sm">
+              <Button onClick={handleBuyWithBalance} disabled={submitting} className="w-full h-11 bg-cardmerald-500 text-white font-semibold rounded-xl hover:bg-cardmerald-600 transition-all text-sm">
                 {submitting ? <div className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t('common.processing')}</div> : <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{t('deposit.payFromBalance')}</div>}
               </Button>
             </div>
@@ -559,7 +559,7 @@ export default function DepositPage() {
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">Rp</span>
                     <Input type="text" inputMode="numeric" placeholder="0" value={amount ? formatAmountDisplay(amount) : ''}
                       onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, ''); setAmount(raw); }}
-                      className="pl-10 h-11 sm:h-14 text-lg sm:text-xl font-bold bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/30 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20" />
+                      className="pl-10 h-11 sm:h-14 text-lg sm:text-xl font-bold bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-[#D4AF37]/20" />
                   </div>
                 </div>
 
@@ -567,7 +567,7 @@ export default function DepositPage() {
                 <div className="flex flex-wrap gap-2">
                   {presetAmounts.map((preset) => (
                     <button key={preset.value} type="button" onClick={() => setAmount(preset.value.toString())}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${amount === preset.value.toString() ? 'bg-gold-gradient text-[#070B14] glow-gold' : 'glass text-muted-foreground hover:text-foreground hover:glow-gold'}`}>
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${amount === preset.value.toString() ? 'bg-gold-gradient text-primary-foreground glow-gold' : 'glass text-muted-foreground hover:text-foreground hover:glow-gold'}`}>
                       {preset.label}
                     </button>
                   ))}
@@ -605,10 +605,10 @@ export default function DepositPage() {
                         const isActive = activeTab === tab.key;
                         return (
                           <button key={tab.key} type="button" onClick={() => { setActiveTab(tab.key); setHasConfirmedPayment(false); }}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${isActive ? 'bg-gold-gradient text-[#070B14] glow-gold' : 'glass text-muted-foreground hover:text-foreground'}`}>
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${isActive ? 'bg-gold-gradient text-primary-foreground glow-gold' : 'glass text-muted-foreground hover:text-foreground'}`}>
                             <Icon className="w-4 h-4" />
                             {t(tab.labelKey)}
-                            {count > 0 && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-[#070B14]/20 text-[#070B14]' : 'bg-white/10 text-muted-foreground'}`}>{count}</span>}
+                            {count > 0 && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-background/20 text-primary-foreground' : 'bg-foreground/10 text-muted-foreground'}`}>{count}</span>}
                           </button>
                         );
                       })}
@@ -622,8 +622,8 @@ export default function DepositPage() {
                           return (
                             <motion.button key={pm.id} type="button" onClick={() => { setSelectedPayment(pm); setHasConfirmedPayment(false); }}
                               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                              className={`relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all ${isSelected ? 'glass-gold glow-gold border border-[#D4AF37]/40' : 'glass border border-transparent hover:border-border/50'}`}>
-                              {isSelected && <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#D4AF37] flex items-center justify-center"><Check className="w-2.5 h-2.5 text-[#070B14]" /></div>}
+                              className={`relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all ${isSelected ? 'glass-gold glow-gold border border-primary/40' : 'glass border border-transparent hover:border-border/50'}`}>
+                              {isSelected && <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center"><Check className="w-2.5 h-2.5 text-primary-foreground" /></div>}
                               <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden" style={{ backgroundColor: pm.color ? `${pm.color}15` : 'rgba(212,175,55,0.1)' }}>
                                 {pm.iconUrl ? <img src={getFileUrl(pm.iconUrl)} alt={pm.name} className="w-6 h-6 object-contain" /> : <span className="text-xs font-bold" style={{ color: pm.color || '#D4AF37' }}>{(pm.name || '').charAt(0)}</span>}
                               </div>
@@ -651,7 +651,7 @@ export default function DepositPage() {
                 {/* Continue to Step 2 */}
                 {numAmount >= 100000 && selectedPayment && (
                   <Button type="button" onClick={() => setStep(2)}
-                    className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm">
+                    className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm">
                     Continue to Payment Details →
                   </Button>
                 )}
@@ -672,7 +672,7 @@ export default function DepositPage() {
 
                 <div className="glass rounded-xl p-4 space-y-3">
                   {/* Amount to pay */}
-                  <div className="p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/20 text-center">
+                  <div className="p-3 rounded-xl bg-cardmerald-400/5 border border-emerald-400/20 text-center">
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Amount to Pay</p>
                     <p className="text-emerald-400 text-2xl font-bold">{formatRupiah(numAmount)}</p>
                   </div>
@@ -699,7 +699,7 @@ export default function DepositPage() {
                         </div>
                       ) : (
                         <div className="flex justify-center">
-                          <div className="w-52 h-52 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-2">
+                          <div className="w-52 h-52 rounded-xl bg-foreground/5 border border-white/10 flex flex-col items-center justify-center gap-2">
                             <QrCode className="w-12 h-12 text-muted-foreground/30" />
                             <p className="text-muted-foreground/50 text-[10px]">{selectedPayment.qrImage ? 'QR image failed to load' : 'No QR image configured'}</p>
                           </div>
@@ -742,7 +742,7 @@ export default function DepositPage() {
                   {/* Confirm Payment Button */}
                   <button type="button" onClick={() => setHasConfirmedPayment(true)}
                     className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
-                      hasConfirmedPayment ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-400/30' : 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20'
+                      hasConfirmedPayment ? 'bg-cardmerald-500/15 text-emerald-400 border border-emerald-400/30' : 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20'
                     }`}>
                     {hasConfirmedPayment ? <><CheckCircle2 className="w-4 h-4" />Payment Confirmed ✓</> : <>{activeTab === 'qris' ? <><QrCode className="w-4 h-4" />I've Completed the QR Payment</> : <><Copy className="w-4 h-4" />I've Sent USDT to the Address</>}</>}
                   </button>
@@ -751,7 +751,7 @@ export default function DepositPage() {
                 {/* Continue to Step 3 */}
                 {hasConfirmedPayment && (
                   <Button type="button" onClick={() => setStep(3)}
-                    className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm">
+                    className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm">
                     Continue to Upload Proof →
                   </Button>
                 )}
@@ -783,10 +783,10 @@ export default function DepositPage() {
                     </div>
                   ) : (
                     <button type="button" onClick={() => fileInputRef.current?.click()}
-                      className="w-full py-8 rounded-xl border-2 border-dashed border-[#D4AF37]/30 hover:border-[#D4AF37]/50 bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 transition-all flex flex-col items-center gap-3">
-                      <ImagePlus className="w-10 h-10 text-[#D4AF37]/50" />
+                      className="w-full py-8 rounded-xl border-border border-dashed border-primary/30 hover:border-primary/50 bg-primary/5 hover:bg-primary/10 transition-all flex flex-col items-center gap-3">
+                      <ImagePlus className="w-10 h-10 text-primary/50" />
                       <div className="text-center">
-                        <p className="text-[#D4AF37] text-sm font-medium">Upload Transfer Proof</p>
+                        <p className="text-primary text-sm font-medium">Upload Transfer Proof</p>
                         <p className="text-muted-foreground text-[10px] mt-0.5">JPG, PNG, WebP, GIF • Max 5MB</p>
                       </div>
                     </button>
@@ -822,7 +822,7 @@ export default function DepositPage() {
 
                 {/* Submit */}
                 <Button type="submit" disabled={submitting || uploadingProof}
-                  className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50">
+                  className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50">
                   {submitting || uploadingProof ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -849,14 +849,14 @@ export default function DepositPage() {
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {deposits.map((deposit) => (
               <div key={deposit.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                <div className="w-9 h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-cardmerald-400/10 flex items-center justify-center shrink-0">
                   <ArrowDownCircle className="w-4 h-4 text-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-foreground text-sm font-medium">{t('deposit.title')}</p>
-                    <span className="text-[10px] font-mono font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-md">{deposit.depositId || '-'}</span>
-                    {deposit.paymentName && <Badge className="bg-white/5 text-muted-foreground text-[9px] border-0 px-1.5 py-0">{deposit.paymentName}</Badge>}
+                    <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">{deposit.depositId || '-'}</span>
+                    {deposit.paymentName && <Badge className="bg-foreground/5 text-muted-foreground text-[9px] border-border px-1.5 py-0">{deposit.paymentName}</Badge>}
                   </div>
                   <p className="text-muted-foreground text-xs">{formatDate(deposit.createdAt)}</p>
                   {deposit.fee > 0 && <p className="text-muted-foreground text-[10px]">Fee: {formatRupiah(deposit.fee)} • Net: {formatRupiah(deposit.netAmount)}</p>}
@@ -867,7 +867,7 @@ export default function DepositPage() {
                     </button>
                   )}
                   {deposit.proofImage && (
-                    <a href={getFileUrl(deposit.proofImage)} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] text-[10px] hover:underline mt-1 inline-block">
+                    <a href={getFileUrl(deposit.proofImage)} target="_blank" rel="noopener noreferrer" className="text-primary text-[10px] hover:underline mt-1 inline-block">
                       📎 View Proof
                     </a>
                   )}

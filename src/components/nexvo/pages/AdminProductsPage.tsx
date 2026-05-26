@@ -295,7 +295,7 @@ export default function AdminProductsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">Kelola Produk</h1>
           <p className="text-muted-foreground text-sm">{products.length} produk terdaftar</p>
         </div>
-        <Button onClick={openAdd} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
+        <Button onClick={openAdd} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold">
           <Plus className="w-4 h-4 mr-2" /> Add Product
         </Button>
       </motion.div>
@@ -314,17 +314,17 @@ export default function AdminProductsPage() {
                   <img src={getFileUrl(product.banner)} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-card-gradient flex items-center justify-center">
-                    <ImageIcon className="w-8 h-8 text-[#D4AF37]/20" />
+                    <ImageIcon className="w-8 h-8 text-primary/20" />
                   </div>
                 )}
                 <div className="absolute top-2 right-2 flex gap-1">
-                  <Badge className={`text-[10px] border-0 ${product.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                  <Badge className={`text-[10px] border-border ${product.isActive ? 'bg-cardmerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                     {product.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 {product.isStopped && (
                   <div className="absolute top-2 left-2">
-                    <Badge className="bg-orange-500/20 text-orange-400 border-0 text-[10px]">Stopped</Badge>
+                    <Badge className="bg-orange-500/20 text-orange-400 border-border text-[10px]">Stopped</Badge>
                   </div>
                 )}
               </div>
@@ -354,16 +354,16 @@ export default function AdminProductsPage() {
                 )}
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={() => openEdit(product)}
-                    className="flex-1 rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5 h-9 sm:h-8 text-xs">
+                    className="flex-1 rounded-xl border-primary/20 text-foreground hover:bg-foreground/5 h-9 sm:h-8 text-xs">
                     <Pencil className="w-3 h-3 mr-1" /> Edit
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => handleToggleStop(product)}
-                    className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${product.isStopped ? 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10' : 'border-orange-500/20 text-orange-400 hover:bg-orange-500/10'}`}
+                    className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${product.isStopped ? 'border-emerald-500/20 text-emerald-400 hover:bg-cardmerald-500/10' : 'border-orange-500/20 text-orange-400 hover:bg-orange-500/10'}`}
                     title={product.isStopped ? 'Activekan' : 'Hentikan'}>
                     {product.isStopped ? <Play className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => handleToggleActive(product)}
-                    className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${product.isActive ? 'border-red-500/20 text-red-400 hover:bg-red-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'}`}
+                    className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${product.isActive ? 'border-red-500/20 text-red-400 hover:bg-red-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-cardmerald-500/10'}`}
                     title={product.isActive ? 'Inactivekan' : 'Activekan'}>
                     {product.isActive ? <Ban className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                   </Button>
@@ -391,7 +391,7 @@ export default function AdminProductsPage() {
           setForm(emptyForm);
         }
       }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-strong border-primary/20 max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">{editId ? 'Edit Product' : 'Add Product Baru'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">{editId ? 'Perbarui informasi produk' : 'Isi detail produk baru'}</DialogDescription>
@@ -400,7 +400,7 @@ export default function AdminProductsPage() {
             <div>
               <Label className="text-muted-foreground text-xs">Product Name *</Label>
               <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Contoh: Paket Emas Premium" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                placeholder="Contoh: Paket Emas Premium" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -408,12 +408,12 @@ export default function AdminProductsPage() {
                 <Input type="number" value={form.price} onChange={(e) => {
                   const val = e.target.value;
                   setForm((f) => ({ ...f, price: val, estimatedProfit: autoCalcProfit(val, f.profitRate) }));
-                }} placeholder="100000" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                }} placeholder="100000" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs">Duration (Hari) *</Label>
                 <Input type="number" value={form.duration} onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value }))}
-                  placeholder="30" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                  placeholder="30" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -422,24 +422,24 @@ export default function AdminProductsPage() {
                 <Input type="number" step="0.1" value={form.profitRate} onChange={(e) => {
                   const val = e.target.value;
                   setForm((f) => ({ ...f, profitRate: val, estimatedProfit: autoCalcProfit(f.price, val) }));
-                }} placeholder="10" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                }} placeholder="10" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs">Est. Daily Profit (Rp) <span className="text-emerald-400">Auto</span></Label>
                 <Input type="number" value={form.estimatedProfit} readOnly
-                  className="glass rounded-xl border-[#D4AF37]/20 bg-[#D4AF37]/5 text-emerald-400 mt-1 cursor-not-allowed" />
+                  className="glass rounded-xl border-primary/20 bg-primary/5 text-emerald-400 mt-1 cursor-not-allowed" />
                 <p className="text-muted-foreground text-[10px] mt-1">Price × Profit% = {form.estimatedProfit ? formatRupiah(parseFloat(form.estimatedProfit)) : '-'}</p>
               </div>
             </div>
             <div>
               <Label className="text-muted-foreground text-xs">Quota *</Label>
               <Input type="number" value={form.quota} onChange={(e) => setForm((f) => ({ ...f, quota: e.target.value }))}
-                placeholder="100" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                placeholder="100" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
             </div>
             <div>
               <Label className="text-muted-foreground text-xs">Deskripsi</Label>
               <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Deskripsi produk..." rows={3} className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1 resize-none" />
+                placeholder="Deskripsi produk..." rows={3} className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1 resize-none" />
             </div>
             <div>
               <Label className="text-muted-foreground text-xs">Banner Produk</Label>
@@ -453,10 +453,10 @@ export default function AdminProductsPage() {
                     </button>
                   </div>
                 ) : (
-                  <label className="block glass rounded-xl border-2 border-dashed border-[#D4AF37]/20 p-6 text-center cursor-pointer hover:border-[#D4AF37]/40 transition-colors">
+                  <label className="block glass rounded-xl border-border border-dashed border-primary/20 p-6 text-center cursor-pointer hover:border-primary/40 transition-colors">
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImageUpload(file); e.target.value = ''; }} />
-                    {uploading ? <Loader2 className="w-6 h-6 text-[#D4AF37] mx-auto animate-spin" /> : (
-                      <><Upload className="w-6 h-6 text-[#D4AF37] mx-auto mb-2" /><p className="text-muted-foreground text-xs">Klik untuk upload gambar</p></>
+                    {uploading ? <Loader2 className="w-6 h-6 text-primary mx-auto animate-spin" /> : (
+                      <><Upload className="w-6 h-6 text-primary mx-auto mb-2" /><p className="text-muted-foreground text-xs">Klik untuk upload gambar</p></>
                     )}
                   </label>
                 )}
@@ -468,8 +468,8 @@ export default function AdminProductsPage() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={saving} className="rounded-xl border-[#D4AF37]/20 text-foreground">Batal</Button>
-            <Button type="button" onClick={handleSave} disabled={saving} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+            <Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={saving} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
+            <Button type="button" onClick={handleSave} disabled={saving} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editId ? 'Simpan' : 'Tambah'}
             </Button>
           </DialogFooter>
@@ -477,7 +477,7 @@ export default function AdminProductsPage() {
       </Dialog>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => { setDeleteId(null); setDeleteName(''); }}>
-        <AlertDialogContent className="glass-strong border-[#D4AF37]/20">
+        <AlertDialogContent className="glass-strong border-primary/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-400" /> Delete Product
@@ -488,7 +488,7 @@ export default function AdminProductsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl border-[#D4AF37]/20 text-foreground" disabled={deleting}>Batal</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl border-primary/20 text-foreground" disabled={deleting}>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting}
               className="rounded-xl bg-red-600 hover:bg-red-700 text-white">
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Hapus'}

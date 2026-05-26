@@ -51,13 +51,13 @@ interface SalaryStats {
 function getStatusConfig(status: string, t: (key: string) => string) {
   switch (status) {
     case 'paid':
-      return { label: t('status.cancelled').replace('Dibatalkan', 'Dibayar'), color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' };
+      return { label: t('status.cancelled').replace('Dibatalkan', 'Dibayar'), color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', border: 'border-emerald-400/20' };
     case 'pending':
       return { label: t('common.pending'), color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20' };
     case 'cancelled':
       return { label: t('status.cancelled'), color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' };
     default:
-      return { label: status, color: 'text-muted-foreground', bg: 'bg-white/5', border: 'border-white/10' };
+      return { label: status, color: 'text-muted-foreground', bg: 'bg-foreground/5', border: 'border-white/10' };
   }
 }
 
@@ -318,7 +318,7 @@ export default function AdminSalaryPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-            <Banknote className="w-5 h-5 text-[#D4AF37]" />
+            <Banknote className="w-5 h-5 text-primary" />
             {t('adminSalary.title')}
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -329,14 +329,14 @@ export default function AdminSalaryPage() {
           <Button
             onClick={handleProcessWeekly}
             disabled={processing}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             {processing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
             {t('adminSalary.title')}
           </Button>
           <Button
             onClick={() => setShowManualDialog(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl"
+            className="bg-cardmerald-600 hover:bg-cardmerald-700 text-white font-semibold rounded-xl"
           >
             <Plus className="w-4 h-4 mr-2" />
             Manual
@@ -348,7 +348,7 @@ export default function AdminSalaryPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass glow-gold rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-400/10 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-cardmerald-400/10 flex items-center justify-center">
               <DollarSign className="w-4 h-4 text-emerald-400" />
             </div>
             <span className="text-muted-foreground text-xs">{t('adminSalary.paidLabel')}</span>
@@ -381,12 +381,12 @@ export default function AdminSalaryPage() {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-[#D4AF37]" />
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-primary" />
             </div>
             <span className="text-muted-foreground text-xs">W{t('adminSalary.weekNumber')}</span>
           </div>
-          <p className="text-[#D4AF37] text-lg font-bold">W{stats?.currentWeek?.weekNumber || '-'}</p>
+          <p className="text-primary text-lg font-bold">W{stats?.currentWeek?.weekNumber || '-'}</p>
           <p className="text-muted-foreground text-[10px]">{stats?.currentWeek?.year || '-'}</p>
         </motion.div>
       </div>
@@ -394,7 +394,7 @@ export default function AdminSalaryPage() {
       {/* Requirements Info */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-gold glow-gold rounded-2xl p-5">
         <h3 className="text-foreground font-semibold text-sm mb-3 flex items-center gap-2">
-          <Banknote className="w-4 h-4 text-[#D4AF37]" />
+          <Banknote className="w-4 h-4 text-primary" />
           {t('networkPage.weeklySalaryBonus')}
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -420,7 +420,7 @@ export default function AdminSalaryPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03]">
-            <Banknote className="w-4 h-4 text-[#D4AF37]" />
+            <Banknote className="w-4 h-4 text-primary" />
             <div>
               <p className="text-foreground text-xs font-medium">Group Omzet</p>
               <p className="text-muted-foreground text-[10px]">{t('adminSalary.salaryAmountSetting')}</p>
@@ -444,7 +444,7 @@ export default function AdminSalaryPage() {
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder={t('common.search') + '...'}
-            className="glass rounded-xl pl-10 border-white/10 focus:border-[#D4AF37]/30 bg-transparent"
+            className="glass rounded-xl pl-10 border-white/10 focus:border-primary/30 bg-transparent"
           />
         </div>
         <div className="flex gap-2">
@@ -456,8 +456,8 @@ export default function AdminSalaryPage() {
               onClick={() => { setStatusFilter(s); setPage(1); }}
               className={`rounded-xl text-xs ${
                 statusFilter === s
-                  ? 'bg-gold-gradient text-[#070B14] font-semibold'
-                  : 'border-white/10 text-foreground/60 hover:text-foreground hover:bg-white/5'
+                  ? 'bg-gold-gradient text-primary-foreground font-semibold'
+                  : 'border-white/10 text-foreground/60 hover:text-foreground hover:bg-foreground/5'
               }`}
             >
               {s === 'all' ? t('common.all') : s === 'paid' ? t('adminSalary.paidLabel') : s === 'pending' ? t('common.pending') : t('status.cancelled')}
@@ -492,7 +492,7 @@ export default function AdminSalaryPage() {
               >
                 <div className="flex items-start gap-3">
                   {/* User Avatar */}
-                  <div className="w-10 h-10 rounded-xl bg-gold-gradient flex items-center justify-center text-sm font-bold text-[#070B14] shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gold-gradient flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
                     {item.user?.name?.charAt(0) || 'U'}
                   </div>
 
@@ -528,11 +528,11 @@ export default function AdminSalaryPage() {
 
                   {/* Amount & Actions */}
                   <div className="text-right shrink-0">
-                    <p className="text-lg font-bold text-[#D4AF37]">{formatRupiah(item.amount)}</p>
+                    <p className="text-lg font-bold text-primary">{formatRupiah(item.amount)}</p>
                     <div className="flex items-center gap-1 mt-2 justify-end">
                       <button
                         onClick={() => openDetailDialog(item)}
-                        className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors"
                         title={t('admin.previewLabel')}
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -540,7 +540,7 @@ export default function AdminSalaryPage() {
                       {item.status === 'pending' && (
                         <button
                           onClick={() => handlePay(item.id)}
-                          className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-cardmerald-500/10 text-muted-foreground hover:text-emerald-400 transition-colors"
                           title={t('adminSalary.markAsPaid')}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -627,7 +627,7 @@ export default function AdminSalaryPage() {
                   <Plus className="w-4 h-4 text-emerald-400" />
                   {t('admin.addNew')} {t('adminSalary.title')}
                 </h3>
-                <button onClick={() => setShowManualDialog(false)} className="p-1 rounded-lg hover:bg-white/5">
+                <button onClick={() => setShowManualDialog(false)} className="p-1 rounded-lg hover:bg-foreground/5">
                   <X className="w-4 h-4 text-muted-foreground" />
                 </button>
               </div>
@@ -693,7 +693,7 @@ export default function AdminSalaryPage() {
                 <Button
                   onClick={handleManualCredit}
                   disabled={processing}
-                  className="flex-1 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+                  className="flex-1 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
                 >
                   {processing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                   {t('admin.addNew')}
@@ -726,7 +726,7 @@ export default function AdminSalaryPage() {
                   <Edit2 className="w-4 h-4 text-blue-400" />
                   {t('common.edit')} {t('adminSalary.title')}
                 </h3>
-                <button onClick={() => setShowEditDialog(false)} className="p-1 rounded-lg hover:bg-white/5">
+                <button onClick={() => setShowEditDialog(false)} className="p-1 rounded-lg hover:bg-foreground/5">
                   <X className="w-4 h-4 text-muted-foreground" />
                 </button>
               </div>
@@ -766,7 +766,7 @@ export default function AdminSalaryPage() {
                 </Button>
                 <Button
                   onClick={handleEdit}
-                  className="flex-1 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+                  className="flex-1 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
                 >
                   {t('common.save')}
                 </Button>
@@ -795,10 +795,10 @@ export default function AdminSalaryPage() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-foreground font-semibold flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-[#D4AF37]" />
+                  <Eye className="w-4 h-4 text-primary" />
                   {t('admin.previewLabel')} {t('adminSalary.title')}
                 </h3>
-                <button onClick={() => setShowDetailDialog(false)} className="p-1 rounded-lg hover:bg-white/5">
+                <button onClick={() => setShowDetailDialog(false)} className="p-1 rounded-lg hover:bg-foreground/5">
                   <X className="w-4 h-4 text-muted-foreground" />
                 </button>
               </div>
@@ -854,7 +854,7 @@ export default function AdminSalaryPage() {
 
               <Button
                 onClick={() => setShowDetailDialog(false)}
-                className="w-full mt-4 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+                className="w-full mt-4 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
               >
                 {t('common.close')}
               </Button>

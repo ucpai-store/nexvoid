@@ -40,7 +40,7 @@ function getStatusConfig(status: string, t: (key: string) => string) {
     case 'success':
     case 'approved':
     case 'active':
-      return { label: t('history.success'), color: 'text-emerald-400', bg: 'bg-emerald-400/10' };
+      return { label: t('history.success'), color: 'text-emerald-400', bg: 'bg-cardmerald-400/10' };
     case 'pending':
       return { label: t('history.pending'), color: 'text-yellow-400', bg: 'bg-yellow-400/10' };
     case 'failed':
@@ -53,26 +53,26 @@ function getStatusConfig(status: string, t: (key: string) => string) {
     case 'stopped':
       return { label: t('history.stopped'), color: 'text-orange-400', bg: 'bg-orange-400/10' };
     default:
-      return { label: status, color: 'text-muted-foreground', bg: 'bg-white/5' };
+      return { label: status, color: 'text-muted-foreground', bg: 'bg-foreground/5' };
   }
 }
 
 function getTypeConfig(type: string, t: (key: string) => string) {
   switch (type) {
     case 'deposit':
-      return { label: t('history.deposit'), icon: ArrowDownCircle, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', prefix: '+' };
+      return { label: t('history.deposit'), icon: ArrowDownCircle, color: 'text-emerald-400', bgColor: 'bg-cardmerald-400/10', prefix: '+' };
     case 'withdraw':
       return { label: t('history.withdrawal'), icon: ArrowUpCircle, color: 'text-blue-400', bgColor: 'bg-blue-400/10', prefix: '-' };
     case 'purchase':
-      return { label: t('history.buyProduct'), icon: ShoppingBag, color: 'text-[#D4AF37]', bgColor: 'bg-[#D4AF37]/10', prefix: '-' };
+      return { label: t('history.buyProduct'), icon: ShoppingBag, color: 'text-primary', bgColor: 'bg-primary/10', prefix: '-' };
     case 'investment':
       return { label: t('history.investment'), icon: Package, color: 'text-purple-400', bgColor: 'bg-purple-400/10', prefix: '-' };
     case 'bonus':
-      return { label: t('history.bonus'), icon: Gift, color: 'text-[#D4AF37]', bgColor: 'bg-[#D4AF37]/10', prefix: '+' };
+      return { label: t('history.bonus'), icon: Gift, color: 'text-primary', bgColor: 'bg-primary/10', prefix: '+' };
     case 'profit':
-      return { label: t('history.profit'), icon: Coins, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', prefix: '+' };
+      return { label: t('history.profit'), icon: Coins, color: 'text-emerald-400', bgColor: 'bg-cardmerald-400/10', prefix: '+' };
     default:
-      return { label: type, icon: History, color: 'text-muted-foreground', bgColor: 'bg-white/5', prefix: '' };
+      return { label: type, icon: History, color: 'text-muted-foreground', bgColor: 'bg-foreground/5', prefix: '' };
   }
 }
 
@@ -244,7 +244,7 @@ export default function HistoryPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('dashboard.tryAgain')}</Button>
@@ -273,12 +273,12 @@ export default function HistoryPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <SummaryCard icon={ArrowDownCircle} label={t('history.deposit')} value={summary?.totalDeposit || 0} color="text-emerald-400" bgColor="bg-emerald-400/10" />
+        <SummaryCard icon={ArrowDownCircle} label={t('history.deposit')} value={summary?.totalDeposit || 0} color="text-emerald-400" bgColor="bg-cardmerald-400/10" />
         <SummaryCard icon={ArrowUpCircle} label={t('history.withdrawal')} value={summary?.totalWithdraw || 0} color="text-blue-400" bgColor="bg-blue-400/10" />
-        <SummaryCard icon={ShoppingBag} label={t('history.purchase')} value={summary?.totalPurchase || 0} color="text-[#D4AF37]" bgColor="bg-[#D4AF37]/10" />
+        <SummaryCard icon={ShoppingBag} label={t('history.purchase')} value={summary?.totalPurchase || 0} color="text-primary" bgColor="bg-primary/10" />
         <SummaryCard icon={Package} label={t('history.investment')} value={summary?.totalInvestment || 0} color="text-purple-400" bgColor="bg-purple-400/10" />
-        <SummaryCard icon={Gift} label={t('history.bonus')} value={summary?.totalBonus || 0} color="text-[#D4AF37]" bgColor="bg-[#D4AF37]/10" />
-        <SummaryCard icon={Coins} label={t('history.profit')} value={summary?.totalProfit || 0} color="text-emerald-400" bgColor="bg-emerald-400/10" />
+        <SummaryCard icon={Gift} label={t('history.bonus')} value={summary?.totalBonus || 0} color="text-primary" bgColor="bg-primary/10" />
+        <SummaryCard icon={Coins} label={t('history.profit')} value={summary?.totalProfit || 0} color="text-emerald-400" bgColor="bg-cardmerald-400/10" />
       </div>
 
       {/* Tabs */}
@@ -288,7 +288,7 @@ export default function HistoryPage() {
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="rounded-lg text-xs px-2.5 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-[#070B14] data-[state=active]:font-semibold"
+              className="rounded-lg text-xs px-2.5 py-2 data-[state=active]:bg-gold-gradient data-[state=active]:text-primary-foreground data-[state=active]:font-semibold"
             >
               {tab.label}
               {tab.value !== 'all' && (

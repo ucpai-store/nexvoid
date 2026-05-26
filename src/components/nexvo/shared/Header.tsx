@@ -72,7 +72,7 @@ export default function Header() {
                 <button
                   key={link.label}
                   onClick={() => handleNavClick(link.section)}
-                  className="px-4 py-2 text-sm font-medium text-foreground/80 hover:text-gold-gradient transition-colors rounded-xl hover:bg-white/5"
+                  className="px-4 py-2 text-sm font-medium text-foreground/80 hover:text-gold-gradient transition-colors rounded-xl hover:bg-foreground/5"
                 >
                   {link.label}
                 </button>
@@ -84,7 +84,7 @@ export default function Header() {
               {token && user ? (
                 <Button
                   onClick={() => navigate('dashboard')}
-                  className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-opacity glow-gold"
+                  className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-opacity glow-gold"
                 >
                   Dashboard
                   <ChevronRight className="w-4 h-4 ml-1" />
@@ -93,7 +93,7 @@ export default function Header() {
                 <>
                   <button
                     onClick={() => navigate('admin-login')}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[#D4AF37]/50 hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 transition-all text-xs font-medium"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-primary/50 hover:text-primary hover:bg-primary/5 transition-all text-xs font-medium"
                     title="Admin Panel Login"
                   >
                     <Shield className="w-3.5 h-3.5" />
@@ -108,7 +108,7 @@ export default function Header() {
                   </Button>
                   <Button
                     onClick={() => navigate('register')}
-                    className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-opacity glow-gold"
+                    className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-opacity glow-gold"
                   >
                     Daftar
                   </Button>
@@ -118,7 +118,7 @@ export default function Header() {
 
             {/* Mobile Menu Button */}
             <button
-              className="md:hidden p-2 rounded-xl hover:bg-white/5 transition-colors"
+              className="md:hidden p-2 rounded-xl hover:bg-foreground/5 transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? (
@@ -157,7 +157,7 @@ export default function Header() {
                   </div>
                   <button
                     onClick={() => setMobileMenuOpen(false)}
-                    className="p-2 rounded-xl hover:bg-white/5"
+                    className="p-2 rounded-xl hover:bg-foreground/5"
                   >
                     <X className="w-5 h-5 text-foreground" />
                   </button>
@@ -172,7 +172,7 @@ export default function Header() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.05 }}
                       onClick={() => handleNavClick(link.section)}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-white/5 transition-colors"
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-foreground/80 hover:text-foreground hover:bg-foreground/5 transition-colors"
                     >
                       <span className="font-medium">{link.label}</span>
                       <ChevronRight className="w-4 h-4 opacity-50" />
@@ -188,7 +188,7 @@ export default function Header() {
                         navigate('dashboard');
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+                      className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
                     >
                       Dashboard
                     </Button>
@@ -199,7 +199,7 @@ export default function Header() {
                           navigate('admin-login');
                           setMobileMenuOpen(false);
                         }}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[#D4AF37]/60 hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 transition-all text-xs font-medium"
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-primary/60 hover:text-primary hover:bg-primary/5 transition-all text-xs font-medium"
                       >
                         <Shield className="w-3.5 h-3.5" />
                         Login Admin
@@ -210,7 +210,7 @@ export default function Header() {
                           navigate('login');
                           setMobileMenuOpen(false);
                         }}
-                        className="w-full rounded-xl border-gold/30 text-foreground hover:bg-white/5"
+                        className="w-full rounded-xl border-gold/30 text-foreground hover:bg-foreground/5"
                       >
                         Masuk
                       </Button>
@@ -219,7 +219,7 @@ export default function Header() {
                           navigate('register');
                           setMobileMenuOpen(false);
                         }}
-                        className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+                        className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
                       >
                         Daftar Sekarang
                       </Button>

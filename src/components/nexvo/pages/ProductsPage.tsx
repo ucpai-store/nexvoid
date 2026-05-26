@@ -45,14 +45,14 @@ function ProductCard({ product, onBuy, index, t }: { product: Product; onBuy: ()
           <img src={getFileUrl(product.banner)} alt={product.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-card-gradient flex items-center justify-center">
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl" />
             <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-[#1E3A5F]/20 blur-2xl" />
-            <ShoppingBag className="w-12 h-12 text-[#D4AF37]/30" />
+            <ShoppingBag className="w-12 h-12 text-primary/30" />
           </div>
         )}
         {/* Profit Rate Badge */}
         <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
-          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] sm:text-[10px] font-semibold backdrop-blur-sm">
+          <Badge className="bg-cardmerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] sm:text-[10px] font-semibold backdrop-blur-sm">
             +{product.profitRate}%
           </Badge>
         </div>
@@ -72,7 +72,7 @@ function ProductCard({ product, onBuy, index, t }: { product: Product; onBuy: ()
         {/* Stats Row */}
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="glass rounded-xl p-2 sm:p-2.5 text-center">
-            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#D4AF37] mx-auto mb-0.5 sm:mb-1" />
+            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary mx-auto mb-0.5 sm:mb-1" />
             <p className="text-foreground text-[11px] sm:text-xs font-medium">{product.duration} {t('products.days')}</p>
             <p className="text-muted-foreground text-[9px] sm:text-[10px]">{t('products.duration')}</p>
           </div>
@@ -89,7 +89,7 @@ function ProductCard({ product, onBuy, index, t }: { product: Product; onBuy: ()
             <span className="text-muted-foreground">{t('products.quotaFilled')}</span>
             <span className="text-foreground font-medium">{quotaPercent}%</span>
           </div>
-          <div className="h-1.5 sm:h-2 rounded-full bg-white/5 overflow-hidden">
+          <div className="h-1.5 sm:h-2 rounded-full bg-foreground/5 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${quotaPercent}%` }}
@@ -106,7 +106,7 @@ function ProductCard({ product, onBuy, index, t }: { product: Product; onBuy: ()
         {/* Buy Button */}
         <Button
           onClick={onBuy}
-          className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all mt-auto h-9 sm:h-11 text-xs sm:text-sm"
+          className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all mt-auto h-9 sm:h-11 text-xs sm:text-sm"
         >
           {t('products.buyNow')}
           <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1" />

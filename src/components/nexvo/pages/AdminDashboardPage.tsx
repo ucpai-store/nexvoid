@@ -199,10 +199,10 @@ export default function AdminDashboardPage() {
   }
 
   const statCards = [
-    { label: 'Total Users', value: stats?.totalUsers || 0, icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', format: 'number' as const },
+    { label: 'Total Users', value: stats?.totalUsers || 0, icon: Users, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', format: 'number' as const },
     { label: 'Total Deposit', value: stats?.totalDepositAmount || 0, icon: ArrowDownCircle, color: 'text-blue-400', bg: 'bg-blue-400/10', format: 'currency' as const },
     { label: 'Total Withdraw', value: stats?.totalWithdrawalAmount || 0, icon: ArrowUpCircle, color: 'text-orange-400', bg: 'bg-orange-400/10', format: 'currency' as const },
-    { label: 'Total Pembelian', value: stats?.activePurchases || 0, icon: ShoppingBag, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', format: 'number' as const },
+    { label: 'Total Pembelian', value: stats?.activePurchases || 0, icon: ShoppingBag, color: 'text-primary', bg: 'bg-primary/10', format: 'number' as const },
     { label: 'Saldo Sistem', value: (stats?.totalMainBalance || 0) + (stats?.totalProfitBalance || 0), icon: Wallet, color: 'text-purple-400', bg: 'bg-purple-400/10', format: 'currency' as const },
   ];
 
@@ -216,7 +216,7 @@ export default function AdminDashboardPage() {
             <p className="text-muted-foreground text-sm">Ringkasan statistik dan aktivitas terkini</p>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            <Badge variant="outline" className="border-[#D4AF37]/30 text-[#D4AF37]">
+            <Badge variant="outline" className="border-primary/30 text-primary">
               <Shield className="w-3 h-3 mr-1" />
               {admin?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
             </Badge>
@@ -271,10 +271,10 @@ export default function AdminDashboardPage() {
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="glass rounded-2xl p-3 sm:p-5">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
+              <TrendingUp className="w-5 h-5 text-primary" />
               <h3 className="text-foreground font-semibold text-sm sm:text-base">Grafik Pendapatan</h3>
             </div>
-            <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20 text-[10px]">7 Hari</Badge>
+            <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">7 Hari</Badge>
           </div>
           <div className="h-[180px] sm:h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -292,7 +292,7 @@ export default function AdminDashboardPage() {
                 <XAxis dataKey="name" stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${(v / 1000000).toFixed(1)}M`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0F172A', border: '1px solid rgba(212,175,55,0.2)', borderRadius: '12px', fontSize: '12px' }}
+                  contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '12px' }}
                   formatter={(value: number) => formatRupiah(value)}
                 />
                 <Area type="monotone" dataKey="deposit" stroke="#3B82F6" fill="url(#depositGrad)" strokeWidth={2} />
@@ -306,10 +306,10 @@ export default function AdminDashboardPage() {
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="glass rounded-2xl p-3 sm:p-5">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-[#D4AF37]" />
+              <Activity className="w-5 h-5 text-primary" />
               <h3 className="text-foreground font-semibold text-sm sm:text-base">Aktivitas Transaksi</h3>
             </div>
-            <Badge className="bg-emerald-400/10 text-emerald-400 border-emerald-400/20 text-[10px]">Hari Ini</Badge>
+            <Badge className="bg-cardmerald-400/10 text-emerald-400 border-emerald-400/20 text-[10px]">Hari Ini</Badge>
           </div>
           <div className="h-[180px] sm:h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -317,7 +317,7 @@ export default function AdminDashboardPage() {
                 <XAxis dataKey="name" stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0F172A', border: '1px solid rgba(212,175,55,0.2)', borderRadius: '12px', fontSize: '12px' }}
+                  contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '12px' }}
                 />
                 <Bar dataKey="transactions" fill="#D4AF37" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -351,7 +351,7 @@ export default function AdminDashboardPage() {
                     <p className="text-emerald-400 text-sm font-semibold">{formatRupiah(item.amount)}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleDepositAction(item.id, 'approve')} disabled={processing[`dep-${item.id}`]} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 transition-colors disabled:opacity-50">
+                    <button onClick={() => handleDepositAction(item.id, 'approve')} disabled={processing[`dep-${item.id}`]} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 transition-colors disabled:opacity-50">
                       {processing[`dep-${item.id}`] ? <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                     </button>
                     <button onClick={() => handleDepositAction(item.id, 'reject')} disabled={processing[`dep-${item.id}`]} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors disabled:opacity-50">
@@ -368,7 +368,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          <Button variant="outline" onClick={() => navigate('admin-deposits')} className="w-full mt-4 rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5">
+          <Button variant="outline" onClick={() => navigate('admin-deposits')} className="w-full mt-4 rounded-xl border-primary/20 text-foreground hover:bg-foreground/5">
             Lihat Semua Deposit <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </motion.div>
@@ -396,7 +396,7 @@ export default function AdminDashboardPage() {
                     <p className="text-orange-400 text-sm font-semibold">{formatRupiah(item.amount)}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleWithdrawalAction(item.id, 'approve')} disabled={processing[`wd-${item.id}`]} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 transition-colors disabled:opacity-50">
+                    <button onClick={() => handleWithdrawalAction(item.id, 'approve')} disabled={processing[`wd-${item.id}`]} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 transition-colors disabled:opacity-50">
                       {processing[`wd-${item.id}`] ? <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                     </button>
                     <button onClick={() => handleWithdrawalAction(item.id, 'reject')} disabled={processing[`wd-${item.id}`]} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors disabled:opacity-50">
@@ -413,7 +413,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          <Button variant="outline" onClick={() => navigate('admin-withdrawals')} className="w-full mt-4 rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5">
+          <Button variant="outline" onClick={() => navigate('admin-withdrawals')} className="w-full mt-4 rounded-xl border-primary/20 text-foreground hover:bg-foreground/5">
             Lihat Semua Withdrawal <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </motion.div>
@@ -424,7 +424,7 @@ export default function AdminDashboardPage() {
         <h3 className="text-foreground font-semibold mb-3">Aksi Cepat</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Kelola Produk', page: 'admin-products' as const, icon: ShoppingBag, color: 'text-[#D4AF37]' },
+            { label: 'Kelola Produk', page: 'admin-products' as const, icon: ShoppingBag, color: 'text-primary' },
             { label: 'Kelola User', page: 'admin-users' as const, icon: Users, color: 'text-emerald-400' },
             { label: 'Live Activity', page: 'admin-live' as const, icon: Clock, color: 'text-blue-400' },
             { label: 'Keamanan', page: 'admin-settings' as const, icon: Shield, color: 'text-purple-400' },

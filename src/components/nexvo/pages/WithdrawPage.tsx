@@ -77,14 +77,14 @@ function getStatusBadge(status: string, t: (key: string) => string) {
   switch (status) {
     case 'success':
     case 'approved':
-      return <Badge className="bg-emerald-400/10 text-emerald-400 border border-emerald-400/20 text-[10px]"><CheckCircle2 className="w-3 h-3 mr-0.5" />{t('dashboard.success')}</Badge>;
+      return <Badge className="bg-cardmerald-400/10 text-emerald-400 border border-emerald-400/20 text-[10px]"><CheckCircle2 className="w-3 h-3 mr-0.5" />{t('dashboard.success')}</Badge>;
     case 'pending':
       return <Badge className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 text-[10px]"><Clock className="w-3 h-3 mr-0.5" />{t('dashboard.pending')}</Badge>;
     case 'failed':
     case 'rejected':
       return <Badge className="bg-red-400/10 text-red-400 border border-red-400/20 text-[10px]"><XCircle className="w-3 h-3 mr-0.5" />{t('dashboard.failed')}</Badge>;
     default:
-      return <Badge className="bg-white/5 text-muted-foreground text-[10px]">{status}</Badge>;
+      return <Badge className="bg-foreground/5 text-muted-foreground text-[10px]">{status}</Badge>;
   }
 }
 
@@ -300,7 +300,7 @@ export default function WithdrawPage() {
           </div>
           <h3 className="text-foreground font-semibold mb-1">{t('dashboard.loadFailed')}</h3>
           <p className="text-muted-foreground text-sm mb-4 sm:mb-6">{error}</p>
-          <Button onClick={retry} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
+          <Button onClick={retry} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold">
             <RefreshCw className="w-4 h-4 mr-2" />{t('dashboard.tryAgain')}
           </Button>
         </div>
@@ -331,10 +331,10 @@ export default function WithdrawPage() {
       {/* Balance Info */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         className="glass-gold glow-gold rounded-2xl p-3 sm:p-5 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-[#D4AF37]/5 blur-2xl" />
+        <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-primary/5 blur-2xl" />
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-            <Wallet className="w-5 h-5 text-[#D4AF37]" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Wallet className="w-5 h-5 text-primary" />
           </div>
           <span className="text-muted-foreground text-sm">Available Balance</span>
         </div>
@@ -360,7 +360,7 @@ export default function WithdrawPage() {
                     onClick={() => setSelectedCategory(cat.key as PaymentCategory)}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
                       isActive
-                        ? 'bg-gold-gradient text-[#070B14] glow-gold'
+                        ? 'bg-gold-gradient text-primary-foreground glow-gold'
                         : 'glass text-muted-foreground hover:text-foreground'
                     }`}
                   >
@@ -386,7 +386,7 @@ export default function WithdrawPage() {
                       onClick={() => setSelectedBank(bank.value)}
                       className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all text-center ${
                         isSelected
-                          ? 'glass-gold glow-gold border border-[#D4AF37]/40'
+                          ? 'glass-gold glow-gold border border-primary/40'
                           : 'glass border border-transparent hover:border-border/50'
                       }`}
                     >
@@ -416,7 +416,7 @@ export default function WithdrawPage() {
                       onClick={() => setSelectedEwallet(ew.value)}
                       className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all text-center ${
                         isSelected
-                          ? 'glass-gold glow-gold border border-[#D4AF37]/40'
+                          ? 'glass-gold glow-gold border border-primary/40'
                           : 'glass border border-transparent hover:border-border/50'
                       }`}
                     >
@@ -477,7 +477,7 @@ export default function WithdrawPage() {
                   placeholder={getAccountPlaceholder()}
                   value={accountNo}
                   onChange={(e) => setAccountNo(e.target.value.replace(selectedCategory === 'bank' ? /[^0-9]/g : /[^0-9+]/g, ''))}
-                  className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
               </div>
               <div className="space-y-2">
@@ -487,7 +487,7 @@ export default function WithdrawPage() {
                   placeholder="Name as per bank book / account"
                   value={holderName}
                   onChange={(e) => setHolderName(e.target.value)}
-                  className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
               </div>
             </motion.div>
@@ -507,7 +507,7 @@ export default function WithdrawPage() {
                   const raw = e.target.value.replace(/[^0-9]/g, '');
                   setAmount(raw);
                 }}
-                className="pl-10 h-11 sm:h-14 text-lg sm:text-xl font-bold bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/30 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                className="pl-10 h-11 sm:h-14 text-lg sm:text-xl font-bold bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-[#D4AF37]/20"
               />
             </div>
             <p className="text-muted-foreground text-xs">
@@ -541,7 +541,7 @@ export default function WithdrawPage() {
           <Button
             type="submit"
             disabled={submitting || !isFormValid()}
-            className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
+            className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
           >
             {submitting ? (
               <div className="flex items-center gap-2">

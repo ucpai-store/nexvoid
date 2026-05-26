@@ -50,8 +50,54 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ══════════════════════════════════════════════════
+   LIGHT MODE - Clean, professional, elegant
+   ══════════════════════════════════════════════════ */
 :root {
   --radius: 0.75rem;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #B8960F;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #1E293B;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: rgba(184, 150, 15, 0.08);
+  --accent-foreground: #B8960F;
+  --destructive: #DC2626;
+  --border: #E2E8F0;
+  --input: #F1F5F9;
+  --ring: #B8960F;
+  --chart-1: #B8960F;
+  --chart-2: #2563EB;
+  --chart-3: #059669;
+  --chart-4: #D97706;
+  --chart-5: #7C3AED;
+  --nexvo-dark: #F8FAFC;
+  --nexvo-darker: #EFF6FF;
+  --nexvo-gold: #B8960F;
+  --nexvo-gold-light: #D4AF37;
+  --nexvo-blue: #DBEAFE;
+  --nexvo-blue-light: #2563EB;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0F172A;
+  --sidebar-primary: #B8960F;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(184, 150, 15, 0.08);
+  --sidebar-accent-foreground: #B8960F;
+  --sidebar-border: #E2E8F0;
+  --sidebar-ring: #B8960F;
+}
+
+/* ══════════════════════════════════════════════════
+   DARK MODE - Luxurious, premium feel
+   ══════════════════════════════════════════════════ */
+.dark {
   --background: #070B14;
   --foreground: #E8ECF4;
   --card: rgba(15, 23, 42, 0.8);
@@ -102,61 +148,127 @@
   }
 }
 
-/* Glassmorphism utilities */
+/* ══════════════════════════════════════════════════
+   Glassmorphism - Auto adapts to theme
+   ══════════════════════════════════════════════════ */
 .glass {
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(212, 175, 55, 0.1);
+  border: 1px solid var(--glass-border);
+}
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(184, 150, 15, 0.12);
+}
+
+.dark {
+  --glass-bg: rgba(15, 23, 42, 0.6);
+  --glass-border: rgba(212, 175, 55, 0.1);
 }
 
 .glass-strong {
-  background: rgba(15, 23, 42, 0.85);
+  background: var(--glass-strong-bg);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(212, 175, 55, 0.15);
+  border: 1px solid var(--glass-strong-border);
+}
+
+:root {
+  --glass-strong-bg: rgba(255, 255, 255, 0.9);
+  --glass-strong-border: rgba(184, 150, 15, 0.18);
+}
+
+.dark {
+  --glass-strong-bg: rgba(15, 23, 42, 0.85);
+  --glass-strong-border: rgba(212, 175, 55, 0.15);
 }
 
 .glass-gold {
-  background: rgba(212, 175, 55, 0.08);
+  background: var(--glass-gold-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(212, 175, 55, 0.2);
+  border: 1px solid var(--glass-gold-border);
 }
 
-/* Glow effects */
+:root {
+  --glass-gold-bg: rgba(184, 150, 15, 0.05);
+  --glass-gold-border: rgba(184, 150, 15, 0.15);
+}
+
+.dark {
+  --glass-gold-bg: rgba(212, 175, 55, 0.08);
+  --glass-gold-border: rgba(212, 175, 55, 0.2);
+}
+
+/* ══════════════════════════════════════════════════
+   Glow effects - Adapted per theme
+   ══════════════════════════════════════════════════ */
 .glow-gold {
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.15), 0 0 40px rgba(212, 175, 55, 0.05);
+  box-shadow: var(--glow-gold);
+}
+
+:root {
+  --glow-gold: 0 0 20px rgba(184, 150, 15, 0.1), 0 0 40px rgba(184, 150, 15, 0.04);
+}
+
+.dark {
+  --glow-gold: 0 0 20px rgba(212, 175, 55, 0.15), 0 0 40px rgba(212, 175, 55, 0.05);
 }
 
 .glow-gold-strong {
-  box-shadow: 0 0 30px rgba(212, 175, 55, 0.25), 0 0 60px rgba(212, 175, 55, 0.1);
+  box-shadow: var(--glow-gold-strong);
+}
+
+:root {
+  --glow-gold-strong: 0 0 30px rgba(184, 150, 15, 0.15), 0 0 60px rgba(184, 150, 15, 0.06);
+}
+
+.dark {
+  --glow-gold-strong: 0 0 30px rgba(212, 175, 55, 0.25), 0 0 60px rgba(212, 175, 55, 0.1);
 }
 
 .glow-blue {
   box-shadow: 0 0 20px rgba(37, 99, 235, 0.15), 0 0 40px rgba(37, 99, 235, 0.05);
 }
 
-/* Custom scrollbar */
+/* ══════════════════════════════════════════════════
+   Custom scrollbar
+   ══════════════════════════════════════════════════ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(7, 11, 20, 0.5);
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.3);
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 175, 55, 0.5);
+  background: var(--scrollbar-thumb-hover);
 }
 
-/* Animations */
+:root {
+  --scrollbar-track: rgba(241, 245, 249, 0.8);
+  --scrollbar-thumb: rgba(184, 150, 15, 0.25);
+  --scrollbar-thumb-hover: rgba(184, 150, 15, 0.4);
+}
+
+.dark {
+  --scrollbar-track: rgba(7, 11, 20, 0.5);
+  --scrollbar-thumb: rgba(212, 175, 55, 0.3);
+  --scrollbar-thumb-hover: rgba(212, 175, 55, 0.5);
+}
+
+/* ══════════════════════════════════════════════════
+   Animations
+   ══════════════════════════════════════════════════ */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -226,33 +338,74 @@
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(212, 175, 55, 0.1) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--shimmer-color) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
 
-/* Gradient backgrounds */
+:root {
+  --shimmer-color: rgba(184, 150, 15, 0.06);
+}
+
+.dark {
+  --shimmer-color: rgba(212, 175, 55, 0.1);
+}
+
+/* ══════════════════════════════════════════════════
+   Gradient backgrounds - Theme-aware
+   ══════════════════════════════════════════════════ */
 .bg-nexvo-gradient {
-  background: linear-gradient(135deg, #070B14 0%, #0F172A 50%, #1E3A5F 100%);
+  background: var(--nexvo-gradient);
+}
+
+:root {
+  --nexvo-gradient: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 50%, #DBEAFE 100%);
+}
+
+.dark {
+  --nexvo-gradient: linear-gradient(135deg, #070B14 0%, #0F172A 50%, #1E3A5F 100%);
 }
 
 .bg-gold-gradient {
+  background: linear-gradient(135deg, #B8960F 0%, #D4AF37 50%, #F0D060 100%);
+}
+
+.dark .bg-gold-gradient {
   background: linear-gradient(135deg, #D4AF37 0%, #F0D060 50%, #D4AF37 100%);
 }
 
 .bg-card-gradient {
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 58, 95, 0.4) 100%);
+  background: var(--card-gradient);
 }
 
-/* Text gradients */
+:root {
+  --card-gradient: linear-gradient(145deg, #FFFFFF 0%, #F8FAFC 100%);
+}
+
+.dark {
+  --card-gradient: linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 58, 95, 0.4) 100%);
+}
+
+/* ══════════════════════════════════════════════════
+   Text gradients
+   ══════════════════════════════════════════════════ */
 .text-gold-gradient {
+  background: linear-gradient(135deg, #B8960F, #D4AF37);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dark .text-gold-gradient {
   background: linear-gradient(135deg, #D4AF37, #F0D060);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Stagger animation delays */
+/* ══════════════════════════════════════════════════
+   Stagger animation delays
+   ══════════════════════════════════════════════════ */
 .stagger-1 { animation-delay: 0.1s; }
 .stagger-2 { animation-delay: 0.2s; }
 .stagger-3 { animation-delay: 0.3s; }
@@ -263,3 +416,32 @@
 /* Hide scrollbar for carousel */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ══════════════════════════════════════════════════
+   Theme transition - Smooth mode switching
+   ══════════════════════════════════════════════════ */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html *,
+html *::before,
+html *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.15s ease;
+}
+
+/* Exclude animations from transition */
+.animate-fade-in,
+.animate-slide-up,
+.animate-slide-down,
+.animate-slide-in-right,
+.animate-slide-in-left,
+.animate-pulse-gold,
+.animate-float,
+.animate-shimmer,
+[style*="animation"],
+.framer-motion *,
+[data-framer-motion] {
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+

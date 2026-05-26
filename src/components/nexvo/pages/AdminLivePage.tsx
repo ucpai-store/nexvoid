@@ -184,13 +184,13 @@ export default function AdminLivePage() {
   const getTypeConfig = (type: string) => {
     switch (type) {
       case 'deposit':
-        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'Deposit' };
+        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: 'Deposit' };
       case 'withdraw':
         return { icon: ArrowUp, color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'Withdraw' };
       case 'purchase':
-        return { icon: ShoppingBag, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', label: 'Purchase' };
+        return { icon: ShoppingBag, color: 'text-primary', bg: 'bg-primary/10', label: 'Purchase' };
       default:
-        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: type };
+        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: type };
     }
   };
 
@@ -211,7 +211,7 @@ export default function AdminLivePage() {
             onClick={handleAutoGenerate}
             disabled={autoGenerating}
             variant="outline"
-            className="rounded-xl border-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/10"
+            className="rounded-xl border-primary/20 text-primary hover:bg-primary/10"
           >
             {autoGenerating ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -222,7 +222,7 @@ export default function AdminLivePage() {
           </Button>
           <Button
             onClick={() => setFormOpen(true)}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <Plus className="w-4 h-4 mr-2" />
             Tambah Manual
@@ -240,14 +240,14 @@ export default function AdminLivePage() {
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Radio className="w-5 h-5 text-[#D4AF37]" />
+              <Radio className="w-5 h-5 text-primary" />
               <h3 className="text-foreground font-semibold">Daftar Aktivitas</h3>
             </div>
             <Button
               size="sm"
               variant="outline"
               onClick={fetchActivities}
-              className="rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5 h-9 sm:h-8 text-xs"
+              className="rounded-xl border-primary/20 text-foreground hover:bg-foreground/5 h-9 sm:h-8 text-xs"
             >
               <RefreshCw className="w-3 h-3 mr-1" /> Refresh
             </Button>
@@ -280,11 +280,11 @@ export default function AdminLivePage() {
                           <span className="text-foreground text-sm font-medium truncate">
                             {maskWhatsApp(activity.userName)}
                           </span>
-                          <Badge className={`${config.bg} ${config.color} border-0 text-[9px] h-4 px-1.5`}>
+                          <Badge className={`${config.bg} ${config.color} border-border text-[9px] h-4 px-1.5`}>
                             {config.label}
                           </Badge>
                           {activity.isFake && (
-                            <Badge className="bg-purple-500/10 text-purple-400 border-0 text-[9px] h-4 px-1.5">
+                            <Badge className="bg-purple-500/10 text-purple-400 border-border text-[9px] h-4 px-1.5">
                               Fake
                             </Badge>
                           )}
@@ -325,14 +325,14 @@ export default function AdminLivePage() {
           className="glass glow-gold rounded-2xl p-3 sm:p-5"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Eye className="w-5 h-5 text-[#D4AF37]" />
+            <Eye className="w-5 h-5 text-primary" />
             <h3 className="text-foreground font-semibold">Preview Homepage</h3>
           </div>
 
           {/* Simulated Preview */}
-          <div className="glass rounded-xl p-3 border border-[#D4AF37]/10">
+          <div className="glass rounded-xl p-3 border border-primary/10">
             <div className="flex items-center gap-2 mb-3">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-cardmerald-400 animate-pulse" />
               <span className="text-xs text-muted-foreground">Aktivitas Terkini</span>
             </div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -357,7 +357,7 @@ export default function AdminLivePage() {
           </div>
 
           {/* Quick Stats */}
-          <Separator className="bg-[#D4AF37]/10 my-4" />
+          <Separator className="bg-primary/10 my-4" />
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <p className="text-emerald-400 font-semibold text-sm">
@@ -372,7 +372,7 @@ export default function AdminLivePage() {
               <p className="text-muted-foreground text-[10px]">Withdraw</p>
             </div>
             <div>
-              <p className="text-[#D4AF37] font-semibold text-sm">
+              <p className="text-primary font-semibold text-sm">
                 {activities.filter((a) => a.type === 'purchase').length}
               </p>
               <p className="text-muted-foreground text-[10px]">Purchase</p>
@@ -383,7 +383,7 @@ export default function AdminLivePage() {
 
       {/* Add Activity Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">Tambah Aktivitas</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -399,10 +399,10 @@ export default function AdminLivePage() {
                 value={formData.type}
                 onValueChange={(val) => setFormData((f) => ({ ...f, type: val }))}
               >
-                <SelectTrigger className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground">
+                <SelectTrigger className="glass rounded-xl border-primary/20 bg-transparent text-foreground">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="glass-strong border-[#D4AF37]/20">
+                <SelectContent className="glass-strong border-primary/20">
                   <SelectItem value="deposit">
                     <div className="flex items-center gap-2">
                       <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />
@@ -417,7 +417,7 @@ export default function AdminLivePage() {
                   </SelectItem>
                   <SelectItem value="purchase">
                     <div className="flex items-center gap-2">
-                      <ShoppingBag className="w-3.5 h-3.5 text-[#D4AF37]" />
+                      <ShoppingBag className="w-3.5 h-3.5 text-primary" />
                       Purchase
                     </div>
                   </SelectItem>
@@ -432,7 +432,7 @@ export default function AdminLivePage() {
                 value={formData.userName}
                 onChange={(e) => setFormData((f) => ({ ...f, userName: e.target.value }))}
                 placeholder="Contoh: Ahmad Rizki"
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground"
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground"
               />
             </div>
 
@@ -444,7 +444,7 @@ export default function AdminLivePage() {
                 value={formData.amount}
                 onChange={(e) => setFormData((f) => ({ ...f, amount: e.target.value }))}
                 placeholder="500000"
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground"
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground"
               />
               {formData.amount && parseFloat(formData.amount) > 0 && (
                 <p className="text-foreground text-xs mt-1">= {formatRupiah(parseFloat(formData.amount))}</p>
@@ -459,7 +459,7 @@ export default function AdminLivePage() {
                   value={formData.productName}
                   onChange={(e) => setFormData((f) => ({ ...f, productName: e.target.value }))}
                   placeholder="Contoh: Paket Emas Premium"
-                  className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground"
+                  className="glass rounded-xl border-primary/20 bg-transparent text-foreground"
                 />
               </div>
             )}
@@ -472,7 +472,7 @@ export default function AdminLivePage() {
                   <button
                     key={name}
                     onClick={() => setFormData((f) => ({ ...f, userName: name }))}
-                    className="px-2 py-1 rounded-lg bg-[#D4AF37]/10 text-[#D4AF37] text-[10px] hover:bg-[#D4AF37]/20 transition-colors"
+                    className="px-2 py-1 rounded-lg bg-primary/10 text-primary text-[10px] hover:bg-primary/20 transition-colors"
                   >
                     {name.split(' ')[0]}
                   </button>
@@ -486,14 +486,14 @@ export default function AdminLivePage() {
               variant="outline"
               onClick={() => setFormOpen(false)}
               disabled={saving}
-              className="rounded-xl border-[#D4AF37]/20 text-foreground"
+              className="rounded-xl border-primary/20 text-foreground"
             >
               Batal
             </Button>
             <Button
               onClick={handleCreate}
               disabled={saving || !formData.userName || !formData.amount}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

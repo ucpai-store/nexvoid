@@ -26,7 +26,7 @@ function getPasswordStrength(password: string, t: (key: string) => string): { le
   if (/[^A-Za-z0-9]/.test(password)) score++;
   if (score <= 2) return { level: 1, label: t('auth.strengthWeak'), color: 'bg-red-500' };
   if (score <= 3) return { level: 2, label: t('auth.strengthMedium'), color: 'bg-yellow-500' };
-  return { level: 3, label: t('auth.strengthStrong'), color: 'bg-emerald-500' };
+  return { level: 3, label: t('auth.strengthStrong'), color: 'bg-cardmerald-500' };
 }
 
 function isValidEmail(email: string): boolean {
@@ -165,10 +165,10 @@ export default function RegisterPage() {
           alt="Background"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-[#070B14]/75" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070B14]/90 via-transparent to-[#070B14]/40" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#070B14]/60 via-transparent to-[#070B14]/60" />
-        <div className="absolute top-1/4 right-1/4 w-72 h-72 rounded-full bg-[#D4AF37]/5 blur-[120px]" />
+        <div className="absolute inset-0 bg-background/75" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
+        <div className="absolute top-1/4 right-1/4 w-72 h-72 rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute bottom-1/4 left-1/4 w-96 h-96 rounded-full bg-[#1E3A5F]/10 blur-[150px]" />
       </div>
 
@@ -188,7 +188,7 @@ export default function RegisterPage() {
               className="mb-5"
             >
               <div className="relative inline-block">
-                <div className="absolute inset-0 blur-[25px] bg-[#D4AF37]/15 rounded-full scale-110" />
+                <div className="absolute inset-0 blur-[25px] bg-primary/15 rounded-full scale-110" />
                 <img
                   src={logoUrl}
                   alt="NEXVO"
@@ -211,7 +211,7 @@ export default function RegisterPage() {
                   placeholder="Masukkan nama pengguna"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
               </div>
             </div>
@@ -231,7 +231,7 @@ export default function RegisterPage() {
                     placeholder="8123456789"
                     value={whatsapp}
                     onChange={(e) => setWhatsapp(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                    className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                   />
                 </div>
               </div>
@@ -248,7 +248,7 @@ export default function RegisterPage() {
                   placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
               </div>
             </div>
@@ -263,7 +263,7 @@ export default function RegisterPage() {
                   placeholder={t('auth.minChars')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
                 <button
                   type="button"
@@ -280,7 +280,7 @@ export default function RegisterPage() {
                       <div
                         key={i}
                         className={`h-1.5 flex-1 rounded-full transition-all ${
-                          i <= strength.level ? strength.color : 'bg-white/10'
+                          i <= strength.level ? strength.color : 'bg-foreground/10'
                         }`}
                       />
                     ))}
@@ -304,7 +304,7 @@ export default function RegisterPage() {
                   placeholder={t('auth.minChars')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
                 <button
                   type="button"
@@ -326,7 +326,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowReferral(!showReferral)}
-                  className="text-[#D4AF37] text-xs font-medium hover:underline"
+                  className="text-primary text-xs font-medium hover:underline"
                 >
                   {showReferral ? t('auth.hide') : t('auth.haveCode')}
                 </button>
@@ -343,7 +343,7 @@ export default function RegisterPage() {
                       placeholder={t('auth.referralCodeOptional')}
                       value={referralCode}
                       onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                      className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                      className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                     />
                   </div>
                 </motion.div>
@@ -354,11 +354,11 @@ export default function RegisterPage() {
             <Button
               type="submit"
               disabled={loading || !canRegister}
-              className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
+              className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-[#070B14]/30 border-t-[#070B14] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   {t('common.processing')}
                 </div>
               ) : (
@@ -376,7 +376,7 @@ export default function RegisterPage() {
               {t('auth.hasAccount')}{' '}
               <button
                 onClick={() => navigate('login')}
-                className="text-[#D4AF37] font-medium hover:underline"
+                className="text-primary font-medium hover:underline"
               >
                 {t('auth.signIn')}
               </button>

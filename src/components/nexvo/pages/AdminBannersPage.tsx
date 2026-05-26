@@ -256,7 +256,7 @@ export default function AdminBannersPage() {
         </div>
         <Button
           onClick={openAdd}
-          className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
         >
           <Plus className="w-4 h-4 mr-2" />
           Tambah Banner
@@ -289,12 +289,12 @@ export default function AdminBannersPage() {
                     <img src={getFileUrl(banner.image)} alt={banner.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-card-gradient flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-[#D4AF37]/20" />
+                      <ImageIcon className="w-8 h-8 text-primary/20" />
                     </div>
                   )}
                   {/* Order Badge */}
                   <div className="absolute top-2 left-2">
-                    <Badge className="bg-black/50 text-white border-0 text-[10px] backdrop-blur-sm">
+                    <Badge className="bg-black/50 text-white border-border text-[10px] backdrop-blur-sm">
                       #{banner.order}
                     </Badge>
                   </div>
@@ -305,10 +305,10 @@ export default function AdminBannersPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <h3 className="text-foreground font-semibold text-base truncate">{banner.title}</h3>
-                      <p className="text-[#D4AF37] text-sm">{banner.subtitle}</p>
+                      <p className="text-primary text-sm">{banner.subtitle}</p>
                     </div>
-                    <Badge className={`text-[10px] border-0 ml-2 shrink-0 ${
-                      banner.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                    <Badge className={`text-[10px] border-border ml-2 shrink-0 ${
+                      banner.isActive ? 'bg-cardmerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
                     }`}>
                       {banner.isActive ? 'Aktif' : 'Nonaktif'}
                     </Badge>
@@ -330,7 +330,7 @@ export default function AdminBannersPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => setPreviewBanner(banner)}
-                      className="rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5 h-9 sm:h-8 text-xs"
+                      className="rounded-xl border-primary/20 text-foreground hover:bg-foreground/5 h-9 sm:h-8 text-xs"
                     >
                       <Eye className="w-3 h-3 mr-1" /> Preview
                     </Button>
@@ -338,13 +338,13 @@ export default function AdminBannersPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => openEdit(banner)}
-                      className="rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5 h-9 sm:h-8 text-xs"
+                      className="rounded-xl border-primary/20 text-foreground hover:bg-foreground/5 h-9 sm:h-8 text-xs"
                     >
                       <Pencil className="w-3 h-3 mr-1" /> Edit
                     </Button>
                     <button
                       onClick={() => handleToggleActive(banner)}
-                      className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors"
+                      className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center hover:bg-foreground/5 transition-colors"
                       title={banner.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                     >
                       {banner.isActive ? (
@@ -376,7 +376,7 @@ export default function AdminBannersPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-strong border-primary/20 max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">
               {editId ? 'Edit Banner' : 'Tambah Banner Baru'}
@@ -393,7 +393,7 @@ export default function AdminBannersPage() {
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 placeholder="Judul banner"
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1"
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1"
               />
             </div>
             <div>
@@ -402,7 +402,7 @@ export default function AdminBannersPage() {
                 value={form.subtitle}
                 onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))}
                 placeholder="Subtitle banner"
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1"
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1"
               />
             </div>
             <div>
@@ -412,7 +412,7 @@ export default function AdminBannersPage() {
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Deskripsi banner..."
                 rows={3}
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1 resize-none"
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1 resize-none"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -422,7 +422,7 @@ export default function AdminBannersPage() {
                   value={form.ctaText}
                   onChange={(e) => setForm((f) => ({ ...f, ctaText: e.target.value }))}
                   placeholder="Mulai Sekarang"
-                  className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1"
+                  className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1"
                 />
               </div>
               <div>
@@ -431,7 +431,7 @@ export default function AdminBannersPage() {
                   value={form.ctaLink}
                   onChange={(e) => setForm((f) => ({ ...f, ctaLink: e.target.value }))}
                   placeholder="/products"
-                  className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1"
+                  className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1"
                 />
               </div>
             </div>
@@ -442,7 +442,7 @@ export default function AdminBannersPage() {
                 value={form.order}
                 onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))}
                 placeholder="0"
-                className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1"
+                className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1"
               />
             </div>
 
@@ -461,7 +461,7 @@ export default function AdminBannersPage() {
                     </button>
                   </div>
                 ) : (
-                  <label className="block glass rounded-xl border-2 border-dashed border-[#D4AF37]/20 p-6 text-center cursor-pointer hover:border-[#D4AF37]/40 transition-colors">
+                  <label className="block glass rounded-xl border-border border-dashed border-primary/20 p-6 text-center cursor-pointer hover:border-primary/40 transition-colors">
                     <input
                       type="file"
                       accept="image/*"
@@ -472,10 +472,10 @@ export default function AdminBannersPage() {
                       }}
                     />
                     {uploading ? (
-                      <Loader2 className="w-6 h-6 text-[#D4AF37] mx-auto animate-spin" />
+                      <Loader2 className="w-6 h-6 text-primary mx-auto animate-spin" />
                     ) : (
                       <>
-                        <Upload className="w-6 h-6 text-[#D4AF37] mx-auto mb-2" />
+                        <Upload className="w-6 h-6 text-primary mx-auto mb-2" />
                         <p className="text-muted-foreground text-xs">Klik untuk upload gambar</p>
                       </>
                     )}
@@ -499,14 +499,14 @@ export default function AdminBannersPage() {
               variant="outline"
               onClick={() => setFormOpen(false)}
               disabled={saving}
-              className="rounded-xl border-[#D4AF37]/20 text-foreground"
+              className="rounded-xl border-primary/20 text-foreground"
             >
               Batal
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editId ? 'Simpan' : 'Tambah'}
             </Button>
@@ -516,7 +516,7 @@ export default function AdminBannersPage() {
 
       {/* Preview Dialog */}
       <Dialog open={!!previewBanner} onOpenChange={() => setPreviewBanner(null)}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg">
+        <DialogContent className="glass-strong border-primary/20 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">Preview Banner</DialogTitle>
           </DialogHeader>
@@ -527,20 +527,20 @@ export default function AdminBannersPage() {
                   <img src={getFileUrl(previewBanner.image)} alt={previewBanner.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <ImageIcon className="w-12 h-12 text-[#D4AF37]/20" />
+                    <ImageIcon className="w-12 h-12 text-primary/20" />
                   </div>
                 )}
               </div>
               <div className="p-4">
                 {previewBanner.subtitle && (
-                  <p className="text-[#D4AF37] text-xs font-medium mb-1">{previewBanner.subtitle}</p>
+                  <p className="text-primary text-xs font-medium mb-1">{previewBanner.subtitle}</p>
                 )}
                 <h3 className="text-gold-gradient text-xl font-bold mb-2">{previewBanner.title}</h3>
                 {previewBanner.description && (
                   <p className="text-muted-foreground text-sm mb-3">{previewBanner.description}</p>
                 )}
                 {previewBanner.ctaText && (
-                  <Button className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl">
+                  <Button className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl">
                     {previewBanner.ctaText}
                   </Button>
                 )}
@@ -552,7 +552,7 @@ export default function AdminBannersPage() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="glass-strong border-[#D4AF37]/20">
+        <AlertDialogContent className="glass-strong border-primary/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Hapus Banner</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -560,7 +560,7 @@ export default function AdminBannersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl border-[#D4AF37]/20 text-foreground" disabled={deleting}>Batal</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl border-primary/20 text-foreground" disabled={deleting}>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting} className="rounded-xl bg-red-600 hover:bg-red-700 text-white" forceMount>
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Hapus'}
             </AlertDialogAction>

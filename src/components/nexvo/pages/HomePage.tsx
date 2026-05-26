@@ -178,8 +178,8 @@ function HeroBanner() {
     return (
       <div className="relative h-[70vh] sm:h-[85vh] flex items-center justify-center bg-nexvo-gradient">
         <div className="animate-pulse space-y-4 text-center px-4">
-          <div className="h-8 w-64 bg-white/10 rounded-2xl mx-auto" />
-          <div className="h-6 w-48 bg-white/5 rounded-xl mx-auto" />
+          <div className="h-8 w-64 bg-foreground/10 rounded-2xl mx-auto" />
+          <div className="h-6 w-48 bg-foreground/5 rounded-xl mx-auto" />
         </div>
       </div>
     );
@@ -196,15 +196,15 @@ function HeroBanner() {
             className="w-full h-full object-cover"
           />
           {/* Dark overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070B14]/90 via-[#070B14]/70 to-[#070B14]/40" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070B14] via-transparent to-[#070B14]/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/70 to-background/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
         </div>
       ) : (
         <div className="absolute inset-0 bg-nexvo-gradient">
           <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-[#D4AF37] blur-[120px]" />
+            <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-primary blur-[120px]" />
             <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-[#1E3A5F] blur-[150px]" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-[#D4AF37]/10" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-primary/10" />
           </div>
         </div>
       )}
@@ -236,7 +236,7 @@ function HeroBanner() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-[#D4AF37] mb-4 sm:mb-6"
+                    className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-primary mb-4 sm:mb-6"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     {banners[current].subtitle}
@@ -268,7 +268,7 @@ function HeroBanner() {
                         const { navigate } = useAppStore.getState();
                         navigate('products');
                       }}
-                      className="bg-gold-gradient text-[#070B14] font-semibold rounded-2xl hover:opacity-90 transition-all glow-gold-strong px-4 sm:px-8 h-11 sm:h-14 text-sm sm:text-base"
+                      className="bg-gold-gradient text-primary-foreground font-semibold rounded-2xl hover:opacity-90 transition-all glow-gold-strong px-4 sm:px-8 h-11 sm:h-14 text-sm sm:text-base"
                     >
                       {banners[current].ctaText || t('landing.startNow')}
                       <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1" />
@@ -278,7 +278,7 @@ function HeroBanner() {
                       onClick={() => {
                         document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
                       }}
-                      className="rounded-2xl border-[#D4AF37]/30 text-foreground hover:bg-white/5 px-4 sm:px-8 h-11 sm:h-14 text-sm sm:text-base"
+                      className="rounded-2xl border-primary/30 text-foreground hover:bg-foreground/5 px-4 sm:px-8 h-11 sm:h-14 text-sm sm:text-base"
                     >
                       <Play className="w-4 h-4 mr-2" />
                       {t('landing.viewProducts')}
@@ -309,7 +309,7 @@ function HeroBanner() {
       </div>
 
       {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#070B14] to-transparent pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
     </section>
   );
 }
@@ -359,7 +359,7 @@ function AboutNexvo() {
     <section id="about" className="relative py-10 sm:py-24 overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 opacity-[0.03]">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-[#D4AF37] blur-[200px]" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-primary blur-[200px]" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-[#1E3A5F] blur-[180px]" />
       </div>
 
@@ -371,7 +371,7 @@ function AboutNexvo() {
           viewport={{ once: true }}
           className="text-center mb-8 sm:mb-16"
         >
-          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-[#D4AF37] mb-4">
+          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-primary mb-4">
             <Shield className="w-3.5 h-3.5" />
             {t('landing.aboutNexvo')}</span>
           <h2 className="text-2xl sm:text-4xl font-bold mb-4">
@@ -396,10 +396,10 @@ function AboutNexvo() {
               className="w-full h-auto object-cover rounded-3xl transition-transform duration-700 group-hover:scale-[1.02]"
             />
             {/* Subtle overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070B14]/60 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent pointer-events-none" />
             {/* Bottom tagline */}
             <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 flex items-center gap-2">
-              <span className="glass-gold rounded-full px-3 py-1 text-xs font-medium text-[#D4AF37]">
+              <span className="glass-gold rounded-full px-3 py-1 text-xs font-medium text-primary">
                 Next-Generation Digital Asset Management
               </span>
             </div>
@@ -416,14 +416,14 @@ function AboutNexvo() {
         >
           <div className="glass glow-gold rounded-3xl p-4 sm:p-10 relative overflow-hidden">
             {/* Decorative corner */}
-            <div className="absolute top-0 right-0 w-40 h-40 bg-[#D4AF37]/[0.04] rounded-bl-full" />
+            <div className="absolute top-0 right-0 w-40 h-40 bg-primary/[0.04] rounded-bl-full" />
 
             <div className="relative">
               {/* Logo */}
               <div className="flex items-center gap-3 mb-6">
                 <img src={logoUrl} alt="NEXVO" className="h-12 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
-                <div className="h-8 w-px bg-[#D4AF37]/20" />
-                <span className="text-[#D4AF37] text-xs font-bold tracking-widest uppercase">Build Value, Grow Future</span>
+                <div className="h-8 w-px bg-primary/20" />
+                <span className="text-primary text-xs font-bold tracking-widest uppercase">Build Value, Grow Future</span>
               </div>
 
               {/* Narrative text */}
@@ -438,12 +438,12 @@ function AboutNexvo() {
                   Security is not optional — it's our foundation. All transactions are encrypted with <strong className="text-foreground">SSL/TLS 256-bit</strong> technology, and every account is protected by multi-layer authentication including OTP verification via WhatsApp and email. With 99.9% uptime and 24/7 monitoring, your investments are always safe and accessible.
                 </p>
                 <p>
-                  Backed by a team of experienced fintech and asset management professionals, NEXVO is more than a platform — it's your partner in financial growth. We believe that <strong className="text-[#D4AF37]">everyone deserves the opportunity to build wealth safely, transparently, and profitably</strong>. Start your investment journey today and let your money work for you.
+                  Backed by a team of experienced fintech and asset management professionals, NEXVO is more than a platform — it's your partner in financial growth. We believe that <strong className="text-primary">everyone deserves the opportunity to build wealth safely, transparently, and profitably</strong>. Start your investment journey today and let your money work for you.
                 </p>
               </div>
 
               {/* Key highlights */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-[#D4AF37]/10">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-primary/10">
                 {[
                   { value: '99.9%', label: t('landing.serverUptime') },
                   { value: '24/7', label: t('landing.onlineSupport') },
@@ -472,8 +472,8 @@ function AboutNexvo() {
               className="glass glow-gold rounded-2xl p-4 sm:p-7 group hover:glow-gold-strong transition-all"
             >
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <feature.icon className="w-6 h-6 text-[#D4AF37]" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <feature.icon className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-foreground font-semibold text-sm sm:text-base mb-2">{feature.title}</h3>
@@ -493,7 +493,7 @@ function AboutNexvo() {
         >
           <Button
             onClick={() => navigate('products')}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-2xl hover:opacity-90 transition-all glow-gold px-8 h-12 sm:h-14 text-sm sm:text-base"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-2xl hover:opacity-90 transition-all glow-gold px-8 h-12 sm:h-14 text-sm sm:text-base"
           >
             {t('landing.startInvestNow')}
             <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
@@ -525,7 +525,7 @@ function StatisticsSection() {
       value: settings ? parseInt(settings.total_members) || 1250 : 1250,
       suffix: '+',
       color: 'text-emerald-400',
-      bg: 'bg-emerald-400/10',
+      bg: 'bg-cardmerald-400/10',
     },
     {
       icon: ArrowLeftRight,
@@ -540,8 +540,8 @@ function StatisticsSection() {
       label: t('landing.uptime'),
       value: settings ? parseFloat(settings.uptime) || 99.9 : 99.9,
       suffix: '%',
-      color: 'text-[#D4AF37]',
-      bg: 'bg-[#D4AF37]/10',
+      color: 'text-primary',
+      bg: 'bg-primary/10',
     },
     {
       icon: ThumbsUp,
@@ -604,7 +604,7 @@ function HowItWorks() {
           viewport={{ once: true }}
           className="text-center mb-8 sm:mb-16"
         >
-          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-[#D4AF37] mb-4">
+          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-primary mb-4">
             <Eye className="w-3.5 h-3.5" />
             {t('landing.howItWorks')}</span>
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
@@ -632,12 +632,12 @@ function HowItWorks() {
               >
                 <div className="glass glow-gold rounded-2xl p-4 sm:p-8 text-center relative group hover:glow-gold-strong transition-all">
                   {/* Step number */}
-                  <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gold-gradient flex items-center justify-center text-xs font-bold text-[#070B14] glow-gold">
+                  <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gold-gradient flex items-center justify-center text-xs font-bold text-primary-foreground glow-gold">
                     {i + 1}
                   </div>
                   {/* Icon */}
-                  <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#D4AF37]/10 mb-4 group-hover:scale-110 transition-transform">
-                    <step.icon className="w-7 h-7 sm:w-8 sm:h-8 text-[#D4AF37]" />
+                  <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 mb-4 group-hover:scale-110 transition-transform">
+                    <step.icon className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
                   </div>
                   <h3 className="text-foreground font-semibold text-base sm:text-lg mb-2">{step.title}</h3>
                   <p className="text-muted-foreground text-xs sm:text-sm">{step.desc}</p>
@@ -678,7 +678,7 @@ function ProductPreview() {
           viewport={{ once: true }}
           className="text-center mb-8 sm:mb-16"
         >
-          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-[#D4AF37] mb-4">
+          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-primary mb-4">
             <Sparkles className="w-3.5 h-3.5" />
             {t('landing.featuredProducts')}</span>
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
@@ -728,7 +728,7 @@ function ProductPreview() {
               <Button
                 variant="outline"
                 onClick={() => navigate('products')}
-                className="rounded-2xl border-[#D4AF37]/30 text-foreground hover:bg-white/5"
+                className="rounded-2xl border-primary/30 text-foreground hover:bg-foreground/5"
               >
                 {t('landing.viewAllProducts')}
                 <ChevronRight className="w-4 h-4 ml-1" />
@@ -755,10 +755,10 @@ function ProductCard({ product, navigate }: { product: Product; navigate: (page:
     <div className="glass glow-gold rounded-2xl overflow-hidden group hover:glow-gold-strong transition-all h-full flex flex-col">
       {/* Card header gradient */}
       <div className="bg-card-gradient p-3 sm:p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-[#D4AF37]/5 blur-2xl" />
+        <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-primary/5 blur-2xl" />
         <div className="flex items-start justify-between mb-3">
           <h3 className="text-foreground font-semibold text-base sm:text-lg">{product.name}</h3>
-          <span className="text-xs font-medium text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-1 rounded-full">
+          <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full">
             {product.profitRate}% / {product.duration}h
           </span>
         </div>
@@ -784,7 +784,7 @@ function ProductCard({ product, navigate }: { product: Product; navigate: (page:
             <span className="text-muted-foreground">{t('landing.quotaFilled')}</span>
             <span className="text-foreground font-medium">{quotaPercent}%</span>
           </div>
-          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+          <div className="h-2 rounded-full bg-foreground/5 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               whileInView={{ width: `${quotaPercent}%` }}
@@ -802,7 +802,7 @@ function ProductCard({ product, navigate }: { product: Product; navigate: (page:
         {/* CTA */}
         <Button
           onClick={() => navigate('product-detail', { productId: product.id })}
-          className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all mt-auto"
+          className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all mt-auto"
         >
           {t('landing.viewDetail')}
           <ChevronRight className="w-4 h-4 ml-1" />
@@ -951,15 +951,15 @@ function LiveActivity() {
   const getTypeConfig = (type: string) => {
     switch (type) {
       case 'deposit':
-        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'Deposit' };
+        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: 'Deposit' };
       case 'withdraw':
         return { icon: ArrowUp, color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'Withdraw' };
       case 'purchase':
-        return { icon: ShoppingBag, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', label: 'Investasi' };
+        return { icon: ShoppingBag, color: 'text-primary', bg: 'bg-primary/10', label: 'Investasi' };
       case 'register':
         return { icon: UserPlus, color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'Daftar Baru' };
       default:
-        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: type };
+        return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: type };
     }
   };
 
@@ -972,10 +972,10 @@ function LiveActivity() {
           viewport={{ once: true }}
           className="text-center mb-8 sm:mb-12"
         >
-          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-[#D4AF37] mb-4">
+          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-primary mb-4">
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cardmerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cardmerald-400" />
             </span>
             {t('landing.liveActivity')}
           </span>
@@ -988,8 +988,8 @@ function LiveActivity() {
         {/* Stats Row */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
           {[
-            { icon: ArrowDown, label: 'Deposit', value: totalDepositsToday.toLocaleString('id-ID'), color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-            { icon: ShoppingBag, label: 'Investasi', value: totalPurchasesToday.toLocaleString('id-ID'), color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
+            { icon: ArrowDown, label: 'Deposit', value: totalDepositsToday.toLocaleString('id-ID'), color: 'text-emerald-400', bg: 'bg-cardmerald-400/10' },
+            { icon: ShoppingBag, label: 'Investasi', value: totalPurchasesToday.toLocaleString('id-ID'), color: 'text-primary', bg: 'bg-primary/10' },
             { icon: UserPlus, label: 'Member Baru', value: totalNewMembers.toLocaleString('id-ID'), color: 'text-purple-400', bg: 'bg-purple-400/10' },
             { icon: TrendingUp, label: 'Volume', value: formatRupiah(totalVolumeToday), color: 'text-orange-400', bg: 'bg-orange-400/10' },
             { icon: Users, label: 'Pengguna Aktif', value: activeUsersNow.toLocaleString('id-ID'), color: 'text-pink-400', bg: 'bg-pink-400/10' },
@@ -1008,10 +1008,10 @@ function LiveActivity() {
         <div className="flex justify-center mb-6">
           <div className="glass-gold rounded-full px-4 py-1.5 flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cardmerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cardmerald-400" />
             </span>
-            <span className="text-[#D4AF37] text-xs font-semibold">{activities.length} transaksi baru</span>
+            <span className="text-primary text-xs font-semibold">{activities.length} transaksi baru</span>
           </div>
         </div>
 
@@ -1056,7 +1056,7 @@ function LiveActivity() {
         </div>
 
         <div className="text-center mt-6 sm:mt-8">
-          <Button variant="outline" onClick={() => navigate('live')} className="rounded-2xl border-[#D4AF37]/30 text-foreground hover:bg-white/5">
+          <Button variant="outline" onClick={() => navigate('live')} className="rounded-2xl border-primary/30 text-foreground hover:bg-foreground/5">
             Lihat Semua Aktivitas <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </div>
@@ -1106,7 +1106,7 @@ function Testimonials() {
           viewport={{ once: true }}
           className="text-center mb-8 sm:mb-16"
         >
-          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-[#D4AF37] mb-4">
+          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-primary mb-4">
             <Star className="w-3.5 h-3.5" />
             {t('landing.testimonials')}</span>
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
@@ -1135,7 +1135,7 @@ function Testimonials() {
                     key={si}
                     className={`w-4 h-4 ${
                       si < t.rating
-                        ? 'text-[#D4AF37] fill-[#D4AF37]'
+                        ? 'text-primary fill-[#D4AF37]'
                         : 'text-white/10'
                     }`}
                   />
@@ -1147,7 +1147,7 @@ function Testimonials() {
               </p>
               {/* User */}
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gold-gradient flex items-center justify-center text-sm font-bold text-[#070B14]">
+                <div className="w-10 h-10 rounded-full bg-gold-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
                   {t.name.charAt(0)}
                 </div>
                 <div>
@@ -1180,9 +1180,9 @@ function CtaSection() {
         >
           {/* Background */}
           <div className="absolute inset-0 bg-gold-gradient opacity-90" />
-          <div className="absolute inset-0 bg-[#070B14]/20" />
+          <div className="absolute inset-0 bg-background/20" />
           {/* Decorative */}
-          <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-foreground/10 blur-3xl" />
           <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full bg-black/10 blur-3xl" />
 
           <div className="relative p-8 sm:p-12 lg:p-16 text-center">
@@ -1192,16 +1192,16 @@ function CtaSection() {
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
             >
-              <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-[#070B14] mb-4 sm:mb-6">
+              <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-primary-foreground mb-4 sm:mb-6">
                 Start Investing Today
               </h2>
-              <p className="text-[#070B14]/70 text-sm sm:text-lg max-w-xl mx-auto mb-6 sm:mb-8">
+              <p className="text-primary-foreground/70 text-sm sm:text-lg max-w-xl mx-auto mb-6 sm:mb-8">
                 Begin your digital investment journey with NEXVO. Register for free and start earning daily profits from commodity-backed packages!
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
                 <Button
                   onClick={() => navigate('register')}
-                  className="bg-[#070B14] text-[#D4AF37] font-semibold rounded-2xl hover:bg-[#0F172A] transition-colors px-8 h-12 sm:h-14 text-sm sm:text-base w-full sm:w-auto"
+                  className="bg-background text-primary font-semibold rounded-2xl hover:bg-secondary transition-colors px-8 h-12 sm:h-14 text-sm sm:text-base w-full sm:w-auto"
                 >
                   Register Free
                   <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1" />
@@ -1209,7 +1209,7 @@ function CtaSection() {
                 <Button
                   variant="outline"
                   onClick={() => navigate('login')}
-                  className="border-[#070B14]/30 text-[#070B14] hover:bg-[#070B14]/10 rounded-2xl px-8 h-12 sm:h-14 text-sm sm:text-base w-full sm:w-auto"
+                  className="border-primary-foreground/30 text-primary-foreground hover:bg-background/10 rounded-2xl px-8 h-12 sm:h-14 text-sm sm:text-base w-full sm:w-auto"
                 >
                   Already Have an Account
                 </Button>
@@ -1223,7 +1223,7 @@ function CtaSection() {
                 { icon: CheckCircle2, text: 'Daily Profit' },
                 { icon: Clock, text: '24/7 Support' },
               ].map((badge) => (
-                <div key={badge.text} className="flex items-center gap-2 text-[#070B14]/70 text-xs sm:text-sm">
+                <div key={badge.text} className="flex items-center gap-2 text-primary-foreground/70 text-xs sm:text-sm">
                   <badge.icon className="w-4 h-4" />
                   {badge.text}
                 </div>

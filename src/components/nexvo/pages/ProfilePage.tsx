@@ -29,9 +29,9 @@ interface BankAccount {
 }
 
 const levelConfig: Record<string, { color: string; bg: string; border: string }> = {
-  Bronze: { color: 'text-amber-600', bg: 'bg-amber-600/10', border: 'border-amber-600/20' },
-  Silver: { color: 'text-gray-300', bg: 'bg-gray-300/10', border: 'border-gray-300/20' },
-  Gold: { color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', border: 'border-[#D4AF37]/20' },
+  Bronze: { color: 'text-amber-600', bg: 'bg-cardmber-600/10', border: 'border-bordermber-600/20' },
+  Silver: { color: 'text-foreground/70', bg: 'bg-gray-300/10', border: 'border-gray-300/20' },
+  Gold: { color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20' },
   Platinum: { color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20' },
 };
 
@@ -244,7 +244,7 @@ export default function ProfilePage() {
     >
       <motion.div variants={itemVariants}>
         <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-          <User className="w-5 h-5 text-[#D4AF37]" />Profil
+          <User className="w-5 h-5 text-primary" />Profil
         </h1>
         <p className="text-muted-foreground text-sm">Kelola informasi akun dan rekening bank Anda</p>
       </motion.div>
@@ -257,7 +257,7 @@ export default function ProfilePage() {
               {avatarSrc ? (
                 <img src={avatarSrc} alt="Avatar" className="w-16 h-16 rounded-2xl object-cover ring-2 ring-[#D4AF37]/30 group-hover:ring-[#D4AF37]/60 transition-all" />
               ) : (
-                <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center text-2xl font-bold text-[#070B14] ring-2 ring-transparent group-hover:ring-[#D4AF37]/60 transition-all">
+                <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center text-2xl font-bold text-primary-foreground ring-2 ring-transparent group-hover:ring-[#D4AF37]/60 transition-all">
                   {user?.name?.charAt(0) || 'U'}
                 </div>
               )}
@@ -299,7 +299,7 @@ export default function ProfilePage() {
 
       <motion.div variants={itemVariants} className="glass rounded-2xl p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
-          <User className="w-4 h-4 text-[#D4AF37]" />
+          <User className="w-4 h-4 text-primary" />
           <h3 className="text-foreground font-semibold text-sm">Ubah Nama</h3>
         </div>
         <form onSubmit={handleUpdateName} className="flex items-center gap-3">
@@ -307,7 +307,7 @@ export default function ProfilePage() {
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input value={name} onChange={(e) => setName(e.target.value)} className="pl-10 h-11 bg-input/50 border-border/50 rounded-xl text-foreground" />
           </div>
-          <Button type="submit" disabled={nameLoading || name === user?.name} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50 shrink-0">
+          <Button type="submit" disabled={nameLoading || name === user?.name} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50 shrink-0">
             {nameLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
           </Button>
         </form>
@@ -315,7 +315,7 @@ export default function ProfilePage() {
 
       <motion.div variants={itemVariants} className="glass rounded-2xl p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Lock className="w-4 h-4 text-[#D4AF37]" />
+          <Lock className="w-4 h-4 text-primary" />
           <h3 className="text-foreground font-semibold text-sm">Ubah Password</h3>
         </div>
         <form onSubmit={handleUpdatePassword} className="space-y-3">
@@ -340,7 +340,7 @@ export default function ProfilePage() {
           {confirmPassword && newPassword !== confirmPassword && (
             <p className="text-red-400 text-xs">Konfirmasi password tidak cocok</p>
           )}
-          <Button type="submit" disabled={passwordLoading} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50">
+          <Button type="submit" disabled={passwordLoading} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold text-sm disabled:opacity-50">
             {passwordLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
             Ubah Password
           </Button>
@@ -350,17 +350,17 @@ export default function ProfilePage() {
       <motion.div variants={itemVariants} className="glass rounded-2xl p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-[#D4AF37]" />
+            <Building2 className="w-4 h-4 text-primary" />
             <h3 className="text-foreground font-semibold text-sm">Rekening Bank</h3>
           </div>
-          <Button onClick={() => openBankDialog()} variant="outline" className="border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-xl text-xs h-8">
+          <Button onClick={() => openBankDialog()} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-xs h-8">
             <Plus className="w-3.5 h-3.5 mr-1" />Tambah
           </Button>
         </div>
 
         {banksLoading ? (
           <div className="animate-pulse space-y-3">
-            {[...Array(2)].map((_, i) => <div key={i} className="h-16 bg-white/5 rounded-xl" />)}
+            {[...Array(2)].map((_, i) => <div key={i} className="h-16 bg-foreground/5 rounded-xl" />)}
           </div>
         ) : banks.length > 0 ? (
           <div className="space-y-3">
@@ -372,13 +372,13 @@ export default function ProfilePage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-foreground text-sm font-medium">{bank.bankName}</p>
-                    {bank.isPrimary && <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border-0 text-[8px] px-1.5 py-0">Utama</Badge>}
+                    {bank.isPrimary && <Badge className="bg-primary/10 text-primary border-border text-[8px] px-1.5 py-0">Utama</Badge>}
                   </div>
                   <p className="text-muted-foreground text-xs">{bank.accountNo}</p>
                   <p className="text-muted-foreground text-[10px]">a/n {bank.holderName}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => openBankDialog(bank)} className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={() => openBankDialog(bank)} className="p-2 rounded-lg hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors">
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button onClick={() => setDeleteDialog(bank)} className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
@@ -403,7 +403,7 @@ export default function ProfilePage() {
           { icon: Crown, label: 'Referral', page: 'referral' as const },
         ].map((item, i) => (
           <button key={item.page} onClick={() => navigate(item.page)} className={`w-full flex items-center gap-3 px-5 py-4 text-sm hover:bg-white/[0.03] transition-colors ${i > 0 ? 'border-t border-border/20' : ''}`}>
-            <item.icon className="w-4 h-4 text-[#D4AF37]" />
+            <item.icon className="w-4 h-4 text-primary" />
             <span className="flex-1 text-left text-foreground">{item.label}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -417,10 +417,10 @@ export default function ProfilePage() {
       </motion.div>
 
       <Dialog open={bankDialog} onOpenChange={setBankDialog}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-[#D4AF37]" />
+              <Building2 className="w-5 h-5 text-primary" />
               {editBank ? 'Edit Rekening' : 'Tambah Rekening'}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -443,7 +443,7 @@ export default function ProfilePage() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setBankDialog(false)} className="border-border/50 text-muted-foreground rounded-xl">Batal</Button>
-            <Button onClick={handleSaveBank} disabled={bankSaving} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
+            <Button onClick={handleSaveBank} disabled={bankSaving} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold">
               {bankSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
               {editBank ? 'Simpan' : 'Tambah'}
             </Button>

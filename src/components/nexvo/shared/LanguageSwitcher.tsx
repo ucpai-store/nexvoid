@@ -21,7 +21,7 @@ export default function LanguageSwitcher({ compact = false }: { compact?: boolea
           onClick={() => setLanguage(lang.key)}
           className={`relative px-2 py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-colors whitespace-nowrap ${
             language === lang.key
-              ? 'text-[#070B14]'
+              ? 'text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'
           }`}
           whileTap={{ scale: 0.95 }}

@@ -23,7 +23,7 @@ const PROMO_ITEMS: PromoItem[] = [
     icon: <Gift className="w-5 h-5" />,
     title: 'Bonus Matching 5 Level',
     desc: 'Dapatkan bonus referral hingga 5 level kedalaman',
-    color: 'text-[#D4AF37]',
+    color: 'text-primary',
   },
   {
     icon: <Shield className="w-5 h-5" />,
@@ -125,14 +125,14 @@ export default function PromoPopup() {
             className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none"
           >
             <div className="pointer-events-auto w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-              <div className="relative bg-gradient-to-b from-[#0F172A] to-[#070B14] border border-[#D4AF37]/30 rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(212,175,55,0.15)]">
+              <div className="relative bg-gradient-to-b from-secondary to-background border border-primary/30 rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(212,175,55,0.15)]">
                 {/* Decorative top glow */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-[#D4AF37]/10 blur-3xl rounded-full" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-primary/10 blur-3xl rounded-full" />
 
                 {/* Close button */}
                 <button
                   onClick={handleDismiss}
-                  className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                  className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-foreground/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-foreground/10 transition-all"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -141,8 +141,8 @@ export default function PromoPopup() {
                 <div className="relative p-5 pt-6">
                   {/* Header */}
                   <div className="text-center mb-5">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 border border-[#D4AF37]/20 mb-3">
-                      <Gift className="w-7 h-7 text-[#D4AF37]" />
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-[#D4AF37]/5 border border-primary/20 mb-3">
+                      <Gift className="w-7 h-7 text-primary" />
                     </div>
                     <h2 className="text-lg font-bold text-white mb-1">
                       Penawaran Spesial!
@@ -178,7 +178,7 @@ export default function PromoPopup() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleCTA}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-[#D4AF37] to-[#F0D060] text-[#070B14] font-bold text-sm rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_30px_rgba(212,175,55,0.5)] transition-all"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-bold text-sm rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_30px_rgba(212,175,55,0.5)] transition-all"
                   >
                     Mulai Sekarang
                     <ChevronRight className="w-4 h-4" />

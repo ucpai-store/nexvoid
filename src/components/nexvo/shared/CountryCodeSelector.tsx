@@ -133,7 +133,7 @@ export default function CountryCodeSelector({ value, onChange, className = '' }:
       <button
         type="button"
         onClick={() => { setOpen(!open); setSearch(''); }}
-        className="flex items-center gap-1 h-12 px-3 bg-input/50 border border-border/50 rounded-xl text-foreground text-sm font-medium hover:bg-input/70 transition-colors whitespace-nowrap focus:border-[#D4AF37]/50"
+        className="flex items-center gap-1 h-12 px-3 bg-input/50 border border-border/50 rounded-xl text-foreground text-sm font-medium hover:bg-input/70 transition-colors whitespace-nowrap focus:border-primary/50"
       >
         <span className="text-base">{selected.flag}</span>
         <span className="text-muted-foreground">+{selected.dialCode}</span>
@@ -153,7 +153,7 @@ export default function CountryCodeSelector({ value, onChange, className = '' }:
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search country..."
-                className="w-full h-8 pl-8 pr-3 bg-input/30 border border-border/30 rounded-lg text-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-[#D4AF37]/50"
+                className="w-full h-8 pl-8 pr-3 bg-input/30 border border-border/30 rounded-lg text-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50"
               />
             </div>
           </div>
@@ -172,8 +172,8 @@ export default function CountryCodeSelector({ value, onChange, className = '' }:
                     setOpen(false);
                     setSearch('');
                   }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/5 transition-colors ${
-                    country.dialCode === value ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'text-foreground'
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-foreground/5 transition-colors ${
+                    country.dialCode === value ? 'bg-primary/10 text-primary' : 'text-foreground'
                   }`}
                 >
                   <span className="text-base w-6 text-center">{country.flag}</span>

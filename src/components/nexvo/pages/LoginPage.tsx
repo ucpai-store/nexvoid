@@ -121,13 +121,13 @@ export default function LoginPage() {
           className="w-full h-full object-cover"
         />
         {/* Dark overlay for readability */}
-        <div className="absolute inset-0 bg-[#070B14]/75" />
+        <div className="absolute inset-0 bg-background/75" />
         {/* Gradient overlay from bottom */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070B14]/90 via-transparent to-[#070B14]/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/40" />
         {/* Side gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#070B14]/60 via-transparent to-[#070B14]/60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
         {/* Subtle gold glow accents */}
-        <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full bg-[#D4AF37]/5 blur-[120px]" />
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-[#1E3A5F]/10 blur-[150px]" />
       </div>
 
@@ -148,7 +148,7 @@ export default function LoginPage() {
             >
               <div className="relative inline-block">
                 {/* Gold glow behind logo */}
-                <div className="absolute inset-0 blur-[25px] bg-[#D4AF37]/15 rounded-full scale-110" />
+                <div className="absolute inset-0 blur-[25px] bg-primary/15 rounded-full scale-110" />
                 <img
                   src={logoUrl}
                   alt="NEXVO"
@@ -167,8 +167,8 @@ export default function LoginPage() {
               onClick={() => setLoginMethod('phone')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 loginMethod === 'phone'
-                  ? 'bg-gold-gradient text-[#070B14] glow-gold shadow-lg shadow-[#D4AF37]/20'
-                  : 'glass text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  ? 'bg-gold-gradient text-primary-foreground glow-gold shadow-lg shadow-[#D4AF37]/20'
+                  : 'glass text-muted-foreground hover:text-foreground hover:bg-foreground/5'
               }`}
             >
               <Phone className="w-4 h-4" />
@@ -179,8 +179,8 @@ export default function LoginPage() {
               onClick={() => setLoginMethod('email')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 loginMethod === 'email'
-                  ? 'bg-gold-gradient text-[#070B14] glow-gold shadow-lg shadow-[#D4AF37]/20'
-                  : 'glass text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  ? 'bg-gold-gradient text-primary-foreground glow-gold shadow-lg shadow-[#D4AF37]/20'
+                  : 'glass text-muted-foreground hover:text-foreground hover:bg-foreground/5'
               }`}
             >
               <Mail className="w-4 h-4" />
@@ -211,7 +211,7 @@ export default function LoginPage() {
                         placeholder="your@email.com"
                         value={emailAddress}
                         onChange={(e) => setEmailAddress(e.target.value)}
-                        className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                        className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                       />
                     </div>
                   </motion.div>
@@ -235,7 +235,7 @@ export default function LoginPage() {
                           placeholder="8123456789"
                           value={phoneNumber}
                           onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                          className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                          className="pl-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                         />
                       </div>
                     </div>
@@ -257,7 +257,7 @@ export default function LoginPage() {
                   placeholder={t('auth.enterPassword')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
                 <button
                   type="button"
@@ -273,11 +273,11 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
+              className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-[#070B14]/30 border-t-[#070B14] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   {t('common.processing')}
                 </div>
               ) : (
@@ -293,7 +293,7 @@ export default function LoginPage() {
           <div className="mt-5 sm:mt-6 text-center space-y-2 sm:space-y-3">
             <button
               onClick={() => navigate('forgot-password')}
-              className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium hover:underline transition-colors"
+              className="text-primary/70 hover:text-primary text-sm font-medium hover:underline transition-colors"
             >
               Forgot Password?
             </button>
@@ -301,14 +301,14 @@ export default function LoginPage() {
               {t('auth.noAccount')}{' '}
               <button
                 onClick={() => navigate('register')}
-                className="text-[#D4AF37] font-medium hover:underline"
+                className="text-primary font-medium hover:underline"
               >
                 {t('auth.registerNow')}
               </button>
             </p>
             <button
               onClick={() => navigate('admin-login')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[#D4AF37]/50 hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 transition-all text-xs font-medium"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-primary/50 hover:text-primary hover:bg-primary/5 transition-all text-xs font-medium"
             >
               <Shield className="w-3.5 h-3.5" />
               {t('auth.adminPanel')}

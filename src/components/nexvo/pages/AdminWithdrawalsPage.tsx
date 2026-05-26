@@ -116,7 +116,7 @@ export default function AdminWithdrawalsPage() {
 
   const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
     pending: { color: 'text-yellow-400', bg: 'bg-yellow-400/10', label: 'Pending' },
-    approved: { color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'Disetujui' },
+    approved: { color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: 'Disetujui' },
     rejected: { color: 'text-red-400', bg: 'bg-red-400/10', label: 'Ditolak' },
   };
 
@@ -145,7 +145,7 @@ export default function AdminWithdrawalsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari user..."
-            className="pl-10 glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground placeholder:text-muted-foreground"
+            className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground placeholder:text-muted-foreground"
           />
         </div>
       </motion.div>
@@ -163,13 +163,13 @@ export default function AdminWithdrawalsPage() {
             onClick={() => setStatusFilter(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
               statusFilter === tab.key
-                ? 'bg-[#D4AF37]/15 text-[#D4AF37] glow-gold'
-                : 'glass text-foreground/60 hover:text-foreground hover:bg-white/5'
+                ? 'bg-primary/15 text-primary glow-gold'
+                : 'glass text-foreground/60 hover:text-foreground hover:bg-foreground/5'
             }`}
           >
             {tab.label}
             {tab.key !== 'all' && (
-              <Badge className="bg-white/10 text-foreground/50 text-[10px] h-4 px-1.5 border-0">
+              <Badge className="bg-foreground/10 text-foreground/50 text-[10px] h-4 px-1.5 border-border">
                 {withdrawals.filter((w) => w.status === tab.key).length}
               </Badge>
             )}
@@ -196,7 +196,7 @@ export default function AdminWithdrawalsPage() {
             <div className="hidden lg:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#D4AF37]/10 hover:bg-transparent">
+                  <TableRow className="border-primary/10 hover:bg-transparent">
                     <TableHead className="text-muted-foreground text-xs">User</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Metode</TableHead>
                     <TableHead className="text-muted-foreground text-xs">No. Akun</TableHead>
@@ -212,17 +212,17 @@ export default function AdminWithdrawalsPage() {
                   {filtered.map((wd) => {
                     const sc = statusConfig[wd.status] || statusConfig.pending;
                     return (
-                      <TableRow key={wd.id} className="border-[#D4AF37]/5 hover:bg-white/[0.02]">
+                      <TableRow key={wd.id} className="border-primary/5 hover:bg-white/[0.02]">
                         <TableCell>
                           <p className="text-foreground text-sm font-medium">{wd.user?.name || 'Unknown'}</p>
                           <p className="text-muted-foreground text-xs">{wd.user?.userId}</p>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            <Landmark className="w-3.5 h-3.5 text-[#D4AF37]" />
+                            <Landmark className="w-3.5 h-3.5 text-primary" />
                             <span className="text-foreground text-xs">{wd.bankName}</span>
                             {wd.paymentType && wd.paymentType !== 'bank' && (
-                              <Badge className="bg-white/5 text-muted-foreground text-[8px] border-0 px-1 py-0">{wd.paymentType}</Badge>
+                              <Badge className="bg-foreground/5 text-muted-foreground text-[8px] border-border px-1 py-0">{wd.paymentType}</Badge>
                             )}
                           </div>
                         </TableCell>
@@ -232,7 +232,7 @@ export default function AdminWithdrawalsPage() {
                         <TableCell className="text-emerald-400 font-semibold text-sm">{formatRupiah(wd.netAmount)}</TableCell>
                         <TableCell className="text-muted-foreground text-xs">{timeAgo(new Date(wd.createdAt))}</TableCell>
                         <TableCell>
-                          <Badge className={`${sc.bg} ${sc.color} border-0 text-[10px]`}>{sc.label}</Badge>
+                          <Badge className={`${sc.bg} ${sc.color} border-border text-[10px]`}>{sc.label}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           {wd.status === 'pending' && (
@@ -240,7 +240,7 @@ export default function AdminWithdrawalsPage() {
                               <button
                                 onClick={() => setApproveDialog(wd.id)}
                                 disabled={processing[wd.id]}
-                                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 transition-colors disabled:opacity-50"
                                 title="Setujui"
                               >
                                 {processing[wd.id] ? (
@@ -278,7 +278,7 @@ export default function AdminWithdrawalsPage() {
                         <p className="text-foreground text-sm font-medium">{wd.user?.name}</p>
                         <p className="text-muted-foreground text-xs">{wd.user?.userId}</p>
                       </div>
-                      <Badge className={`${sc.bg} ${sc.color} border-0 text-[10px]`}>{sc.label}</Badge>
+                      <Badge className={`${sc.bg} ${sc.color} border-border text-[10px]`}>{sc.label}</Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mb-2 text-xs">
                       <div>
@@ -298,14 +298,14 @@ export default function AdminWithdrawalsPage() {
                         <p className="text-emerald-400 font-semibold">{formatRupiah(wd.netAmount)}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#D4AF37]/10">
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-primary/10">
                       <span className="text-muted-foreground text-xs">{timeAgo(new Date(wd.createdAt))}</span>
                       {wd.status === 'pending' && (
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setApproveDialog(wd.id)}
                             disabled={processing[wd.id]}
-                            className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 disabled:opacity-50"
+                            className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 disabled:opacity-50"
                           >
                             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                           </button>
@@ -334,7 +334,7 @@ export default function AdminWithdrawalsPage() {
 
       {/* Approve Confirmation Dialog */}
       <Dialog open={!!approveDialog} onOpenChange={() => setApproveDialog(null)}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground">Setujui Withdrawal</DialogTitle>
           </DialogHeader>
@@ -346,7 +346,7 @@ export default function AdminWithdrawalsPage() {
               const wd = withdrawals.find((w) => w.id === approveDialog);
               if (!wd) return null;
               return (
-                <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1 text-sm">
+                <div className="mt-3 p-3 rounded-xl bg-cardmerald-500/10 border border-emerald-500/20 space-y-1 text-sm">
                   <p className="text-foreground font-medium">{wd.user?.name || 'Unknown'}</p>
                   <p className="text-muted-foreground">{wd.bankName} • {wd.accountNo}</p>
                   <p className="text-emerald-400 font-semibold">{formatRupiah(wd.netAmount)}</p>
@@ -358,7 +358,7 @@ export default function AdminWithdrawalsPage() {
             <Button
               variant="outline"
               onClick={() => setApproveDialog(null)}
-              className="rounded-xl border-[#D4AF37]/20 text-foreground"
+              className="rounded-xl border-primary/20 text-foreground"
             >
               Batal
             </Button>
@@ -369,7 +369,7 @@ export default function AdminWithdrawalsPage() {
                 }
                 setApproveDialog(null);
               }}
-              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="rounded-xl bg-cardmerald-600 hover:bg-cardmerald-700 text-white"
             >
               Ya, Setujui
             </Button>
@@ -379,7 +379,7 @@ export default function AdminWithdrawalsPage() {
 
       {/* Reject Dialog */}
       <Dialog open={!!rejectDialog} onOpenChange={() => { setRejectDialog(null); setRejectNote(''); }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground">Tolak Withdrawal</DialogTitle>
           </DialogHeader>
@@ -390,14 +390,14 @@ export default function AdminWithdrawalsPage() {
               onChange={(e) => setRejectNote(e.target.value)}
               placeholder="Masukkan alasan penolakan..."
               rows={3}
-              className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground resize-none"
+              className="glass rounded-xl border-primary/20 bg-transparent text-foreground resize-none"
             />
           </div>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => { setRejectDialog(null); setRejectNote(''); }}
-              className="rounded-xl border-[#D4AF37]/20 text-foreground"
+              className="rounded-xl border-primary/20 text-foreground"
             >
               Batal
             </Button>

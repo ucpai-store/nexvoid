@@ -404,7 +404,7 @@ export default function AdminSettingsPage() {
   const getActionBadge = (action: string) => {
     switch (action) {
       case 'LOGIN_SUCCESS':
-        return <Badge className="bg-emerald-400/10 text-emerald-400 border-emerald-400/20 text-[10px]">Login</Badge>;
+        return <Badge className="bg-cardmerald-400/10 text-emerald-400 border-emerald-400/20 text-[10px]">Login</Badge>;
       case 'LOGIN_FAILED':
         return <Badge className="bg-red-400/10 text-red-400 border-red-400/20 text-[10px]">Gagal</Badge>;
       case 'CHANGE_PASSWORD':
@@ -414,17 +414,17 @@ export default function AdminSettingsPage() {
       case 'DELETE_ADMIN':
         return <Badge className="bg-red-400/10 text-red-400 border-red-400/20 text-[10px]">Hapus Admin</Badge>;
       case 'UNLOCK_ADMIN':
-        return <Badge className="bg-emerald-400/10 text-emerald-400 border-emerald-400/20 text-[10px]">Unlock Admin</Badge>;
+        return <Badge className="bg-cardmerald-400/10 text-emerald-400 border-emerald-400/20 text-[10px]">Unlock Admin</Badge>;
       default:
-        return <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20 text-[10px]">{action}</Badge>;
+        return <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">{action}</Badge>;
     }
   };
 
   if (loading) {
     return (
       <div className="p-3 sm:p-5 lg:p-6 space-y-4">
-        <div className="h-10 w-48 bg-white/5 rounded-xl animate-pulse" />
-        <div className="h-64 bg-white/5 rounded-2xl animate-pulse" />
+        <div className="h-10 w-48 bg-foreground/5 rounded-xl animate-pulse" />
+        <div className="h-64 bg-foreground/5 rounded-2xl animate-pulse" />
       </div>
     );
   }
@@ -438,32 +438,32 @@ export default function AdminSettingsPage() {
       </motion.div>
 
       <Tabs defaultValue="password" className="space-y-6">
-        <TabsList className="bg-[#0F172A]/60 border border-[#D4AF37]/10 rounded-xl p-1 overflow-x-auto no-scrollbar w-full sm:w-auto">
-          <TabsTrigger value="password" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
+        <TabsList className="bg-secondary/60 border border-primary/10 rounded-xl p-1 overflow-x-auto no-scrollbar w-full sm:w-auto">
+          <TabsTrigger value="password" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0">
             <Key className="w-4 h-4 mr-2" />
             Ganti Password
           </TabsTrigger>
-          <TabsTrigger value="admins" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0" disabled={!isSuperAdmin}>
+          <TabsTrigger value="admins" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0" disabled={!isSuperAdmin}>
             <Users className="w-4 h-4 mr-2" />
             Daftar Admin
           </TabsTrigger>
-          <TabsTrigger value="whatsapp" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
+          <TabsTrigger value="whatsapp" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0">
             <MessageCircle className="w-4 h-4 mr-2" />
             WhatsApp
           </TabsTrigger>
-          <TabsTrigger value="numbers" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
+          <TabsTrigger value="numbers" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0">
             <Phone className="w-4 h-4 mr-2" />
             Nomor Penting
           </TabsTrigger>
-          <TabsTrigger value="fees" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
+          <TabsTrigger value="fees" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0">
             <DollarSign className="w-4 h-4 mr-2" />
             Fees
           </TabsTrigger>
-          <TabsTrigger value="salary" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
+          <TabsTrigger value="salary" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0">
             <Banknote className="w-4 h-4 mr-2" />
             Gaji Mingguan
           </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-lg data-[state=active]:bg-[#D4AF37]/10 data-[state=active]:text-[#D4AF37] text-xs sm:text-sm shrink-0">
+          <TabsTrigger value="logs" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0">
             <ScrollText className="w-4 h-4 mr-2" />
             Log Aktivitas
           </TabsTrigger>
@@ -474,8 +474,8 @@ export default function AdminSettingsPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-lg">
             <div className="glass glow-gold rounded-2xl p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-                  <Lock className="w-6 h-6 text-[#D4AF37]" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-foreground font-semibold">Ganti Password</h3>
@@ -492,9 +492,9 @@ export default function AdminSettingsPage() {
                       value={oldPassword}
                       onChange={(e) => setOldPassword(e.target.value)}
                       placeholder="Masukkan password lama"
-                      className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl pr-10"
+                      className="h-11 bg-secondary/60 border-primary/20 rounded-xl pr-10"
                     />
-                    <button type="button" onClick={() => setShowOldPass(!showOldPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-[#D4AF37]">
+                    <button type="button" onClick={() => setShowOldPass(!showOldPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary">
                       {showOldPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -508,9 +508,9 @@ export default function AdminSettingsPage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Masukkan password baru"
-                      className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl pr-10"
+                      className="h-11 bg-secondary/60 border-primary/20 rounded-xl pr-10"
                     />
-                    <button type="button" onClick={() => setShowNewPass(!showNewPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-[#D4AF37]">
+                    <button type="button" onClick={() => setShowNewPass(!showNewPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary">
                       {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -529,7 +529,7 @@ export default function AdminSettingsPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Ulangi password baru"
-                    className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl"
+                    className="h-11 bg-secondary/60 border-primary/20 rounded-xl"
                   />
                   {confirmPassword && newPassword !== confirmPassword && (
                     <p className="text-red-400 text-xs flex items-center gap-1">
@@ -542,7 +542,7 @@ export default function AdminSettingsPage() {
                 <Button
                   type="submit"
                   disabled={changingPassword || !oldPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-                  className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all"
+                  className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all"
                 >
                   {changingPassword ? (
                     <><Loader2 className="w-4 h-4 animate-spin mr-2" />Menyimpan...</>
@@ -569,33 +569,33 @@ export default function AdminSettingsPage() {
                   <h3 className="text-foreground font-semibold">Daftar Admin ({admins.length})</h3>
                   <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+                      <Button className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
                         <UserPlus className="w-4 h-4 mr-2" />
                         Tambah Admin
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-md">
+                    <DialogContent className="glass-strong border-primary/20 max-w-md">
                       <DialogHeader>
                         <DialogTitle className="text-gold-gradient">Tambah Admin Baru</DialogTitle>
                       </DialogHeader>
                       <form onSubmit={handleAddAdmin} className="space-y-4 mt-4">
                         <div className="space-y-2">
                           <Label className="text-sm">Nama Lengkap</Label>
-                          <Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Nama admin" className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl" />
+                          <Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Nama admin" className="h-11 bg-secondary/60 border-primary/20 rounded-xl" />
                         </div>
                         <div className="space-y-2">
                           <Label className="text-sm">Username</Label>
-                          <Input value={addUsername} onChange={(e) => setAddUsername(e.target.value)} placeholder="Username login" className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl" />
+                          <Input value={addUsername} onChange={(e) => setAddUsername(e.target.value)} placeholder="Username login" className="h-11 bg-secondary/60 border-primary/20 rounded-xl" />
                         </div>
                         <div className="space-y-2">
                           <Label className="text-sm">Email</Label>
-                          <Input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="Email admin" className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl" />
+                          <Input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="Email admin" className="h-11 bg-secondary/60 border-primary/20 rounded-xl" />
                         </div>
                         <div className="space-y-2">
                           <Label className="text-sm">Password</Label>
-                          <Input type="password" value={addPassword} onChange={(e) => setAddPassword(e.target.value)} placeholder="Minimal 6 karakter" className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl" />
+                          <Input type="password" value={addPassword} onChange={(e) => setAddPassword(e.target.value)} placeholder="Minimal 6 karakter" className="h-11 bg-secondary/60 border-primary/20 rounded-xl" />
                         </div>
-                        <Button type="submit" disabled={addingAdmin} className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl">
+                        <Button type="submit" disabled={addingAdmin} className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl">
                           {addingAdmin ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
                           Tambah Admin
                         </Button>
@@ -614,13 +614,13 @@ export default function AdminSettingsPage() {
                       className="glass rounded-2xl p-4 flex items-center justify-between"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-gold-gradient flex items-center justify-center text-sm font-bold text-[#070B14]">
+                        <div className="w-11 h-11 rounded-xl bg-gold-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
                           {a.name.charAt(0)}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="text-foreground font-medium text-sm">{a.name}</p>
-                            <Badge className={`${a.role === 'super_admin' ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-blue-400/10 text-blue-400'} text-[9px] border-0`}>
+                            <Badge className={`${a.role === 'super_admin' ? 'bg-primary/10 text-primary' : 'bg-blue-400/10 text-blue-400'} text-[9px] border-border`}>
                               {a.role === 'super_admin' ? 'Super Admin' : 'Admin'}
                             </Badge>
                           </div>
@@ -639,7 +639,7 @@ export default function AdminSettingsPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleUnlockAdmin(a)}
-                            className="h-9 sm:h-8 rounded-lg border-emerald-400/30 text-emerald-400 hover:bg-emerald-400/10 text-xs gap-1"
+                            className="h-9 sm:h-8 rounded-lg border-emerald-400/30 text-emerald-400 hover:bg-cardmerald-400/10 text-xs gap-1"
                           >
                             <Unlock className="w-3.5 h-3.5" />
                             Unlock
@@ -701,12 +701,12 @@ export default function AdminSettingsPage() {
                 if (!open) resetWaForm();
               }}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+                  <Button className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
                     <Plus className="w-4 h-4 mr-2" />
                     Tambah WhatsApp
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-md">
+                <DialogContent className="glass-strong border-primary/20 max-w-md">
                   <DialogHeader>
                     <DialogTitle className="text-gold-gradient">{waEditMode ? 'Edit WhatsApp Admin' : 'Tambah WhatsApp Admin'}</DialogTitle>
                   </DialogHeader>
@@ -717,7 +717,7 @@ export default function AdminSettingsPage() {
                         value={waName}
                         onChange={(e) => setWaName(e.target.value)}
                         placeholder="Contoh: CS John, Admin 1"
-                        className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl"
+                        className="h-11 bg-secondary/60 border-primary/20 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -726,7 +726,7 @@ export default function AdminSettingsPage() {
                         value={waPhone}
                         onChange={(e) => setWaPhone(e.target.value)}
                         placeholder="Contoh: 628123456789"
-                        className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl"
+                        className="h-11 bg-secondary/60 border-primary/20 rounded-xl"
                       />
                       <p className="text-muted-foreground text-[11px]">Gunakan format internasional tanpa + (contoh: 628123456789)</p>
                     </div>
@@ -737,11 +737,11 @@ export default function AdminSettingsPage() {
                         value={waOrder}
                         onChange={(e) => setWaOrder(parseInt(e.target.value) || 0)}
                         placeholder="0"
-                        className="h-11 bg-[#0F172A]/60 border-[#D4AF37]/20 rounded-xl"
+                        className="h-11 bg-secondary/60 border-primary/20 rounded-xl"
                       />
                       <p className="text-muted-foreground text-[11px]">Angka lebih kecil ditampilkan lebih dulu</p>
                     </div>
-                    <Button type="submit" disabled={waSaving} className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl">
+                    <Button type="submit" disabled={waSaving} className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl">
                       {waSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : waEditMode ? <Pencil className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                       {waEditMode ? 'Simpan Perubahan' : 'Tambah WhatsApp'}
                     </Button>
@@ -752,7 +752,7 @@ export default function AdminSettingsPage() {
 
             {waLoading ? (
               <div className="glass rounded-2xl p-8 text-center">
-                <Loader2 className="w-8 h-8 text-[#D4AF37] mx-auto mb-3 animate-spin" />
+                <Loader2 className="w-8 h-8 text-primary mx-auto mb-3 animate-spin" />
                 <p className="text-muted-foreground text-sm">Memuat data WhatsApp admin...</p>
               </div>
             ) : waAdmins.length === 0 ? (
@@ -772,13 +772,13 @@ export default function AdminSettingsPage() {
                     className="glass rounded-2xl p-4 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${wa.isActive ? 'bg-emerald-400/10' : 'bg-white/5'}`}>
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${wa.isActive ? 'bg-cardmerald-400/10' : 'bg-foreground/5'}`}>
                         <Phone className={`w-5 h-5 ${wa.isActive ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-foreground font-medium text-sm">{wa.name}</p>
-                          <Badge className={`${wa.isActive ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' : 'bg-red-400/10 text-red-400 border-red-400/20'} text-[9px]`}>
+                          <Badge className={`${wa.isActive ? 'bg-cardmerald-400/10 text-emerald-400 border-emerald-400/20' : 'bg-red-400/10 text-red-400 border-red-400/20'} text-[9px]`}>
                             {wa.isActive ? 'Aktif' : 'Nonaktif'}
                           </Badge>
                         </div>
@@ -795,7 +795,7 @@ export default function AdminSettingsPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleWaEdit(wa)}
-                        className="h-9 sm:h-8 rounded-lg border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/10 text-xs gap-1"
+                        className="h-9 sm:h-8 rounded-lg border-primary/30 text-primary hover:bg-primary/10 text-xs gap-1"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -842,7 +842,7 @@ export default function AdminSettingsPage() {
         <TabsContent value="numbers">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-lg">
             <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-              <Phone className="w-5 h-5 text-[#D4AF37]" />
+              <Phone className="w-5 h-5 text-primary" />
               Nomor Penting Admin
             </h3>
 
@@ -885,8 +885,8 @@ export default function AdminSettingsPage() {
               </div>
 
               {/* Info Box */}
-              <div className="p-3 rounded-xl bg-[#D4AF37]/5 border border-[#D4AF37]/10">
-                <p className="text-[#D4AF37] text-xs font-medium mb-1">📌 Informasi:</p>
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/10">
+                <p className="text-primary text-xs font-medium mb-1">📌 Informasi:</p>
                 <p className="text-muted-foreground text-xs">
                   • Nomor Admin = nomor untuk koneksi WhatsApp Bot (pairing code)
                 </p>
@@ -926,7 +926,7 @@ export default function AdminSettingsPage() {
                   }
                 }}
                 disabled={savingNumbers}
-                className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all"
+                className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all"
               >
                 {savingNumbers ? (
                   <><Loader2 className="w-4 h-4 animate-spin mr-2" />Menyimpan...</>
@@ -942,7 +942,7 @@ export default function AdminSettingsPage() {
         <TabsContent value="fees">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-lg">
             <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-[#D4AF37]" />
+              <DollarSign className="w-5 h-5 text-primary" />
               Fee Configuration
             </h3>
 
@@ -1008,7 +1008,7 @@ export default function AdminSettingsPage() {
                   }
                 }}
                 disabled={savingFees}
-                className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all"
+                className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all"
               >
                 {savingFees ? (
                   <><Loader2 className="w-4 h-4 animate-spin mr-2" />Menyimpan...</>
@@ -1024,7 +1024,7 @@ export default function AdminSettingsPage() {
         <TabsContent value="salary">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-lg">
             <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
-              <Banknote className="w-5 h-5 text-[#D4AF37]" />
+              <Banknote className="w-5 h-5 text-primary" />
               Konfigurasi Gaji Mingguan (Bonus Salary)
             </h3>
 
@@ -1096,8 +1096,8 @@ export default function AdminSettingsPage() {
                   </div>
 
                   {/* Summary */}
-                  <div className="p-3 rounded-xl bg-[#D4AF37]/5 border border-[#D4AF37]/10">
-                    <p className="text-[#D4AF37] text-xs font-medium mb-1">Ringkasan Sistem:</p>
+                  <div className="p-3 rounded-xl bg-primary/5 border border-primary/10">
+                    <p className="text-primary text-xs font-medium mb-1">Ringkasan Sistem:</p>
                     <p className="text-muted-foreground text-xs">
                       User WAJIB memiliki deposit aktif sendiri + ≥{salaryConfig.minDirectRefs ?? 10} referral langsung (L1) dengan deposit aktif → sistem otomatis mendeteksi {salaryConfig.salaryRate ?? 2.5}% omzet grup/minggu selama {salaryConfig.maxWeeks ?? 12} minggu (total {(salaryConfig.salaryRate ?? 2.5) * (salaryConfig.maxWeeks ?? 12)}% omzet). Auto-credit setiap Senin 00:00 WIB.
                     </p>
@@ -1135,7 +1135,7 @@ export default function AdminSettingsPage() {
                       }
                     }}
                     disabled={savingSalary}
-                    className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+                    className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
                   >
                     {savingSalary ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
                     Simpan Konfigurasi Gaji
@@ -1143,7 +1143,7 @@ export default function AdminSettingsPage() {
                 </>
               ) : (
                 <div className="text-center py-8">
-                  <Loader2 className="w-8 h-8 text-[#D4AF37] mx-auto mb-3 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-primary mx-auto mb-3 animate-spin" />
                   <p className="text-muted-foreground text-sm">Memuat konfigurasi gaji...</p>
                 </div>
               )}
@@ -1156,7 +1156,7 @@ export default function AdminSettingsPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-foreground font-semibold">Log Aktivitas Admin ({formatNumber(logs.length)})</h3>
-              <Button variant="outline" onClick={fetchData} className="rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5 text-xs">
+              <Button variant="outline" onClick={fetchData} className="rounded-xl border-primary/20 text-foreground hover:bg-foreground/5 text-xs">
                 Refresh
               </Button>
             </div>
@@ -1171,7 +1171,7 @@ export default function AdminSettingsPage() {
                   className="glass rounded-xl p-3 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-xs font-bold text-[#D4AF37]">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                       {log.admin?.name?.charAt(0) || '?'}
                     </div>
                     <div>

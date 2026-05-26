@@ -158,7 +158,7 @@ export default function AdminAssetPage() {
   };
 
   const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
-    active: { color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'Aktif' },
+    active: { color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: 'Aktif' },
     completed: { color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'Selesai' },
     stopped: { color: 'text-red-400', bg: 'bg-red-400/10', label: 'Dihentikan' },
   };
@@ -182,7 +182,7 @@ export default function AdminAssetPage() {
         </div>
         <div className="relative max-w-xs w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari user atau produk..." className="pl-10 glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground placeholder:text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari user atau produk..." className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground placeholder:text-muted-foreground" />
         </div>
       </motion.div>
 
@@ -200,7 +200,7 @@ export default function AdminAssetPage() {
           <p className="text-muted-foreground text-xs">Total Profit</p>
         </div>
         <div className="glass glow-gold rounded-2xl p-4 text-center">
-          <p className="text-[#D4AF37] font-bold text-lg">{filtered.filter((a) => a.status === 'active').length}</p>
+          <p className="text-primary font-bold text-lg">{filtered.filter((a) => a.status === 'active').length}</p>
           <p className="text-muted-foreground text-xs">Aset Aktif</p>
         </div>
       </motion.div>
@@ -208,7 +208,7 @@ export default function AdminAssetPage() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar">
         {filterTabs.map((tab) => (
           <button key={tab.key} onClick={() => { setStatusFilter(tab.key); setSearch(''); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${statusFilter === tab.key ? 'bg-[#D4AF37]/15 text-[#D4AF37] glow-gold' : 'glass text-foreground/60 hover:text-foreground hover:bg-white/5'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${statusFilter === tab.key ? 'bg-primary/15 text-primary glow-gold' : 'glass text-foreground/60 hover:text-foreground hover:bg-foreground/5'}`}>
             {tab.label}
           </button>
         ))}
@@ -222,7 +222,7 @@ export default function AdminAssetPage() {
             <div className="hidden lg:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#D4AF37]/10 hover:bg-transparent">
+                  <TableRow className="border-primary/10 hover:bg-transparent">
                     <TableHead className="text-muted-foreground text-xs">User</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Tipe</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Produk/Paket</TableHead>
@@ -238,31 +238,31 @@ export default function AdminAssetPage() {
                     const sc = statusConfig[asset.status] || statusConfig.active;
                     const isLoading = actionLoading[asset.id];
                     return (
-                      <TableRow key={asset.type + '-' + asset.id} className="border-[#D4AF37]/5 hover:bg-white/[0.02]">
+                      <TableRow key={asset.type + '-' + asset.id} className="border-primary/5 hover:bg-white/[0.02]">
                         <TableCell>
                           <p className="text-foreground text-sm font-medium">{asset.userName}</p>
                           <p className="text-muted-foreground text-xs">{asset.userNxvId}</p>
                         </TableCell>
                         <TableCell>
-                          <Badge className={`${asset.type === 'investment' ? 'bg-purple-400/10 text-purple-400' : 'bg-[#D4AF37]/10 text-[#D4AF37]'} border-0 text-[10px]`}>
+                          <Badge className={`${asset.type === 'investment' ? 'bg-purple-400/10 text-purple-400' : 'bg-primary/10 text-primary'} border-border text-[10px]`}>
                             {asset.type === 'investment' ? 'Investasi' : 'Produk'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-foreground text-sm">{asset.productName}</TableCell>
                         <TableCell className="text-foreground font-semibold text-sm">{formatRupiah(asset.totalPrice)}</TableCell>
                         <TableCell className="text-emerald-400 text-sm">+{formatRupiah(asset.dailyProfit)}</TableCell>
-                        <TableCell className="text-[#D4AF37] font-semibold text-sm">{formatRupiah(asset.profitEarned)}</TableCell>
-                        <TableCell><Badge className={`${sc.bg} ${sc.color} border-0 text-[10px]`}>{sc.label}</Badge></TableCell>
+                        <TableCell className="text-primary font-semibold text-sm">{formatRupiah(asset.profitEarned)}</TableCell>
+                        <TableCell><Badge className={`${sc.bg} ${sc.color} border-border text-[10px]`}>{sc.label}</Badge></TableCell>
                         <TableCell className="text-right">
                           {asset.status === 'active' && (
                             <div className="flex items-center justify-end gap-1">
-                              <button onClick={() => { setProfitDialog(asset.id); setProfitDialogType(asset.type); }} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center hover:bg-[#D4AF37]/20 transition-colors" title="Tambah Profit">
-                                <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
+                              <button onClick={() => { setProfitDialog(asset.id); setProfitDialogType(asset.type); }} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors" title="Tambah Profit">
+                                <TrendingUp className="w-4 h-4 text-primary" />
                               </button>
                               <button onClick={() => handleStatusAction(asset.id, asset.type, 'stop')} disabled={isLoading} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors disabled:opacity-50" title="Hentikan Aset">
                                 {isLoading ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" /> : <Square className="w-4 h-4 text-red-400" />}
                               </button>
-                              <button onClick={() => handleStatusAction(asset.id, asset.type, 'complete')} disabled={isLoading} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 transition-colors disabled:opacity-50" title="Selesaikan Aset">
+                              <button onClick={() => handleStatusAction(asset.id, asset.type, 'complete')} disabled={isLoading} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 transition-colors disabled:opacity-50" title="Selesaikan Aset">
                                 {isLoading ? <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" /> : <CheckCircle className="w-4 h-4 text-emerald-400" />}
                               </button>
                             </div>
@@ -287,26 +287,26 @@ export default function AdminAssetPage() {
                         <p className="text-muted-foreground text-xs">{asset.productName}</p>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Badge className={`${asset.type === 'investment' ? 'bg-purple-400/10 text-purple-400' : 'bg-[#D4AF37]/10 text-[#D4AF37]'} border-0 text-[10px]`}>
+                        <Badge className={`${asset.type === 'investment' ? 'bg-purple-400/10 text-purple-400' : 'bg-primary/10 text-primary'} border-border text-[10px]`}>
                           {asset.type === 'investment' ? 'Investasi' : 'Produk'}
                         </Badge>
-                        <Badge className={`${sc.bg} ${sc.color} border-0 text-[10px]`}>{sc.label}</Badge>
+                        <Badge className={`${sc.bg} ${sc.color} border-border text-[10px]`}>{sc.label}</Badge>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-xs mb-3">
                       <div><span className="text-muted-foreground">Nilai</span><p className="text-foreground font-semibold">{formatRupiah(asset.totalPrice)}</p></div>
                       <div><span className="text-muted-foreground">Profit/Hari</span><p className="text-emerald-400 font-semibold">+{formatRupiah(asset.dailyProfit)}</p></div>
-                      <div><span className="text-muted-foreground">Total Profit</span><p className="text-[#D4AF37] font-semibold">{formatRupiah(asset.profitEarned)}</p></div>
+                      <div><span className="text-muted-foreground">Total Profit</span><p className="text-primary font-semibold">{formatRupiah(asset.profitEarned)}</p></div>
                     </div>
                     {asset.status === 'active' && (
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { setProfitDialog(asset.id); setProfitDialogType(asset.type); }} className="flex-1 rounded-xl border-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/10 h-9 sm:h-8 text-xs">
+                        <Button size="sm" variant="outline" onClick={() => { setProfitDialog(asset.id); setProfitDialogType(asset.type); }} className="flex-1 rounded-xl border-primary/20 text-primary hover:bg-primary/10 h-9 sm:h-8 text-xs">
                           <TrendingUp className="w-3 h-3 mr-1" /> Profit
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => handleStatusAction(asset.id, asset.type, 'stop')} disabled={isLoading} className="flex-1 rounded-xl border-red-400/30 text-red-400 hover:bg-red-500/10 h-9 sm:h-8 text-xs">
                           {isLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Square className="w-3 h-3 mr-1" />} Stop
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleStatusAction(asset.id, asset.type, 'complete')} disabled={isLoading} className="flex-1 rounded-xl border-emerald-400/30 text-emerald-400 hover:bg-emerald-500/10 h-9 sm:h-8 text-xs">
+                        <Button size="sm" variant="outline" onClick={() => handleStatusAction(asset.id, asset.type, 'complete')} disabled={isLoading} className="flex-1 rounded-xl border-emerald-400/30 text-emerald-400 hover:bg-cardmerald-500/10 h-9 sm:h-8 text-xs">
                           {isLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 mr-1" />} Selesai
                         </Button>
                       </div>
@@ -325,21 +325,21 @@ export default function AdminAssetPage() {
       </motion.div>
 
       <Dialog open={!!profitDialog} onOpenChange={(open) => { if (!open) { setProfitDialog(null); setProfitAmount(''); } }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">Tambah Profit</DialogTitle>
             <DialogDescription className="text-muted-foreground">Masukkan jumlah profit yang ingin ditambahkan ke aset ini</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label className="text-muted-foreground text-xs mb-2 block">Jumlah Profit (Rp)</Label>
-            <Input type="number" value={profitAmount} onChange={(e) => setProfitAmount(e.target.value)} placeholder="Masukkan jumlah..." className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+            <Input type="number" value={profitAmount} onChange={(e) => setProfitAmount(e.target.value)} placeholder="Masukkan jumlah..." className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
             {profitAmount && parseFloat(profitAmount) > 0 && (
               <p className="text-emerald-400 text-sm mt-2 font-medium">= {formatRupiah(parseFloat(profitAmount))}</p>
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setProfitDialog(null); setProfitAmount(''); }} disabled={addingProfit} className="rounded-xl border-[#D4AF37]/20 text-foreground">Batal</Button>
-            <Button onClick={handleAddProfit} disabled={addingProfit || !profitAmount} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+            <Button variant="outline" onClick={() => { setProfitDialog(null); setProfitAmount(''); }} disabled={addingProfit} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
+            <Button onClick={handleAddProfit} disabled={addingProfit || !profitAmount} className="rounded-xl bg-cardmerald-600 hover:bg-cardmerald-700 text-white font-semibold">
               {addingProfit ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Tambah Profit'}
             </Button>
           </DialogFooter>

@@ -149,7 +149,7 @@ export default function MatchingBonusPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('matching.tryAgain')}
@@ -164,16 +164,16 @@ export default function MatchingBonusPage() {
   const maxLevel = info?.maxMatchingLevel ?? 5;
 
   const levelColors = [
-    'text-[#D4AF37]',
+    'text-primary',
     'text-blue-400',
     'text-emerald-400',
     'text-purple-400',
     'text-rose-400',
   ];
   const levelBgs = [
-    'bg-[#D4AF37]/10',
+    'bg-primary/10',
     'bg-blue-400/10',
-    'bg-emerald-400/10',
+    'bg-cardmerald-400/10',
     'bg-purple-400/10',
     'bg-rose-400/10',
   ];
@@ -183,7 +183,7 @@ export default function MatchingBonusPage() {
       {/* Header */}
       <div>
         <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-          <GitCompare className="w-6 h-6 text-[#D4AF37]" />
+          <GitCompare className="w-6 h-6 text-primary" />
           Bonus Matching Profit
         </h1>
         <p className="text-muted-foreground text-sm">Dapatkan bonus dari profit downline Anda hingga 5 level</p>
@@ -195,13 +195,13 @@ export default function MatchingBonusPage() {
         animate={{ opacity: 1, y: 0 }}
         className="glass-gold glow-gold rounded-2xl p-4 sm:p-6 lg:p-8 relative overflow-hidden"
       >
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-[#1E3A5F]/10 blur-3xl" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center glow-gold animate-float">
-              <DollarSign className="w-6 h-6 text-[#070B14]" />
+              <DollarSign className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
               <h2 className="text-foreground font-semibold">Profit Matching Overview</h2>
@@ -212,10 +212,10 @@ export default function MatchingBonusPage() {
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-3">
             {/* Total Downline Profit */}
-            <div className="rounded-xl p-4 border border-[#D4AF37]/20 bg-[#D4AF37]/5">
+            <div className="rounded-xl p-4 border border-primary/20 bg-primary/5">
               <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
-                <span className="text-sm font-medium text-[#D4AF37]">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-primary">
                   Profit Downline
                 </span>
               </div>
@@ -235,7 +235,7 @@ export default function MatchingBonusPage() {
           </div>
 
           {/* Potential Bonus */}
-          <div className="mt-4 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
+          <div className="mt-4 p-3 rounded-xl bg-cardmerald-500/5 border border-emerald-500/10 flex items-center justify-between">
             <span className="text-muted-foreground text-sm">Potensi Bonus Matching</span>
             <span className="text-emerald-400 text-lg font-bold">{formatRupiah(info?.potentialBonus ?? 0)}</span>
           </div>
@@ -257,7 +257,7 @@ export default function MatchingBonusPage() {
               <Button
                 onClick={handleClaim}
                 disabled={claiming}
-                className="w-full bg-gold-gradient text-[#070B14] font-bold rounded-xl hover:opacity-90 glow-gold h-12 text-sm"
+                className="w-full bg-gold-gradient text-primary-foreground font-bold rounded-xl hover:opacity-90 glow-gold h-12 text-sm"
               >
                 {claiming ? (
                   <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Memproses...</>
@@ -283,7 +283,7 @@ export default function MatchingBonusPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-3 sm:mb-4 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-[#D4AF37]" />
+          <Layers className="w-4 h-4 text-primary" />
           Level Matching Profit
         </h3>
 
@@ -299,7 +299,7 @@ export default function MatchingBonusPage() {
                     <p className="text-foreground text-sm font-medium">
                       Level {lvl.level}
                     </p>
-                    <Badge className={`${levelBgs[i]} ${levelColors[i]} border-0 text-xs font-bold`}>
+                    <Badge className={`${levelBgs[i]} ${levelColors[i]} border-border text-xs font-bold`}>
                       {lvl.rate}%
                     </Badge>
                     <span className="text-muted-foreground text-[10px]">
@@ -329,8 +329,8 @@ export default function MatchingBonusPage() {
           transition={{ delay: 0.1 }}
           className="glass glow-gold rounded-2xl p-4 flex items-center gap-4"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5 text-primary" />
           </div>
           <div>
             <p className="text-2xl font-bold text-emerald-400">{formatRupiah(data?.totals?.totalAmount ?? info?.totalMatchingEarned ?? 0)}</p>
@@ -344,7 +344,7 @@ export default function MatchingBonusPage() {
           transition={{ delay: 0.12 }}
           className="glass rounded-2xl p-4 flex items-center gap-4"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-cardmerald-500/10 flex items-center justify-center shrink-0">
             <DollarSign className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
@@ -362,7 +362,7 @@ export default function MatchingBonusPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-3 sm:mb-4 flex items-center gap-2">
-          <GitCompare className="w-4 h-4 text-[#D4AF37]" />
+          <GitCompare className="w-4 h-4 text-primary" />
           Riwayat Matching Profit
         </h3>
 
@@ -370,15 +370,15 @@ export default function MatchingBonusPage() {
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {data.history.map((entry) => (
               <div key={entry.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                <div className={`w-10 h-10 rounded-xl ${levelBgs[entry.level - 1] || 'bg-[#D4AF37]/10'} flex items-center justify-center shrink-0`}>
-                  <Award className={`w-5 h-5 ${levelColors[entry.level - 1] || 'text-[#D4AF37]'}`} />
+                <div className={`w-10 h-10 rounded-xl ${levelBgs[entry.level - 1] || 'bg-primary/10'} flex items-center justify-center shrink-0`}>
+                  <Award className={`w-5 h-5 ${levelColors[entry.level - 1] || 'text-primary'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-foreground text-sm font-medium">
                       Level {entry.level}
                     </p>
-                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
+                    <Badge className="bg-cardmerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
                       {entry.rate}%
                     </Badge>
                   </div>
@@ -411,24 +411,24 @@ export default function MatchingBonusPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-3 flex items-center gap-2">
-          <Info className="w-4 h-4 text-[#D4AF37]" />
+          <Info className="w-4 h-4 text-primary" />
           Cara Kerja Matching Profit
         </h3>
         <div className="space-y-2 text-muted-foreground text-xs">
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">1.</span>
+            <span className="text-primary font-bold">1.</span>
             <span>Ketika downline Anda mendapat <strong className="text-foreground">profit harian</strong>, Anda otomatis mendapat matching bonus</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">2.</span>
+            <span className="text-primary font-bold">2.</span>
             <span>Persentase matching berdasarkan level: <strong className="text-foreground">L1: 5%, L2: 4%, L3: 3%, L4: 2%, L5: 1%</strong></span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">3.</span>
+            <span className="text-primary font-bold">3.</span>
             <span>Bonus matching <strong className="text-foreground">otomatis dikreditkan</strong> setiap kali profit harian didistribusikan (00:00 WIB)</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">4.</span>
+            <span className="text-primary font-bold">4.</span>
             <span>Sistem ini <strong className="text-foreground">bukan binary</strong> — tidak ada kaki kiri/kanan, matching berdasarkan total profit downline</span>
           </div>
         </div>

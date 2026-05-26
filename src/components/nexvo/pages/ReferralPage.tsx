@@ -96,9 +96,9 @@ export default function ReferralPage() {
 
   // Referral level info - Percentage display matching screenshot
   const referralLevels = [
-    { level: 1, label: 'Level 1', desc: 'Direct invite', bonus: '10%', color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
+    { level: 1, label: 'Level 1', desc: 'Direct invite', bonus: '10%', color: 'text-primary', bg: 'bg-primary/10' },
     { level: 2, label: 'Level 2', desc: 'Invite from Level 1', bonus: '5%', color: 'text-blue-400', bg: 'bg-blue-400/10' },
-    { level: 3, label: 'Level 3', desc: 'Invite from Level 2', bonus: '4%', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    { level: 3, label: 'Level 3', desc: 'Invite from Level 2', bonus: '4%', color: 'text-emerald-400', bg: 'bg-cardmerald-400/10' },
     { level: 4, label: 'Level 4', desc: 'Invite from Level 3', bonus: '3%', color: 'text-purple-400', bg: 'bg-purple-400/10' },
     { level: 5, label: 'Level 5', desc: 'Invite from Level 4', bonus: '2%', color: 'text-rose-400', bg: 'bg-rose-400/10' },
   ];
@@ -136,7 +136,7 @@ export default function ReferralPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Coba Lagi
@@ -158,7 +158,7 @@ export default function ReferralPage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl p-4 flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20"
+        className="rounded-2xl p-4 flex items-center gap-3 bg-cardmerald-500/10 border border-emerald-500/20"
       >
         <Gift className="w-5 h-5 text-emerald-400 shrink-0" />
         <div className="flex-1">
@@ -177,12 +177,12 @@ export default function ReferralPage() {
         animate={{ opacity: 1, y: 0 }}
         className="glass-gold glow-gold-strong rounded-2xl p-4 sm:p-6 lg:p-8 text-center relative overflow-hidden"
       >
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-[#1E3A5F]/10 blur-3xl" />
 
         <div className="relative z-10">
           <div className="w-14 h-14 rounded-2xl bg-gold-gradient flex items-center justify-center mx-auto mb-4 glow-gold animate-float">
-            <Gift className="w-7 h-7 text-[#070B14]" />
+            <Gift className="w-7 h-7 text-primary-foreground" />
           </div>
 
           <p className="text-muted-foreground text-sm mb-2">{t('referral.yourCode')}</p>
@@ -203,12 +203,12 @@ export default function ReferralPage() {
               <Button
                 onClick={handleCopyLink}
                 variant="outline"
-                className="border-[#D4AF37]/30 text-foreground hover:bg-[#D4AF37]/10 rounded-xl shrink-0"
+                className="border-primary/30 text-foreground hover:bg-primary/10 rounded-xl shrink-0"
               >
                 {copied ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 ) : (
-                  <Copy className="w-4 h-4 text-[#D4AF37]" />
+                  <Copy className="w-4 h-4 text-primary" />
                 )}
                 <span className="ml-1.5 text-xs">Salin Link</span>
               </Button>
@@ -218,14 +218,14 @@ export default function ReferralPage() {
           <div className="flex items-center justify-center gap-3">
             <Button
               onClick={handleWhatsAppShare}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors"
+              className="bg-cardmerald-600 hover:bg-cardmerald-700 text-white font-semibold rounded-xl transition-colors"
             >
               <MessageCircle className="w-4 h-4 mr-2" />
               {t('referral.shareViaWhatsApp')}
             </Button>
             <Button
               onClick={handleShare}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
             >
               <Share2 className="w-4 h-4 mr-2" />
               {t('referral.shareVia')}
@@ -242,8 +242,8 @@ export default function ReferralPage() {
           transition={{ delay: 0.05 }}
           className="glass glow-gold rounded-2xl p-4 text-center"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-            <Users className="w-5 h-5 text-[#D4AF37]" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+            <Users className="w-5 h-5 text-primary" />
           </div>
           <p className="text-2xl font-bold text-foreground">
             {totalReferrals}
@@ -257,7 +257,7 @@ export default function ReferralPage() {
           transition={{ delay: 0.1 }}
           className="glass glow-gold rounded-2xl p-4 text-center"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-400/10 flex items-center justify-center mx-auto mb-2">
+          <div className="w-10 h-10 rounded-xl bg-cardmerald-400/10 flex items-center justify-center mx-auto mb-2">
             <TrendingUp className="w-5 h-5 text-emerald-400" />
           </div>
           <p className="text-2xl font-bold text-emerald-400">
@@ -275,7 +275,7 @@ export default function ReferralPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-4 flex items-center gap-2">
-          <Award className="w-4 h-4 text-[#D4AF37]" />
+          <Award className="w-4 h-4 text-primary" />
           {t('referral.referralLevel')}
         </h3>
         <div className="space-y-3">
@@ -288,7 +288,7 @@ export default function ReferralPage() {
                 <p className="text-foreground text-sm font-medium">{lvl.label}</p>
                 <p className="text-muted-foreground text-xs">{lvl.desc}</p>
               </div>
-              <Badge className={`${lvl.bg} ${lvl.color} border-0 text-xs font-bold`}>
+              <Badge className={`${lvl.bg} ${lvl.color} border-border text-xs font-bold`}>
                 {lvl.bonus}
               </Badge>
             </div>
@@ -307,7 +307,7 @@ export default function ReferralPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-4 flex items-center gap-2">
-          <UserPlus className="w-4 h-4 text-[#D4AF37]" />
+          <UserPlus className="w-4 h-4 text-primary" />
           {t('referral.teamList')}
         </h3>
 
@@ -315,7 +315,7 @@ export default function ReferralPage() {
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {referralData.referrals.map((ref, i) => (
               <div key={ref.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                <div className="w-9 h-9 rounded-xl bg-gold-gradient flex items-center justify-center text-sm font-bold text-[#070B14] shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-gold-gradient flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
                   {ref.name?.charAt(0) || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -323,7 +323,7 @@ export default function ReferralPage() {
                   <p className="text-muted-foreground text-xs">{maskWhatsApp(ref.whatsapp)}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px]">
+                  <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px]">
                     Level {ref.level}
                   </Badge>
                   {ref.bonus > 0 && (

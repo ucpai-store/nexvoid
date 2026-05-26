@@ -250,7 +250,7 @@ function SolarNetworkVisualization({
         <motion.text
           x={cx} y={cy + 4}
           textAnchor="middle"
-          fill="#070B14"
+          fill="var(--background)"
           fontSize="14"
           fontWeight="bold"
           initial={{ opacity: 0 }}
@@ -288,7 +288,7 @@ function SolarNetworkVisualization({
       <div className="flex items-center justify-center gap-3 sm:gap-4 mt-4 flex-wrap">
         {[1, 2, 3, 4, 5].map((l) => (
           <div key={l} className="flex items-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-full bg-[#D4AF37]/${30 - (l - 1) * 4} border border-[#D4AF37]/${50 - (l - 1) * 6}`} />
+            <div className={`w-2.5 h-2.5 rounded-full bg-primary/${30 - (l - 1) * 4} border border-primary/${50 - (l - 1) * 6}`} />
             <span className="text-muted-foreground text-[10px]">L{l}</span>
             <span className="text-foreground text-[10px] font-medium">
               {levelCounts[l - 1]} orang
@@ -322,13 +322,13 @@ function LevelDetailCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 + index * 0.08, duration: 0.4 }}
-      className="glass-strong rounded-2xl p-4 sm:p-5 relative overflow-hidden hover:glow-gold hover:border-[#D4AF37]/20 transition-all duration-300"
+      className="glass-strong rounded-2xl p-4 sm:p-5 relative overflow-hidden hover:glow-gold hover:border-primary/20 transition-all duration-300"
     >
       {/* Level badge */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-            <span className="text-[#D4AF37] text-sm font-bold">L{level}</span>
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <span className="text-primary text-sm font-bold">L{level}</span>
           </div>
           <div>
             <h3 className="text-foreground font-semibold text-sm">Level {level}</h3>
@@ -345,19 +345,19 @@ function LevelDetailCard({
       <div className="space-y-2">
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02]">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-[#D4AF37]/8 flex items-center justify-center">
-              <Users className="w-3 h-3 text-[#D4AF37]/70" />
+            <div className="w-6 h-6 rounded-lg bg-primary/8 flex items-center justify-center">
+              <Users className="w-3 h-3 text-primary/70" />
             </div>
             <div>
               <p className="text-muted-foreground text-[10px]">Bonus Sponsor</p>
               <p className="text-foreground/60 text-[10px]">Rate {sponsorRate}%</p>
             </div>
           </div>
-          <span className="text-[#D4AF37] text-xs font-bold">{formatRupiah(sponsorBonus)}</span>
+          <span className="text-primary text-xs font-bold">{formatRupiah(sponsorBonus)}</span>
         </div>
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02]">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-emerald-400/8 flex items-center justify-center">
+            <div className="w-6 h-6 rounded-lg bg-cardmerald-400/8 flex items-center justify-center">
               <TrendingUp className="w-3 h-3 text-emerald-400/70" />
             </div>
             <div>
@@ -391,11 +391,11 @@ function BonusStatCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className="glass-strong rounded-2xl p-4 sm:p-5 text-center relative overflow-hidden hover:glow-gold hover:border-[#D4AF37]/20 transition-all duration-300"
+      className="glass-strong rounded-2xl p-4 sm:p-5 text-center relative overflow-hidden hover:glow-gold hover:border-primary/20 transition-all duration-300"
     >
-      <div className="absolute top-0 right-0 w-16 h-16 rounded-full bg-[#D4AF37]/3 blur-2xl" />
-      <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-3">
-        <Icon className="w-5 h-5 text-[#D4AF37]" />
+      <div className="absolute top-0 right-0 w-16 h-16 rounded-full bg-primary/3 blur-2xl" />
+      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+        <Icon className="w-5 h-5 text-primary" />
       </div>
       <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">{title}</p>
       <p className="text-gold-gradient text-xl sm:text-2xl font-bold mb-1">{formatRupiah(amount)}</p>
@@ -429,7 +429,7 @@ function MilestoneProgress({
           {isAchieved ? (
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           ) : (
-            <div className="w-4 h-4 rounded-full border-2 border-[#D4AF37]/30" />
+            <div className="w-4 h-4 rounded-full border-border border-primary/30" />
           )}
           <span className="text-foreground text-xs font-medium">Level {milestone.level}</span>
         </div>
@@ -437,19 +437,19 @@ function MilestoneProgress({
           <span className="text-muted-foreground text-[10px]">
             Omzet {formatRupiah(milestone.omzet)}
           </span>
-          <span className="text-[#D4AF37] text-[10px] font-bold">
+          <span className="text-primary text-[10px] font-bold">
             → {formatRupiah(milestone.reward)}
           </span>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="relative h-2 rounded-full bg-white/5 overflow-hidden">
+      <div className="relative h-2 rounded-full bg-foreground/5 overflow-hidden">
         <motion.div
           className={`absolute left-0 top-0 h-full rounded-full ${
             isAchieved
-              ? 'bg-emerald-400'
-              : 'bg-gradient-to-r from-[#D4AF37] to-[#F0D060]'
+              ? 'bg-cardmerald-400'
+              : 'bg-gradient-to-r from-primary to-primary/80'
           }`}
           initial={{ width: 0 }}
           animate={{ width: `${progressPercent}%` }}
@@ -492,8 +492,8 @@ function LevelReferralList({
         className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-white/[0.02] transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-            <span className="text-[#D4AF37] text-sm font-bold">L{level}</span>
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <span className="text-primary text-sm font-bold">L{level}</span>
           </div>
           <div className="text-left">
             <h3 className="text-foreground font-semibold text-sm">Level {level}</h3>
@@ -503,7 +503,7 @@ function LevelReferralList({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[#D4AF37] text-xs font-semibold">{data.count}</span>
+          <span className="text-primary text-xs font-semibold">{data.count}</span>
           <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </motion.div>
@@ -527,7 +527,7 @@ function LevelReferralList({
                   className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-xs font-bold text-[#D4AF37]">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                       {member.name?.charAt(0) || '?'}
                     </div>
                     <div>
@@ -536,7 +536,7 @@ function LevelReferralList({
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-[#D4AF37] text-xs font-semibold">
+                    <p className="text-primary text-xs font-semibold">
                       {formatRupiah(member.totalDeposit)}
                     </p>
                     <p className="text-muted-foreground text-[10px]">
@@ -637,7 +637,7 @@ export default function NetworkPage() {
           <p className="text-muted-foreground text-sm mb-6">{error || t('network.networkUnavailable')}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Coba Lagi
@@ -659,13 +659,13 @@ export default function NetworkPage() {
         className="glass-strong rounded-2xl p-5 sm:p-8 relative overflow-hidden"
       >
         {/* Background decoration */}
-        <div className="absolute top-0 left-0 w-40 h-40 rounded-full bg-[#D4AF37]/5 blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/3 blur-3xl" />
+        <div className="absolute top-0 left-0 w-40 h-40 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-32 h-32 rounded-full bg-primary/3 blur-3xl" />
 
         <div className="relative z-10">
           {/* Title */}
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Sun className="w-6 h-6 text-[#D4AF37]" />
+            <Sun className="w-6 h-6 text-primary" />
             <h1 className="text-gold-gradient text-2xl sm:text-3xl lg:text-4xl font-bold">
               {t('network.solarNetwork')}</h1>
           </div>
@@ -676,17 +676,17 @@ export default function NetworkPage() {
           {/* Referral code */}
           <div className="flex items-center justify-center mb-6">
             <div className="glass rounded-xl px-4 py-2.5 flex items-center gap-3">
-              <Crown className="w-4 h-4 text-[#D4AF37]" />
+              <Crown className="w-4 h-4 text-primary" />
               <span className="text-muted-foreground text-xs">{t('referral.yourCode')}:</span>
-              <span className="text-[#D4AF37] text-lg font-bold tracking-wider">
+              <span className="text-primary text-lg font-bold tracking-wider">
                 {networkData.referralCode}
               </span>
               <button
                 onClick={copyReferralCode}
-                className="p-1.5 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-primary/10 transition-colors"
                 title="Salin kode"
               >
-                <Copy className="w-4 h-4 text-[#D4AF37]/70 hover:text-[#D4AF37]" />
+                <Copy className="w-4 h-4 text-primary/70 hover:text-primary" />
               </button>
             </div>
           </div>
@@ -720,7 +720,7 @@ export default function NetworkPage() {
       >
         <div className="text-center mb-2">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <Sun className="w-5 h-5 text-[#D4AF37]" />
+            <Sun className="w-5 h-5 text-primary" />
             <h2 className="text-foreground font-semibold text-base sm:text-lg">{t('network.networkVisualization')}</h2>
           </div>
           <p className="text-muted-foreground text-xs">
@@ -815,7 +815,7 @@ export default function NetworkPage() {
       >
         <div className="text-center mb-5">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <Gift className="w-5 h-5 text-[#D4AF37]" />
+            <Gift className="w-5 h-5 text-primary" />
             <h2 className="text-gold-gradient text-xl sm:text-2xl font-bold">Reward Milestone</h2>
           </div>
           <p className="text-muted-foreground text-xs sm:text-sm">
@@ -849,7 +849,7 @@ export default function NetworkPage() {
       >
         <div className="text-center mb-5">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <Users className="w-5 h-5 text-[#D4AF37]" />
+            <Users className="w-5 h-5 text-primary" />
             <h2 className="text-gold-gradient text-xl sm:text-2xl font-bold">{t('network.referralList')}</h2>
           </div>
           <p className="text-muted-foreground text-xs sm:text-sm">
@@ -876,7 +876,7 @@ export default function NetworkPage() {
               <Button
                 onClick={() => navigate('referral')}
                 variant="outline"
-                className="mt-4 border-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-xl"
+                className="mt-4 border-primary/20 text-primary hover:bg-primary/10 rounded-xl"
               >
                 <ChevronRight className="w-4 h-4 mr-1" />
                 {t('network.inviteFriendsNow')}</Button>

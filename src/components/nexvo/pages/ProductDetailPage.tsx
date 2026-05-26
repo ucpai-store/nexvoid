@@ -164,7 +164,7 @@ export default function ProductDetailPage() {
           </div>
           <h2 className="text-foreground text-xl font-semibold mb-2">Produk Tidak Ditemukan</h2>
           <p className="text-muted-foreground text-sm mb-4">Produk yang Anda cari tidak tersedia atau telah dihapus.</p>
-          <Button onClick={() => navigate('products')} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl">
+          <Button onClick={() => navigate('products')} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl">
             Kembali ke Produk
           </Button>
         </div>
@@ -201,9 +201,9 @@ export default function ProductDetailPage() {
             <img src={getFileUrl(product.banner)} alt={product.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-card-gradient flex items-center justify-center">
-              <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+              <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-primary/5 blur-3xl" />
               <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-[#1E3A5F]/20 blur-3xl" />
-              <Package className="w-16 h-16 text-[#D4AF37]/20" />
+              <Package className="w-16 h-16 text-primary/20" />
             </div>
           )}
         </div>
@@ -227,7 +227,7 @@ export default function ProductDetailPage() {
         {/* Key Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 sm:mb-6">
           <div className="glass glow-gold rounded-2xl p-4 text-center">
-            <Clock className="w-5 h-5 text-[#D4AF37] mx-auto mb-2" />
+            <Clock className="w-5 h-5 text-primary mx-auto mb-2" />
             <p className="text-foreground font-semibold text-lg">{product.duration}</p>
             <p className="text-muted-foreground text-xs">Hari Durasi</p>
           </div>
@@ -237,7 +237,7 @@ export default function ProductDetailPage() {
             <p className="text-muted-foreground text-xs">Est. Profit</p>
           </div>
           <div className="glass glow-gold rounded-2xl p-4 text-center">
-            <TrendingUp className="w-5 h-5 text-[#D4AF37] mx-auto mb-2" />
+            <TrendingUp className="w-5 h-5 text-primary mx-auto mb-2" />
             <p className="text-foreground font-semibold text-lg">{product.profitRate}%</p>
             <p className="text-muted-foreground text-xs">Profit Rate</p>
           </div>
@@ -254,7 +254,7 @@ export default function ProductDetailPage() {
             <span className="text-muted-foreground">Kuota Terisi</span>
             <span className="text-foreground font-medium">{quotaPercent}%</span>
           </div>
-          <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+          <div className="h-3 rounded-full bg-foreground/5 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${quotaPercent}%` }}
@@ -276,7 +276,7 @@ export default function ProductDetailPage() {
           </p>
         </div>
 
-        <Separator className="bg-[#D4AF37]/10 mb-4 sm:mb-6" />
+        <Separator className="bg-primary/10 mb-4 sm:mb-6" />
 
         {/* Quantity Selector */}
         <div className="glass rounded-2xl p-3 sm:p-5 mb-4 sm:mb-6">
@@ -285,14 +285,14 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-white/10 transition-colors"
+                className="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-foreground/10 transition-colors"
               >
                 <Minus className="w-4 h-4 text-foreground" />
               </button>
               <span className="text-foreground text-2xl font-bold w-12 text-center">{quantity}</span>
               <button
                 onClick={() => setQuantity(Math.min(remaining > 0 ? remaining : 10, quantity + 1))}
-                className="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-white/10 transition-colors"
+                className="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-foreground/10 transition-colors"
               >
                 <Plus className="w-4 h-4 text-foreground" />
               </button>
@@ -303,7 +303,7 @@ export default function ProductDetailPage() {
             </div>
           </div>
           {quantity > 1 && (
-            <div className="mt-3 pt-3 border-t border-[#D4AF37]/10">
+            <div className="mt-3 pt-3 border-t border-primary/10">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total Est. Profit</span>
                 <span className="text-emerald-400 font-medium">{formatRupiah(totalEstimatedProfit)}</span>
@@ -311,7 +311,7 @@ export default function ProductDetailPage() {
             </div>
           )}
           {/* Balance info */}
-          <div className="mt-3 pt-3 border-t border-[#D4AF37]/10">
+          <div className="mt-3 pt-3 border-t border-primary/10">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Total Saldo</span>
               <span className={`font-medium ${hasEnoughBalance ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -324,7 +324,7 @@ export default function ProductDetailPage() {
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground/60">Saldo Utama</span>
-              <span className="text-[#D4AF37]">{formatRupiah(user?.mainBalance || 0)}</span>
+              <span className="text-primary">{formatRupiah(user?.mainBalance || 0)}</span>
             </div>
             {!hasEnoughBalance && (
               <p className="text-red-400 text-xs mt-1">
@@ -338,7 +338,7 @@ export default function ProductDetailPage() {
         <Button
           onClick={handleBuyClick}
           disabled={remaining <= 0}
-          className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-2xl hover:opacity-90 transition-all h-14 text-base glow-gold-strong"
+          className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-2xl hover:opacity-90 transition-all h-14 text-base glow-gold-strong"
         >
           {remaining <= 0 ? (
             <>
@@ -367,10 +367,10 @@ export default function ProductDetailPage() {
 
       {/* Confirm Purchase Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-[#D4AF37]" />
+              <ShoppingBag className="w-5 h-5 text-primary" />
               Konfirmasi Pembelian
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -393,14 +393,14 @@ export default function ProductDetailPage() {
               <span className="text-muted-foreground">Harga Satuan</span>
               <span className="text-foreground font-medium">{formatRupiah(product.price)}</span>
             </div>
-            <Separator className="bg-[#D4AF37]/10" />
+            <Separator className="bg-primary/10" />
             <div className="flex justify-between text-base">
               <span className="text-foreground font-semibold">Total</span>
               <span className="text-gold-gradient font-bold text-lg">{formatRupiah(totalPrice)}</span>
             </div>
             {hasEnoughBalance && (
               <>
-                <Separator className="bg-[#D4AF37]/10" />
+                <Separator className="bg-primary/10" />
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Sisa Saldo</span>
                   <span className="text-foreground font-medium">
@@ -422,7 +422,7 @@ export default function ProductDetailPage() {
             <Button
               onClick={handleConfirmBuy}
               disabled={buying}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
             >
               {buying ? (
                 <div className="flex items-center gap-2">
@@ -447,9 +447,9 @@ export default function ProductDetailPage() {
 
       {/* Success Dialog */}
       <Dialog open={successOpen} onOpenChange={(open) => { if (!open) navigate('history'); }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
-            <div className="w-16 h-16 rounded-2xl bg-emerald-400/10 flex items-center justify-center mx-auto mb-2">
+            <div className="w-16 h-16 rounded-2xl bg-cardmerald-400/10 flex items-center justify-center mx-auto mb-2">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             </div>
             <DialogTitle className="text-foreground text-center">Pembelian Berhasil!</DialogTitle>
@@ -470,7 +470,7 @@ export default function ProductDetailPage() {
           <DialogFooter>
             <Button
               onClick={() => navigate('history')}
-              className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+              className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
             >
               Lihat Riwayat
             </Button>

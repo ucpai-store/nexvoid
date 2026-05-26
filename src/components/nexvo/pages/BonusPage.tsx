@@ -31,8 +31,8 @@ interface BonusSummary {
 
 /* 3 bonus types only: referal, m.profit, gaji */
 const bonusTypeConfig: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
-  referral: { icon: Users, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', label: 'Bonus Referal' },
-  sponsor: { icon: Users, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', label: 'Bonus Referal' },
+  referral: { icon: Users, color: 'text-primary', bg: 'bg-primary/10', label: 'Bonus Referal' },
+  sponsor: { icon: Users, color: 'text-primary', bg: 'bg-primary/10', label: 'Bonus Referal' },
   matching: { icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'M.Profit' },
   level: { icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'M.Profit' },
   salary: { icon: Coins, color: 'text-orange-400', bg: 'bg-orange-400/10', label: 'Gaji' },
@@ -130,7 +130,7 @@ export default function BonusPage() {
           </div>
           <h3 className="text-foreground font-semibold mb-1">Failed to Load Data</h3>
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
-          <Button onClick={retry} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
+          <Button onClick={retry} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold">
             <RefreshCw className="w-4 h-4 mr-2" />Coba Lagi
           </Button>
         </div>
@@ -147,7 +147,7 @@ export default function BonusPage() {
     >
       <motion.div variants={itemVariants}>
         <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-          <Gift className="w-5 h-5 text-[#D4AF37]" />
+          <Gift className="w-5 h-5 text-primary" />
           Bonus
         </h1>
         <p className="text-muted-foreground text-sm">Riwayat semua bonus yang Anda terima</p>
@@ -155,10 +155,10 @@ export default function BonusPage() {
 
       {/* Total Bonus */}
       <motion.div variants={itemVariants} className="glass-gold glow-gold-strong rounded-2xl p-4 sm:p-6 text-center relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl" />
         <div className="relative z-10">
           <div className="w-14 h-14 rounded-2xl bg-gold-gradient flex items-center justify-center mx-auto mb-3 glow-gold">
-            <Coins className="w-7 h-7 text-[#070B14]" />
+            <Coins className="w-7 h-7 text-primary-foreground" />
           </div>
           <p className="text-muted-foreground text-xs mb-1">Total Bonus Diterima</p>
           <p className="text-3xl sm:text-4xl font-bold text-gold-gradient">{formatRupiah(summary?.total || 0)}</p>
@@ -169,7 +169,7 @@ export default function BonusPage() {
       {/* 3 Bonus Types: Referal, M.Profit, Gaji */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { icon: Users, label: 'Referal', value: summary?.referral || 0, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
+          { icon: Users, label: 'Referal', value: summary?.referral || 0, color: 'text-primary', bg: 'bg-primary/10' },
           { icon: TrendingUp, label: 'M.Profit', value: summary?.matching || 0, color: 'text-purple-400', bg: 'bg-purple-400/10' },
           { icon: Coins, label: 'Gaji', value: summary?.salary || 0, color: 'text-orange-400', bg: 'bg-orange-400/10' },
         ].map((item) => (
@@ -187,7 +187,7 @@ export default function BonusPage() {
       <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-foreground font-semibold text-sm flex items-center gap-2">
-            <Award className="w-4 h-4 text-[#D4AF37]" />
+            <Award className="w-4 h-4 text-primary" />
             Riwayat Bonus
           </h3>
           <span className="text-muted-foreground text-[10px]">{filtered.length} transaksi</span>
@@ -206,7 +206,7 @@ export default function BonusPage() {
               onClick={() => setFilter(f.key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 filter === f.key
-                  ? 'bg-gold-gradient text-[#070B14]'
+                  ? 'bg-gold-gradient text-primary-foreground'
                   : 'glass text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -233,7 +233,7 @@ export default function BonusPage() {
                   <div className="text-right shrink-0">
                     <p className="text-emerald-400 text-sm font-semibold">+{formatRupiah(bonus.amount)}</p>
                     {bonus.level > 0 && (
-                      <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border-0 text-[9px] px-1.5 py-0">
+                      <Badge className="bg-primary/10 text-primary border-border text-[9px] px-1.5 py-0">
                         Level {bonus.level}
                       </Badge>
                     )}

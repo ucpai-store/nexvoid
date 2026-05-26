@@ -181,14 +181,14 @@ function SecurityInfoPanel() {
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 font-mono">
         <Clock className="w-3 h-3" />
         <span>{time}</span>
-        <span className="text-[#D4AF37]/30">|</span>
+        <span className="text-primary/30">|</span>
         <MapPin className="w-3 h-3" />
         <span>{ip}</span>
       </div>
       <div className="flex items-center gap-2 text-[10px] font-mono">
         <ShieldCheck className="w-3 h-3 text-emerald-400" />
         <span className="text-emerald-400/80">Security Score: {securityScore}/100</span>
-        <span className="text-[#D4AF37]/30">|</span>
+        <span className="text-primary/30">|</span>
         <Cpu className="w-3 h-3 text-muted-foreground/60" />
         <span className="text-muted-foreground/60">{browserInfo} &bull; Encrypted</span>
       </div>
@@ -225,16 +225,16 @@ function VerificationSteps({ step }: { step: number }) {
               {isCompleted ? (
                 <CheckCircle2 className="w-4 h-4 text-white" />
               ) : (
-                <Icon className={`w-4 h-4 ${isActive ? 'text-[#070B14]' : 'text-[#D4AF37]/40'}`} />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-primary-foreground' : 'text-primary/40'}`} />
               )}
             </motion.div>
             <span className={`text-[10px] font-medium hidden sm:inline ${
-              isCompleted ? 'text-emerald-400' : isActive ? 'text-[#D4AF37]' : 'text-muted-foreground/30'
+              isCompleted ? 'text-emerald-400' : isActive ? 'text-primary' : 'text-muted-foreground/30'
             }`}>
               {s.label}
             </span>
             {i < steps.length - 1 && (
-              <div className={`w-6 sm:w-10 h-[1px] ${isCompleted ? 'bg-emerald-400/50' : 'bg-[#D4AF37]/10'}`} />
+              <div className={`w-6 sm:w-10 h-[1px] ${isCompleted ? 'bg-cardmerald-400/50' : 'bg-primary/10'}`} />
             )}
           </div>
         );
@@ -296,11 +296,11 @@ function SecurityScanning() {
         animate={{ rotate: 360 }}
         transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
       >
-        <div className="absolute inset-0 rounded-full border-2 border-[#D4AF37]/20" />
-        <div className="absolute inset-2 rounded-full border border-[#D4AF37]/30 border-dashed" />
-        <div className="absolute inset-0 rounded-full border-t-2 border-[#D4AF37]" style={{ clipPath: 'polygon(50% 0%, 50% 50%, 100% 0%)' }} />
-        <div className="absolute inset-4 rounded-full bg-[#0F172A]/80 flex items-center justify-center">
-          <ShieldCheck className="w-10 h-10 text-[#D4AF37]" />
+        <div className="absolute inset-0 rounded-full border-border border-primary/20" />
+        <div className="absolute inset-2 rounded-full border border-primary/30 border-dashed" />
+        <div className="absolute inset-0 rounded-full border-t-2 border-primary" style={{ clipPath: 'polygon(50% 0%, 50% 50%, 100% 0%)' }} />
+        <div className="absolute inset-4 rounded-full bg-secondary/80 flex items-center justify-center">
+          <ShieldCheck className="w-10 h-10 text-primary" />
         </div>
       </motion.div>
 
@@ -329,9 +329,9 @@ function SecurityScanning() {
               {item.done ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               ) : (
-                <Loader2 className="w-3.5 h-3.5 text-[#D4AF37] animate-spin shrink-0" />
+                <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />
               )}
-              <span className={item.done ? 'text-emerald-400/80' : 'text-[#D4AF37]'}>{item.text}</span>
+              <span className={item.done ? 'text-emerald-400/80' : 'text-primary'}>{item.text}</span>
             </motion.div>
           ))}
         </div>
@@ -450,11 +450,11 @@ export default function AdminLoginPage() {
 
       {/* Radial glows */}
       <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full bg-[#1E3A5F]/[0.04] blur-[180px]" />
-      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full bg-[#D4AF37]/[0.03] blur-[150px]" />
+      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full bg-primary/[0.03] blur-[150px]" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px]">
-        <div className="absolute inset-0 rounded-full border border-[#D4AF37]/[0.04] animate-[spin_60s_linear_infinite]" />
-        <div className="absolute inset-8 rounded-full border border-[#D4AF37]/[0.06] animate-[spin_45s_linear_infinite_reverse]" />
-        <div className="absolute inset-16 rounded-full border border-[#D4AF37]/[0.08] animate-[spin_30s_linear_infinite]" />
+        <div className="absolute inset-0 rounded-full border border-primary/[0.04] animate-[spin_60s_linear_infinite]" />
+        <div className="absolute inset-8 rounded-full border border-primary/[0.06] animate-[spin_45s_linear_infinite_reverse]" />
+        <div className="absolute inset-16 rounded-full border border-primary/[0.08] animate-[spin_30s_linear_infinite]" />
       </div>
 
       {/* Main Card */}
@@ -466,9 +466,9 @@ export default function AdminLoginPage() {
       >
         <div className="relative">
           {/* Card glow effect */}
-          <div className="absolute -inset-[1px] rounded-[28px] bg-gradient-to-b from-[#D4AF37]/20 via-[#D4AF37]/5 to-transparent z-0" />
+          <div className="absolute -inset-[1px] rounded-[28px] bg-gradient-to-b from-primary/20 via-[#D4AF37]/5 to-transparent z-0" />
 
-          <div className="relative rounded-[28px] overflow-hidden bg-[#0B1120]/95 backdrop-blur-xl border border-[#D4AF37]/[0.12] shadow-[0_0_80px_rgba(212,175,55,0.06),0_25px_50px_rgba(0,0,0,0.5)]">
+          <div className="relative rounded-[28px] overflow-hidden bg-[#0B1120]/95 backdrop-blur-xl border border-primary/[0.12] shadow-[0_0_80px_rgba(212,175,55,0.06),0_25px_50px_rgba(0,0,0,0.5)]">
 
             {/* Top accent line */}
             <div className="h-[2px] bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
@@ -480,7 +480,7 @@ export default function AdminLoginPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 }}
                 onClick={() => navigate('home')}
-                className="flex items-center gap-1.5 text-muted-foreground/60 hover:text-[#D4AF37] transition-all mb-6 group"
+                className="flex items-center gap-1.5 text-muted-foreground/60 hover:text-primary transition-all mb-6 group"
               >
                 <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
                 <span className="text-xs font-medium">Beranda</span>
@@ -516,7 +516,7 @@ export default function AdminLoginPage() {
                     />
                     {/* Rotating ring */}
                     <motion.div
-                      className="absolute -inset-3 rounded-2xl border border-[#D4AF37]/30"
+                      className="absolute -inset-3 rounded-2xl border border-primary/30"
                       animate={{ rotate: 360 }}
                       transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
                     />
@@ -529,7 +529,7 @@ export default function AdminLoginPage() {
                     transition={{ delay: 0.6, type: 'spring', stiffness: 200 }}
                     className="absolute -top-2 -right-3"
                   >
-                    <div className="bg-gradient-to-r from-[#D4AF37] to-[#F0D060] text-[#070B14] text-[8px] font-black px-2 py-0.5 rounded-md shadow-lg shadow-[#D4AF37]/20 tracking-wider">
+                    <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-[8px] font-black px-2 py-0.5 rounded-md shadow-lg shadow-[#D4AF37]/20 tracking-wider">
                       SUPER ADMIN
                     </div>
                   </motion.div>
@@ -545,8 +545,8 @@ export default function AdminLoginPage() {
                   className="flex items-center justify-center gap-1.5 mt-3"
                 >
                   <div className="relative">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <div className="absolute inset-0 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cardmerald-400" />
+                    <div className="absolute inset-0 w-1.5 h-1.5 rounded-full bg-cardmerald-400 animate-ping" />
                   </div>
                   <span className="text-emerald-400/90 text-[10px] font-semibold tracking-wider">ENCRYPTED CONNECTION</span>
                   <Lock className="w-3 h-3 text-emerald-400/60" />
@@ -592,7 +592,7 @@ export default function AdminLoginPage() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="mb-4 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/15"
+                    className="mb-4 p-3 rounded-xl bg-cardmber-500/[0.06] border border-bordermber-500/15"
                   >
                     <div className="flex items-center gap-2.5">
                       <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
@@ -605,7 +605,7 @@ export default function AdminLoginPage() {
                           <div
                             key={i}
                             className={`w-1.5 h-6 rounded-full ${
-                              i <= (5 - remainingAttempts) ? 'bg-red-400/60' : 'bg-[#D4AF37]/20'
+                              i <= (5 - remainingAttempts) ? 'bg-red-400/60' : 'bg-primary/20'
                             }`}
                           />
                         ))}
@@ -622,11 +622,11 @@ export default function AdminLoginPage() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="mb-4 p-2.5 rounded-xl bg-[#D4AF37]/[0.04] border border-[#D4AF37]/10 text-center"
+                    className="mb-4 p-2.5 rounded-xl bg-primary/[0.04] border border-primary/10 text-center"
                   >
-                    <span className="text-[#D4AF37]/70 text-xs font-mono">
+                    <span className="text-primary/70 text-xs font-mono">
                       <Clock className="w-3 h-3 inline mr-1.5 -mt-0.5" />
-                      Tunggu <span className="text-[#D4AF37] font-bold">{cooldown}s</span> sebelum mencoba lagi
+                      Tunggu <span className="text-primary font-bold">{cooldown}s</span> sebelum mencoba lagi
                     </span>
                   </motion.div>
                 )}
@@ -660,19 +660,19 @@ export default function AdminLoginPage() {
                       className="space-y-1.5"
                     >
                       <Label className="text-foreground/80 text-[11px] font-semibold tracking-wide uppercase flex items-center gap-1.5">
-                        <User className="w-3 h-3 text-[#D4AF37]/60" />
+                        <User className="w-3 h-3 text-primary/60" />
                         Username / Email
                       </Label>
                       <div className="relative group">
-                        <div className="absolute left-0 top-0 bottom-0 w-10 rounded-l-xl bg-[#D4AF37]/[0.04] border-r border-[#D4AF37]/10 flex items-center justify-center">
-                          <Hash className="w-3.5 h-3.5 text-[#D4AF37]/40" />
+                        <div className="absolute left-0 top-0 bottom-0 w-10 rounded-l-xl bg-primary/[0.04] border-r border-primary/10 flex items-center justify-center">
+                          <Hash className="w-3.5 h-3.5 text-primary/40" />
                         </div>
                         <Input
                           type="text"
                           placeholder="Masukkan username atau email"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          className="pl-11 h-11 bg-[#0F172A]/40 border-[#D4AF37]/[0.08] rounded-xl text-foreground text-sm placeholder:text-muted-foreground/30 focus:border-[#D4AF37]/30 focus:ring-[#D4AF37]/10 transition-all hover:border-[#D4AF37]/15"
+                          className="pl-11 h-11 bg-secondary/40 border-primary/[0.08] rounded-xl text-foreground text-sm placeholder:text-muted-foreground/30 focus:border-primary/30 focus:ring-[#D4AF37]/10 transition-all hover:border-primary/15"
                           autoComplete="username"
                           disabled={loading || !!lockMessage || cooldown > 0}
                         />
@@ -690,26 +690,26 @@ export default function AdminLoginPage() {
                       className="space-y-1.5"
                     >
                       <Label className="text-foreground/80 text-[11px] font-semibold tracking-wide uppercase flex items-center gap-1.5">
-                        <KeyRound className="w-3 h-3 text-[#D4AF37]/60" />
+                        <KeyRound className="w-3 h-3 text-primary/60" />
                         Password
                       </Label>
                       <div className="relative group">
-                        <div className="absolute left-0 top-0 bottom-0 w-10 rounded-l-xl bg-[#D4AF37]/[0.04] border-r border-[#D4AF37]/10 flex items-center justify-center">
-                          <Lock className="w-3.5 h-3.5 text-[#D4AF37]/40" />
+                        <div className="absolute left-0 top-0 bottom-0 w-10 rounded-l-xl bg-primary/[0.04] border-r border-primary/10 flex items-center justify-center">
+                          <Lock className="w-3.5 h-3.5 text-primary/40" />
                         </div>
                         <Input
                           type={showPassword ? 'text' : 'password'}
                           placeholder="Masukkan password rahasia"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="pl-11 pr-11 h-11 bg-[#0F172A]/40 border-[#D4AF37]/[0.08] rounded-xl text-foreground text-sm placeholder:text-muted-foreground/30 focus:border-[#D4AF37]/30 focus:ring-[#D4AF37]/10 transition-all hover:border-[#D4AF37]/15"
+                          className="pl-11 pr-11 h-11 bg-secondary/40 border-primary/[0.08] rounded-xl text-foreground text-sm placeholder:text-muted-foreground/30 focus:border-primary/30 focus:ring-[#D4AF37]/10 transition-all hover:border-primary/15"
                           autoComplete="current-password"
                           disabled={loading || !!lockMessage || cooldown > 0}
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-[#D4AF37] transition-colors p-0.5"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-primary transition-colors p-0.5"
                         >
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -731,7 +731,7 @@ export default function AdminLoginPage() {
                       ].map((item, i) => (
                         <div
                           key={i}
-                          className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg bg-[#D4AF37]/[0.02] border border-[#D4AF37]/[0.05]"
+                          className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg bg-primary/[0.02] border border-primary/[0.05]"
                         >
                           <item.icon className="w-3.5 h-3.5 text-emerald-400/70" />
                           <span className="text-[9px] font-semibold text-muted-foreground/50 tracking-wider">{item.label}</span>
@@ -744,10 +744,10 @@ export default function AdminLoginPage() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.6 }}
-                      className="p-2.5 rounded-xl bg-[#0B1120] border border-[#D4AF37]/[0.06]"
+                      className="p-2.5 rounded-xl bg-[#0B1120] border border-primary/[0.06]"
                     >
                       <div className="flex items-start gap-2">
-                        <Terminal className="w-3.5 h-3.5 text-[#D4AF37]/40 shrink-0 mt-0.5" />
+                        <Terminal className="w-3.5 h-3.5 text-primary/40 shrink-0 mt-0.5" />
                         <p className="text-muted-foreground/40 text-[10px] leading-relaxed font-mono">
                           Area terbatas. Semua percobaan akses dicatat secara real-time. IP dan device fingerprint tersimpan.
                         </p>
@@ -763,7 +763,7 @@ export default function AdminLoginPage() {
                       <Button
                         type="submit"
                         disabled={loading || !!lockMessage || cooldown > 0}
-                        className="w-full h-11 bg-gradient-to-r from-[#D4AF37] via-[#F0D060] to-[#D4AF37] text-[#070B14] font-bold rounded-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.3)] transition-all text-sm disabled:opacity-40 disabled:hover:shadow-none relative overflow-hidden group"
+                        className="w-full h-11 bg-gradient-to-r from-primary via-[#F0D060] to-[#D4AF37] text-primary-foreground font-bold rounded-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.3)] transition-all text-sm disabled:opacity-40 disabled:hover:shadow-none relative overflow-hidden group"
                       >
                         {/* Shimmer effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
@@ -794,7 +794,7 @@ export default function AdminLoginPage() {
               {/* Divider */}
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#D4AF37]/[0.06]" />
+                  <div className="w-full border-t border-primary/[0.06]" />
                 </div>
                 <div className="relative flex justify-center">
                   <span className="bg-[#0B1120] px-3 text-muted-foreground/25 text-[10px] tracking-widest">ATAU</span>
@@ -810,7 +810,7 @@ export default function AdminLoginPage() {
               >
                 <button
                   onClick={() => navigate('login')}
-                  className="text-muted-foreground/40 text-xs hover:text-[#D4AF37] transition-colors inline-flex items-center gap-1.5 group"
+                  className="text-muted-foreground/40 text-xs hover:text-primary transition-colors inline-flex items-center gap-1.5 group"
                 >
                   <User className="w-3 h-3 group-hover:scale-110 transition-transform" />
                   Login sebagai User biasa
@@ -818,7 +818,7 @@ export default function AdminLoginPage() {
               </motion.div>
 
               {/* Security info panel */}
-              <div className="mt-5 pt-4 border-t border-[#D4AF37]/[0.04]">
+              <div className="mt-5 pt-4 border-t border-primary/[0.04]">
                 <SecurityInfoPanel />
               </div>
             </div>

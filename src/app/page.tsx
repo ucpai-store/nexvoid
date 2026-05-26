@@ -21,7 +21,7 @@ const PromoPopup = dynamic(
 /* ───────── Single dynamic import for entire app shell ───────── */
 function AppShellFallback() {
   return (
-    <div className="min-h-screen bg-[#070B14] flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center">
         <p className="text-white mb-4">Failed to load application</p>
         <button onClick={() => window.location.reload()} className="px-4 py-2 bg-[#D4AF37] text-black rounded-lg">Retry</button>
@@ -43,10 +43,10 @@ const AppShell = dynamic(
 function AppLoader() {
   const { logoUrl } = useSiteStore();
   return (
-    <div className="min-h-screen bg-[#070B14] flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center animate-fade-in">
         <img src={logoUrl} alt="NEXVO" className="h-20 w-auto object-contain mb-3 mx-auto" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
-        <Loader2 className="w-6 h-6 text-[#D4AF37] animate-spin mx-auto" />
+        <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
       </div>
     </div>
   );

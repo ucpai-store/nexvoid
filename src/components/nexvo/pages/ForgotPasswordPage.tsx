@@ -202,10 +202,10 @@ export default function ForgotPasswordPage() {
           alt="Background"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-[#070B14]/75" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070B14]/90 via-transparent to-[#070B14]/40" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#070B14]/60 via-transparent to-[#070B14]/60" />
-        <div className="absolute top-1/4 right-1/4 w-72 h-72 rounded-full bg-[#D4AF37]/5 blur-[120px]" />
+        <div className="absolute inset-0 bg-background/75" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
+        <div className="absolute top-1/4 right-1/4 w-72 h-72 rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute bottom-1/4 left-1/4 w-96 h-96 rounded-full bg-[#1E3A5F]/10 blur-[150px]" />
       </div>
 
@@ -234,7 +234,7 @@ export default function ForgotPasswordPage() {
               className="mb-4"
             >
               <div className="relative inline-block">
-                <div className="absolute inset-0 blur-[25px] bg-[#D4AF37]/15 rounded-full scale-110" />
+                <div className="absolute inset-0 blur-[25px] bg-primary/15 rounded-full scale-110" />
                 <img
                   src={useSiteStore.getState().logoUrl}
                   alt="NEXVO"
@@ -255,14 +255,14 @@ export default function ForgotPasswordPage() {
               <div key={s} className="flex items-center flex-1">
                 <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all ${
                   stepIndex[step] >= i
-                    ? 'bg-gold-gradient text-[#070B14]'
-                    : 'bg-white/5 text-muted-foreground'
+                    ? 'bg-gold-gradient text-primary-foreground'
+                    : 'bg-foreground/5 text-muted-foreground'
                 }`}>
                   {stepIndex[step] > i ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
                 </div>
                 {i < 2 && (
                   <div className={`flex-1 h-0.5 mx-1 rounded-full transition-all ${
-                    stepIndex[step] > i ? 'bg-[#D4AF37]' : 'bg-white/10'
+                    stepIndex[step] > i ? 'bg-primary' : 'bg-foreground/10'
                   }`} />
                 )}
               </div>
@@ -281,7 +281,7 @@ export default function ForgotPasswordPage() {
                     placeholder="your@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                    className="pl-10 h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                   />
                 </div>
                 <p className="text-muted-foreground/60 text-xs">
@@ -292,11 +292,11 @@ export default function ForgotPasswordPage() {
               <Button
                 type="submit"
                 disabled={loading || !email}
-                className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
+                className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-[#070B14]/30 border-t-[#070B14] rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     Sending...
                   </div>
                 ) : (
@@ -330,21 +330,21 @@ export default function ForgotPasswordPage() {
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                   maxLength={6}
-                  className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground text-center text-lg font-mono tracking-widest placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground text-center text-lg font-mono tracking-widest placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
               </div>
 
               <div className="text-center">
                 {countdown > 0 ? (
                   <p className="text-muted-foreground text-sm">
-                    Resend in <span className="text-[#D4AF37] font-medium">{countdown}s</span>
+                    Resend in <span className="text-primary font-medium">{countdown}s</span>
                   </p>
                 ) : (
                   <Button
                     variant="ghost"
                     onClick={handleResendOTP}
                     disabled={resending}
-                    className="text-[#D4AF37] hover:text-[#F0D060] hover:bg-[#D4AF37]/10 rounded-xl"
+                    className="text-primary hover:text-primary/80 hover:bg-primary/10 rounded-xl"
                   >
                     <RefreshCw className={`w-4 h-4 mr-2 ${resending ? 'animate-spin' : ''}`} />
                     Resend Code
@@ -355,11 +355,11 @@ export default function ForgotPasswordPage() {
               <Button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
+                className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-[#070B14]/30 border-t-[#070B14] rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     Verifying...
                   </div>
                 ) : (
@@ -384,7 +384,7 @@ export default function ForgotPasswordPage() {
                     placeholder="Minimum 6 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="pl-10 pr-10 h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                    className="pl-10 pr-10 h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                   />
                   <button
                     type="button"
@@ -405,7 +405,7 @@ export default function ForgotPasswordPage() {
                     placeholder="Repeat new password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10 pr-10 h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                    className="pl-10 pr-10 h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                   />
                   <button
                     type="button"
@@ -423,11 +423,11 @@ export default function ForgotPasswordPage() {
               <Button
                 type="submit"
                 disabled={loading || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
-                className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
+                className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-[#070B14]/30 border-t-[#070B14] rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     Saving...
                   </div>
                 ) : (
@@ -447,7 +447,7 @@ export default function ForgotPasswordPage() {
               animate={{ opacity: 1, scale: 1 }}
               className="text-center py-4"
             >
-              <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-full bg-cardmerald-500/15 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-10 h-10 text-emerald-400" />
               </div>
               <h2 className="text-lg font-bold text-foreground mb-1">Password Changed Successfully!</h2>
@@ -456,7 +456,7 @@ export default function ForgotPasswordPage() {
               </p>
               <Button
                 onClick={() => navigate('login')}
-                className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
+                className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
               >
                 <div className="flex items-center gap-2">
                   Go to Login

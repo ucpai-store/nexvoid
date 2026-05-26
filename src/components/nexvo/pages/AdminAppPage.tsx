@@ -158,7 +158,7 @@ export default function AdminAppPage() {
           className="glass glow-gold rounded-2xl p-4 sm:p-6"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Package className="w-5 h-5 text-[#D4AF37]" />
+            <Package className="w-5 h-5 text-primary" />
             <h3 className="text-foreground font-semibold">APK Saat Ini</h3>
           </div>
 
@@ -179,7 +179,7 @@ export default function AdminAppPage() {
                 </div>
                 <div>
                   <span className="text-muted-foreground text-xs">Status</span>
-                  <Badge className={`${apkInfo.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'} border-0 text-[10px]`}>
+                  <Badge className={`${apkInfo.isActive ? 'bg-cardmerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'} border-border text-[10px]`}>
                     {apkInfo.isActive ? 'Aktif' : 'Nonaktif'}
                   </Badge>
                 </div>
@@ -203,15 +203,15 @@ export default function AdminAppPage() {
                 if (file) handleApkUpload(file);
               }}
             />
-            <div className="glass rounded-xl border-2 border-dashed border-[#D4AF37]/20 p-6 text-center hover:border-[#D4AF37]/40 transition-colors">
+            <div className="glass rounded-xl border-border border-dashed border-primary/20 p-6 text-center hover:border-primary/40 transition-colors">
               {uploading ? (
                 <div>
-                  <Loader2 className="w-8 h-8 text-[#D4AF37] mx-auto animate-spin mb-2" />
+                  <Loader2 className="w-8 h-8 text-primary mx-auto animate-spin mb-2" />
                   <p className="text-muted-foreground text-sm">Mengupload APK...</p>
                 </div>
               ) : (
                 <>
-                  <Upload className="w-8 h-8 text-[#D4AF37] mx-auto mb-2" />
+                  <Upload className="w-8 h-8 text-primary mx-auto mb-2" />
                   <p className="text-foreground font-medium text-sm mb-1">Upload APK Baru</p>
                   <p className="text-muted-foreground text-xs">Klik untuk memilih file .apk</p>
                 </>
@@ -228,7 +228,7 @@ export default function AdminAppPage() {
           className="glass glow-gold rounded-2xl p-4 sm:p-6"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Smartphone className="w-5 h-5 text-[#D4AF37]" />
+            <Smartphone className="w-5 h-5 text-primary" />
             <h3 className="text-foreground font-semibold">Versi Aplikasi</h3>
           </div>
           <div>
@@ -237,7 +237,7 @@ export default function AdminAppPage() {
               value={version}
               onChange={(e) => setVersion(e.target.value)}
               placeholder="1.0.0"
-              className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground"
+              className="glass rounded-xl border-primary/20 bg-transparent text-foreground"
             />
             <div className="flex items-start gap-2 mt-2">
               <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
@@ -254,7 +254,7 @@ export default function AdminAppPage() {
           className="glass glow-gold rounded-2xl p-4 sm:p-6"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Download className="w-5 h-5 text-[#D4AF37]" />
+            <Download className="w-5 h-5 text-primary" />
             <h3 className="text-foreground font-semibold">Download Link</h3>
           </div>
           <div>
@@ -263,7 +263,7 @@ export default function AdminAppPage() {
               value={downloadLink}
               onChange={(e) => setDownloadLink(e.target.value)}
               placeholder="https://example.com/app.apk"
-              className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground"
+              className="glass rounded-xl border-primary/20 bg-transparent text-foreground"
             />
           </div>
         </motion.div>
@@ -277,7 +277,7 @@ export default function AdminAppPage() {
           <Button
             onClick={handleSave}
             disabled={saving}
-            className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-2xl hover:opacity-90 transition-all h-12 glow-gold-strong"
+            className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-2xl hover:opacity-90 transition-all h-12 glow-gold-strong"
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin mr-2" />

@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import CSChatBubbleWrapper from "@/components/nexvo/shared/CSChatBubbleWrapper";
 import PushNotificationManager from "@/components/nexvo/shared/PushNotificationManager";
+import { ThemeProvider } from "@/components/nexvo/shared/ThemeProvider";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -10,7 +11,10 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#070B14",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F8FAFC" },
+    { media: "(prefers-color-scheme: dark)", color: "#070B14" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -86,11 +90,19 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased bg-background text-foreground font-[Poppins,sans-serif]">
-        {children}
-        <CSChatBubbleWrapper />
-        <PushNotificationManager />
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange={false}
+        >
+          {children}
+          <CSChatBubbleWrapper />
+          <PushNotificationManager />
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );
 }
+

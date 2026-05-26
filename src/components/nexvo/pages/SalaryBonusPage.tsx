@@ -148,7 +148,7 @@ export default function SalaryBonusPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('salary.tryAgain')}
@@ -179,7 +179,7 @@ export default function SalaryBonusPage() {
       {/* Header */}
       <div>
         <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-          <Banknote className="w-6 h-6 text-[#D4AF37]" />
+          <Banknote className="w-6 h-6 text-primary" />
           Bonus Gaji Mingguan
         </h1>
         <p className="text-muted-foreground text-sm">Dapatkan {salaryRate}% dari omzet grup setiap minggu selama {maxWeeks} minggu</p>
@@ -192,7 +192,7 @@ export default function SalaryBonusPage() {
           animate={{ opacity: 1, y: 0 }}
           className="glass rounded-2xl p-4 sm:p-6 lg:p-8 text-center border border-emerald-500/20"
         >
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-cardmerald-500/10 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-emerald-400" />
           </div>
           <h2 className="text-foreground text-lg font-bold mb-1">Program Gaji Selesai! 🎉</h2>
@@ -209,14 +209,14 @@ export default function SalaryBonusPage() {
           animate={{ opacity: 1, y: 0 }}
           className="glass-gold glow-gold rounded-2xl p-4 sm:p-6 lg:p-8 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/5 blur-3xl" />
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl" />
           <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-[#1E3A5F]/10 blur-3xl" />
 
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center glow-gold animate-float">
-                  <Banknote className="w-6 h-6 text-[#070B14]" />
+                  <Banknote className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h2 className="text-foreground font-semibold">Status Kelayakan</h2>
@@ -225,7 +225,7 @@ export default function SalaryBonusPage() {
                   </p>
                 </div>
               </div>
-              <Badge className={`${isEligible ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'} border text-xs font-bold px-3 py-1`}>
+              <Badge className={`${isEligible ? 'bg-cardmerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'} border text-xs font-bold px-3 py-1`}>
                 {isEligible ? (
                   <><CheckCircle2 className="w-3 h-3 mr-1" />Layak</>
                 ) : (
@@ -242,7 +242,7 @@ export default function SalaryBonusPage() {
                   {weeksReceived} / {maxWeeks} Minggu
                 </span>
               </div>
-              <div className="w-full h-3 rounded-full bg-white/5 overflow-hidden">
+              <div className="w-full h-3 rounded-full bg-foreground/5 overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${(weeksReceived / maxWeeks) * 100}%` }}
@@ -272,19 +272,19 @@ export default function SalaryBonusPage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-foreground text-sm font-medium flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    <Users className="w-3.5 h-3.5 text-primary" />
                     Min. {minDirectRefs} Direct Invites
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {activeRefDeposits} / {minDirectRefs} (Wajib {minDirectRefs} orang)
                   </span>
                 </div>
-                <div className="w-full h-2.5 rounded-full bg-white/5 overflow-hidden">
+                <div className="w-full h-2.5 rounded-full bg-foreground/5 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.min((activeRefDeposits / minDirectRefs) * 100, 100)}%` }}
                     transition={{ duration: 0.8, ease: 'easeOut' }}
-                    className={`h-full rounded-full ${meetsMinDirectRefs ? 'bg-emerald-400' : 'bg-[#D4AF37]'}`}
+                    className={`h-full rounded-full ${meetsMinDirectRefs ? 'bg-cardmerald-400' : 'bg-primary'}`}
                   />
                 </div>
                 {!meetsMinDirectRefs && (
@@ -304,7 +304,7 @@ export default function SalaryBonusPage() {
                 <>
                   <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
                     <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-[#D4AF37]" />
+                      <Zap className="w-4 h-4 text-primary" />
                       <span className="text-muted-foreground text-xs">Estimasi Gaji/Minggu</span>
                     </div>
                     <span className="text-emerald-400 font-bold text-sm">
@@ -314,7 +314,7 @@ export default function SalaryBonusPage() {
 
                   <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
                     <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
+                      <TrendingUp className="w-4 h-4 text-primary" />
                       <span className="text-muted-foreground text-xs">Omzet Grup</span>
                     </div>
                     <span className="text-foreground font-semibold text-sm">
@@ -324,10 +324,10 @@ export default function SalaryBonusPage() {
 
                   <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
                     <div className="flex items-center gap-2">
-                      <Banknote className="w-4 h-4 text-[#D4AF37]" />
+                      <Banknote className="w-4 h-4 text-primary" />
                       <span className="text-muted-foreground text-xs">Rate Gaji</span>
                     </div>
-                    <span className="text-[#D4AF37] font-bold text-sm">
+                    <span className="text-primary font-bold text-sm">
                       {salaryRate}% / minggu
                     </span>
                   </div>
@@ -345,7 +345,7 @@ export default function SalaryBonusPage() {
             {/* Claim Button / Status */}
             <div className="mt-6">
               {data?.alreadyClaimedThisWeek ? (
-                <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-cardmerald-500/10 border border-emerald-500/20">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                   <span className="text-emerald-400 text-sm font-medium">Gaji minggu ini sudah dikreditkan otomatis</span>
                 </div>
@@ -353,7 +353,7 @@ export default function SalaryBonusPage() {
                 <Button
                   onClick={handleClaim}
                   disabled={claiming}
-                  className="w-full bg-gold-gradient text-[#070B14] font-bold rounded-xl hover:opacity-90 glow-gold h-12 text-sm"
+                  className="w-full bg-gold-gradient text-primary-foreground font-bold rounded-xl hover:opacity-90 glow-gold h-12 text-sm"
                 >
                   {claiming ? (
                     <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Memproses...</>
@@ -403,8 +403,8 @@ export default function SalaryBonusPage() {
             transition={{ delay: 0.05 }}
             className="glass glow-gold rounded-2xl p-4 text-center"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
             </div>
             <p className="text-2xl font-bold text-emerald-400">{formatRupiah(data?.totalSalaryEarned || 0)}</p>
             <p className="text-muted-foreground text-xs">Total Gaji Diterima</p>
@@ -416,8 +416,8 @@ export default function SalaryBonusPage() {
             transition={{ delay: 0.1 }}
             className="glass glow-gold rounded-2xl p-4 text-center"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <Clock className="w-5 h-5 text-[#D4AF37]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+              <Clock className="w-5 h-5 text-primary" />
             </div>
             <p className="text-foreground text-lg font-bold">{weeksReceived} <span className="text-muted-foreground text-sm font-normal">/ {maxWeeks}</span></p>
             <p className="text-muted-foreground text-xs">Minggu Diterima</p>
@@ -429,8 +429,8 @@ export default function SalaryBonusPage() {
             transition={{ delay: 0.15 }}
             className="glass glow-gold rounded-2xl p-4 text-center"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <Zap className="w-5 h-5 text-[#D4AF37]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+              <Zap className="w-5 h-5 text-primary" />
             </div>
             <p className="text-foreground text-lg font-bold">{salaryRate}%</p>
             <p className="text-muted-foreground text-xs">Rate / Minggu</p>
@@ -442,8 +442,8 @@ export default function SalaryBonusPage() {
             transition={{ delay: 0.2 }}
             className="glass glow-gold rounded-2xl p-4 text-center"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-2">
-              <Users className="w-5 h-5 text-[#D4AF37]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+              <Users className="w-5 h-5 text-primary" />
             </div>
             <p className="text-foreground text-lg font-bold">{activeRefDeposits}</p>
             <p className="text-muted-foreground text-xs">Direct Invites</p>
@@ -459,7 +459,7 @@ export default function SalaryBonusPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-3 sm:mb-4 flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-[#D4AF37]" />
+          <Calendar className="w-4 h-4 text-primary" />
           Riwayat Gaji Mingguan
         </h3>
 
@@ -467,18 +467,18 @@ export default function SalaryBonusPage() {
           <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
             {data.salaryBonuses.map((bonus, i) => (
               <div key={bonus.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center shrink-0">
-                  <Award className="w-5 h-5 text-[#D4AF37]" />
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Award className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-foreground text-sm font-medium">
                       Minggu {bonus.weekOfTotal}/{maxWeeks}
                     </p>
-                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
+                    <Badge className="bg-cardmerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
                       Lunas
                     </Badge>
-                    <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20 border text-[10px] px-1.5 py-0">
+                    <Badge className="bg-primary/10 text-primary border-primary/20 border text-[10px] px-1.5 py-0">
                       {bonus.salaryRate}%
                     </Badge>
                   </div>
@@ -511,28 +511,28 @@ export default function SalaryBonusPage() {
         className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
       >
         <h3 className="text-foreground font-semibold text-sm mb-3 flex items-center gap-2">
-          <Zap className="w-4 h-4 text-[#D4AF37]" />
+          <Zap className="w-4 h-4 text-primary" />
           Cara Kerja Bonus Gaji
         </h3>
         <div className="space-y-2 text-muted-foreground text-xs">
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">1.</span>
+            <span className="text-primary font-bold">1.</span>
             <span>Wajib memiliki <strong className="text-foreground">deposit aktif (investasi)</strong> sendiri</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">2.</span>
+            <span className="text-primary font-bold">2.</span>
             <span>Wajib mengundang minimal <strong className="text-foreground">{minDirectRefs} orang</strong> (Level 1) dengan investasi aktif</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">3.</span>
+            <span className="text-primary font-bold">3.</span>
             <span>Setelah memenuhi syarat, gaji <strong className="text-foreground">{salaryRate}%</strong> dari omzet grup dikreditkan setiap <strong className="text-foreground\">Senin pukul 00:00 WIB</strong></span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">4.</span>
+            <span className="text-primary font-bold">4.</span>
             <span>Gaji berlangsung selama <strong className="text-foreground">{maxWeeks} minggu</strong> sejak syarat terpenuhi</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-[#D4AF37] font-bold">5.</span>
+            <span className="text-primary font-bold">5.</span>
             <span>Profit & bonus gaji masuk <strong className="text-foreground">saldo utama</strong> (bisa ditarik)</span>
           </div>
         </div>

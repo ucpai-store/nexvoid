@@ -221,14 +221,14 @@ export default function PushNotificationManager() {
       {/* Subtle prompt to enable notifications */}
       {showPrompt && permission === "default" && (
         <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="bg-[#1a1f2e] border border-[#2a3041] rounded-xl p-4 shadow-xl">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-xl">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+              <div className="flex-shrink-0 w-10 h-10 bg-cardmerald-500/20 rounded-lg flex items-center justify-center">
                 <Bell className="w-5 h-5 text-emerald-400" />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-semibold text-white">Aktifkan Notifikasi</h4>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {isAdminSession
                     ? "Dapatkan notifikasi langsung di HP Anda untuk deposit, withdrawal, dan pendaftaran user baru."
                     : "Dapatkan notifikasi langsung di HP Anda untuk deposit, withdrawal, dan profit harian."}
@@ -237,13 +237,13 @@ export default function PushNotificationManager() {
                   <button
                     onClick={requestPermission}
                     disabled={isRegistering}
-                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 bg-cardmerald-500 hover:bg-cardmerald-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
                   >
                     {isRegistering ? "Mengaktifkan..." : "Aktifkan"}
                   </button>
                   <button
                     onClick={dismissPrompt}
-                    className="px-3 py-1.5 text-gray-400 hover:text-gray-300 text-xs transition-colors"
+                    className="px-3 py-1.5 text-muted-foreground hover:text-foreground/70 text-xs transition-colors"
                   >
                     Nanti saja
                   </button>
@@ -251,7 +251,7 @@ export default function PushNotificationManager() {
               </div>
               <button
                 onClick={dismissPrompt}
-                className="flex-shrink-0 text-gray-500 hover:text-gray-400 transition-colors"
+                className="flex-shrink-0 text-muted-foreground hover:text-muted-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>

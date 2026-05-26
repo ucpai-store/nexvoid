@@ -135,15 +135,15 @@ function generateBatch(count?: number): LiveActivity[] {
 function getTypeConfig(type: string) {
   switch (type) {
     case 'deposit':
-      return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'Deposit' };
+      return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: 'Deposit' };
     case 'withdraw':
       return { icon: ArrowUp, color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'Withdraw' };
     case 'purchase':
-      return { icon: ShoppingBag, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', label: 'Investasi' };
+      return { icon: ShoppingBag, color: 'text-primary', bg: 'bg-primary/10', label: 'Investasi' };
     case 'register':
       return { icon: UserPlus, color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'Daftar Baru' };
     default:
-      return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: type };
+      return { icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: type };
   }
 }
 
@@ -216,13 +216,13 @@ export default function LiveActivePage() {
     >
       {/* HEADER */}
       <motion.div variants={itemVariants} className="glass glow-gold rounded-2xl p-4 sm:p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-[#D4AF37]/5 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-emerald-500/5 blur-3xl" />
+        <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-cardmerald-500/5 blur-3xl" />
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-                <Radio className="w-5 h-5 sm:w-6 sm:h-6 text-[#D4AF37]" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Radio className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -231,8 +231,8 @@ export default function LiveActivePage() {
                   </h1>
                   <div className="flex items-center gap-1.5 glass-gold rounded-full px-2.5 py-1">
                     <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cardmerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cardmerald-400" />
                     </span>
                     <span className="text-[10px] font-semibold text-emerald-400">LIVE</span>
                   </div>
@@ -247,8 +247,8 @@ export default function LiveActivePage() {
       {/* BIG STATS */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {[
-          { icon: Coins, label: 'Deposit Hari Ini', value: totalDepositsToday.toLocaleString('id-ID'), color: 'text-emerald-400', bg: 'bg-emerald-400/10', glow: true },
-          { icon: Gem, label: 'Investasi Hari Ini', value: totalPurchasesToday.toLocaleString('id-ID'), color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', glow: true },
+          { icon: Coins, label: 'Deposit Hari Ini', value: totalDepositsToday.toLocaleString('id-ID'), color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', glow: true },
+          { icon: Gem, label: 'Investasi Hari Ini', value: totalPurchasesToday.toLocaleString('id-ID'), color: 'text-primary', bg: 'bg-primary/10', glow: true },
           { icon: Users, label: 'Member Baru', value: totalNewMembers.toLocaleString('id-ID'), color: 'text-purple-400', bg: 'bg-purple-400/10' },
           { icon: ArrowUp, label: 'Withdraw Hari Ini', value: totalWithdrawToday.toLocaleString('id-ID'), color: 'text-blue-400', bg: 'bg-blue-400/10' },
           { icon: TrendingUp, label: 'Volume Hari Ini', value: formatRupiah(totalVolumeToday), color: 'text-orange-400', bg: 'bg-orange-400/10' },
@@ -267,8 +267,8 @@ export default function LiveActivePage() {
       {/* ACTIVITY BREAKDOWN */}
       <motion.div variants={itemVariants} className="grid grid-cols-4 gap-2 sm:gap-3">
         {[
-          { type: 'deposit', count: depositCount, icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', label: 'Deposit' },
-          { type: 'purchase', count: purchaseCount, icon: ShoppingBag, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', border: 'border-[#D4AF37]/20', label: 'Investasi' },
+          { type: 'deposit', count: depositCount, icon: ArrowDown, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', border: 'border-emerald-400/20', label: 'Deposit' },
+          { type: 'purchase', count: purchaseCount, icon: ShoppingBag, color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20', label: 'Investasi' },
           { type: 'withdraw', count: withdrawCount, icon: ArrowUp, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20', label: 'Withdraw' },
           { type: 'register', count: registerCount, icon: UserPlus, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20', label: 'Daftar' },
         ].map((item) => (
@@ -284,20 +284,20 @@ export default function LiveActivePage() {
 
       {/* LIVE FEED */}
       <motion.div variants={itemVariants} className="glass glow-gold rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-[#D4AF37]/3 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-emerald-500/3 blur-3xl" />
+        <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-primary/3 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-cardmerald-500/3 blur-3xl" />
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4 sm:mb-5">
             <div className="flex items-center gap-2">
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cardmerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-cardmerald-400" />
               </span>
               <h2 className="text-foreground font-semibold text-sm sm:text-base">Feed Transaksi Live</h2>
             </div>
             <div className="glass-gold rounded-full px-3 py-1 flex items-center gap-1.5">
-              <Flame className="w-3 h-3 text-[#D4AF37]" />
-              <span className="text-[#D4AF37] text-[10px] sm:text-xs font-semibold">{activities.length} aktivitas baru</span>
+              <Flame className="w-3 h-3 text-primary" />
+              <span className="text-primary text-[10px] sm:text-xs font-semibold">{activities.length} aktivitas baru</span>
             </div>
           </div>
 
@@ -350,15 +350,15 @@ export default function LiveActivePage() {
             </AnimatePresence>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#D4AF37]/10 flex items-center justify-between">
+          <div className="mt-4 pt-3 border-t border-primary/10 flex items-center justify-between">
             <div className="flex items-center gap-2 text-muted-foreground text-[10px] sm:text-xs">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cardmerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cardmerald-400" />
               </span>
               <span>Data real-time dari platform NEXVO</span>
             </div>
-            <button onClick={() => navigate('history')} className="text-[#D4AF37] text-xs font-medium hover:underline flex items-center gap-1">
+            <button onClick={() => navigate('history')} className="text-primary text-xs font-medium hover:underline flex items-center gap-1">
               Lihat Semua <ChevronDown className="w-3 h-3" />
             </button>
           </div>
@@ -373,8 +373,8 @@ export default function LiveActivePage() {
           <p className="text-muted-foreground text-xs">Total Deposit Hari Ini</p>
         </div>
         <div className="glass glow-gold rounded-2xl p-4 text-center">
-          <Gem className="w-8 h-8 text-[#D4AF37] mx-auto mb-2" />
-          <p className="text-[#D4AF37] font-bold text-xl">{totalPurchasesToday.toLocaleString('id-ID')}</p>
+          <Gem className="w-8 h-8 text-primary mx-auto mb-2" />
+          <p className="text-primary font-bold text-xl">{totalPurchasesToday.toLocaleString('id-ID')}</p>
           <p className="text-muted-foreground text-xs">Total Investasi Hari Ini</p>
         </div>
         <div className="glass glow-gold rounded-2xl p-4 text-center">

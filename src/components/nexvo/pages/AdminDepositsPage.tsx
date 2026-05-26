@@ -118,7 +118,7 @@ export default function AdminDepositsPage() {
 
   const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
     pending: { color: 'text-yellow-400', bg: 'bg-yellow-400/10', label: 'Pending' },
-    approved: { color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'Disetujui' },
+    approved: { color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', label: 'Disetujui' },
     rejected: { color: 'text-red-400', bg: 'bg-red-400/10', label: 'Ditolak' },
   };
 
@@ -147,7 +147,7 @@ export default function AdminDepositsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari user..."
-            className="pl-10 glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground placeholder:text-muted-foreground"
+            className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground placeholder:text-muted-foreground"
           />
         </div>
       </motion.div>
@@ -165,13 +165,13 @@ export default function AdminDepositsPage() {
             onClick={() => setStatusFilter(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
               statusFilter === tab.key
-                ? 'bg-[#D4AF37]/15 text-[#D4AF37] glow-gold'
-                : 'glass text-foreground/60 hover:text-foreground hover:bg-white/5'
+                ? 'bg-primary/15 text-primary glow-gold'
+                : 'glass text-foreground/60 hover:text-foreground hover:bg-foreground/5'
             }`}
           >
             {tab.label}
             {tab.key !== 'all' && (
-              <Badge className="bg-white/10 text-foreground/50 text-[10px] h-4 px-1.5 border-0">
+              <Badge className="bg-foreground/10 text-foreground/50 text-[10px] h-4 px-1.5 border-border">
                 {deposits.filter((d) => d.status === tab.key).length}
               </Badge>
             )}
@@ -198,7 +198,7 @@ export default function AdminDepositsPage() {
             <div className="hidden lg:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#D4AF37]/10 hover:bg-transparent">
+                  <TableRow className="border-primary/10 hover:bg-transparent">
                     <TableHead className="text-muted-foreground text-xs">Deposit ID</TableHead>
                     <TableHead className="text-muted-foreground text-xs">User</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Jumlah</TableHead>
@@ -212,9 +212,9 @@ export default function AdminDepositsPage() {
                   {filtered.map((deposit) => {
                     const sc = statusConfig[deposit.status] || statusConfig.pending;
                     return (
-                      <TableRow key={deposit.id} className="border-[#D4AF37]/5 hover:bg-white/[0.02]">
+                      <TableRow key={deposit.id} className="border-primary/5 hover:bg-white/[0.02]">
                         <TableCell>
-                          <span className="text-[#D4AF37] font-mono font-bold text-xs bg-[#D4AF37]/10 px-2 py-0.5 rounded-md">{deposit.depositId || '-'}</span>
+                          <span className="text-primary font-mono font-bold text-xs bg-primary/10 px-2 py-0.5 rounded-md">{deposit.depositId || '-'}</span>
                         </TableCell>
                         <TableCell>
                           <p className="text-foreground text-sm font-medium">{deposit.user?.name || 'Unknown'}</p>
@@ -230,7 +230,7 @@ export default function AdminDepositsPage() {
                           {deposit.proofImage ? (
                             <button
                               onClick={() => setProofDialog(deposit.proofImage)}
-                              className="flex items-center gap-1.5 text-[#D4AF37] hover:text-[#F0D060] text-xs"
+                              className="flex items-center gap-1.5 text-primary hover:text-primary/80 text-xs"
                             >
                               <Eye className="w-3.5 h-3.5" />
                               Lihat
@@ -243,7 +243,7 @@ export default function AdminDepositsPage() {
                           {timeAgo(new Date(deposit.createdAt))}
                         </TableCell>
                         <TableCell>
-                          <Badge className={`${sc.bg} ${sc.color} border-0 text-[10px]`}>
+                          <Badge className={`${sc.bg} ${sc.color} border-border text-[10px]`}>
                             {sc.label}
                           </Badge>
                         </TableCell>
@@ -253,7 +253,7 @@ export default function AdminDepositsPage() {
                               <button
                                 onClick={() => handleAction(deposit.id, 'approved')}
                                 disabled={processing[deposit.id]}
-                                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 transition-colors disabled:opacity-50"
                                 title="Setujui"
                               >
                                 {processing[deposit.id] ? (
@@ -288,11 +288,11 @@ export default function AdminDepositsPage() {
                   <div key={deposit.id} className="glass rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <span className="text-[#D4AF37] font-mono font-bold text-xs bg-[#D4AF37]/10 px-2 py-0.5 rounded-md mr-2">{deposit.depositId || '-'}</span>
+                        <span className="text-primary font-mono font-bold text-xs bg-primary/10 px-2 py-0.5 rounded-md mr-2">{deposit.depositId || '-'}</span>
                         <p className="text-foreground text-sm font-medium mt-1">{deposit.user?.name}</p>
                         <p className="text-muted-foreground text-xs">{deposit.user?.userId}</p>
                       </div>
-                      <Badge className={`${sc.bg} ${sc.color} border-0 text-[10px]`}>{sc.label}</Badge>
+                      <Badge className={`${sc.bg} ${sc.color} border-border text-[10px]`}>{sc.label}</Badge>
                     </div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-foreground font-semibold">{formatRupiah(deposit.amount)}</span>
@@ -304,7 +304,7 @@ export default function AdminDepositsPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => setProofDialog(deposit.proofImage)}
-                          className="rounded-xl border-[#D4AF37]/20 text-[#D4AF37] h-7 text-xs"
+                          className="rounded-xl border-primary/20 text-primary h-7 text-xs"
                         >
                           <Eye className="w-3 h-3 mr-1" /> Bukti
                         </Button>
@@ -316,7 +316,7 @@ export default function AdminDepositsPage() {
                           <button
                             onClick={() => handleAction(deposit.id, 'approved')}
                             disabled={processing[deposit.id]}
-                            className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 disabled:opacity-50"
+                            className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 disabled:opacity-50"
                           >
                             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                           </button>
@@ -345,7 +345,7 @@ export default function AdminDepositsPage() {
 
       {/* Proof Image Dialog */}
       <Dialog open={!!proofDialog} onOpenChange={() => setProofDialog(null)}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg">
+        <DialogContent className="glass-strong border-primary/20 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">Bukti Transfer</DialogTitle>
           </DialogHeader>
@@ -359,7 +359,7 @@ export default function AdminDepositsPage() {
 
       {/* Reject Dialog */}
       <Dialog open={!!rejectDialog} onOpenChange={() => { setRejectDialog(null); setRejectNote(''); }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground">Tolak Deposit</DialogTitle>
           </DialogHeader>
@@ -370,14 +370,14 @@ export default function AdminDepositsPage() {
               onChange={(e) => setRejectNote(e.target.value)}
               placeholder="Masukkan alasan penolakan..."
               rows={3}
-              className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground resize-none"
+              className="glass rounded-xl border-primary/20 bg-transparent text-foreground resize-none"
             />
           </div>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => { setRejectDialog(null); setRejectNote(''); }}
-              className="rounded-xl border-[#D4AF37]/20 text-foreground"
+              className="rounded-xl border-primary/20 text-foreground"
             >
               Batal
             </Button>

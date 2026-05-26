@@ -95,34 +95,34 @@ export default function CSChatBubble({ context = 'general', userId, userName }: 
             className="fixed bottom-[88px] sm:bottom-20 right-3 sm:right-5 z-[60] w-[280px] flex flex-col rounded-2xl overflow-hidden shadow-2xl"
           >
             {/* Header */}
-            <div className="bg-[#D4AF37] px-4 py-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-[#070B14] flex items-center justify-center overflow-hidden shrink-0">
+            <div className="bg-primary px-4 py-3 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-background flex items-center justify-center overflow-hidden shrink-0">
                 <img src="/cs-chat-icon.png" alt="CS" className="w-full h-full object-cover rounded-full" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-[#070B14] text-sm leading-tight">{getContextLabel()}</h3>
+                <h3 className="font-bold text-primary-foreground text-sm leading-tight">{getContextLabel()}</h3>
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-700" />
-                  <span className="text-[#070B14]/70 text-[11px]">Online</span>
+                  <span className="text-primary-foreground/70 text-[11px]">Online</span>
                 </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-7 h-7 rounded-lg bg-[#070B14]/20 flex items-center justify-center hover:bg-[#070B14]/30 transition-colors shrink-0"
+                className="w-7 h-7 rounded-lg bg-background/20 flex items-center justify-center hover:bg-background/30 transition-colors shrink-0"
               >
-                <X className="w-4 h-4 text-[#070B14]" />
+                <X className="w-4 h-4 text-primary-foreground" />
               </button>
             </div>
 
             {/* Body */}
             <div className="bg-[#0c1222] p-4 space-y-3">
-              <p className="text-center text-gray-400 text-[11px]">
+              <p className="text-center text-muted-foreground text-[11px]">
                 Chat directly with our support team via WhatsApp
               </p>
 
               {loading ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-5 h-5 text-[#D4AF37] animate-spin" />
+                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -157,7 +157,7 @@ export default function CSChatBubble({ context = 'general', userId, userName }: 
           animate={{ scale: 1 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="fixed bottom-[88px] sm:bottom-5 right-3 sm:right-5 z-50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg overflow-hidden group bg-[#D4AF37] hover:bg-[#c9a22e] transition-colors"
+          className="fixed bottom-[88px] sm:bottom-5 right-3 sm:right-5 z-50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg overflow-hidden group bg-primary hover:bg-[#c9a22e] transition-colors"
         >
           <img
             src="/cs-chat-icon.png"

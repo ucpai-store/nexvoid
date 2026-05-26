@@ -532,7 +532,7 @@ export default function AdminApiKeyPage() {
             setGeneratedKey(null);
             setGenerateOpen(true);
           }}
-          className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
         >
           <Plus className="w-4 h-4 mr-2" />
           Generate Key
@@ -546,14 +546,14 @@ export default function AdminApiKeyPage() {
         transition={{ delay: 0.05 }}
         className={`glass rounded-2xl p-3 sm:p-6 mb-4 sm:mb-6 border ${
           pairingData.botConnected
-            ? 'border-emerald-500/20 bg-emerald-500/[0.02]'
+            ? 'border-emerald-500/20 bg-cardmerald-500/[0.02]'
             : 'border-red-500/10 bg-red-500/[0.02]'
         }`}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              pairingData.botConnected ? 'bg-emerald-500/10' : 'bg-red-500/10'
+              pairingData.botConnected ? 'bg-cardmerald-500/10' : 'bg-red-500/10'
             }`}>
               {pairingData.botConnected ? (
                 <Wifi className="w-5 h-5 text-emerald-400" />
@@ -566,9 +566,9 @@ export default function AdminApiKeyPage() {
               <p className="text-muted-foreground text-xs">Connect WhatsApp bot for web control</p>
             </div>
           </div>
-          <Badge className={`text-[10px] border-0 ${
+          <Badge className={`text-[10px] border-border ${
             pairingData.botConnected
-              ? 'bg-emerald-500/20 text-emerald-400'
+              ? 'bg-cardmerald-500/20 text-emerald-400'
               : 'bg-red-500/20 text-red-400'
           }`}>
             {pairingData.botConnected ? (
@@ -603,7 +603,7 @@ export default function AdminApiKeyPage() {
 
         {/* Disconnected notice */}
         {!pairingData.botConnected && (
-          <div className="glass rounded-xl p-3 mb-4 border border-amber-500/10">
+          <div className="glass rounded-xl p-3 mb-4 border border-bordermber-500/10">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <div>
@@ -622,7 +622,7 @@ export default function AdminApiKeyPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass glow-gold rounded-2xl p-3 sm:p-6 mb-4 sm:mb-6 border border-[#D4AF37]/10"
+        className="glass glow-gold rounded-2xl p-3 sm:p-6 mb-4 sm:mb-6 border border-primary/10"
       >
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
@@ -641,25 +641,25 @@ export default function AdminApiKeyPage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setConnectMode('pairing')}
-              className={"p-4 rounded-xl border-2 transition-all text-left " + (connectMode === 'pairing' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}
+              className={"p-4 rounded-xl border-border transition-all text-left " + (connectMode === 'pairing' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}
             >
-              <Smartphone className={"w-5 h-5 mb-1.5 " + (connectMode === 'pairing' ? 'text-[#D4AF37]' : 'text-muted-foreground')} />
-              <p className={"font-semibold text-xs " + (connectMode === 'pairing' ? 'text-[#D4AF37]' : 'text-foreground')}>Pairing Code</p>
+              <Smartphone className={"w-5 h-5 mb-1.5 " + (connectMode === 'pairing' ? 'text-primary' : 'text-muted-foreground')} />
+              <p className={"font-semibold text-xs " + (connectMode === 'pairing' ? 'text-primary' : 'text-foreground')}>Pairing Code</p>
               <p className="text-muted-foreground text-[9px] mt-0.5">Enter bot number, get code</p>
             </button>
             <button
               onClick={() => setConnectMode('qr')}
-              className={"p-4 rounded-xl border-2 transition-all text-left " + (connectMode === 'qr' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}
+              className={"p-4 rounded-xl border-border transition-all text-left " + (connectMode === 'qr' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}
             >
-              <QrCode className={"w-5 h-5 mb-1.5 " + (connectMode === 'qr' ? 'text-[#D4AF37]' : 'text-muted-foreground')} />
-              <p className={"font-semibold text-xs " + (connectMode === 'qr' ? 'text-[#D4AF37]' : 'text-foreground')}>QR Scan Code</p>
+              <QrCode className={"w-5 h-5 mb-1.5 " + (connectMode === 'qr' ? 'text-primary' : 'text-muted-foreground')} />
+              <p className={"font-semibold text-xs " + (connectMode === 'qr' ? 'text-primary' : 'text-foreground')}>QR Scan Code</p>
               <p className="text-muted-foreground text-[9px] mt-0.5">Scan QR like WhatsApp Web</p>
             </button>
           </div>
         </div>
 
         {/* Admin Number for Pairing */}
-        <div className="mb-5 p-3 rounded-xl border border-[#D4AF37]/10 bg-[#D4AF37]/[0.02]">
+        <div className="mb-5 p-3 rounded-xl border border-primary/10 bg-primary/[0.02]">
           <Label className="text-muted-foreground text-xs flex items-center gap-1.5 mb-2">
             <MessageSquare className="w-3 h-3" />
             Admin WhatsApp Number (Owner)
@@ -671,7 +671,7 @@ export default function AdminApiKeyPage() {
                 value={botConfig.bot_admin_number}
                 onChange={(e) => setBotConfig({ ...botConfig, bot_admin_number: e.target.value })}
                 placeholder="6281234567890"
-                className="pl-10 glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground font-mono text-sm"
+                className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground font-mono text-sm"
               />
             </div>
             <Button
@@ -701,7 +701,7 @@ export default function AdminApiKeyPage() {
               }}
               disabled={savingBot}
               size="sm"
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
             >
               {savingBot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </Button>
@@ -718,7 +718,7 @@ export default function AdminApiKeyPage() {
                   <Zap className="w-4 h-4 text-violet-400" />
                   <span className="text-violet-400 text-xs font-semibold uppercase tracking-wider">Active Pairing Code</span>
                 </div>
-                <Badge className="bg-emerald-500/20 text-emerald-400 border-0 text-[10px]">
+                <Badge className="bg-cardmerald-500/20 text-emerald-400 border-border text-[10px]">
                   <CheckCircle2 className="w-3 h-3 mr-1" />
                   Active
                 </Badge>
@@ -734,7 +734,7 @@ export default function AdminApiKeyPage() {
                 <div className="absolute top-2 right-2 flex gap-1">
                   <button
                     onClick={() => setPairingCodeVisible(!pairingCodeVisible)}
-                    className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                    className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors"
                     title={pairingCodeVisible ? 'Sembunyikan' : 'Tampilkan'}
                   >
                     {pairingCodeVisible ? (
@@ -766,23 +766,23 @@ export default function AdminApiKeyPage() {
             </div>
 
             {/* Cara Menghubungkan */}
-            <div className="glass rounded-xl p-3 border border-[#D4AF37]/10 bg-[#070B14]/50">
+            <div className="glass rounded-xl p-3 border border-primary/10 bg-background/50">
               <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Smartphone className="w-3 h-3" />
                 How to Connect to WhatsApp
               </p>
-              <div className="bg-[#070B14]/80 rounded-lg p-2.5 border border-[#D4AF37]/5 space-y-2">
+              <div className="bg-background/80 rounded-lg p-2.5 border border-primary/5 space-y-2">
                 <p className="text-foreground text-xs font-medium">📱 Steps:</p>
                 <div className="space-y-1.5">
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">1.</span> Open WhatsApp on your phone</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">2.</span> Tap ⋮ (menu) {'>'}  Linked Devices</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">3.</span> Tap "Link a device"</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">4.</span> Pilih "Link with phone number"</p>
-                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">5.</span> Enter code: <span className="text-[#D4AF37] font-bold font-mono">{pairingData.pairingCode}</span></p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">1.</span> Open WhatsApp on your phone</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">2.</span> Tap ⋮ (menu) {'>'}  Linked Devices</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">3.</span> Tap "Link a device"</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">4.</span> Pilih "Link with phone number"</p>
+                  <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">5.</span> Enter code: <span className="text-primary font-bold font-mono">{pairingData.pairingCode}</span></p>
                 </div>
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
-                  {pairingLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D4AF37]" />}
-                  <p className="text-[#D4AF37] text-[11px]">{pairingLoading ? 'Requesting code from WhatsApp...' : 'Waiting for code to be entered on WhatsApp...'}</p>
+                  {pairingLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />}
+                  <p className="text-primary text-[11px]">{pairingLoading ? 'Requesting code from WhatsApp...' : 'Waiting for code to be entered on WhatsApp...'}</p>
                 </div>
               </div>
             </div>
@@ -833,33 +833,33 @@ export default function AdminApiKeyPage() {
         {connectMode === 'qr' && !pairingData.botConnected && (
           <div className="space-y-4">
             {qrImage ? (
-              <div className="glass rounded-xl p-4 border border-[#D4AF37]/20 bg-[#D4AF37]/[0.02]">
+              <div className="glass rounded-xl p-4 border border-primary/20 bg-primary/[0.02]">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <QrCode className="w-4 h-4 text-[#D4AF37]" />
-                    <span className="text-[#D4AF37] text-xs font-semibold uppercase tracking-wider">WhatsApp QR Code</span>
+                    <QrCode className="w-4 h-4 text-primary" />
+                    <span className="text-primary text-xs font-semibold uppercase tracking-wider">WhatsApp QR Code</span>
                   </div>
-                  <Badge className="bg-amber-500/20 text-amber-400 border-0 text-[10px]">Ready to Scan</Badge>
+                  <Badge className="bg-cardmber-500/20 text-amber-400 border-border text-[10px]">Ready to Scan</Badge>
                 </div>
                 <div className="flex justify-center">
                   <div className="bg-white rounded-xl p-3 shadow-lg">
                     <img src={qrImage} alt="WhatsApp QR Code" className="w-56 h-56 object-contain" />
                   </div>
                 </div>
-                <div className="glass rounded-xl p-3 mt-3 border border-[#D4AF37]/10 bg-[#070B14]/50">
+                <div className="glass rounded-xl p-3 mt-3 border border-primary/10 bg-background/50">
                   <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <Smartphone className="w-3 h-3" />
                     How to Scan QR Code
                   </p>
-                  <div className="bg-[#070B14]/80 rounded-lg p-2.5 border border-[#D4AF37]/5 space-y-1.5">
-                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">1.</span> Open WhatsApp on your phone</p>
-                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">2.</span> Tap menu {'>'} Linked Devices</p>
-                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">3.</span> Tap &quot;Link a device&quot;</p>
-                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-[#D4AF37] font-bold">4.</span> Scan the QR code above</p>
+                  <div className="bg-background/80 rounded-lg p-2.5 border border-primary/5 space-y-1.5">
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">1.</span> Open WhatsApp on your phone</p>
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">2.</span> Tap menu {'>'} Linked Devices</p>
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">3.</span> Tap &quot;Link a device&quot;</p>
+                    <p className="text-muted-foreground text-[11px] flex gap-2"><span className="text-primary font-bold">4.</span> Scan the QR code above</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-3">
-                  <Button onClick={fetchQRImage} variant="outline" size="sm" className="rounded-xl border-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/10 text-xs">
+                  <Button onClick={fetchQRImage} variant="outline" size="sm" className="rounded-xl border-primary/20 text-primary hover:bg-primary/10 text-xs">
                     <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Refresh QR
                   </Button>
                   <Button onClick={handleRevokePairingCode} disabled={revokingPairing} variant="outline" size="sm" className="rounded-xl border-red-500/20 text-red-400 hover:bg-red-500/10 text-xs">
@@ -869,17 +869,17 @@ export default function AdminApiKeyPage() {
               </div>
             ) : (
               <div className="text-center py-4">
-                <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-3">
-                  <QrCode className="w-6 h-6 text-[#D4AF37]/40" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <QrCode className="w-6 h-6 text-primary/40" />
                 </div>
                 <p className="text-muted-foreground text-sm mb-3">Click below to generate a QR code</p>
-                <Button onClick={handleConnectQR} disabled={pairingLoading} className="bg-[#D4AF37] hover:bg-[#c9a22e] text-[#070B14] font-semibold rounded-xl">
+                <Button onClick={handleConnectQR} disabled={pairingLoading} className="bg-primary hover:bg-[#c9a22e] text-primary-foreground font-semibold rounded-xl">
                   {pairingLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <QrCode className="w-4 h-4 mr-2" />}Generate QR Code
                 </Button>
                 {pairingLoading && !qrImage && (
                   <div className="flex items-center justify-center gap-2 mt-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
-                    <p className="text-[#D4AF37] text-xs">Generating QR code from WhatsApp...</p>
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <p className="text-primary text-xs">Generating QR code from WhatsApp...</p>
                   </div>
                 )}
               </div>
@@ -888,7 +888,7 @@ export default function AdminApiKeyPage() {
         )}
 
         {/* Security Notice */}
-        <div className="mt-4 p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10">
+        <div className="mt-4 p-2.5 rounded-xl bg-cardmber-500/5 border border-bordermber-500/10">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
             <div>
@@ -910,7 +910,7 @@ export default function AdminApiKeyPage() {
         className="glass glow-gold rounded-2xl p-3 sm:p-6 mb-4 sm:mb-6"
       >
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-cardmerald-500/10 flex items-center justify-center">
             <Bot className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
@@ -930,7 +930,7 @@ export default function AdminApiKeyPage() {
               value={botConfig.bot_whatsapp_number}
               onChange={(e) => setBotConfig({ ...botConfig, bot_whatsapp_number: e.target.value })}
               placeholder="6281234567890"
-              className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1 font-mono text-sm"
+              className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1 font-mono text-sm"
             />
             <p className="text-muted-foreground text-[10px] mt-1">Bot number connected with API key</p>
           </div>
@@ -945,7 +945,7 @@ export default function AdminApiKeyPage() {
               value={botConfig.bot_admin_number}
               onChange={(e) => setBotConfig({ ...botConfig, bot_admin_number: e.target.value })}
               placeholder="6281234567890"
-              className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1 font-mono text-sm"
+              className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1 font-mono text-sm"
             />
             <p className="text-muted-foreground text-[10px] mt-1">Admin number for receiving approval notifications</p>
           </div>
@@ -1037,7 +1037,7 @@ export default function AdminApiKeyPage() {
           <Button
             onClick={handleSaveBotConfig}
             disabled={savingBot}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             {savingBot ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
             Save Bot Configuration
@@ -1047,7 +1047,7 @@ export default function AdminApiKeyPage() {
             variant="outline"
             size="sm"
             onClick={() => setShowApiDocs(!showApiDocs)}
-            className="rounded-xl border-[#D4AF37]/20 text-foreground text-xs"
+            className="rounded-xl border-primary/20 text-foreground text-xs"
           >
             <BookOpen className="w-3.5 h-3.5 mr-1.5" />
             API Docs
@@ -1061,10 +1061,10 @@ export default function AdminApiKeyPage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-4 glass rounded-xl p-4 border border-[#D4AF37]/10 overflow-hidden"
+            className="mt-4 glass rounded-xl p-4 border border-primary/10 overflow-hidden"
           >
             <h4 className="text-foreground text-sm font-semibold mb-3 flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-[#D4AF37]" />
+              <BookOpen className="w-4 h-4 text-primary" />
               Dokumentasi API Bot WhatsApp
             </h4>
             <div className="space-y-2.5 text-xs font-mono">
@@ -1088,9 +1088,9 @@ export default function AdminApiKeyPage() {
               ].map((api) => (
                 <div key={api.endpoint} className={`flex items-start gap-2 text-[11px] ${api.highlight ? 'bg-violet-500/5 -mx-1 px-1 py-0.5 rounded' : ''}`}>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                    api.method === 'GET' ? 'bg-emerald-500/20 text-emerald-400' :
+                    api.method === 'GET' ? 'bg-cardmerald-500/20 text-emerald-400' :
                     api.method === 'POST' ? 'bg-blue-500/20 text-blue-400' :
-                    api.method === 'PUT' ? 'bg-amber-500/20 text-amber-400' :
+                    api.method === 'PUT' ? 'bg-cardmber-500/20 text-amber-400' :
                     'bg-red-500/20 text-red-400'
                   }`}>
                     {api.method}
@@ -1102,7 +1102,7 @@ export default function AdminApiKeyPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-3 p-2.5 bg-amber-500/5 rounded-lg border border-amber-500/10">
+            <div className="mt-3 p-2.5 bg-cardmber-500/5 rounded-lg border border-bordermber-500/10">
               <p className="text-amber-400 text-[11px] font-semibold mb-1">Autentikasi</p>
               <p className="text-muted-foreground text-[10px]">
                 Semua endpoint bot memerlukan header <code className="text-foreground">X-API-Key: {'<your_api_key>'}</code> atau <code className="text-foreground">Authorization: Bearer {'<token>'}</code>
@@ -1127,8 +1127,8 @@ export default function AdminApiKeyPage() {
                 {/* Key Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center shrink-0">
-                      <Key className="w-5 h-5 text-[#D4AF37]" />
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Key className="w-5 h-5 text-primary" />
                     </div>
                     <div className="min-w-0">
                       <h3 className="text-foreground font-semibold text-sm truncate">{apiKey.name}</h3>
@@ -1139,9 +1139,9 @@ export default function AdminApiKeyPage() {
                   {/* Meta Row */}
                   <div className="flex flex-wrap items-center gap-3 mt-3 ml-0 sm:ml-[52px]">
                     <Badge
-                      className={`text-[10px] border-0 ${
+                      className={`text-[10px] border-border ${
                         apiKey.isActive
-                          ? 'bg-emerald-500/20 text-emerald-400'
+                          ? 'bg-cardmerald-500/20 text-emerald-400'
                           : 'bg-red-500/20 text-red-400'
                       }`}
                     >
@@ -1177,7 +1177,7 @@ export default function AdminApiKeyPage() {
                       disabled={togglingId === apiKey.id}
                     />
                     {togglingId === apiKey.id && (
-                      <Loader2 className="w-3 h-3 text-[#D4AF37] animate-spin" />
+                      <Loader2 className="w-3 h-3 text-primary animate-spin" />
                     )}
                   </div>
 
@@ -1202,8 +1202,8 @@ export default function AdminApiKeyPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="glass rounded-2xl p-6 sm:p-12 text-center"
         >
-          <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-4">
-            <Key className="w-8 h-8 text-[#D4AF37]/40" />
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Key className="w-8 h-8 text-primary/40" />
           </div>
           <h3 className="text-foreground font-semibold mb-2">No API Keys Yet</h3>
           <p className="text-muted-foreground text-sm mb-4 max-w-sm mx-auto">
@@ -1215,7 +1215,7 @@ export default function AdminApiKeyPage() {
               setGeneratedKey(null);
               setGenerateOpen(true);
             }}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <Plus className="w-4 h-4 mr-2" />
             Generate First Key
@@ -1235,7 +1235,7 @@ export default function AdminApiKeyPage() {
           }
         }}
       >
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg">
+        <DialogContent className="glass-strong border-primary/20 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">Generate New API Key</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -1253,7 +1253,7 @@ export default function AdminApiKeyPage() {
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
                   placeholder="Contoh: WhatsApp Bot, CRM Integration"
-                  className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1"
+                  className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleGenerate();
                   }}
@@ -1265,7 +1265,7 @@ export default function AdminApiKeyPage() {
                   value={customApiKey}
                   onChange={(e) => setCustomApiKey(e.target.value)}
                   placeholder="Kosongkan untuk auto-generate, atau masukkan key custom (min 20 karakter)"
-                  className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1 font-mono text-xs"
+                  className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1 font-mono text-xs"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleGenerate();
                   }}
@@ -1277,7 +1277,7 @@ export default function AdminApiKeyPage() {
             </div>
           ) : (
             <div className="space-y-4 py-2">
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
+              <div className="bg-cardmber-500/10 border border-bordermber-500/20 rounded-xl p-3 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-amber-400 text-xs font-semibold">Perhatian!</p>
@@ -1292,7 +1292,7 @@ export default function AdminApiKeyPage() {
                   API Key — <span className="text-amber-400 font-semibold">{generatedKey.name}</span>
                 </Label>
                 <div className="mt-1 relative">
-                  <div className="glass rounded-xl border-[#D4AF37]/20 p-3 pr-20 font-mono text-xs text-foreground break-all">
+                  <div className="glass rounded-xl border-primary/20 p-3 pr-20 font-mono text-xs text-foreground break-all">
                     {keyVisible
                       ? generatedKey.key
                       : generatedKey.key.substring(0, 16) + '•••••••••••••••••••••••••••••••••••••'}
@@ -1300,7 +1300,7 @@ export default function AdminApiKeyPage() {
                   <div className="absolute top-2 right-2 flex gap-1">
                     <button
                       onClick={() => setKeyVisible(!keyVisible)}
-                      className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                      className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors"
                       title={keyVisible ? 'Sembunyikan' : 'Tampilkan'}
                     >
                       {keyVisible ? (
@@ -1311,13 +1311,13 @@ export default function AdminApiKeyPage() {
                     </button>
                     <button
                       onClick={() => handleCopyKey(generatedKey.key)}
-                      className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center hover:bg-[#D4AF37]/20 transition-colors"
+                      className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
                       title="Salin"
                     >
                       {keyCopied ? (
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                       ) : (
-                        <Copy className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <Copy className="w-3.5 h-3.5 text-primary" />
                       )}
                     </button>
                   </div>
@@ -1338,14 +1338,14 @@ export default function AdminApiKeyPage() {
                   variant="outline"
                   onClick={() => setGenerateOpen(false)}
                   disabled={generating}
-                  className="rounded-xl border-[#D4AF37]/20 text-foreground"
+                  className="rounded-xl border-primary/20 text-foreground"
                 >
                   Batal
                 </Button>
                 <Button
                   onClick={handleGenerate}
                   disabled={generating || !keyName.trim()}
-                  className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+                  className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
                 >
                   {generating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1360,7 +1360,7 @@ export default function AdminApiKeyPage() {
                   setGenerateOpen(false);
                   setGeneratedKey(null);
                 }}
-                className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90"
+                className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90"
               >
                 {keyCopied ? 'Selesai' : 'Saya Sudah Menyalin'}
               </Button>
@@ -1371,7 +1371,7 @@ export default function AdminApiKeyPage() {
 
       {/* ───────── Delete Confirmation ───────── */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="glass-strong border-[#D4AF37]/20">
+        <AlertDialogContent className="glass-strong border-primary/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-400" />
@@ -1383,7 +1383,7 @@ export default function AdminApiKeyPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel
-              className="rounded-xl border-[#D4AF37]/20 text-foreground"
+              className="rounded-xl border-primary/20 text-foreground"
               disabled={deleting}
             >
               Batal

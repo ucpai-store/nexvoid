@@ -77,38 +77,38 @@ export default function AIChatBubble() {
             className="fixed bottom-20 right-3 sm:bottom-6 sm:right-6 md:bottom-8 md:right-6 z-[60] w-[calc(100vw-1.5rem)] sm:w-[22rem] max-h-[40vh] sm:max-h-[55vh] flex flex-col glass-strong rounded-2xl overflow-hidden shadow-2xl glow-gold"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#D4AF37] to-[#F0D060] px-3 py-3 flex items-center gap-2">
+            <div className="bg-gradient-to-r from-primary to-primary/80 px-3 py-3 flex items-center gap-2">
               {/* Back button - prominent */}
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-10 h-10 rounded-xl bg-white/30 flex items-center justify-center hover:bg-white/50 transition-colors shrink-0"
+                className="w-10 h-10 rounded-xl bg-white/30 flex items-center justify-center hover:bg-foreground/50 transition-colors shrink-0"
                 title="Back"
               >
-                <ArrowLeft className="w-5 h-5 text-[#070B14]" />
+                <ArrowLeft className="w-5 h-5 text-primary-foreground" />
               </button>
               {/* AI Icon */}
-              <div className="w-10 h-10 rounded-2xl bg-[#070B14]/20 flex items-center justify-center overflow-hidden shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-background/20 flex items-center justify-center overflow-hidden shrink-0">
                 <img src="/nexvo-ai-icon.jpeg" alt="NEXVO AI" className="w-full h-full object-cover rounded-2xl" />
               </div>
               {/* Title */}
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-[#070B14] text-sm leading-tight">{t('ai.assistant')}</h3>
-                <p className="text-[#070B14]/70 text-xs leading-tight">{t('ai.online')}</p>
+                <h3 className="font-semibold text-primary-foreground text-sm leading-tight">{t('ai.assistant')}</h3>
+                <p className="text-primary-foreground/70 text-xs leading-tight">{t('ai.online')}</p>
               </div>
               {/* Reset & Close buttons */}
               <button
                 onClick={() => setMessages([{ role: 'assistant', content: t('ai.greeting') }])}
-                className="w-9 h-9 rounded-xl bg-white/30 flex items-center justify-center hover:bg-white/50 transition-colors shrink-0"
+                className="w-9 h-9 rounded-xl bg-white/30 flex items-center justify-center hover:bg-foreground/50 transition-colors shrink-0"
                 title="Reset Chat"
               >
-                <RotateCcw className="w-4 h-4 text-[#070B14]" />
+                <RotateCcw className="w-4 h-4 text-primary-foreground" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-9 h-9 rounded-xl bg-white/30 flex items-center justify-center hover:bg-white/50 transition-colors shrink-0"
+                className="w-9 h-9 rounded-xl bg-white/30 flex items-center justify-center hover:bg-foreground/50 transition-colors shrink-0"
                 title="Close"
               >
-                <X className="w-5 h-5 text-[#070B14]" />
+                <X className="w-5 h-5 text-primary-foreground" />
               </button>
             </div>
 
@@ -122,17 +122,17 @@ export default function AIChatBubble() {
                   className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                 >
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    msg.role === 'user' ? 'bg-[#D4AF37]/20' : 'bg-[#1E3A5F]/30'
+                    msg.role === 'user' ? 'bg-primary/20' : 'bg-[#1E3A5F]/30'
                   }`}>
                     {msg.role === 'user' ? (
-                      <User className="w-4 h-4 text-[#D4AF37]" />
+                      <User className="w-4 h-4 text-primary" />
                     ) : (
                       <img src="/nexvo-ai-icon.jpeg" alt="AI" className="w-full h-full object-cover rounded-xl" />
                     )}
                   </div>
                   <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                     msg.role === 'user'
-                      ? 'bg-[#D4AF37]/20 text-foreground rounded-tr-md'
+                      ? 'bg-primary/20 text-foreground rounded-tr-md'
                       : 'bg-[#1E3A5F]/30 text-foreground rounded-tl-md'
                   }`}>
                     {msg.content}
@@ -145,7 +145,7 @@ export default function AIChatBubble() {
                     <img src="/nexvo-ai-icon.jpeg" alt="AI" className="w-full h-full object-cover rounded-xl" />
                   </div>
                   <div className="bg-[#1E3A5F]/30 px-4 py-3 rounded-2xl rounded-tl-md">
-                    <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin" />
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
                   </div>
                 </div>
               )}
@@ -153,7 +153,7 @@ export default function AIChatBubble() {
             </div>
 
             {/* Input */}
-            <div className="p-3 border-t border-[#D4AF37]/10">
+            <div className="p-3 border-t border-primary/10">
               <div className="flex gap-2">
                 <input
                   ref={inputRef}
@@ -162,14 +162,14 @@ export default function AIChatBubble() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                   placeholder={t("ai.typeMessage")}
-                  className="flex-1 bg-[#0F172A]/60 border border-[#D4AF37]/20 rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                  className="flex-1 bg-secondary/60 border border-primary/20 rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 transition-colors"
                 />
                 <button
                   onClick={sendMessage}
                   disabled={!input.trim() || isLoading}
-                  className="w-10 h-10 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#F0D060] flex items-center justify-center disabled:opacity-50 hover:shadow-lg transition-all"
+                  className="w-10 h-10 rounded-2xl bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center disabled:opacity-50 hover:shadow-lg transition-all"
                 >
-                  <Send className="w-4 h-4 text-[#070B14]" />
+                  <Send className="w-4 h-4 text-primary-foreground" />
                 </button>
               </div>
             </div>
@@ -183,7 +183,7 @@ export default function AIChatBubble() {
           onClick={() => setIsOpen(true)}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="fixed bottom-20 right-3 sm:bottom-6 sm:right-6 md:bottom-8 md:right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#F0D060] flex items-center justify-center shadow-lg glow-gold hover:scale-105 transition-transform overflow-hidden"
+          className="fixed bottom-20 right-3 sm:bottom-6 sm:right-6 md:bottom-8 md:right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center shadow-lg glow-gold hover:scale-105 transition-transform overflow-hidden"
           whileTap={{ scale: 0.95 }}
         >
           <img src="/nexvo-ai-icon.jpeg" alt="NEXVO AI" className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl" />

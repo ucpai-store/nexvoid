@@ -73,7 +73,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <button
                     onClick={() => handleLinkClick(link.section)}
-                    className="flex items-center gap-1.5 text-muted-foreground hover:text-[#D4AF37] transition-colors text-sm group"
+                    className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors text-sm group"
                   >
                     <ChevronRight className="w-3 h-3 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all" />
                     {link.label}
@@ -99,7 +99,7 @@ export default function Footer() {
                   <li key={item}>
                     <button
                       onClick={() => navigate('products')}
-                      className="flex items-center gap-1.5 text-muted-foreground hover:text-[#D4AF37] transition-colors text-sm group"
+                      className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors text-sm group"
                     >
                       <ChevronRight className="w-3 h-3 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all" />
                       {item}
@@ -122,15 +122,15 @@ export default function Footer() {
             </h4>
             <ul className="space-y-3">
               <li className="flex items-start gap-3 text-muted-foreground text-sm">
-                <Mail className="w-4 h-4 mt-0.5 text-[#D4AF37] shrink-0" />
+                <Mail className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                 <span>support@nexvo.id</span>
               </li>
               <li className="flex items-start gap-3 text-muted-foreground text-sm">
-                <Globe2 className="w-4 h-4 mt-0.5 text-[#D4AF37] shrink-0" />
+                <Globe2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                 <span>www.nexvo.id</span>
               </li>
               <li className="flex items-start gap-3 text-muted-foreground text-sm">
-                <MapPin className="w-4 h-4 mt-0.5 text-[#D4AF37] shrink-0" />
+                <MapPin className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                 <span>Singapore</span>
               </li>
             </ul>

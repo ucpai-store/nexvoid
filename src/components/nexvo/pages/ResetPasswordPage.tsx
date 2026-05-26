@@ -23,8 +23,8 @@ function getPasswordStrength(password: string, t: (key: string) => string): { le
   if (score <= 1) return { level: 1, label: t('auth.strengthWeak'), color: 'bg-red-500' };
   if (score <= 2) return { level: 2, label: t('auth.strengthFair'), color: 'bg-orange-500' };
   if (score <= 3) return { level: 3, label: t('auth.strengthGood'), color: 'bg-yellow-500' };
-  if (score <= 4) return { level: 4, label: t('auth.strengthStrong'), color: 'bg-emerald-500' };
-  return { level: 5, label: t('auth.strengthVeryStrong'), color: 'bg-emerald-400' };
+  if (score <= 4) return { level: 4, label: t('auth.strengthStrong'), color: 'bg-cardmerald-500' };
+  return { level: 5, label: t('auth.strengthVeryStrong'), color: 'bg-cardmerald-400' };
 }
 
 export default function ResetPasswordPage() {
@@ -94,7 +94,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
         <div className="absolute inset-0 bg-nexvo-gradient">
-          <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-[#D4AF37]/5 blur-[120px]" />
+          <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-primary/5 blur-[120px]" />
           <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-[#1E3A5F]/10 blur-[150px]" />
         </div>
         <div className="relative z-10 text-center">
@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
             <p className="text-muted-foreground text-sm mb-6">{t('auth.resetLinkExpired')}</p>
             <Button
               onClick={() => navigate('forgot-password')}
-              className="h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
+              className="h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
             >
               {t('auth.requestNewCode')}
             </Button>
@@ -117,9 +117,9 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-nexvo-gradient">
-        <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-[#D4AF37]/5 blur-[120px]" />
+        <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-[#1E3A5F]/10 blur-[150px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full border border-[#D4AF37]/5" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full border border-primary/5" />
       </div>
 
       <motion.div
@@ -147,9 +147,9 @@ export default function ResetPasswordPage() {
               className="mb-5"
             >
               <div className="relative inline-block">
-                <div className="absolute inset-0 blur-[25px] bg-[#D4AF37]/15 rounded-full scale-110" />
-                <div className="relative w-16 h-16 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto">
-                  <ShieldCheck className="w-8 h-8 text-[#D4AF37]" />
+                <div className="absolute inset-0 blur-[25px] bg-primary/15 rounded-full scale-110" />
+                <div className="relative w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                  <ShieldCheck className="w-8 h-8 text-primary" />
                 </div>
               </div>
             </motion.div>
@@ -171,7 +171,7 @@ export default function ResetPasswordPage() {
                   placeholder={t('auth.enterPassword')}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                  className="pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
                 />
                 <button
                   type="button"
@@ -194,7 +194,7 @@ export default function ResetPasswordPage() {
                       <div
                         key={level}
                         className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                          level <= strength.level ? strength.color : 'bg-white/10'
+                          level <= strength.level ? strength.color : 'bg-foreground/10'
                         }`}
                       />
                     ))}
@@ -221,7 +221,7 @@ export default function ResetPasswordPage() {
                   placeholder={t('auth.confirmNewPasswordPlaceholder')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 ${
+                  className={`pl-10 pr-10 h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20 ${
                     passwordsMismatch ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20' : ''
                   } ${passwordsMatch ? 'border-emerald-500/50 focus:border-emerald-500/50 focus:ring-emerald-500/20' : ''}`}
                 />
@@ -252,11 +252,11 @@ export default function ResetPasswordPage() {
             <Button
               type="submit"
               disabled={loading || !newPassword || !confirmPassword || passwordsMismatch || newPassword.length < 6}
-              className="w-full h-12 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
+              className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-[#070B14]/30 border-t-[#070B14] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   {t('auth.resetting')}
                 </div>
               ) : (

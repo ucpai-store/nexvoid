@@ -71,9 +71,9 @@ interface ProfitStatus {
 }
 
 const levelConfig: Record<string, { color: string; bg: string; border: string }> = {
-  Bronze: { color: 'text-amber-600', bg: 'bg-amber-600/10', border: 'border-amber-600/20' },
-  Silver: { color: 'text-gray-300', bg: 'bg-gray-300/10', border: 'border-gray-300/20' },
-  Gold: { color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', border: 'border-[#D4AF37]/20' },
+  Bronze: { color: 'text-amber-600', bg: 'bg-cardmber-600/10', border: 'border-bordermber-600/20' },
+  Silver: { color: 'text-foreground/70', bg: 'bg-gray-300/10', border: 'border-gray-300/20' },
+  Gold: { color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20' },
   Platinum: { color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20' },
 };
 
@@ -87,7 +87,7 @@ function getStatusConfig(status: string, t: (key: string) => string) {
     case 'success':
     case 'approved':
     case 'active':
-      return { label: t('dashboard.success'), color: 'text-emerald-400', bg: 'bg-emerald-400/10' };
+      return { label: t('dashboard.success'), color: 'text-emerald-400', bg: 'bg-cardmerald-400/10' };
     case 'completed':
       return { label: t('dashboard.completed'), color: 'text-blue-400', bg: 'bg-blue-400/10' };
     case 'pending':
@@ -96,7 +96,7 @@ function getStatusConfig(status: string, t: (key: string) => string) {
     case 'rejected':
       return { label: t('dashboard.failed'), color: 'text-red-400', bg: 'bg-red-400/10' };
     default:
-      return { label: status, color: 'text-muted-foreground', bg: 'bg-white/5' };
+      return { label: status, color: 'text-muted-foreground', bg: 'bg-foreground/5' };
   }
 }
 
@@ -284,7 +284,7 @@ export default function UserDashboard() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('dashboard.tryAgain')}
@@ -307,7 +307,7 @@ export default function UserDashboard() {
       {/* Profile Card */}
       <motion.div variants={itemVariants} className="glass glow-gold rounded-2xl p-3 sm:p-5 lg:p-6">
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gold-gradient flex items-center justify-center text-xl sm:text-2xl font-bold text-[#070B14] shrink-0">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gold-gradient flex items-center justify-center text-xl sm:text-2xl font-bold text-primary-foreground shrink-0">
             {user?.name?.charAt(0) || 'U'}
           </div>
           <div className="flex-1 min-w-0">
@@ -329,7 +329,7 @@ export default function UserDashboard() {
           </div>
           <button
             onClick={() => fetchUserData()}
-            className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 rounded-xl hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -339,17 +339,17 @@ export default function UserDashboard() {
       {/* Balance Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <motion.div variants={itemVariants} className="glass-gold glow-gold rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-[#D4AF37]/5 blur-2xl" />
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-primary/5 blur-2xl" />
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-[#D4AF37]" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-primary" />
             </div>
             <span className="text-muted-foreground text-sm">Saldo Utama</span>
             {showProfitFlash && (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium"
+                className="text-[10px] bg-cardmerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium"
               >
                 +Profit!
               </motion.span>
@@ -384,9 +384,9 @@ export default function UserDashboard() {
           variants={itemVariants}
           className="glass glow-gold rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-emerald-500/5 blur-2xl" />
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-cardmerald-500/5 blur-2xl" />
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-cardmerald-500/10 flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
             </div>
             <span className="text-muted-foreground text-sm">Total Profit</span>
@@ -400,14 +400,14 @@ export default function UserDashboard() {
 
       {/* ── Profit Schedule Card ── Real-time countdown to next profit at 00:00 WIB */}
       <motion.div variants={itemVariants} className="glass glow-gold rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-[#D4AF37]/3 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-emerald-500/3 blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/3 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-cardmerald-500/3 blur-3xl" />
 
         <div className="relative z-10">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-cardmerald-500/10 flex items-center justify-center">
                 <Timer className="w-4 h-4 text-emerald-400" />
               </div>
               <div>
@@ -417,13 +417,13 @@ export default function UserDashboard() {
             </div>
             <div className="flex items-center gap-2">
               <div className="glass rounded-lg px-2 py-1 flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${profitStatus?.todayProfitCredited ? 'bg-emerald-400' : 'bg-yellow-400'} animate-pulse`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${profitStatus?.todayProfitCredited ? 'bg-cardmerald-400' : 'bg-yellow-400'} animate-pulse`} />
                 <span className="text-[10px] text-muted-foreground">
                   WIB: {wibTime}
                 </span>
               </div>
               {profitStatus?.todayProfitCredited && (
-                <Badge className="bg-emerald-400/10 text-emerald-400 border-0 text-[9px] px-1.5 py-0">
+                <Badge className="bg-cardmerald-400/10 text-emerald-400 border-border text-[9px] px-1.5 py-0">
                   <CheckCircle2 className="w-3 h-3 mr-0.5" />
                   Hari ini sudah
                 </Badge>
@@ -437,12 +437,12 @@ export default function UserDashboard() {
               <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.hours)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">JAM</p>
             </div>
-            <span className="text-lg sm:text-xl font-bold text-[#D4AF37] animate-pulse">:</span>
+            <span className="text-lg sm:text-xl font-bold text-primary animate-pulse">:</span>
             <div className="glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px]">
               <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.minutes)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">MENIT</p>
             </div>
-            <span className="text-lg sm:text-xl font-bold text-[#D4AF37] animate-pulse">:</span>
+            <span className="text-lg sm:text-xl font-bold text-primary animate-pulse">:</span>
             <div className="glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px]">
               <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.seconds)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">DETIK</p>
@@ -451,7 +451,7 @@ export default function UserDashboard() {
 
           {/* Estimasi profit */}
           {hasActiveInvestments && (
-            <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 mb-3">
+            <div className="bg-cardmerald-500/5 border border-emerald-500/10 rounded-xl p-3 mb-3">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-emerald-400 text-xs font-medium">Estimasi Profit Berikutnya</span>
@@ -473,7 +473,7 @@ export default function UserDashboard() {
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white/[0.02] rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-1">
-                <Zap className="w-3 h-3 text-[#D4AF37]" />
+                <Zap className="w-3 h-3 text-primary" />
                 <span className="text-[10px] text-muted-foreground">Profit Harian</span>
               </div>
               <p className="text-foreground text-[10px] font-medium">00:00 WIB setiap hari</p>
@@ -495,7 +495,7 @@ export default function UserDashboard() {
             </div>
             <div className="bg-white/[0.02] rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-1">
-                <Gift className="w-3 h-3 text-[#D4AF37]" />
+                <Gift className="w-3 h-3 text-primary" />
                 <span className="text-[10px] text-muted-foreground">Bonus Sponsor</span>
               </div>
               <p className="text-foreground text-[10px] font-medium">Saat downline daftar</p>
@@ -509,8 +509,8 @@ export default function UserDashboard() {
         <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5 lg:p-6">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-                <Coins className="w-4 h-4 text-[#D4AF37]" />
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Coins className="w-4 h-4 text-primary" />
               </div>
               <div>
                 <h3 className="text-foreground font-semibold text-sm">Pendapatan Hari Ini</h3>
@@ -521,10 +521,10 @@ export default function UserDashboard() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {[
-              { label: 'Profit Harian', value: todayEarnings.profit, color: 'text-emerald-400', bg: 'bg-emerald-400/10', icon: TrendingUp },
+              { label: 'Profit Harian', value: todayEarnings.profit, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', icon: TrendingUp },
               { label: 'Matching', value: todayEarnings.matching, color: 'text-purple-400', bg: 'bg-purple-400/10', icon: Users },
               { label: 'Gaji', value: todayEarnings.salary, color: 'text-blue-400', bg: 'bg-blue-400/10', icon: Award },
-              { label: 'Sponsor', value: todayEarnings.sponsor, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', icon: Gift },
+              { label: 'Sponsor', value: todayEarnings.sponsor, color: 'text-primary', bg: 'bg-primary/10', icon: Gift },
             ].map((item) => (
               <div key={item.label} className="bg-white/[0.02] rounded-xl p-3 text-center">
                 <div className={`inline-flex items-center justify-center w-7 h-7 rounded-lg ${item.bg} mb-1.5`}>
@@ -542,16 +542,16 @@ export default function UserDashboard() {
       <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
         <Button
           onClick={() => navigate('deposit')}
-          className="h-14 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold-strong text-sm"
+          className="h-14 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold-strong text-sm"
         >
           <ArrowDownCircle className="w-5 h-5 mr-2" />
           {t('dashboard.depositBtn')}
         </Button>
         <Button
           onClick={() => navigate('withdraw')}
-          className="h-14 bg-card-gradient border border-[#D4AF37]/20 text-foreground font-semibold rounded-xl hover:bg-white/5 hover:border-[#D4AF37]/40 transition-all text-sm"
+          className="h-14 bg-card-gradient border border-primary/20 text-foreground font-semibold rounded-xl hover:bg-foreground/5 hover:border-primary/40 transition-all text-sm"
         >
-          <ArrowUpCircle className="w-5 h-5 mr-2 text-[#D4AF37]" />
+          <ArrowUpCircle className="w-5 h-5 mr-2 text-primary" />
           {t('dashboard.withdrawBtn')}
         </Button>
       </motion.div>
@@ -559,9 +559,9 @@ export default function UserDashboard() {
       {/* Earnings Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { icon: ArrowDownCircle, label: t('dashboard.totalDeposit'), value: user?.totalDeposit || 0, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+          { icon: ArrowDownCircle, label: t('dashboard.totalDeposit'), value: user?.totalDeposit || 0, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10' },
           { icon: ArrowUpCircle, label: t('dashboard.totalWithdraw'), value: user?.totalWithdraw || 0, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-          { icon: TrendingUp, label: t('dashboard.totalProfit'), value: user?.totalProfit || 0, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
+          { icon: TrendingUp, label: t('dashboard.totalProfit'), value: user?.totalProfit || 0, color: 'text-primary', bg: 'bg-primary/10' },
           { icon: Award, label: t('dashboard.level'), value: user?.level || 'Bronze', color: level.color, bg: level.bg, isText: true },
         ].map((item) => (
           <motion.div
@@ -587,9 +587,9 @@ export default function UserDashboard() {
       {/* Quick Nav */}
       <motion.div variants={itemVariants} className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
         {[
-          { icon: ShoppingBag, label: t('nav.products'), page: 'products' as const, color: 'text-[#D4AF37]' },
+          { icon: ShoppingBag, label: t('nav.products'), page: 'products' as const, color: 'text-primary' },
           { icon: Package, label: t('nav.assets'), page: 'assets' as const, color: 'text-purple-400' },
-          { icon: TrendingUp, label: t('nav.paket'), page: 'paket' as const, color: 'text-[#D4AF37]' },
+          { icon: TrendingUp, label: t('nav.paket'), page: 'paket' as const, color: 'text-primary' },
           { icon: Shield, label: t('nav.bank'), page: 'bank' as const, color: 'text-blue-400' },
           { icon: Clock, label: t('nav.history'), page: 'history' as const, color: 'text-orange-400' },
         ].map((item) => (
@@ -598,7 +598,7 @@ export default function UserDashboard() {
             onClick={() => navigate(item.page)}
             className="glass rounded-2xl p-3 sm:p-4 flex flex-col items-center gap-1.5 sm:gap-2 hover:glow-gold transition-all group"
           >
-            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center group-hover:scale-110 transition-transform">
               <item.icon className={`w-5 h-5 ${item.color}`} />
             </div>
             <span className="text-foreground text-[10px] sm:text-xs font-medium">{item.label}</span>
@@ -611,12 +611,12 @@ export default function UserDashboard() {
         <motion.div variants={itemVariants} className="glass rounded-2xl p-3 sm:p-5 lg:p-6">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h3 className="text-foreground font-semibold text-sm sm:text-base flex items-center gap-2">
-              <Package className="w-4 h-4 text-[#D4AF37]" />
+              <Package className="w-4 h-4 text-primary" />
               {t('dashboard.activeAssets')}
             </h3>
             <button
               onClick={() => navigate('assets')}
-              className="text-[#D4AF37] text-xs font-medium hover:underline flex items-center gap-1"
+              className="text-primary text-xs font-medium hover:underline flex items-center gap-1"
             >
               {t('dashboard.viewAll')}
               <ChevronRight className="w-3 h-3" />
@@ -638,7 +638,7 @@ export default function UserDashboard() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-foreground text-sm font-semibold">{formatRupiah(asset.amount)}</p>
-                  <Badge className="bg-emerald-400/10 text-emerald-400 border-0 text-[9px] px-1.5 py-0">{t('dashboard.active')}</Badge>
+                  <Badge className="bg-cardmerald-400/10 text-emerald-400 border-border text-[9px] px-1.5 py-0">{t('dashboard.active')}</Badge>
                 </div>
               </div>
             ))}
@@ -654,7 +654,7 @@ export default function UserDashboard() {
             variant="ghost"
             size="sm"
             onClick={() => navigate('history')}
-            className="text-[#D4AF37] text-xs hover:text-[#F0D060] hover:bg-[#D4AF37]/10 rounded-xl"
+            className="text-primary text-xs hover:text-primary/80 hover:bg-primary/10 rounded-xl"
           >
             {t('dashboard.viewAll')}
             <ChevronRight className="w-3 h-3 ml-1" />
@@ -666,13 +666,13 @@ export default function UserDashboard() {
             {recentTransactions.map((tx) => {
               const statusCfg = getStatusConfig(tx.status, t);
               const typeIcon = {
-                deposit: { icon: ArrowDownCircle, color: 'text-emerald-400', bg: 'bg-emerald-400/10', prefix: '+' },
+                deposit: { icon: ArrowDownCircle, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', prefix: '+' },
                 withdraw: { icon: ArrowUpCircle, color: 'text-blue-400', bg: 'bg-blue-400/10', prefix: '-' },
-                purchase: { icon: ShoppingBag, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', prefix: '-' },
+                purchase: { icon: ShoppingBag, color: 'text-primary', bg: 'bg-primary/10', prefix: '-' },
                 investment: { icon: Package, color: 'text-purple-400', bg: 'bg-purple-400/10', prefix: '-' },
-                bonus: { icon: Gift, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', prefix: '+' },
-                profit: { icon: Coins, color: 'text-emerald-400', bg: 'bg-emerald-400/10', prefix: '+' },
-              }[tx.type] || { icon: Clock, color: 'text-muted-foreground', bg: 'bg-white/5', prefix: '' };
+                bonus: { icon: Gift, color: 'text-primary', bg: 'bg-primary/10', prefix: '+' },
+                profit: { icon: Coins, color: 'text-emerald-400', bg: 'bg-cardmerald-400/10', prefix: '+' },
+              }[tx.type] || { icon: Clock, color: 'text-muted-foreground', bg: 'bg-foreground/5', prefix: '' };
               const Icon = typeIcon.icon;
               const typeLabel = {
                 deposit: t('dashboard.depositBtn'),

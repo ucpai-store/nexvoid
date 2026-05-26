@@ -55,10 +55,10 @@ function PackageCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08, duration: 0.4, ease: 'easeOut' }}
       whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-      className="group glass-strong rounded-2xl p-3 sm:p-5 lg:p-6 flex flex-col relative overflow-hidden hover:glow-gold hover:border-[#D4AF37]/30 transition-all duration-300"
+      className="group glass-strong rounded-2xl p-3 sm:p-5 lg:p-6 flex flex-col relative overflow-hidden hover:glow-gold hover:border-primary/30 transition-all duration-300"
     >
       {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-[#D4AF37]/3 blur-3xl group-hover:bg-[#D4AF37]/8 transition-colors" />
+      <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-primary/3 blur-3xl group-hover:bg-primary/8 transition-colors" />
 
       {/* Package name */}
       <div className="relative z-10">
@@ -74,7 +74,7 @@ function PackageCard({
         {/* Details */}
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-400/10 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-cardmerald-400/10 flex items-center justify-center shrink-0">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
             </div>
             <div>
@@ -95,7 +95,7 @@ function PackageCard({
         </div>
 
         {/* Capital Return badge */}
-        <Badge className="bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-medium mb-4">
+        <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-medium mb-4">
           <ShieldCheck className="w-3 h-3 mr-1" />
           {t('paket.capitalReturn')}
         </Badge>
@@ -108,7 +108,7 @@ function PackageCard({
         {/* Invest button */}
         <Button
           onClick={() => onInvest(pkg)}
-          className="w-full h-11 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
+          className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
         >
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4" />
@@ -241,7 +241,7 @@ export default function PaketPage() {
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
           <Button
             onClick={retry}
-            className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('dashboard.tryAgain')}</Button>
@@ -288,10 +288,10 @@ export default function PaketPage() {
 
       {/* Confirm Investment Dialog */}
       <Dialog open={!!confirmPkg} onOpenChange={(open) => { if (!open) setConfirmPkg(null); }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
-              <Wallet className="w-5 h-5 text-[#D4AF37]" />
+              <Wallet className="w-5 h-5 text-primary" />
               {t('paket.confirmInvestTitle')}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -319,7 +319,7 @@ export default function PaketPage() {
                 <span className="text-muted-foreground">{t('paket.contractLabel')}</span>
                 <span className="text-foreground font-medium">{confirmPkg.contractDays} Hari</span>
               </div>
-              <Separator className="bg-[#D4AF37]/10" />
+              <Separator className="bg-primary/10" />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t('paket.yourBalance')}</span>
                 <span className={`font-medium ${totalAvailableBalance >= confirmPkg.amount ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -332,7 +332,7 @@ export default function PaketPage() {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground/60">Saldo Utama</span>
-                <span className="text-[#D4AF37]">{formatRupiah(user?.mainBalance || 0)}</span>
+                <span className="text-primary">{formatRupiah(user?.mainBalance || 0)}</span>
               </div>
               {totalAvailableBalance >= confirmPkg.amount && (
                 <div className="flex justify-between text-sm">
@@ -356,7 +356,7 @@ export default function PaketPage() {
             <Button
               onClick={handleConfirmInvest}
               disabled={!!investing}
-              className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+              className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
             >
               {investing ? (
                 <div className="flex items-center gap-2">
@@ -378,9 +378,9 @@ export default function PaketPage() {
 
       {/* Success Dialog */}
       <Dialog open={!!successPkg} onOpenChange={(open) => { if (!open) { setSuccessPkg(null); navigate('assets'); } }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
-            <div className="w-16 h-16 rounded-2xl bg-emerald-400/10 flex items-center justify-center mx-auto mb-2">
+            <div className="w-16 h-16 rounded-2xl bg-cardmerald-400/10 flex items-center justify-center mx-auto mb-2">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             </div>
             <DialogTitle className="text-foreground text-center">{t('paket.investSuccessTitle')}</DialogTitle>
@@ -407,7 +407,7 @@ export default function PaketPage() {
           <DialogFooter>
             <Button
               onClick={() => { setSuccessPkg(null); navigate('assets'); }}
-              className="w-full bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+              className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
             >
               {t('paket.viewMyAssets')}
             </Button>

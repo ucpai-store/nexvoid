@@ -172,7 +172,7 @@ export default function AdminPackagesPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">Kelola Paket Investasi</h1>
           <p className="text-muted-foreground text-sm">{packages.length} paket terdaftar</p>
         </div>
-        <Button onClick={openAdd} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold">
+        <Button onClick={openAdd} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold">
           <Plus className="w-4 h-4 mr-2" /> Tambah Paket
         </Button>
       </motion.div>
@@ -187,9 +187,9 @@ export default function AdminPackagesPage() {
             <motion.div key={pkg.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
               className="glass glow-gold rounded-2xl overflow-hidden group hover:glow-gold-strong transition-all">
               <div className="relative h-20 bg-card-gradient flex items-center justify-center overflow-hidden">
-                <Package className="w-10 h-10 text-[#D4AF37]/30" />
+                <Package className="w-10 h-10 text-primary/30" />
                 <div className="absolute top-2 right-2">
-                  <Badge className={`text-[10px] border-0 ${pkg.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                  <Badge className={`text-[10px] border-border ${pkg.isActive ? 'bg-cardmerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                     {pkg.isActive ? 'Aktif' : 'Nonaktif'}
                   </Badge>
                 </div>
@@ -217,11 +217,11 @@ export default function AdminPackagesPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={() => openEdit(pkg)}
-                    className="flex-1 rounded-xl border-[#D4AF37]/20 text-foreground hover:bg-white/5 h-9 sm:h-8 text-xs">
+                    className="flex-1 rounded-xl border-primary/20 text-foreground hover:bg-foreground/5 h-9 sm:h-8 text-xs">
                     <Pencil className="w-3 h-3 mr-1" /> Edit
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => handleToggleActive(pkg)}
-                    className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${pkg.isActive ? 'border-orange-500/20 text-orange-400 hover:bg-orange-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'}`}
+                    className={`rounded-xl h-9 sm:h-8 text-xs px-2 ${pkg.isActive ? 'border-orange-500/20 text-orange-400 hover:bg-orange-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-cardmerald-500/10'}`}
                     title={pkg.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
                     {pkg.isActive ? <Ban className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                   </Button>
@@ -243,7 +243,7 @@ export default function AdminPackagesPage() {
       )}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-strong border-primary/20 max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">{editId ? 'Edit Paket Investasi' : 'Tambah Paket Investasi Baru'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">{editId ? 'Perbarui informasi paket' : 'Isi detail paket baru'}</DialogDescription>
@@ -252,23 +252,23 @@ export default function AdminPackagesPage() {
             <div>
               <Label className="text-muted-foreground text-xs">Nama Paket *</Label>
               <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Contoh: Paket Emas Premium" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                placeholder="Contoh: Paket Emas Premium" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
             </div>
             <div>
               <Label className="text-muted-foreground text-xs">Jumlah Investasi / Rp *</Label>
               <Input type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                placeholder="1000000" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                placeholder="1000000" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-muted-foreground text-xs">Profit Rate / % *</Label>
                 <Input type="number" step="0.1" value={form.profitRate} onChange={(e) => setForm((f) => ({ ...f, profitRate: e.target.value }))}
-                  placeholder="10" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                  placeholder="10" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs">Durasi Kontrak / Hari</Label>
                 <Input type="number" value={form.contractDays} onChange={(e) => setForm((f) => ({ ...f, contractDays: e.target.value }))}
-                  placeholder="90" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                  placeholder="90" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
               </div>
             </div>
             {/* Auto-calculated profit preview */}
@@ -288,7 +288,7 @@ export default function AdminPackagesPage() {
             <div>
               <Label className="text-muted-foreground text-xs">Urutan / Order</Label>
               <Input type="number" value={form.order} onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))}
-                placeholder="0" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" />
+                placeholder="0" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" />
             </div>
             <div className="flex items-center justify-between glass rounded-xl p-3">
               <Label className="text-foreground text-sm">Paket Aktif</Label>
@@ -296,8 +296,8 @@ export default function AdminPackagesPage() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving} className="rounded-xl border-[#D4AF37]/20 text-foreground">Batal</Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+            <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editId ? 'Simpan' : 'Tambah'}
             </Button>
           </DialogFooter>
@@ -305,7 +305,7 @@ export default function AdminPackagesPage() {
       </Dialog>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => { setDeleteId(null); setDeleteName(''); }}>
-        <AlertDialogContent className="glass-strong border-[#D4AF37]/20">
+        <AlertDialogContent className="glass-strong border-primary/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-400" /> Hapus Paket Investasi
@@ -316,7 +316,7 @@ export default function AdminPackagesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl border-[#D4AF37]/20 text-foreground" disabled={deleting}>Batal</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl border-primary/20 text-foreground" disabled={deleting}>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting}
               className="rounded-xl bg-red-600 hover:bg-red-700 text-white" forceMount>
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Hapus'}

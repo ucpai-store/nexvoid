@@ -185,7 +185,7 @@ export default function AdminUsersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Cari nama, ID, WhatsApp, email..."
-            className="pl-10 glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground placeholder:text-muted-foreground" />
+            className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground placeholder:text-muted-foreground" />
         </div>
       </motion.div>
 
@@ -198,7 +198,7 @@ export default function AdminUsersPage() {
             <div className="hidden lg:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#D4AF37]/10 hover:bg-transparent">
+                  <TableRow className="border-primary/10 hover:bg-transparent">
                     <TableHead className="text-muted-foreground text-xs">ID</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Nama</TableHead>
                     <TableHead className="text-muted-foreground text-xs">WhatsApp</TableHead>
@@ -213,13 +213,13 @@ export default function AdminUsersPage() {
                 </TableHeader>
                 <TableBody>
                   {paged.map((user) => (
-                    <TableRow key={user.id} className="border-[#D4AF37]/5 hover:bg-white/[0.02]">
+                    <TableRow key={user.id} className="border-primary/5 hover:bg-white/[0.02]">
                       <TableCell className="text-foreground text-xs font-mono">{user.userId}</TableCell>
                       <TableCell className="text-foreground text-sm font-medium">{user.name || '-'}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">{maskWhatsApp(user.whatsapp)}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">{user.email}</TableCell>
                       <TableCell>
-                        <Badge className={`text-[10px] ${user.level === 'Gold' ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : user.level === 'Platinum' ? 'bg-purple-400/10 text-purple-400' : 'bg-gray-400/10 text-gray-400'} border-0`}>
+                        <Badge className={`text-[10px] ${user.level === 'Gold' ? 'bg-primary/10 text-primary' : user.level === 'Platinum' ? 'bg-purple-400/10 text-purple-400' : 'bg-gray-400/10 text-muted-foreground'} border-border`}>
                           <Crown className="w-3 h-3 mr-1" />{user.level}
                         </Badge>
                       </TableCell>
@@ -228,18 +228,18 @@ export default function AdminUsersPage() {
                       <TableCell className="text-emerald-400 text-sm">{formatRupiah(user.totalProfit || 0)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Badge className={`text-[10px] ${user.isSuspended ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'} border-0`}>
+                          <Badge className={`text-[10px] ${user.isSuspended ? 'bg-red-500/10 text-red-400' : 'bg-cardmerald-500/10 text-emerald-400'} border-border`}>
                             {user.isSuspended ? 'Suspended' : 'Aktif'}
                           </Badge>
-                          {!user.isVerified && <Badge className="bg-yellow-500/10 text-yellow-400 text-[9px] border-0">Unverified</Badge>}
+                          {!user.isVerified && <Badge className="bg-yellow-500/10 text-yellow-400 text-[9px] border-border">Unverified</Badge>}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEditDialog(user)} className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center hover:bg-[#D4AF37]/20 transition-colors" title="Edit User">
-                            <Pencil className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <button onClick={() => openEditDialog(user)} className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors" title="Edit User">
+                            <Pencil className="w-3.5 h-3.5 text-primary" />
                           </button>
-                          <button onClick={() => setSaldoDialog({ userId: user.id, type: 'add' })} className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 transition-colors" title="Tambah Saldo">
+                          <button onClick={() => setSaldoDialog({ userId: user.id, type: 'add' })} className="w-8 h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 transition-colors" title="Tambah Saldo">
                             <Plus className="w-3.5 h-3.5 text-emerald-400" />
                           </button>
                           <button onClick={() => setSaldoDialog({ userId: user.id, type: 'reduce' })} className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center hover:bg-orange-500/20 transition-colors" title="Kurangi Saldo">
@@ -272,25 +272,25 @@ export default function AdminUsersPage() {
                       <p className="text-muted-foreground text-xs font-mono">{user.userId}</p>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Badge className={`text-[10px] ${user.isSuspended ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'} border-0`}>
+                      <Badge className={`text-[10px] ${user.isSuspended ? 'bg-red-500/10 text-red-400' : 'bg-cardmerald-500/10 text-emerald-400'} border-border`}>
                         {user.isSuspended ? 'Suspend' : 'Aktif'}
                       </Badge>
-                      {!user.isVerified && <Badge className="bg-yellow-500/10 text-yellow-400 text-[9px] border-0">Unverified</Badge>}
+                      {!user.isVerified && <Badge className="bg-yellow-500/10 text-yellow-400 text-[9px] border-border">Unverified</Badge>}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                     <div><span className="text-muted-foreground">WhatsApp</span><p className="text-foreground">{maskWhatsApp(user.whatsapp)}</p></div>
                     <div><span className="text-muted-foreground">Email</span><p className="text-foreground truncate">{user.email}</p></div>
-                    <div><span className="text-muted-foreground">Level</span><p className="text-[#D4AF37]">{user.level}</p></div>
+                    <div><span className="text-muted-foreground">Level</span><p className="text-primary">{user.level}</p></div>
                     <div><span className="text-muted-foreground">Saldo Utama</span><p className="text-foreground">{formatRupiah(user.mainBalance)}</p></div>
                     <div><span className="text-muted-foreground">Saldo Deposit</span><p className="text-blue-400">{formatRupiah(user.depositBalance || 0)}</p></div>
                     <div><span className="text-muted-foreground">Total Profit</span><p className="text-emerald-400">{formatRupiah(user.totalProfit || 0)}</p></div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Button size="sm" variant="outline" onClick={() => openEditDialog(user)} className="rounded-xl border-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/5 h-8 text-xs">
+                    <Button size="sm" variant="outline" onClick={() => openEditDialog(user)} className="rounded-xl border-primary/20 text-primary hover:bg-primary/5 h-8 text-xs">
                       <Pencil className="w-3 h-3 mr-1" /> Edit
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setSaldoDialog({ userId: user.id, type: 'add' })} className="rounded-xl border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 h-8 text-xs">
+                    <Button size="sm" variant="outline" onClick={() => setSaldoDialog({ userId: user.id, type: 'add' })} className="rounded-xl border-emerald-500/20 text-emerald-400 hover:bg-cardmerald-500/10 h-8 text-xs">
                       <Plus className="w-3 h-3 mr-1" /> Saldo
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setSaldoDialog({ userId: user.id, type: 'reduce' })} className="rounded-xl border-orange-500/20 text-orange-400 hover:bg-orange-500/10 h-8 text-xs">
@@ -311,11 +311,11 @@ export default function AdminUsersPage() {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between p-4 border-t border-[#D4AF37]/10">
+              <div className="flex items-center justify-between p-4 border-t border-primary/10">
                 <p className="text-muted-foreground text-xs">Halaman {page} dari {totalPages}</p>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="w-8 h-8 rounded-lg glass flex items-center justify-center disabled:opacity-30 hover:bg-white/5"><ChevronLeft className="w-4 h-4" /></button>
-                  <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="w-8 h-8 rounded-lg glass flex items-center justify-center disabled:opacity-30 hover:bg-white/5"><ChevronRight className="w-4 h-4" /></button>
+                  <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="w-8 h-8 rounded-lg glass flex items-center justify-center disabled:opacity-30 hover:bg-foreground/5"><ChevronLeft className="w-4 h-4" /></button>
+                  <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="w-8 h-8 rounded-lg glass flex items-center justify-center disabled:opacity-30 hover:bg-foreground/5"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>
             )}
@@ -325,19 +325,19 @@ export default function AdminUsersPage() {
 
       {/* Edit User Dialog */}
       <Dialog open={!!editDialog} onOpenChange={(open) => { if (!open) setEditDialog(null); }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-md">
+        <DialogContent className="glass-strong border-primary/20 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient flex items-center gap-2"><Pencil className="w-4 h-4" />Edit User</DialogTitle>
             <DialogDescription className="text-muted-foreground">Edit informasi user <span className="text-foreground font-medium">{editDialog?.userId}</span></DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div><Label className="text-muted-foreground text-xs">Nama</Label><Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nama user" className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1" /></div>
-            <div><Label className="text-muted-foreground text-xs">Nomor WhatsApp</Label><div className="relative mt-1"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={editForm.whatsapp} onChange={(e) => setEditForm((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="628123456789" className="pl-10 glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" /></div></div>
-            <div><Label className="text-muted-foreground text-xs">Email</Label><div className="relative mt-1"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} placeholder="user@email.com" className="pl-10 glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" /></div></div>
+            <div><Label className="text-muted-foreground text-xs">Nama</Label><Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nama user" className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1" /></div>
+            <div><Label className="text-muted-foreground text-xs">Nomor WhatsApp</Label><div className="relative mt-1"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={editForm.whatsapp} onChange={(e) => setEditForm((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="628123456789" className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground" /></div></div>
+            <div><Label className="text-muted-foreground text-xs">Email</Label><div className="relative mt-1"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} placeholder="user@email.com" className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground" /></div></div>
             <div><Label className="text-muted-foreground text-xs">Level</Label>
               <Select value={editForm.level} onValueChange={(value) => setEditForm((f) => ({ ...f, level: value }))}>
-                <SelectTrigger className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground mt-1"><SelectValue placeholder="Pilih Level" /></SelectTrigger>
-                <SelectContent className="glass-strong border-[#D4AF37]/20">
+                <SelectTrigger className="glass rounded-xl border-primary/20 bg-transparent text-foreground mt-1"><SelectValue placeholder="Pilih Level" /></SelectTrigger>
+                <SelectContent className="glass-strong border-primary/20">
                   <SelectItem value="Bronze">🥉 Bronze</SelectItem>
                   <SelectItem value="Silver">🥈 Silver</SelectItem>
                   <SelectItem value="Gold">🥇 Gold</SelectItem>
@@ -348,8 +348,8 @@ export default function AdminUsersPage() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditDialog(null)} disabled={savingEdit} className="rounded-xl border-[#D4AF37]/20 text-foreground">Batal</Button>
-            <Button onClick={handleEditSave} disabled={savingEdit} className="bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90">
+            <Button variant="outline" onClick={() => setEditDialog(null)} disabled={savingEdit} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
+            <Button onClick={handleEditSave} disabled={savingEdit} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90">
               {savingEdit ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Pencil className="w-4 h-4 mr-2" />}Simpan
             </Button>
           </DialogFooter>
@@ -358,19 +358,19 @@ export default function AdminUsersPage() {
 
       {/* Saldo Dialog */}
       <Dialog open={!!saldoDialog} onOpenChange={(open) => { if (!open) { setSaldoDialog(null); setSaldoAmount(''); } }}>
-        <DialogContent className="glass-strong border-[#D4AF37]/20 max-w-sm">
+        <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">{saldoDialog?.type === 'add' ? 'Tambah Saldo' : 'Kurangi Saldo'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">Masukkan jumlah saldo yang ingin {saldoDialog?.type === 'add' ? 'ditambahkan' : 'dikurangi'}</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label className="text-muted-foreground text-xs mb-2 block">Jumlah (Rp)</Label>
-            <Input type="number" value={saldoAmount} onChange={(e) => setSaldoAmount(e.target.value)} placeholder="Masukkan jumlah..." className="glass rounded-xl border-[#D4AF37]/20 bg-transparent text-foreground" />
+            <Input type="number" value={saldoAmount} onChange={(e) => setSaldoAmount(e.target.value)} placeholder="Masukkan jumlah..." className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
             {saldoAmount && parseFloat(saldoAmount) > 0 && (<p className="text-foreground text-sm mt-2">= {formatRupiah(parseFloat(saldoAmount))}</p>)}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setSaldoDialog(null); setSaldoAmount(''); }} disabled={processing} className="rounded-xl border-[#D4AF37]/20 text-foreground">Batal</Button>
-            <Button onClick={handleSaldoAction} disabled={processing || !saldoAmount} className={`rounded-xl font-semibold ${saldoDialog?.type === 'add' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}>
+            <Button variant="outline" onClick={() => { setSaldoDialog(null); setSaldoAmount(''); }} disabled={processing} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
+            <Button onClick={handleSaldoAction} disabled={processing || !saldoAmount} className={`rounded-xl font-semibold ${saldoDialog?.type === 'add' ? 'bg-cardmerald-600 hover:bg-cardmerald-700 text-white' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}>
               {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : saldoDialog?.type === 'add' ? 'Tambah' : 'Kurangi'}
             </Button>
           </DialogFooter>
@@ -379,7 +379,7 @@ export default function AdminUsersPage() {
 
       {/* Delete User Dialog */}
       <AlertDialog open={!!deleteUserId} onOpenChange={(open) => { if (!open) setDeleteUserId(null); }}>
-        <AlertDialogContent className="glass-strong border-[#D4AF37]/20">
+        <AlertDialogContent className="glass-strong border-primary/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-400" /> Hapus User
@@ -389,7 +389,7 @@ export default function AdminUsersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl border-[#D4AF37]/20 text-foreground" disabled={deletingUser}>Batal</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl border-primary/20 text-foreground" disabled={deletingUser}>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteUser} disabled={deletingUser} className="rounded-xl bg-red-600 hover:bg-red-700 text-white" forceMount>
               {deletingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Hapus'}
             </AlertDialogAction>

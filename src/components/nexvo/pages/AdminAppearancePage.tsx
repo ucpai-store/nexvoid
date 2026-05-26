@@ -207,7 +207,7 @@ export default function AdminAppearancePage() {
     return (
       <div className="p-3 sm:p-5 lg:p-6">
         <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" />
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
       </div>
     );
@@ -253,8 +253,8 @@ export default function AdminAppearancePage() {
         className="glass rounded-2xl p-4 sm:p-8"
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-            <ImageIcon className="w-5 h-5 text-[#D4AF37]" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <ImageIcon className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h2 className="text-foreground font-semibold text-lg">Logo Website</h2>
@@ -312,7 +312,7 @@ export default function AdminAppearancePage() {
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onClick={() => fileInputRef.current?.click()}
-              className="glass-strong rounded-xl p-6 min-h-[200px] flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-border hover:border-[#D4AF37]/30 transition-colors group"
+              className="glass-strong rounded-xl p-6 min-h-[200px] flex flex-col items-center justify-center cursor-pointer border-border border-dashed border-border hover:border-primary/30 transition-colors group"
             >
               {previewUrl ? (
                 <div className="text-center">
@@ -327,8 +327,8 @@ export default function AdminAppearancePage() {
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-3 group-hover:bg-[#D4AF37]/20 transition-colors">
-                    <Upload className="w-6 h-6 text-[#D4AF37]" />
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3 group-hover:bg-primary/20 transition-colors">
+                    <Upload className="w-6 h-6 text-primary" />
                   </div>
                   <p className="text-foreground text-sm font-medium mb-1">
                     Klik atau seret file ke sini
@@ -358,7 +358,7 @@ export default function AdminAppearancePage() {
                 <Button
                   onClick={handleUpload}
                   disabled={uploading}
-                  className="flex-1 bg-gold-gradient text-[#070B14] font-semibold rounded-xl hover:opacity-90 glow-gold"
+                  className="flex-1 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
                 >
                   {uploading ? (
                     <>
@@ -386,8 +386,8 @@ export default function AdminAppearancePage() {
         </div>
 
         {/* Tips */}
-        <div className="mt-8 p-4 rounded-xl bg-[#D4AF37]/5 border border-[#D4AF37]/10">
-          <h4 className="text-[#D4AF37] text-sm font-medium mb-2">💡 Tips Logo</h4>
+        <div className="mt-8 p-4 rounded-xl bg-primary/5 border border-primary/10">
+          <h4 className="text-primary text-sm font-medium mb-2">💡 Tips Logo</h4>
           <ul className="text-muted-foreground text-xs space-y-1.5">
             <li>• Gunakan logo dengan latar transparan (PNG/SVG) untuk hasil terbaik</li>
             <li>• Ukuran rekomendasi: lebar 200-400px untuk tampilan optimal</li>
@@ -405,8 +405,8 @@ export default function AdminAppearancePage() {
         className="glass rounded-2xl p-4 sm:p-8 mt-4 sm:mt-6"
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center">
-            <ImageIcon className="w-5 h-5 text-[#D4AF37]" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <ImageIcon className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h2 className="text-foreground font-semibold text-lg">Preview Logo</h2>

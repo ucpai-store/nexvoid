@@ -100,8 +100,8 @@ function PlaceholderPage({ title, icon: Icon }: { title: string; icon: React.Ele
   return (
     <div className="flex-1 flex items-center justify-center min-h-[60vh]">
       <div className="glass rounded-3xl p-8 sm:p-12 text-center max-w-md mx-auto glow-gold animate-fade-in">
-        <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-4">
-          <Icon className="w-8 h-8 text-[#D4AF37]" />
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+          <Icon className="w-8 h-8 text-primary" />
         </div>
         <h2 className="text-foreground text-xl font-semibold mb-2">{title}</h2>
         <p className="text-muted-foreground text-sm">This page is under development</p>
@@ -132,7 +132,7 @@ export default function AppShell() {
     // If on admin-login AND already has token → redirect to dashboard
     if (currentPage === 'admin-login' && adminToken) {
       return (
-        <div className="min-h-screen bg-[#070B14]">
+        <div className="min-h-screen bg-background">
           <AdminHeader />
           <main className="lg:ml-[260px]">
             <AdminDashboardPage />
@@ -144,7 +144,7 @@ export default function AppShell() {
     // If on admin-login AND no token → show login page
     if (currentPage === 'admin-login' && !adminToken) {
       return (
-        <div className="min-h-screen bg-[#070B14]">
+        <div className="min-h-screen bg-background">
           <AdminLoginPage />
         </div>
       );
@@ -153,7 +153,7 @@ export default function AppShell() {
     // If on any other admin page AND no token → redirect to admin login
     if (currentPage !== 'admin-login' && !adminToken) {
       return (
-        <div className="min-h-screen bg-[#070B14]">
+        <div className="min-h-screen bg-background">
           <AdminLoginPage />
         </div>
       );
@@ -161,7 +161,7 @@ export default function AppShell() {
 
     // Authenticated admin pages
     return (
-      <div className="min-h-screen bg-[#070B14]">
+      <div className="min-h-screen bg-background">
         <AdminHeader />
         <main className="lg:ml-[260px]">
           {renderPage(currentPage)}
@@ -181,20 +181,20 @@ export default function AppShell() {
     if (!isVerified) {
       if (currentPage === 'otp') {
         return (
-          <div className="min-h-screen bg-[#070B14]">
+          <div className="min-h-screen bg-background">
             <OTPPage />
           </div>
         );
       }
       if (currentPage === 'forgot-password') {
         return (
-          <div className="min-h-screen bg-[#070B14]">
+          <div className="min-h-screen bg-background">
             <ForgotPasswordPage />
           </div>
         );
       }
       return (
-        <div className="min-h-screen bg-[#070B14]">
+        <div className="min-h-screen bg-background">
           <OTPPage />
         </div>
       );
@@ -203,7 +203,7 @@ export default function AppShell() {
     // If authenticated user on auth pages (login/register/otp/forgot-password) → redirect to home
     if (['login', 'register', 'otp', 'forgot-password'].includes(currentPage)) {
       return (
-        <div className="min-h-screen bg-[#070B14] flex flex-col">
+        <div className="min-h-screen bg-background flex flex-col">
           <UserHeader />
           <main className="flex-1">
             <HomePage />
@@ -217,7 +217,7 @@ export default function AppShell() {
     const PageComponent = PAGE_COMPONENTS[currentPage];
     if (PageComponent) {
       return (
-        <div className="min-h-screen bg-[#070B14] flex flex-col">
+        <div className="min-h-screen bg-background flex flex-col">
           <UserHeader />
           <main className="flex-1">
             <PageComponent />
@@ -229,7 +229,7 @@ export default function AppShell() {
 
     // Fallback for authenticated user → show home
     return (
-      <div className="min-h-screen bg-[#070B14] flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col">
         <UserHeader />
         <main className="flex-1">
           <HomePage />
@@ -244,7 +244,7 @@ export default function AppShell() {
   // ────────────────────────────────────────────────
   if (currentPage === 'register') {
     return (
-      <div className="min-h-screen bg-[#070B14]">
+      <div className="min-h-screen bg-background">
         <RegisterPage />
       </div>
     );
@@ -252,7 +252,7 @@ export default function AppShell() {
 
   if (currentPage === 'otp') {
     return (
-      <div className="min-h-screen bg-[#070B14]">
+      <div className="min-h-screen bg-background">
         <OTPPage />
       </div>
     );
@@ -260,7 +260,7 @@ export default function AppShell() {
 
   if (currentPage === 'forgot-password') {
     return (
-      <div className="min-h-screen bg-[#070B14]">
+      <div className="min-h-screen bg-background">
         <ForgotPasswordPage />
       </div>
     );
@@ -268,7 +268,7 @@ export default function AppShell() {
 
   // Default: show login page for all unauthenticated users
   return (
-    <div className="min-h-screen bg-[#070B14]">
+    <div className="min-h-screen bg-background">
       <LoginPage />
     </div>
   );
