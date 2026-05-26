@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { getAllSettings, isWithinWorkingHours } from '@/lib/settings';
 import { notifyBot } from '@/lib/bot-notification';
+import { sendPushToAdmins } from '@/lib/push-notification';
 
 export async function POST(request: NextRequest) {
   try {
@@ -101,6 +102,9 @@ export async function POST(request: NextRequest) {
       paymentType,
       status: 'pending',
     });
+
+    // Push notification to admins about new withdrawal
+    sendPushToAdmins("🏦 Withdrawal Baru", `${user.name || user.userId} request withdraw Rp ${Math.floor(amount).toLocaleString("id-ID")}`, { type: "withdrawal", withdrawalId: withdrawal.id, userId: user.id }).catch(() => {});
 
     return NextResponse.json({ success: true, data: withdrawal });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateBotRequest } from '@/lib/bot-auth';
+import { sendPushNotification } from '@/lib/push-notification';
 
 // PUT - Reject a pending deposit via bot
 export async function PUT(request: NextRequest) {
@@ -45,6 +46,9 @@ export async function PUT(request: NextRequest) {
         note: note || '',
       },
     });
+
+    // Push notification to user about rejected deposit
+    sendPushNotification(deposit.userId, "user", "❌ Deposit Ditolak", `Deposit Rp ${Math.floor(deposit.amount).toLocaleString("id-ID")} ditolak. ${note || ""}`, { type: "deposit_rejected", depositId: updatedDeposit.depositId }).catch(() => {});
 
     return NextResponse.json({
       success: true,

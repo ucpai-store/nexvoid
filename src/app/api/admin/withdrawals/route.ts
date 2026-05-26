@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAdminFromRequest } from '@/lib/auth';
+import { sendPushNotification } from '@/lib/push-notification';
 
 export async function GET(request: NextRequest) {
   try {
@@ -111,9 +112,27 @@ export async function PUT(request: NextRequest) {
       return updated;
     });
 
+    // Push notification to user about withdrawal status change
+    if (status === 'approved') {
+      sendPushNotification(
+        withdrawal.userId, "user",
+        "✅ Withdrawal Disetujui",
+        `Withdrawal Rp ${Math.floor(withdrawal.amount).toLocaleString("id-ID")} telah disetujui`,
+        { type: "withdrawal_approved", withdrawalId: withdrawal.id }
+      ).catch(() => {});
+    } else {
+      sendPushNotification(
+        withdrawal.userId, "user",
+        "❌ Withdrawal Ditolak",
+        `Withdrawal Rp ${Math.floor(withdrawal.amount).toLocaleString("id-ID")} ditolak. Saldo dikembalikan. ${note || ""}`,
+        { type: "withdrawal_rejected", withdrawalId: withdrawal.id }
+      ).catch(() => {});
+    }
+
     return NextResponse.json({ success: true, data: updatedWithdrawal });
   } catch (error) {
     console.error('Update admin withdrawal error:', error);
     return NextResponse.json({ success: false, error: 'Database belum tersedia. Silakan hubungi admin.' }, { status: 503 });
   }
 }
+

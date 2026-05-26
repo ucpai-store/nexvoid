@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateBotRequest } from '@/lib/bot-auth';
+import { sendPushNotification } from '@/lib/push-notification';
 
 // PUT - Approve a pending withdrawal via bot
 export async function PUT(request: NextRequest) {
@@ -56,6 +57,9 @@ export async function PUT(request: NextRequest) {
 
       return updatedWithdrawal;
     });
+
+    // Push notification to user about approved withdrawal
+    sendPushNotification(withdrawal.userId, "user", "✅ Withdrawal Disetujui", `Withdrawal Rp ${Math.floor(result.amount).toLocaleString("id-ID")} telah disetujui`, { type: "withdrawal_approved", withdrawalId: result.id }).catch(() => {});
 
     return NextResponse.json({
       success: true,

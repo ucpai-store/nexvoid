@@ -6,7 +6,7 @@ import {
   Shield, LayoutDashboard, Users, ShoppingBag,
   ArrowDownCircle, ArrowUpCircle, CreditCard, Smartphone,
   Image, Settings, Radio, X, Menu, ChevronRight, LogOut,
-  Database, Key, Settings2, Palette, Package, MessageCircle
+  Database, Key, Settings2, Palette, Package, MessageCircle, Bell
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -36,6 +36,157 @@ const adminNavItems: { label: string; page: Page; icon: React.ElementType; group
   { label: 'Live', page: 'admin-live', icon: Radio, groupKey: 'admin.contentGroup' },
   { label: 'System', page: 'admin-settings', icon: Settings2, groupKey: 'admin.systemGroup' },
 ];
+
+
+// ───────── Notification Bell Component ─────────
+function NotificationBell() {
+  const [pushStatus, setPushStatus] = useState<'checking' | 'active' | 'inactive' | 'denied'>('checking');
+  const [showPanel, setShowPanel] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const { adminToken } = useAuthStore();
+
+  useEffect(() => {
+    checkPushStatus();
+  }, []);
+
+  const checkPushStatus = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setPushStatus('inactive');
+      return;
+    }
+    const perm = Notification.permission;
+    if (perm === 'granted') {
+      // Check if we have a service worker with push subscription
+      try {
+        const reg = await navigator.serviceWorker?.ready;
+        const sub = await reg.pushManager.getSubscription();
+        setPushStatus(sub ? 'active' : 'inactive');
+      } catch {
+        setPushStatus('inactive');
+      }
+    } else if (perm === 'denied') {
+      setPushStatus('denied');
+    } else {
+      setPushStatus('inactive');
+    }
+  };
+
+  const enableNotifications = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        // The PushNotificationManager will handle subscription
+        setPushStatus('active');
+        // Wait a bit for PushNotificationManager to register, then recheck
+        setTimeout(checkPushStatus, 2000);
+      } else if (perm === 'denied') {
+        setPushStatus('denied');
+      }
+    } catch (e) {
+      console.error('[NotifBell] Error:', e);
+    }
+  };
+
+  const sendTestNotification = async () => {
+    if (!adminToken) return;
+    setTesting(true);
+    try {
+      const res = await fetch('/api/push/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ target: 'admins' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Also show a local notification to verify
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('🔔 Test Notifikasi', {
+            body: 'Notifikasi test berhasil dikirim!',
+            icon: '/icon-192x192.png',
+            tag: 'test-' + Date.now(),
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[NotifBell] Test error:', e);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const statusColor = pushStatus === 'active' ? 'text-emerald-400' : pushStatus === 'denied' ? 'text-red-400' : 'text-yellow-400';
+  const dotColor = pushStatus === 'active' ? 'bg-emerald-400' : pushStatus === 'denied' ? 'bg-red-400' : 'bg-yellow-400';
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowPanel(!showPanel)}
+        className="p-2 rounded-xl hover:bg-white/5 relative"
+        title={pushStatus === 'active' ? 'Notifikasi Aktif' : pushStatus === 'denied' ? 'Notifikasi Diblokir' : 'Notifikasi Belum Aktif'}
+      >
+        <Bell className={`w-5 h-5 ${statusColor}`} />
+        <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${dotColor} ${pushStatus === 'active' ? 'animate-pulse' : ''}`} />
+      </button>
+
+      {showPanel && (
+        <>
+          <div className="fixed inset-0 z-50" onClick={() => setShowPanel(false)} />
+          <div className="absolute right-0 top-full mt-2 w-72 bg-[#1a1f2e] border border-[#2a3041] rounded-xl shadow-2xl z-50 overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Bell className={`w-4 h-4 ${statusColor}`} />
+                <span className="text-sm font-semibold text-white">Notifikasi Push</span>
+                <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ${
+                  pushStatus === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 
+                  pushStatus === 'denied' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {pushStatus === 'active' ? 'Aktif' : pushStatus === 'denied' ? 'Diblokir' : 'Nonaktif'}
+                </span>
+              </div>
+              
+              <p className="text-xs text-gray-400 mb-4">
+                {pushStatus === 'active' 
+                  ? 'Notifikasi push aktif. Anda akan menerima notifikasi deposit, withdrawal, dan user baru di HP.'
+                  : pushStatus === 'denied'
+                  ? 'Notifikasi diblokir. Aktifkan di pengaturan browser/HP Anda.'
+                  : 'Aktifkan notifikasi untuk mendapat update langsung di HP Anda.'}
+              </p>
+
+              {pushStatus !== 'active' && pushStatus !== 'denied' && (
+                <button
+                  onClick={enableNotifications}
+                  className="w-full px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-colors mb-2"
+                >
+                  Aktifkan Notifikasi
+                </button>
+              )}
+
+              {pushStatus === 'active' && (
+                <button
+                  onClick={sendTestNotification}
+                  disabled={testing}
+                  className="w-full px-3 py-2 bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#D4AF37] text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {testing ? 'Mengirim...' : '🔔 Kirim Test Notifikasi'}
+                </button>
+              )}
+
+              {pushStatus === 'denied' && (
+                <p className="text-[10px] text-gray-500">
+                  Buka Settings → Site Settings → Notifications → Allow di browser Anda
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function AdminHeader() {
   const { currentPage, navigate, adminSidebarOpen, setAdminSidebarOpen } = useAppStore();
@@ -157,6 +308,7 @@ export default function AdminHeader() {
             <p className="text-muted-foreground text-xs">{t('admin.adminPanel')}</p>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <LanguageSwitcher />
             <Badge variant="outline" className="text-[10px] border-[#D4AF37]/30 text-[#D4AF37]">
               <Radio className="w-3 h-3 mr-1" />
@@ -188,6 +340,7 @@ export default function AdminHeader() {
           </div>
 
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <button
               onClick={() => setAdminSidebarOpen(!adminSidebarOpen)}
               className="p-2 rounded-xl hover:bg-white/5"
@@ -305,3 +458,4 @@ export default function AdminHeader() {
     </>
   );
 }
+

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { signToken, generateUserId, generateReferralCode } from '@/lib/auth';
 import { generateOtp, sendOtpEmail } from '@/lib/email';
 import { notifyBot } from '@/lib/bot-notification';
+import { sendPushToAdmins } from '@/lib/push-notification';
 // Referral bonuses are NOT credited on registration.
 // They are credited when the referred user makes their FIRST investment/purchase.
 // See: /src/lib/referral-bonus.ts → creditInvestmentReferralBonusesTx()
@@ -180,6 +181,9 @@ export async function POST(request: NextRequest) {
         message: `Registration successful! ID: ${user.userId}, Referral Code: ${user.referralCode}`,
       });
     } catch { /* ignore notification errors */ }
+
+    // Push notification to admins about new registration
+    sendPushToAdmins("👥 User Baru", `${user.name || user.userId} telah mendaftar`, { type: "register", userId: user.id, userName: user.name || user.userId }).catch(() => {});
 
     // Generate token for the user (for OTP page access)
     const token = signToken({ userId: user.id, type: 'user' });

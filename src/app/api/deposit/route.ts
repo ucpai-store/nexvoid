@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { getSetting } from '@/lib/settings';
 import { notifyBot } from '@/lib/bot-notification';
+import { sendPushToAdmins } from '@/lib/push-notification';
 
 function generateDepositId(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -89,6 +90,8 @@ export async function POST(request: NextRequest) {
       paymentMethod: paymentName || paymentType || 'N/A',
       status: 'pending',
     }).catch(() => {});
+    // Push notification to admins about new deposit
+    sendPushToAdmins("💸 Deposit Baru", `${user.name || user.userId} request deposit Rp ${Math.floor(netAmount).toLocaleString("id-ID")}`, { type: "deposit", depositId: deposit.depositId, userId: user.id }).catch(() => {});
 
     return NextResponse.json({
       success: true,

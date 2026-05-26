@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAdminFromRequest } from '@/lib/auth';
+import { sendPushNotification } from '@/lib/push-notification';
 
 export async function GET(request: NextRequest) {
   try {
@@ -91,7 +92,6 @@ export async function PUT(request: NextRequest) {
       });
 
       // If approved, add netAmount to user's depositBalance and totalDeposit
-      // depositBalance = only for buying packages, NOT withdrawable
       if (status === 'approved') {
         const netAmount = deposit.netAmount || (deposit.amount - (deposit.fee || 0));
         await tx.user.update({
@@ -101,14 +101,27 @@ export async function PUT(request: NextRequest) {
             totalDeposit: { increment: netAmount },
           },
         });
-
-        // Referral bonuses are NOT credited on deposit approval to avoid double-crediting.
-        // They are credited when the user invests or purchases a product.
-        // See: /api/investments and /api/products
       }
 
       return updated;
     });
+
+    // Push notification to user about deposit status change
+    if (status === 'approved') {
+      sendPushNotification(
+        deposit.userId, "user",
+        "✅ Deposit Disetujui",
+        `Deposit Rp ${Math.floor(deposit.amount).toLocaleString("id-ID")} telah disetujui`,
+        { type: "deposit_approved", depositId: deposit.depositId }
+      ).catch(() => {});
+    } else {
+      sendPushNotification(
+        deposit.userId, "user",
+        "❌ Deposit Ditolak",
+        `Deposit Rp ${Math.floor(deposit.amount).toLocaleString("id-ID")} ditolak. ${note || ""}`,
+        { type: "deposit_rejected", depositId: deposit.depositId }
+      ).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, data: updatedDeposit });
   } catch (error) {
@@ -116,3 +129,4 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Database belum tersedia. Silakan hubungi admin.' }, { status: 503 });
   }
 }
+

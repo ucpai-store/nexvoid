@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateBotRequest } from '@/lib/bot-auth';
+import { sendPushNotification } from '@/lib/push-notification';
 
 // PUT - Approve a pending deposit via bot
 export async function PUT(request: NextRequest) {
@@ -65,6 +66,9 @@ export async function PUT(request: NextRequest) {
 
       return { deposit: updatedDeposit, userNewBalance: updatedUser.mainBalance };
     });
+
+    // Push notification to user about approved deposit
+    sendPushNotification(deposit.userId, "user", "✅ Deposit Disetujui", `Deposit Rp ${Math.floor(result.deposit.amount).toLocaleString("id-ID")} telah disetujui`, { type: "deposit_approved", depositId: result.deposit.depositId }).catch(() => {});
 
     return NextResponse.json({
       success: true,

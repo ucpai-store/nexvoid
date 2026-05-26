@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creditDailyReferralBonuses } from '@/lib/referral-bonus';
+import { sendPushNotification } from '@/lib/push-notification';
 
 // ──────────── Constants ────────────
 
@@ -319,6 +320,9 @@ async function processDailyInvestmentProfits(): Promise<{
 
       result.processed++;
       result.totalProfit += dailyProfit;
+
+      // Push notification to user about daily profit
+      sendPushNotification(inv.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(dailyProfit).toLocaleString("id-ID")} hari ini`, { type: "daily_profit", amount: dailyProfit }).catch(() => {});
     } catch (error: unknown) {
       result.errors++;
       const message = error instanceof Error ? error.message : String(error);
@@ -451,6 +455,9 @@ async function processDailyInvestmentProfits(): Promise<{
 
       result.processed++;
       result.totalProfit += dailyProfit;
+
+      // Push notification to user about daily profit
+      sendPushNotification(purchase.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(dailyProfit).toLocaleString("id-ID")} hari ini`, { type: "daily_profit", amount: dailyProfit }).catch(() => {});
     } catch (error: unknown) {
       result.errors++;
       const message = error instanceof Error ? error.message : String(error);

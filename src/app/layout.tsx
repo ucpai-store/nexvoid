@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import CSChatBubbleWrapper from "@/components/nexvo/shared/CSChatBubbleWrapper";
+import PushNotificationManager from "@/components/nexvo/shared/PushNotificationManager";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -87,6 +88,7 @@ export default function RootLayout({
       <body className="antialiased bg-background text-foreground font-[Poppins,sans-serif]">
         {children}
         <CSChatBubbleWrapper />
+        <PushNotificationManager />
         <Toaster />
       </body>
     </html>

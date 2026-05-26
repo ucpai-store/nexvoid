@@ -7,7 +7,7 @@ import {
   ArrowDownCircle, ArrowUpCircle, History, Users,
   Settings, LogOut, X, Menu, ChevronRight, Crown,
   Home, Receipt, User, TrendingUp, Package,
-  Banknote, GitCompare, Sparkles
+  Banknote, GitCompare, Sparkles, Bell, BellOff
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -42,6 +42,113 @@ const mobileBottomKeys: { key: string; page: Page; icon: React.ElementType }[] =
   { key: 'nav.wallet', page: 'deposit', icon: Wallet },
   { key: 'nav.profile', page: 'settings', icon: User },
 ];
+
+
+// ───────── User Notification Bell Component ─────────
+function UserNotificationBell() {
+  const [pushStatus, setPushStatus] = useState<'checking' | 'active' | 'inactive' | 'denied'>('checking');
+  const [showPanel, setShowPanel] = useState(false);
+  const { token } = useAuthStore();
+
+  useEffect(() => {
+    checkPushStatus();
+  }, []);
+
+  const checkPushStatus = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setPushStatus('inactive');
+      return;
+    }
+    const perm = Notification.permission;
+    if (perm === 'granted') {
+      try {
+        const reg = await navigator.serviceWorker?.ready;
+        const sub = await reg.pushManager.getSubscription();
+        setPushStatus(sub ? 'active' : 'inactive');
+      } catch {
+        setPushStatus('inactive');
+      }
+    } else if (perm === 'denied') {
+      setPushStatus('denied');
+    } else {
+      setPushStatus('inactive');
+    }
+  };
+
+  const enableNotifications = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        setPushStatus('active');
+        setTimeout(checkPushStatus, 2000);
+      } else if (perm === 'denied') {
+        setPushStatus('denied');
+      }
+    } catch (e) {
+      console.error('[UserNotifBell] Error:', e);
+    }
+  };
+
+  const statusColor = pushStatus === 'active' ? 'text-emerald-400' : pushStatus === 'denied' ? 'text-red-400' : 'text-yellow-400';
+  const dotColor = pushStatus === 'active' ? 'bg-emerald-400' : pushStatus === 'denied' ? 'bg-red-400' : 'bg-yellow-400';
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowPanel(!showPanel)}
+        className="p-2 rounded-xl hover:bg-white/5 relative"
+        title={pushStatus === 'active' ? 'Notifikasi Aktif' : 'Aktifkan Notifikasi'}
+      >
+        <Bell className={`w-5 h-5 ${statusColor}`} />
+        <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${dotColor} ${pushStatus === 'active' ? 'animate-pulse' : ''}`} />
+      </button>
+
+      {showPanel && (
+        <>
+          <div className="fixed inset-0 z-50" onClick={() => setShowPanel(false)} />
+          <div className="absolute right-0 top-full mt-2 w-72 bg-[#1a1f2e] border border-[#2a3041] rounded-xl shadow-2xl z-50 overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Bell className={`w-4 h-4 ${statusColor}`} />
+                <span className="text-sm font-semibold text-white">Notifikasi</span>
+                <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ${
+                  pushStatus === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 
+                  pushStatus === 'denied' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {pushStatus === 'active' ? 'Aktif' : pushStatus === 'denied' ? 'Diblokir' : 'Nonaktif'}
+                </span>
+              </div>
+              
+              <p className="text-xs text-gray-400 mb-4">
+                {pushStatus === 'active' 
+                  ? 'Notifikasi aktif. Anda akan menerima update deposit, profit, dan withdrawal.'
+                  : pushStatus === 'denied'
+                  ? 'Notifikasi diblokir. Aktifkan di pengaturan browser/HP Anda.'
+                  : 'Aktifkan notifikasi untuk mendapat update langsung di HP.'}
+              </p>
+
+              {pushStatus !== 'active' && pushStatus !== 'denied' && (
+                <button
+                  onClick={enableNotifications}
+                  className="w-full px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  Aktifkan Notifikasi
+                </button>
+              )}
+
+              {pushStatus === 'denied' && (
+                <p className="text-[10px] text-gray-500">
+                  Buka Settings → Site Settings → Notifications → Allow
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function UserHeader() {
   const { currentPage, navigate, sidebarOpen, setSidebarOpen } = useAppStore();
@@ -104,6 +211,8 @@ export default function UserHeader() {
 
             {/* User Actions */}
             <div className="flex items-center gap-3">
+              {/* Notification Bell */}
+              <UserNotificationBell />
               {/* Language Switcher */}
               <LanguageSwitcher />
 
@@ -337,3 +446,4 @@ export default function UserHeader() {
     </>
   );
 }
+

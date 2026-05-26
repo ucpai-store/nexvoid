@@ -386,3 +386,15 @@ model WhatsAppAdmin {
 }
 
 
+
+model PushSubscription {
+  id          String   @id @default(cuid())
+  userId      String   // user id or admin id
+  userType    String   @default("user")  // "user" or "admin"
+  endpoint    String
+  p256dh      String
+  auth        String
+  userAgent   String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

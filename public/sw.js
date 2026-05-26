@@ -1,5 +1,5 @@
-// NEXVO Service Worker v28 - PWA Install Support for All Platforms
-const CACHE_NAME = 'nexvo-v28';
+// NEXVO Service Worker v29 - Push Notifications + Admin Support - PWA Install Support for All Platforms
+const CACHE_NAME = 'nexvo-v29';
 
 // Core PWA assets to pre-cache for installability
 const PRECACHE_URLS = [
@@ -91,4 +91,75 @@ self.addEventListener('fetch', (event) => {
     }).catch(() => caches.match(request))
   );
 });
+
+
+
+// ──────────── Push Notification Handlers ────────────
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push notification received:', event);
+  
+  let data = {
+    title: 'NEXVO',
+    body: 'Anda memiliki notifikasi baru',
+    data: {}
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    } catch (e) {
+      data.body = event.data.text() || data.body;
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: '/icon-192x192.png',
+    badge: '/icon-72x72.png',
+    vibrate: [100, 50, 100],
+    data: {
+      url: data.data?.url || '/',
+      ...data.data
+    },
+    actions: [
+      { action: 'open', title: 'Buka' },
+      { action: 'close', title: 'Tutup' }
+    ],
+    tag: 'nexvo-notification-' + Date.now(),
+    requireInteraction: false,
+    silent: false
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification click:', event);
+  
+  event.notification.close();
+
+  if (event.action === 'close') {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || '/';
+  
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If there's already an open window, focus it and navigate
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});
+
 

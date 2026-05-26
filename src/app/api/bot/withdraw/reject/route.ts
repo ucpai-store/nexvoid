@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateBotRequest } from '@/lib/bot-auth';
+import { sendPushNotification } from '@/lib/push-notification';
 
 // PUT - Reject a pending withdrawal via bot
 export async function PUT(request: NextRequest) {
@@ -56,6 +57,9 @@ export async function PUT(request: NextRequest) {
 
       return updatedWithdrawal;
     });
+
+    // Push notification to user about rejected withdrawal
+    sendPushNotification(withdrawal.userId, "user", "❌ Withdrawal Ditolak", `Withdrawal Rp ${Math.floor(withdrawal.amount).toLocaleString("id-ID")} ditolak. ${note || ""}`, { type: "withdrawal_rejected", withdrawalId: result.id }).catch(() => {});
 
     return NextResponse.json({
       success: true,
