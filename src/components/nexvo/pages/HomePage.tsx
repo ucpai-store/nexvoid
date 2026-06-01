@@ -393,7 +393,7 @@ function AboutNexvo() {
           <div className="relative rounded-3xl overflow-hidden glow-gold group">
             <img
               src="/nexvo-about-banner.jpeg"
-              alt="NEXVO - Next-Generation Digital Asset Management Platform"
+              alt="NEXVO - Next-Generation Multi-Asset Investment Platform Platform"
               className="w-full h-auto object-cover rounded-3xl transition-transform duration-700 group-hover:scale-[1.02]"
             />
             {/* Subtle overlay */}
@@ -401,7 +401,7 @@ function AboutNexvo() {
             {/* Bottom tagline */}
             <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 flex items-center gap-2">
               <span className="glass-gold rounded-full px-3 py-1 text-xs font-medium text-primary">
-                Next-Generation Digital Asset Management
+                Next-Generation Multi-Asset Investment Platform
               </span>
             </div>
           </div>
@@ -430,16 +430,16 @@ function AboutNexvo() {
               {/* Narrative text */}
               <div className="space-y-4 text-foreground/80 text-sm sm:text-base leading-relaxed">
                 <p>
-                  <strong className="text-gold-gradient">NEXVO</strong> is a next-generation digital asset management platform built to deliver secure, transparent, and profitable investment opportunities to people around the world. Powered by commodity-backed portfolios and advanced fintech infrastructure, NEXVO makes wealth-building accessible to everyone — from first-time investors to seasoned professionals.
+                  <strong className="text-gold-gradient">NEXVO</strong> is a next-generation digital investment platform built to deliver secure, transparent, and profitable investment opportunities across multiple asset classes — stocks (saham), gold (emas), commodities, and cryptocurrency (kripto). Powered by diversified portfolios and advanced fintech infrastructure, NEXVO makes wealth-building accessible to everyone — from first-time investors to seasoned professionals looking to diversify their portfolio.
                 </p>
                 <p>
-                  Our mission is simple: <strong className="text-foreground">democratize access to high-quality investments</strong>. Whether you're starting with a small amount or ready to scale, NEXVO provides the tools, security, and support you need to grow your digital assets with confidence. Every package is designed to generate consistent daily profits — up to 10% returns — with full transparency on every transaction.
+                  Our mission is simple: <strong className="text-foreground">democratize access to high-quality investments</strong>. Whether you're starting with a small amount or ready to scale, NEXVO provides the tools, security, and support you need to grow your assets with confidence. Choose from stock investments, gold trading, commodity portfolios, or crypto assets — all in one platform. Every package is designed to generate consistent daily profits — up to 10% returns — with full transparency on every transaction.
                 </p>
                 <p>
                   Security is not optional — it's our foundation. All transactions are encrypted with <strong className="text-foreground">SSL/TLS 256-bit</strong> technology, and every account is protected by multi-layer authentication including OTP verification via WhatsApp and email. With 99.9% uptime and 24/7 monitoring, your investments are always safe and accessible.
                 </p>
                 <p>
-                  Backed by a team of experienced fintech and asset management professionals, NEXVO is more than a platform — it's your partner in financial growth. We believe that <strong className="text-primary">everyone deserves the opportunity to build wealth safely, transparently, and profitably</strong>. Start your investment journey today and let your money work for you.
+                  Backed by a team of experienced fintech, stock market, and asset management professionals, NEXVO is more than a platform — it's your partner in financial growth. Whether you're into stocks, gold, commodities, or crypto, we believe that <strong className="text-primary">everyone deserves the opportunity to build wealth safely, transparently, and profitably</strong>. Start your investment journey today and let your money work for you.
                 </p>
               </div>
 
@@ -1251,10 +1251,10 @@ function ComprehensiveGuide() {
                   </div>
                   <div className="space-y-4 text-foreground/80 text-sm sm:text-base leading-relaxed">
                     <p>
-                      <strong className="text-gold-gradient">NEXVO</strong> (Next-Generation Value Optimization) adalah platform manajemen aset digital berbasis komoditas yang dirancang untuk memberikan peluang investasi yang aman, transparan, dan menguntungkan bagi semua orang. Dengan teknologi fintech terdepan, NEXVO menghadirkan sistem investasi komoditas yang bisa diakses siapa saja — dari investor pemula hingga profesional berpengalaman.
+                      <strong className="text-gold-gradient">NEXVO</strong> (Next-Generation Value Optimization) adalah platform investasi digital terpadu yang menawarkan beragam instrumen investasi — mulai dari <strong className="text-foreground">saham, emas, komoditas, kripto (crypto), hingga reksadana digital</strong>. Dirancang untuk memberikan peluang investasi yang aman, transparan, dan menguntungkan bagi semua orang.
                     </p>
                     <p>
-                      Didirikan dengan misi <strong className="text-foreground">&quot;Build Value, Grow Future&quot;</strong>, NEXVO memungkinkan kamu untuk menumbuhkan aset digital melalui paket investasi komoditas dengan profit harian hingga <strong className="text-primary">10%</strong>. Setiap transaksi tercatat transparan, setiap profit terukur, dan setiap aset terjaga keamanannya.
+                      Didirikan dengan misi <strong className="text-foreground">&quot;Build Value, Grow Future&quot;</strong>, NEXVO memungkinkan kamu untuk menumbuhkan aset melalui paket investasi diversified dengan profit harian hingga <strong className="text-primary">10%</strong>. Setiap transaksi tercatat transparan, setiap profit terukur, dan setiap aset terjaga keamanannya. Dari investor pemula yang baru mulai, hingga profesional yang ingin diversifikasi portofolio — NEXVO punya paket yang tepat untuk kamu.
                     </p>
                   </div>
                 </div>
@@ -1265,7 +1265,7 @@ function ComprehensiveGuide() {
                   {
                     icon: TrendingUp,
                     title: 'Profit Harian Konsisten',
-                    desc: 'Raih profit harian dari paket investasi komoditas yang kamu pilih. Profit otomatis masuk ke saldo profit setiap hari — tanpa perlu melakukan apapun.',
+                    desc: 'Raih profit harian dari paket investasi saham, emas, komoditas, dan kripto yang kamu pilih. Profit otomatis masuk ke saldo profit setiap hari — tanpa perlu melakukan apapun.',
                     highlight: 'Hingga 10% / hari',
                   },
                   {
@@ -1345,12 +1345,75 @@ function ComprehensiveGuide() {
                   </div>
                   <div className="space-y-4 text-foreground/80 text-sm sm:text-base leading-relaxed">
                     <p>
-                      NEXVO menggunakan sistem investasi berbasis <strong className="text-foreground">komoditas</strong> (emas, perak, dan komoditas berharga lainnya). Setiap paket investasi yang tersedia di platform terhubung langsung dengan portofolio komoditas yang dikelola oleh tim profesional.
+                      NEXVO menghadirkan sistem investasi <strong className="text-foreground">multi-aset</strong> yang mencakup berbagai instrumen keuangan. Setiap paket investasi yang tersedia di platform terhubung langsung dengan portofolio terdiversifikasi yang dikelola oleh tim profesional berpengalaman.
                     </p>
                     <p>
-                      Ketika kamu membeli paket investasi, dana kamu dialokasikan ke portofolio komoditas yang menghasilkan profit harian berdasarkan performa pasar. Profit tersebut kemudian didistribusikan secara otomatis ke saldo profit akunmu setiap hari.
+                      Ketika kamu membeli paket investasi, dana kamu dialokasikan ke berbagai instrumen — mulai dari <strong className="text-foreground">saham blue-chip</strong>, <strong className="text-foreground">emas & komoditas</strong>, hingga <strong className="text-foreground">aset kripto pilihan</strong> — yang menghasilkan profit harian berdasarkan performa pasar. Profit tersebut kemudian didistribusikan secara otomatis ke saldo profit akunmu setiap hari, tanpa perlu kamu monitor secara manual.
                     </p>
                   </div>
+                </div>
+              </div>
+
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Layers className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Jenis Investasi di NEXVO</h3>
+                </div>
+                <p className="text-muted-foreground text-xs sm:text-sm mb-6">NEXVO menawarkan beragam instrumen investasi yang terdiversifikasi untuk memaksimalkan potensi profit dan meminimalkan risiko.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    {
+                      icon: BarChart3,
+                      name: 'Saham',
+                      nameEn: 'Stocks',
+                      color: 'from-blue-500 to-blue-600',
+                      desc: 'Investasi di perusahaan blue-chip dan perusahaan berkembang di berbagai sektor — teknologi, keuangan, konsumer, dan lainnya.',
+                      highlights: ['Dividen berkala', 'Capital gain', 'Saham blue-chip'],
+                    },
+                    {
+                      icon: Sparkles,
+                      name: 'Emas',
+                      nameEn: 'Gold',
+                      color: 'from-primary to-nexvo-gold-light',
+                      desc: 'Investasi emas fisik dan digital yang nilainya cenderung naik seiring waktu. Safe haven untuk perlindungan aset dari inflasi.',
+                      highlights: ['Anti-inflasi', 'Nilai naik stabil', 'Safe haven asset'],
+                    },
+                    {
+                      icon: ArrowLeftRight,
+                      name: 'Komoditas',
+                      nameEn: 'Commodities',
+                      color: 'from-amber-500 to-orange-600',
+                      desc: 'Investasi di komoditas berharga seperti perak, minyak, dan logam industri. Portofolio terdiversifikasi di sektor riil.',
+                      highlights: ['Diversifikasi risiko', 'Sektor riil', 'Profit musiman'],
+                    },
+                    {
+                      icon: Globe,
+                      name: 'Kripto',
+                      nameEn: 'Crypto',
+                      color: 'from-purple-500 to-indigo-600',
+                      desc: 'Investasi di aset kripto pilihan teratas seperti Bitcoin, Ethereum, dan altcoin potensial. Volatilitas tinggi, potensi profit besar.',
+                      highlights: ['Potensi profit tinggi', 'Market 24/7', 'Aset digital'],
+                    },
+                  ].map((inv) => (
+                    <div key={inv.name} className="rounded-2xl bg-secondary/50 border border-border p-4 sm:p-5 group hover:glow-gold transition-all">
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r ${inv.color} text-white text-xs font-semibold mb-3`}>
+                        <inv.icon className="w-3.5 h-3.5" />
+                        <span>{inv.name}</span>
+                        <span className="text-white/50 text-[10px]">({inv.nameEn})</span>
+                      </div>
+                      <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed mb-3">{inv.desc}</p>
+                      <div className="space-y-1.5">
+                        {inv.highlights.map((h) => (
+                          <div key={h} className="flex items-center gap-2 text-xs text-foreground/70">
+                            <CheckCircle2 className="w-3 h-3 text-primary shrink-0" />
+                            {h}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1414,7 +1477,7 @@ function ComprehensiveGuide() {
                     {[
                       { step: 1, title: 'Deposit Dana', desc: 'Top up saldo melalui QRIS atau USDT. Pilih metode pembayaran, transfer, dan upload bukti pembayaran.' },
                       { step: 2, title: 'Verifikasi Admin', desc: 'Admin NEXVO akan memverifikasi pembayaran kamu. Proses biasanya selesai dalam beberapa menit.' },
-                      { step: 3, title: 'Pilih Paket Investasi', desc: 'Jelajahi paket investasi komoditas yang tersedia. Setiap paket punya harga, durasi, dan profit rate yang berbeda.' },
+                      { step: 3, title: 'Pilih Paket Investasi', desc: 'Jelajahi paket investasi yang tersedia — saham, emas, komoditas, kripto. Setiap paket punya harga, durasi, dan profit rate yang berbeda.' },
                       { step: 4, title: 'Profit Harian Otomatis', desc: 'Setelah membeli paket, profit harian akan otomatis masuk ke saldo profit kamu berdasarkan profit rate paket.' },
                       { step: 5, title: 'Tarik Profit', desc: 'Kapan saja kamu bisa menarik profit ke rekening bank yang sudah terdaftar. Proses cepat dan aman.' },
                       { step: 6, title: 'Bonus Referral', desc: 'Ajak teman menggunakan kode referral kamu dan dapatkan bonus tambahan ke saldo profit.' },

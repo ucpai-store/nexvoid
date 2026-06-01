@@ -19,14 +19,17 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "NEXVO - Platform Manajemen Aset Digital & Investasi Komoditas Terpercaya",
-  description: "NEXVO adalah platform manajemen aset digital berbasis komoditas terpercaya. Raih profit harian hingga 10% dari paket investasi emas & komoditas. Deposito mudah via QRIS & USDT, penarikan cepat, keamanan SSL 256-bit. Build Value, Grow Future!",
+  description: "NEXVO adalah platform investasi digital terpadu — saham, emas, komoditas, kripto. Raih profit harian hingga 10% dari paket investasi diversified. Deposito mudah via QRIS & USDT, penarikan cepat, keamanan SSL 256-bit. Build Value, Grow Future!",
   keywords: [
-    "NEXVO", "investasi digital", "aset digital", "komoditas", "emas", "gold investment",
+    "NEXVO", "investasi digital", "aset digital", "saham", "stocks", "emas", "gold investment",
+    "komoditas", "commodities", "kripto", "crypto", "cryptocurrency", "bitcoin", "ethereum",
     "profit harian", "daily profit", "manajemen aset", "asset management",
-    "investasi online", "QRIS", "USDT", "crypto", "referral bonus",
-    "platform investasi terpercaya", "digital asset platform", "passive income",
+    "investasi online", "investasi saham", "investasi emas", "investasi kripto",
+    "QRIS", "USDT", "referral bonus", "passive income",
+    "platform investasi terpercaya", "digital asset platform",
     "investasi komoditas", "commodity investment", "passive income online",
-    "cuan online", "investasi aman", "profit konsisten"
+    "cuan online", "investasi aman", "profit konsisten", "dividen saham",
+    "reksadana digital", "portofolio investasi", "diversifikasi aset"
   ],
   manifest: "/manifest.webmanifest",
   icons: {
@@ -54,7 +57,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "NEXVO - Platform Manajemen Aset Digital Terpercaya",
-    description: "Raih profit harian hingga 10% dari investasi komoditas. Deposito mudah via QRIS & USDT, keamanan SSL 256-bit, penarikan cepat. Build Value, Grow Future!",
+    description: "Investasi saham, emas, komoditas & kripto di satu platform. Profit harian hingga 10%, deposit QRIS & USDT, keamanan SSL 256-bit. Build Value, Grow Future!",
     url: "https://nexvo.id",
     siteName: "NEXVO",
     type: "website",
