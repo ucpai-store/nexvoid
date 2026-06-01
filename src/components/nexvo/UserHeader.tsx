@@ -189,7 +189,7 @@ export default function UserHeader() {
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => navigate('home')}
             >
-              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
             </div>
 
             {/* Desktop Nav */}
@@ -270,7 +270,7 @@ export default function UserHeader() {
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => navigate('home')}
           >
-            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
           </div>
 
           <div className="flex items-center gap-2">

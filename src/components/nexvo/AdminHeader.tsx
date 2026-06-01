@@ -233,7 +233,7 @@ export default function AdminHeader() {
               className="flex items-center gap-2.5 cursor-pointer"
               onClick={() => navigate('admin-dashboard')}
             >
-              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
               <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] px-1.5 py-0 h-4">
                 ADMIN
               </Badge>
@@ -335,7 +335,7 @@ export default function AdminHeader() {
       >
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-2.5">
-            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
             <span className="text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
               ADMIN
             </span>
@@ -375,7 +375,7 @@ export default function AdminHeader() {
                 {/* Sidebar Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+                    <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
                     <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] px-1.5 py-0 h-4">
                       ADMIN
                     </Badge>

@@ -511,7 +511,7 @@ export default function AdminLoginPage() {
                     <img
                       src={logoUrl}
                       alt="NEXVO"
-                      className="h-16 w-auto object-contain"
+                      className="h-16 w-auto object-contain invert dark:invert-0"
                       onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }}
                     />
                     {/* Rotating ring */}
