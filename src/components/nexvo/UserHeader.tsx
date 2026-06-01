@@ -179,7 +179,7 @@ export default function UserHeader() {
         animate={{ y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 hidden md:block ${
-          scrolled ? 'glass-strong shadow-lg shadow-black/20' : 'bg-background/95'
+          scrolled ? 'glass-strong shadow-lg shadow-black/20 bg-black' : 'bg-black'
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -189,7 +189,7 @@ export default function UserHeader() {
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => navigate('home')}
             >
-              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
             </div>
 
             {/* Desktop Nav */}
@@ -201,7 +201,7 @@ export default function UserHeader() {
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
                     isActive(item.page)
                       ? 'bg-primary/10 text-primary'
-                      : 'text-foreground/70 hover:text-foreground hover:bg-foreground/5'
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
                 >
                   <item.icon className="w-4 h-4" />
@@ -225,7 +225,7 @@ export default function UserHeader() {
                   {user?.avatar ? <img src={getFileUrl(user.avatar)} alt={user.name || 'User'} className="w-full h-full object-cover" /> : (user?.name?.charAt(0) || 'U')}
                 </div>
                 <div className="text-left">
-                  <p className="text-foreground text-xs font-medium leading-tight">
+                  <p className="text-white text-xs font-medium leading-tight">
                     {user?.name || 'User'}
                   </p>
                   <div className="flex items-center gap-1">
@@ -239,7 +239,7 @@ export default function UserHeader() {
 
               <button
                 onClick={() => navigate('settings')}
-                className="p-2 rounded-xl hover:bg-foreground/5 text-foreground/70 hover:text-foreground transition-colors"
+                className="p-2 rounded-xl hover:bg-white/5 text-white/70 hover:text-white transition-colors"
               >
                 <Settings className="w-5 h-5" />
               </button>
@@ -261,7 +261,7 @@ export default function UserHeader() {
         animate={{ y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className={`fixed top-0 left-0 right-0 z-40 md:hidden transition-all duration-300 ${
-          scrolled ? 'glass-strong shadow-lg shadow-black/20' : 'bg-background/95'
+          scrolled ? 'glass-strong shadow-lg shadow-black/20 bg-black' : 'bg-black'
         }`}
       >
         <div className="flex items-center justify-between h-14 px-4">
@@ -270,7 +270,7 @@ export default function UserHeader() {
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => navigate('home')}
           >
-            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
           </div>
 
           <div className="flex items-center gap-2">
@@ -286,7 +286,7 @@ export default function UserHeader() {
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 rounded-xl hover:bg-foreground/5"
             >
-              <Menu className="w-5 h-5 text-foreground" />
+              <Menu className="w-5 h-5 text-white" />
             </button>
           </div>
         </div>
@@ -318,7 +318,7 @@ export default function UserHeader() {
                       {user?.avatar ? <img src={getFileUrl(user.avatar)} alt={user.name || 'User'} className="w-full h-full object-cover" /> : (user?.name?.charAt(0) || 'U')}
                     </div>
                     <div>
-                      <p className="text-foreground font-medium text-sm">{user?.name || 'User'}</p>
+                      <p className="text-white font-medium text-sm">{user?.name || 'User'}</p>
                       <div className="flex items-center gap-1">
                         <Crown className="w-3 h-3 text-primary" />
                         <span className="text-primary text-xs">{user?.level || 'Bronze'}</span>
@@ -329,7 +329,7 @@ export default function UserHeader() {
                     onClick={() => setSidebarOpen(false)}
                     className="p-2 rounded-xl hover:bg-foreground/5"
                   >
-                    <X className="w-5 h-5 text-foreground" />
+                    <X className="w-5 h-5 text-white" />
                   </button>
                 </div>
 
@@ -348,7 +348,7 @@ export default function UserHeader() {
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                         isActive(item.page)
                           ? 'bg-primary/10 text-primary'
-                          : 'text-foreground/70 hover:text-foreground hover:bg-foreground/5'
+                          : 'text-white/70 hover:text-white hover:bg-white/5'
                       }`}
                     >
                       <item.icon className="w-5 h-5" />

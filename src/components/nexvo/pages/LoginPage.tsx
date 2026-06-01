@@ -152,7 +152,7 @@ export default function LoginPage() {
                 <img
                   src={logoUrl}
                   alt="NEXVO"
-                  className="relative h-14 sm:h-20 w-auto object-contain invert dark:invert-0"
+                  className="relative h-14 sm:h-20 w-auto object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }}
                 />
               </div>
