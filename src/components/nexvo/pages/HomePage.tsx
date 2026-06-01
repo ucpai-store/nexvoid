@@ -9,7 +9,8 @@ import {
   Eye, TrendingUp, UserPlus, Sparkles,
   Play, CheckCircle2, Globe, Lock, Zap,
   BarChart3, Wallet, BadgeCheck, Rocket,
-  ShieldCheck, Layers, ArrowRight
+  ShieldCheck, Layers, ArrowRight,
+  Banknote, GitCompare
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -1163,6 +1164,551 @@ function Testimonials() {
   );
 }
 
+
+/* ═══════════════════════════════════════════
+   COMPREHENSIVE PROMO & GUIDE SECTION
+   ═══════════════════════════════════════════ */
+function ComprehensiveGuide() {
+  const t = useT();
+  const { navigate } = useAppStore();
+  const [activeTab, setActiveTab] = useState<'platform' | 'system' | 'guide' | 'security'>('platform');
+
+  const tabs = [
+    { key: 'platform' as const, label: 'Tentang Platform', icon: Globe },
+    { key: 'system' as const, label: 'Sistem Investasi', icon: BarChart3 },
+    { key: 'guide' as const, label: 'Panduan Lengkap', icon: Rocket },
+    { key: 'security' as const, label: 'Keamanan', icon: ShieldCheck },
+  ];
+
+  return (
+    <section id="guide" className="relative py-10 sm:py-24 overflow-hidden">
+      <div className="absolute inset-0 opacity-[0.02]">
+        <div className="absolute top-1/4 left-0 w-[600px] h-[600px] rounded-full bg-primary blur-[200px]" />
+        <div className="absolute bottom-1/4 right-0 w-[500px] h-[500px] rounded-full bg-nexvo-blue blur-[180px]" />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-8 sm:mb-12"
+        >
+          <span className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-1.5 text-xs font-medium text-primary mb-4">
+            <Layers className="w-3.5 h-3.5" />
+            Selengkapnya Tentang NEXVO
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold mb-4">
+            <span className="text-gold-gradient">Semua Yang Perlu</span>
+            <br />
+            <span className="text-foreground">Kamu Ketahui</span>
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto">
+            Pelajari lebih dalam tentang platform NEXVO, sistem investasi kami, panduan lengkap cara mulai, dan bagaimana kami menjaga keamanan asetmu.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8 sm:mb-12"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
+                activeTab === tab.key
+                  ? 'bg-gold-gradient text-primary-foreground glow-gold'
+                  : 'glass text-muted-foreground hover:text-foreground hover:glow-gold'
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </motion.div>
+
+        <AnimatePresence mode="wait">
+          {activeTab === 'platform' && (
+            <motion.div
+              key="platform"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6 sm:space-y-8"
+            >
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/[0.03] rounded-bl-full" />
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Globe className="w-5 h-5 text-primary" />
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-foreground">Apa Itu NEXVO?</h3>
+                  </div>
+                  <div className="space-y-4 text-foreground/80 text-sm sm:text-base leading-relaxed">
+                    <p>
+                      <strong className="text-gold-gradient">NEXVO</strong> (Next-Generation Value Optimization) adalah platform manajemen aset digital berbasis komoditas yang dirancang untuk memberikan peluang investasi yang aman, transparan, dan menguntungkan bagi semua orang. Dengan teknologi fintech terdepan, NEXVO menghadirkan sistem investasi komoditas yang bisa diakses siapa saja — dari investor pemula hingga profesional berpengalaman.
+                    </p>
+                    <p>
+                      Didirikan dengan misi <strong className="text-foreground">&quot;Build Value, Grow Future&quot;</strong>, NEXVO memungkinkan kamu untuk menumbuhkan aset digital melalui paket investasi komoditas dengan profit harian hingga <strong className="text-primary">10%</strong>. Setiap transaksi tercatat transparan, setiap profit terukur, dan setiap aset terjaga keamanannya.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                {[
+                  {
+                    icon: TrendingUp,
+                    title: 'Profit Harian Konsisten',
+                    desc: 'Raih profit harian dari paket investasi komoditas yang kamu pilih. Profit otomatis masuk ke saldo profit setiap hari — tanpa perlu melakukan apapun.',
+                    highlight: 'Hingga 10% / hari',
+                  },
+                  {
+                    icon: CreditCard,
+                    title: 'Deposito Mudah & Cepat',
+                    desc: 'Top up saldo melalui QRIS (scan QR) atau USDT (Tether). Proses verifikasi cepat, saldo langsung tersedia di akunmu.',
+                    highlight: 'QRIS & USDT',
+                  },
+                  {
+                    icon: ArrowUp,
+                    title: 'Penarikan Cepat',
+                    desc: 'Tarik profit atau saldo kapan saja. Proses penarikan diverifikasi admin dan dana dikirim ke rekening bank terdaftar.',
+                    highlight: '< 24 Jam',
+                  },
+                  {
+                    icon: Users,
+                    title: 'Program Referral',
+                    desc: 'Ajak teman bergabung dan dapatkan bonus referral. Semakin banyak yang kamu ajak, semakin besar bonus yang kamu dapatkan.',
+                    highlight: 'Bonus Multi-Level',
+                  },
+                  {
+                    icon: Wallet,
+                    title: 'Multi-Balance System',
+                    desc: 'NEXVO menggunakan sistem 3 saldo terpisah: Saldo Utama, Saldo Deposit, dan Saldo Profit. Setiap saldo punya fungsi spesifik untuk keamanan dan transparansi.',
+                    highlight: '3 Saldo Terpisah',
+                  },
+                  {
+                    icon: Smartphone,
+                    title: 'Akses Mobile & PWA',
+                    desc: 'Install NEXVO langsung di HP-mu seperti aplikasi native. Dapatkan notifikasi push real-time, akses cepat, dan pengalaman mobile yang optimal.',
+                    highlight: 'Progressive Web App',
+                  },
+                ].map((feature, i) => (
+                  <motion.div
+                    key={feature.title}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.08 }}
+                    className="glass glow-gold rounded-2xl p-4 sm:p-6 group hover:glow-gold-strong transition-all"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <feature.icon className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <h4 className="text-foreground font-semibold text-sm">{feature.title}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">{feature.highlight}</span>
+                        </div>
+                        <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{feature.desc}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'system' && (
+            <motion.div
+              key="system"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6 sm:space-y-8"
+            >
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/[0.03] rounded-bl-full" />
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-primary" />
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-foreground">Bagaimana Sistem Investasi NEXVO Bekerja?</h3>
+                  </div>
+                  <div className="space-y-4 text-foreground/80 text-sm sm:text-base leading-relaxed">
+                    <p>
+                      NEXVO menggunakan sistem investasi berbasis <strong className="text-foreground">komoditas</strong> (emas, perak, dan komoditas berharga lainnya). Setiap paket investasi yang tersedia di platform terhubung langsung dengan portofolio komoditas yang dikelola oleh tim profesional.
+                    </p>
+                    <p>
+                      Ketika kamu membeli paket investasi, dana kamu dialokasikan ke portofolio komoditas yang menghasilkan profit harian berdasarkan performa pasar. Profit tersebut kemudian didistribusikan secara otomatis ke saldo profit akunmu setiap hari.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Wallet className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Sistem 3 Saldo NEXVO</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    {
+                      name: 'Saldo Utama',
+                      color: 'from-emerald-500 to-emerald-600',
+                      desc: 'Saldo utama yang bisa kamu gunakan untuk membeli paket investasi. Top up via deposit untuk mengisi saldo ini.',
+                      uses: ['Membeli paket investasi', 'Transfer ke saldo deposit'],
+                    },
+                    {
+                      name: 'Saldo Deposit',
+                      color: 'from-primary to-nexvo-gold-light',
+                      desc: 'Saldo khusus deposit yang sudah diverifikasi. Digunakan untuk pembelian paket investasi.',
+                      uses: ['Membeli paket investasi', 'Dana yang sudah terverifikasi'],
+                    },
+                    {
+                      name: 'Saldo Profit',
+                      color: 'from-blue-500 to-blue-600',
+                      desc: 'Saldo yang berisi profit harian dari investasi kamu. Bisa ditarik ke rekening bank kapan saja.',
+                      uses: ['Penarikan ke rekening bank', 'Hasil profit investasi'],
+                    },
+                  ].map((balance) => (
+                    <div key={balance.name} className="rounded-2xl bg-secondary/50 border border-border p-4 sm:p-5">
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r ${balance.color} text-white text-xs font-semibold mb-3`}>
+                        <span className="w-2 h-2 rounded-full bg-white/50" />
+                        {balance.name}
+                      </div>
+                      <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed mb-3">{balance.desc}</p>
+                      <div className="space-y-1.5">
+                        {balance.uses.map((use) => (
+                          <div key={use} className="flex items-center gap-2 text-xs text-foreground/70">
+                            <CheckCircle2 className="w-3 h-3 text-primary shrink-0" />
+                            {use}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <ArrowLeftRight className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Alur Investasi</h3>
+                </div>
+                <div className="relative">
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary/50 via-primary/20 to-transparent hidden sm:block" />
+                  <div className="space-y-4">
+                    {[
+                      { step: 1, title: 'Deposit Dana', desc: 'Top up saldo melalui QRIS atau USDT. Pilih metode pembayaran, transfer, dan upload bukti pembayaran.' },
+                      { step: 2, title: 'Verifikasi Admin', desc: 'Admin NEXVO akan memverifikasi pembayaran kamu. Proses biasanya selesai dalam beberapa menit.' },
+                      { step: 3, title: 'Pilih Paket Investasi', desc: 'Jelajahi paket investasi komoditas yang tersedia. Setiap paket punya harga, durasi, dan profit rate yang berbeda.' },
+                      { step: 4, title: 'Profit Harian Otomatis', desc: 'Setelah membeli paket, profit harian akan otomatis masuk ke saldo profit kamu berdasarkan profit rate paket.' },
+                      { step: 5, title: 'Tarik Profit', desc: 'Kapan saja kamu bisa menarik profit ke rekening bank yang sudah terdaftar. Proses cepat dan aman.' },
+                      { step: 6, title: 'Bonus Referral', desc: 'Ajak teman menggunakan kode referral kamu dan dapatkan bonus tambahan ke saldo profit.' },
+                    ].map((item) => (
+                      <div key={item.step} className="flex items-start gap-4">
+                        <div className="relative z-10 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-primary font-bold text-sm">{item.step}</span>
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <h4 className="text-foreground font-semibold text-sm mb-1">{item.title}</h4>
+                          <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{item.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    icon: Banknote,
+                    title: 'Salary Bonus',
+                    desc: 'Bonus gaji yang didapatkan berdasarkan total investasi aktif. Semakin besar investasi, semakin besar salary bonus yang kamu terima.',
+                    tag: 'Bulanan',
+                  },
+                  {
+                    icon: GitCompare,
+                    title: 'Matching Bonus',
+                    desc: 'Bonus pasangan dari jaringan referral kamu. Setiap pasangan referral di kiri dan kanan menghasilkan matching bonus.',
+                    tag: 'Real-time',
+                  },
+                ].map((bonus) => (
+                  <div key={bonus.title} className="glass glow-gold rounded-2xl p-4 sm:p-6 hover:glow-gold-strong transition-all">
+                    <div className="flex items-center gap-2 mb-3">
+                      <bonus.icon className="w-5 h-5 text-primary" />
+                      <h4 className="text-foreground font-semibold text-sm">{bonus.title}</h4>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold ml-auto">{bonus.tag}</span>
+                    </div>
+                    <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{bonus.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'guide' && (
+            <motion.div
+              key="guide"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6 sm:space-y-8"
+            >
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/[0.03] rounded-bl-full" />
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Rocket className="w-5 h-5 text-primary" />
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-foreground">Panduan Lengkap Memulai NEXVO</h3>
+                  </div>
+                  <p className="text-muted-foreground text-sm mb-6">Ikuti langkah-langkah berikut untuk mulai berinvestasi di NEXVO. Prosesnya cepat dan mudah!</p>
+                </div>
+              </div>
+
+              {[
+                {
+                  step: 1,
+                  title: 'Daftar Akun NEXVO',
+                  desc: 'Kunjungi nexvo.id dan klik tombol "Daftar". Isi formulir pendaftaran dengan nomor WhatsApp aktif dan email valid. Kamu akan menerima kode OTP via WhatsApp untuk verifikasi.',
+                  tips: ['Pastikan nomor WhatsApp aktif dan bisa menerima pesan', 'Gunakan email yang sering kamu cek', 'Simpan kode referral jika ada yang mengajak'],
+                  icon: UserPlus,
+                },
+                {
+                  step: 2,
+                  title: 'Verifikasi Akun',
+                  desc: 'Masukkan kode OTP yang dikirim ke WhatsApp dan email kamu. Setelah verifikasi berhasil, akun kamu aktif dan siap digunakan.',
+                  tips: ['Cek folder spam jika OTP tidak muncul di email', 'OTP WhatsApp biasanya tiba dalam 30 detik', 'Klik "Kirim Ulang" jika OTP tidak diterima'],
+                  icon: BadgeCheck,
+                },
+                {
+                  step: 3,
+                  title: 'Top Up Saldo (Deposit)',
+                  desc: 'Masuk ke menu Deposit, pilih metode pembayaran (QRIS atau USDT), masukkan nominal yang diinginkan, lakukan pembayaran, dan upload bukti transfer.',
+                  tips: ['QRIS: Scan QR dan bayar via e-wallet/mobile banking', 'USDT: Transfer USDT (TRC20) ke alamat yang tersedia', 'Minimal deposit sesuai ketentuan yang berlaku'],
+                  icon: CreditCard,
+                },
+                {
+                  step: 4,
+                  title: 'Pilih Paket Investasi',
+                  desc: 'Jelajahi daftar paket investasi di halaman Products. Setiap paket menampilkan harga, durasi kontrak, profit rate, dan kuota tersedia. Pilih yang sesuai dengan budget dan target profit kamu.',
+                  tips: ['Perhatikan profit rate dan durasi kontrak', 'Cek kuota tersedia sebelum membeli', 'Kamu bisa membeli beberapa paket sekaligus'],
+                  icon: ShoppingBag,
+                },
+                {
+                  step: 5,
+                  title: 'Pantau Profit Harian',
+                  desc: 'Setelah membeli paket, profit harian akan otomatis dikreditkan ke Saldo Profit kamu. Pantau perkembangan investasi melalui Dashboard dan halaman Profit.',
+                  tips: ['Cek dashboard secara berkala', 'Notifikasi push akan muncul saat profit masuk', 'Total profit terakumulasi secara otomatis'],
+                  icon: TrendingUp,
+                },
+                {
+                  step: 6,
+                  title: 'Tarik Dana (Withdrawal)',
+                  desc: 'Ketika kamu ingin menarik profit, masuk ke menu Withdrawal. Pastikan rekening bank sudah terdaftar. Masukkan nominal penarikan dan tunggu proses verifikasi admin.',
+                  tips: ['Daftarkan rekening bank terlebih dahulu di menu Bank', 'Perhatikan fee penarikan yang berlaku', 'Proses verifikasi biasanya selesai dalam 24 jam'],
+                  icon: ArrowUp,
+                },
+              ].map((item, i) => (
+                <motion.div
+                  key={item.step}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="glass glow-gold rounded-2xl p-4 sm:p-6"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="relative z-10 w-14 h-14 rounded-xl bg-gold-gradient flex items-center justify-center shrink-0 glow-gold">
+                      <span className="text-primary-foreground font-bold text-lg">{item.step}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <item.icon className="w-4 h-4 text-primary" />
+                        <h4 className="text-foreground font-semibold text-sm sm:text-base">{item.title}</h4>
+                      </div>
+                      <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed mb-3">{item.desc}</p>
+                      <div className="bg-secondary/50 rounded-xl p-3">
+                        <p className="text-[10px] text-primary font-semibold mb-2 uppercase tracking-wider">Tips</p>
+                        <div className="space-y-1.5">
+                          {item.tips.map((tip) => (
+                            <div key={tip} className="flex items-start gap-2 text-xs text-foreground/70">
+                              <CheckCircle2 className="w-3 h-3 text-primary shrink-0 mt-0.5" />
+                              {tip}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Pertanyaan Umum</h3>
+                </div>
+                <div className="space-y-4">
+                  {[
+                    { q: 'Berapa minimal deposit?', a: 'Minimal deposit bervariasi tergantung metode pembayaran. Silakan cek halaman Deposit untuk informasi lebih detail.' },
+                    { q: 'Berapa lama proses verifikasi deposit?', a: 'Verifikasi deposit biasanya selesai dalam beberapa menit hingga maksimal 24 jam, tergantung antrian dan waktu operasional.' },
+                    { q: 'Bagaimana cara menarik profit?', a: 'Masuk ke menu Withdrawal, pastikan rekening bank sudah terdaftar, masukkan nominal penarikan, dan tunggu verifikasi admin.' },
+                    { q: 'Apakah bisa membeli lebih dari satu paket?', a: 'Ya! Kamu bisa membeli beberapa paket investasi sekaligus selama kuota masih tersedia dan saldo mencukupi.' },
+                    { q: 'Bagaimana cara mendapatkan kode referral?', a: 'Kode referral otomatis tersedia di halaman Referral setelah kamu mendaftar. Bagikan kode tersebut ke teman-temanmu.' },
+                    { q: 'Apakah NEXVO bisa diakses dari HP?', a: 'Tentu! NEXVO adalah Progressive Web App (PWA) yang bisa diinstall langsung di HP-mu. Akses nexvo.id di browser HP dan klik "Install".' },
+                  ].map((faq, i) => (
+                    <div key={i} className="rounded-xl bg-secondary/50 border border-border p-4">
+                      <h4 className="text-foreground font-semibold text-sm mb-1.5">{faq.q}</h4>
+                      <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{faq.a}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'security' && (
+            <motion.div
+              key="security"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6 sm:space-y-8"
+            >
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/[0.03] rounded-bl-full" />
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <ShieldCheck className="w-5 h-5 text-primary" />
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-foreground">Keamanan Terjamin di NEXVO</h3>
+                  </div>
+                  <div className="space-y-4 text-foreground/80 text-sm sm:text-base leading-relaxed">
+                    <p>
+                      Keamanan bukan opsi — itu fondasi kami. NEXVO dibangun dengan arsitektur keamanan berlapis yang memastikan setiap aset, transaksi, dan data pribadi kamu terlindungi dari ancaman siber.
+                    </p>
+                    <p>
+                      Kami menggunakan standar keamanan tingkat enterprise yang sama digunakan oleh institusi keuangan besar. Dari enkripsi data hingga monitoring 24/7, setiap aspek platform dirancang dengan keamanan sebagai prioritas utama.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                {[
+                  {
+                    icon: Lock,
+                    title: 'Enkripsi SSL/TLS 256-bit',
+                    desc: 'Semua data yang ditransmisikan antara browser dan server NEXVO dienkripsi menggunakan sertifikat SSL/TLS 256-bit. Ini adalah standar enkripsi yang sama digunakan oleh perbankan online.',
+                  },
+                  {
+                    icon: Smartphone,
+                    title: 'Verifikasi OTP WhatsApp & Email',
+                    desc: 'Setiap login dan transaksi penting memerlukan verifikasi OTP via WhatsApp dan email. Ini memastikan hanya pemilik akun yang bisa mengakses dan melakukan transaksi.',
+                  },
+                  {
+                    icon: Shield,
+                    title: 'Autentikasi Multi-Layer',
+                    desc: 'Sistem autentikasi berlapis melindungi akun dari akses tidak sah. Termasuk session management, token JWT, dan verifikasi identitas ganda.',
+                  },
+                  {
+                    icon: Eye,
+                    title: 'Monitoring 24/7',
+                    desc: 'Tim keamanan kami memantau platform 24 jam sehari, 7 hari seminggu. Setiap aktivitas mencurigakan langsung terdeteksi dan ditangani.',
+                  },
+                  {
+                    icon: Globe,
+                    title: 'Server Uptime 99.9%',
+                    desc: 'Infrastruktur cloud yang andal dengan jaminan uptime 99.9%. Platform selalu tersedia kapanpun kamu membutuhkannya.',
+                  },
+                  {
+                    icon: Zap,
+                    title: 'Backup Data Otomatis',
+                    desc: 'Data platform di-backup secara otomatis dan terenkripsi. Dalam kondisi apapun, data kamu selalu bisa dipulihkan dengan aman.',
+                  },
+                ].map((feature, i) => (
+                  <motion.div
+                    key={feature.title}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.08 }}
+                    className="glass glow-gold rounded-2xl p-4 sm:p-6 group hover:glow-gold-strong transition-all"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <feature.icon className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="text-foreground font-semibold text-sm mb-2">{feature.title}</h4>
+                        <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{feature.desc}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="glass glow-gold rounded-3xl p-4 sm:p-8">
+                <h4 className="text-foreground font-semibold text-sm mb-4">Keamanan NEXVO dalam Angka</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { value: '256-bit', label: 'Enkripsi SSL' },
+                    { value: '99.9%', label: 'Server Uptime' },
+                    { value: '24/7', label: 'Monitoring Aktif' },
+                    { value: '2-Factor', label: 'Verifikasi Login' },
+                  ].map((stat) => (
+                    <div key={stat.label} className="text-center p-3 rounded-xl bg-secondary/50">
+                      <div className="text-lg sm:text-xl font-bold text-gold-gradient">{stat.value}</div>
+                      <div className="text-muted-foreground text-xs mt-1">{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mt-10 sm:mt-14"
+        >
+          <Button
+            onClick={() => navigate('register')}
+            className="bg-gold-gradient text-primary-foreground font-semibold rounded-2xl hover:opacity-90 transition-all glow-gold px-8 h-12 sm:h-14 text-sm sm:text-base"
+          >
+            Mulai Investasi Sekarang
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+          </Button>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 /* ═══════════════════════════════════════════
    CTA SECTION
    ═══════════════════════════════════════════ */
@@ -1260,6 +1806,7 @@ export default function HomePage() {
       <StatisticsSection />
       <ProductPreview />
       <HowItWorks />
+      <ComprehensiveGuide />
       <CtaSection />
       <Footer />
     </div>

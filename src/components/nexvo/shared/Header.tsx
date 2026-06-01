@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useSiteStore } from '@/stores/site-store';
 import { getFileUrl } from '@/lib/file-url';
 import { Button } from '@/components/ui/button';
+import ThemeToggle from '@/components/nexvo/shared/ThemeToggle';
 
 export default function Header() {
   const { currentPage, navigate } = useAppStore();
@@ -29,6 +30,7 @@ export default function Header() {
     { label: 'Home', page: 'home' as const, section: 'hero' },
     { label: 'Produk', page: 'home' as const, section: 'products' },
     { label: 'Tentang', page: 'home' as const, section: 'about' },
+    { label: 'Panduan', page: 'home' as const, section: 'guide' },
   ];
 
   const handleNavClick = (section: string) => {
@@ -81,6 +83,7 @@ export default function Header() {
 
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-3">
+              <ThemeToggle />
               {token && user ? (
                 <Button
                   onClick={() => navigate('dashboard')}
@@ -182,6 +185,9 @@ export default function Header() {
 
                 {/* Mobile Actions */}
                 <div className="p-4 space-y-3 border-t border-border">
+                  <div className="flex justify-center mb-2">
+                    <ThemeToggle />
+                  </div>
                   {token && user ? (
                     <Button
                       onClick={() => {

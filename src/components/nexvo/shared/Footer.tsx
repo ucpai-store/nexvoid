@@ -14,6 +14,7 @@ export default function Footer() {
     { label: 'Home', section: 'hero' },
     { label: 'Products', section: 'products' },
     { label: 'How It Works', section: 'how-it-works' },
+    { label: 'Panduan Lengkap', section: 'guide' },
     { label: 'Testimonials', section: 'testimonials' },
   ];
 
@@ -44,7 +45,7 @@ export default function Footer() {
               <img src={logoUrl} alt="NEXVO" className="h-10 sm:h-14 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
             </div>
             <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6 max-w-xs">
-              A trusted commodity-based digital asset management platform. Build Value, Grow Future.
+              NEXVO — Platform manajemen aset digital berbasis komoditas terpercaya. Profit harian hingga 10%, deposit mudah via QRIS & USDT, keamanan SSL 256-bit. Build Value, Grow Future.
             </p>
             <div className="flex items-center gap-3">
               {['M', 'T', 'I', 'Y'].map((letter, i) => (
@@ -94,7 +95,7 @@ export default function Footer() {
               Services
             </h4>
             <ul className="space-y-2.5">
-              {['Asset Management', 'Commodity Investment', 'Daily Profit', 'Referral Program'].map(
+              {['Investasi Komoditas', 'Profit Harian', 'Salary Bonus', 'Matching Bonus', 'Referral Program'].map(
                 (item) => (
                   <li key={item}>
                     <button

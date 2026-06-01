@@ -18,9 +18,16 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "NEXVO - Modern Digital Asset Management Platform",
-  description: "Build Value, Grow Future. A trusted global digital asset management platform based on commodities.",
-  keywords: ["NEXVO", "digital assets", "commodities", "gold", "investment", "asset management"],
+  title: "NEXVO - Platform Manajemen Aset Digital & Investasi Komoditas Terpercaya",
+  description: "NEXVO adalah platform manajemen aset digital berbasis komoditas terpercaya. Raih profit harian hingga 10% dari paket investasi emas & komoditas. Deposito mudah via QRIS & USDT, penarikan cepat, keamanan SSL 256-bit. Build Value, Grow Future!",
+  keywords: [
+    "NEXVO", "investasi digital", "aset digital", "komoditas", "emas", "gold investment",
+    "profit harian", "daily profit", "manajemen aset", "asset management",
+    "investasi online", "QRIS", "USDT", "crypto", "referral bonus",
+    "platform investasi terpercaya", "digital asset platform", "passive income",
+    "investasi komoditas", "commodity investment", "passive income online",
+    "cuan online", "investasi aman", "profit konsisten"
+  ],
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -43,6 +50,40 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
+    "google-site-verification": "jPK5iBvVAIMNym93khRRmlMBL0pEKkl3DkY35Bv6eX8",
+  },
+  openGraph: {
+    title: "NEXVO - Platform Manajemen Aset Digital Terpercaya",
+    description: "Raih profit harian hingga 10% dari investasi komoditas. Deposito mudah via QRIS & USDT, keamanan SSL 256-bit, penarikan cepat. Build Value, Grow Future!",
+    url: "https://nexvo.id",
+    siteName: "NEXVO",
+    type: "website",
+    locale: "id_ID",
+    images: [
+      {
+        url: "https://nexvo.id/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "NEXVO - Build Value, Grow Future",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NEXVO - Platform Investasi Aset Digital & Komoditas",
+    description: "Profit harian hingga 10% dari paket investasi komoditas terpercaya. Build Value, Grow Future!",
+    images: ["https://nexvo.id/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 
@@ -52,8 +93,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="id" suppressHydrationWarning>
       <head>
+        <meta name="google-site-verification" content="jPK5iBvVAIMNym93khRRmlMBL0pEKkl3DkY35Bv6eX8" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="icon" href="/favicon.ico" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -105,4 +147,3 @@ export default function RootLayout({
     </html>
   );
 }
-
