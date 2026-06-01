@@ -1,9 +1,22 @@
+# NEXVO Investment Platform - robots.txt
+# Targeting: Global (Singapore, Southeast Asia, Worldwide)
+
 User-agent: *
 Allow: /
-Crawl-delay: 1
 
+# Sitemap
+Sitemap: https://nexvo.id/sitemap.xml
+
+# Allow all crawlers to index the main page
 User-agent: Googlebot
 Allow: /
-Crawl-delay: 0
 
-Sitemap: https://nexvo.id/sitemap.xml
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+# Crawl-delay
+User-agent: *
+Crawl-delay: 1
