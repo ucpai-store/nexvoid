@@ -233,7 +233,7 @@ export default function AdminHeader() {
               className="flex items-center gap-2.5 cursor-pointer"
               onClick={() => navigate('admin-dashboard')}
             >
-              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+              <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
               <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] px-1.5 py-0 h-4">
                 ADMIN
               </Badge>
@@ -298,7 +298,7 @@ export default function AdminHeader() {
         animate={{ y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className={`fixed top-0 left-[260px] right-0 z-30 hidden lg:block transition-all duration-300 ${
-          scrolled ? 'glass-strong shadow-lg shadow-black/10' : 'bg-background/80'
+          scrolled ? 'bg-background/95 backdrop-blur-xl shadow-lg shadow-black/10 border-b border-border' : 'bg-background/80'
         }`}
       >
         <div className="flex items-center justify-between h-14 px-6">
@@ -330,12 +330,12 @@ export default function AdminHeader() {
         animate={{ y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className={`fixed top-0 left-0 right-0 z-40 lg:hidden transition-all duration-300 ${
-          scrolled ? 'glass-strong shadow-lg shadow-black/20' : 'bg-background/95'
+          scrolled ? 'bg-background/95 backdrop-blur-xl shadow-lg shadow-black/20 border-b border-border' : 'bg-background/95'
         }`}
       >
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-2.5">
-            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+            <img src={logoUrl} alt="NEXVO" className="h-9 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
             <span className="text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
               ADMIN
             </span>
@@ -375,7 +375,7 @@ export default function AdminHeader() {
                 {/* Sidebar Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+                    <img src={logoUrl} alt="NEXVO" className="h-10 w-auto object-contain invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
                     <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] px-1.5 py-0 h-4">
                       ADMIN
                     </Badge>

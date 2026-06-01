@@ -45,7 +45,7 @@ function AppLoader() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center animate-fade-in">
-        <img src={logoUrl} alt="NEXVO" className="h-20 w-auto object-contain mb-3 mx-auto" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
+        <img src={logoUrl} alt="NEXVO" className="h-20 w-auto object-contain mb-3 mx-auto invert dark:invert-0" onError={(e) => { (e.target as HTMLImageElement).src = '/api/files/nexvo-logo.png'; }} />
         <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
       </div>
     </div>
