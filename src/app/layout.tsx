@@ -54,7 +54,7 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
-    "google-site-verification": "jPK5iBvVAIMNym93khRRmlMBL0pEKkl3DkY35Bv6eX8",
+    "google-site-verification": "6RorboIBMBLmY3U5i0CDru6nBtlCQcJ3v0oNnUz696o",
   },
   openGraph: {
     title: "NEXVO - Platform Manajemen Aset Digital Terpercaya",
@@ -99,7 +99,7 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
-        <meta name="google-site-verification" content="jPK5iBvVAIMNym93khRRmlMBL0pEKkl3DkY35Bv6eX8" />
+        <meta name="google-site-verification" content="6RorboIBMBLmY3U5i0CDru6nBtlCQcJ3v0oNnUz696o" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="icon" href="/favicon.ico" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
