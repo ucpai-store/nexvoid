@@ -7,7 +7,6 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useSiteStore } from '@/stores/site-store';
 import { useAppStore } from '@/stores/app-store';
 import ErrorBoundary from '@/components/nexvo/ErrorBoundary';
-import LandingPage from '@/components/nexvo/LandingPage';
 
 const PWAInstallPrompt = dynamic(
   () => import('@/components/nexvo/shared/PWAInstallPrompt'),
@@ -57,7 +56,6 @@ export default function App() {
   const { loadFromStorage, hydrateAdmin, hydrateUser } = useAuthStore();
   const { fetchSettings } = useSiteStore();
   const [mounted, setMounted] = useState(false);
-  const [showApp, setShowApp] = useState(false);
 
   useEffect(() => {
     loadFromStorage();
@@ -81,7 +79,6 @@ export default function App() {
       if (refCode && !token && !adminToken) {
         useAppStore.getState().navigate('register', { referralCode: refCode.toUpperCase() });
         window.history.replaceState({}, '', window.location.pathname);
-        setShowApp(true);
       } else if (adminToken) {
         // If admin already has a hash page, respect it; otherwise go to dashboard
         if (hasValidHashPage && hashPage.startsWith('admin')) {
@@ -89,7 +86,6 @@ export default function App() {
         } else {
           useAppStore.getState().navigate('admin-dashboard');
         }
-        setShowApp(true);
       } else if (token) {
         // If user already has a hash page, respect it; otherwise go to home
         if (hasValidHashPage && !hashPage.startsWith('admin')) {
@@ -97,41 +93,39 @@ export default function App() {
         } else {
           useAppStore.getState().navigate('home');
         }
-        setShowApp(true);
+      } else {
+        // Not authenticated - go to login page directly
+        useAppStore.getState().navigate('login');
       }
-      // If no token and no adminToken, stay on landing page (showApp remains false)
     };
     init();
 
     return cleanup;
   }, []);
 
-  const handleLogin = () => {
-    useAppStore.getState().navigate('login');
-    setShowApp(true);
-  };
-
-  const handleRegister = () => {
-    useAppStore.getState().navigate('register');
-    setShowApp(true);
-  };
-
-  // Show landing page first (SSR content for Google) before mounting / auth check
-  if (!mounted) {
-    return <LandingPage onLogin={handleLogin} onRegister={handleRegister} />;
-  }
-
-  // If authenticated, show the full app
-  if (showApp) {
-    return (
-      <ErrorBoundary>
-        <AppShell />
-        <PWAInstallPrompt />
-        <PromoPopup />
-      </ErrorBoundary>
-    );
-  }
-
-  // Not authenticated - show landing page
-  return <LandingPage onLogin={handleLogin} onRegister={handleRegister} />;
+  // Always show AppShell (with login page if not authenticated)
+  return (
+    <ErrorBoundary>
+      {/* Hidden SEO content for Google crawlers */}
+      <div className="sr-only">
+        <h1>NEXVO - World&apos;s Best Investment Platform | Smart Digital Investing for Singapore &amp; Global Investors</h1>
+        <p>NEXVO is the world&apos;s leading smart investment platform trusted by investors across Singapore, Southeast Asia, and globally. Earn daily profits up to 10% with AI-powered multi-asset investment strategies covering stocks, gold, commodities, and cryptocurrency. Start investing from just $50 with guaranteed returns and institutional-grade security.</p>
+        <h2>Why NEXVO is the Best Investment Platform in Singapore &amp; Worldwide</h2>
+        <p>NEXVO combines cutting-edge AI technology with proven investment strategies to deliver consistent daily profits. Our platform offers multi-asset investment portfolios including blue-chip stocks, gold trading, commodity futures, and cryptocurrency - all managed by advanced algorithms that maximize returns while minimizing risk. Join over 50,000+ investors from Singapore, Malaysia, Indonesia, and across the globe who trust NEXVO for their financial growth.</p>
+        <h2>Investment Products Available on NEXVO Platform</h2>
+        <p>NEXVO offers four premium investment categories: Stock Investment with daily profits, Gold Investment with stable returns, Commodity Trading with competitive yields, and Crypto Investment with high potential returns. Each product is backed by AI-driven market analysis and professional risk management. Minimum investment starts from just $50, making it accessible for all investor levels.</p>
+        <h2>How to Start Investing with NEXVO</h2>
+        <p>Getting started with NEXVO is simple: 1) Create your free account, 2) Fund your wallet via bank transfer or cryptocurrency, 3) Choose your preferred investment product, 4) Earn daily profits automatically deposited to your balance. No trading experience required - our AI handles everything for you.</p>
+        <h2>NEXVO Referral Program - Earn While You Invite</h2>
+        <p>NEXVO&apos;s referral program offers multi-tier commission structure. Additionally, qualify for our exclusive Salary Program where active referrers can earn weekly salary payments.</p>
+        <h2>NEXVO Security &amp; Trust - Your Investment is Safe</h2>
+        <p>NEXVO employs bank-grade 256-bit SSL encryption, two-factor authentication (2FA), and cold storage for digital assets. All user funds are segregated and protected. NEXVO maintains 99.99% uptime with servers distributed across Singapore, Tokyo, and London for maximum reliability.</p>
+        <h2>Countries Where NEXVO is Available</h2>
+        <p>NEXVO is available to investors in Singapore, Malaysia, Indonesia, Thailand, Philippines, Vietnam, Brunei, India, China, Japan, South Korea, Australia, New Zealand, United Arab Emirates, United Kingdom, and over 100+ countries worldwide.</p>
+      </div>
+      <AppShell />
+      <PWAInstallPrompt />
+      <PromoPopup />
+    </ErrorBoundary>
+  );
 }
