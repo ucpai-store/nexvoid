@@ -19,18 +19,18 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://nexvo.id"),
-  title: "NEXVO - Platform Manajemen Aset Digital & Investasi Komoditas Terpercaya",
-  description: "NEXVO adalah platform investasi digital terpadu — saham, emas, komoditas, kripto. Raih profit harian hingga 10% dari paket investasi diversified. Deposito mudah via QRIS & USDT, penarikan cepat, keamanan SSL 256-bit. Build Value, Grow Future!",
+  title: "NEXVO — World's #1 Digital Investment Platform | Stocks, Gold, Commodities, Crypto",
+  description: "NEXVO is the world's leading digital investment platform. Invest in stocks, gold, commodities & crypto. Earn daily profits up to 10%. Trusted by 50,000+ investors across 12+ countries. Bank-grade SSL 256-bit security, instant withdrawals. Build Value, Grow Future!",
   keywords: [
-    "NEXVO", "investasi digital", "aset digital", "saham", "stocks", "emas", "gold investment",
-    "komoditas", "commodities", "kripto", "crypto", "cryptocurrency", "bitcoin", "ethereum",
-    "profit harian", "daily profit", "manajemen aset", "asset management",
-    "investasi online", "investasi saham", "investasi emas", "investasi kripto",
-    "QRIS", "USDT", "referral bonus", "passive income",
-    "platform investasi terpercaya", "digital asset platform",
-    "investasi komoditas", "commodity investment", "passive income online",
-    "cuan online", "investasi aman", "profit konsisten", "dividen saham",
-    "reksadana digital", "portofolio investasi", "diversifikasi aset"
+    "NEXVO", "best investment platform", "digital investment", "stocks", "gold investment",
+    "commodities trading", "cryptocurrency", "bitcoin", "ethereum", "daily profit",
+    "passive income", "wealth management", "asset management", "investment Singapore",
+    "investment Malaysia", "investment Asia", "online investment platform",
+    "stock market", "gold trading", "crypto trading", "referral bonus",
+    "investment app", "secure investment", "diversified portfolio",
+    "daily returns", "investment returns", "financial freedom",
+    "portfolio management", "digital assets", "smart investment",
+    "high yield investment", "investment opportunity", "grow wealth"
   ],
   manifest: "/manifest.webmanifest",
   icons: {
@@ -57,8 +57,8 @@ export const metadata: Metadata = {
     "google-site-verification": "6RorboIBMBLmY3U5i0CDru6nBtlCQcJ3v0oNnUz696o",
   },
   openGraph: {
-    title: "NEXVO - Platform Manajemen Aset Digital Terpercaya",
-    description: "Investasi saham, emas, komoditas & kripto di satu platform. Profit harian hingga 10%, deposit QRIS & USDT, keamanan SSL 256-bit. Build Value, Grow Future!",
+    title: "NEXVO — World's #1 Investment Platform",
+    description: "Invest in stocks, gold, commodities & crypto. Daily profits up to 10%. Trusted by 50K+ investors worldwide. Bank-grade security. Build Value, Grow Future!",
     url: "https://nexvo.id",
     siteName: "NEXVO",
     type: "website",
@@ -74,8 +74,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "NEXVO - Platform Investasi Aset Digital & Komoditas",
-    description: "Profit harian hingga 10% dari paket investasi komoditas terpercaya. Build Value, Grow Future!",
+    title: "NEXVO — World's Best Investment Platform",
+    description: "Daily profits up to 10%. Stocks, gold, commodities, crypto — all in one platform. Build Value, Grow Future!",
     images: ["https://nexvo.id/api/files/nexvo-logo.png"],
   },
   robots: {
@@ -97,7 +97,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="google-site-verification" content="6RorboIBMBLmY3U5i0CDru6nBtlCQcJ3v0oNnUz696o" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -143,7 +143,7 @@ export default function RootLayout({
               "name": "NEXVO",
               "url": "https://nexvo.id",
               "logo": "https://nexvo.id/api/files/nexvo-logo.png",
-              "description": "Platform investasi digital terpadu - saham, emas, komoditas, kripto. Build Value, Grow Future!"
+              "description": "The world's #1 digital investment platform. Stocks, gold, commodities, crypto. Trusted by 50K+ investors across 12+ countries. Build Value, Grow Future!"
             }),
           }}
         />
@@ -155,7 +155,7 @@ export default function RootLayout({
               "@type": "WebSite",
               "name": "NEXVO",
               "url": "https://nexvo.id",
-              "description": "Platform investasi digital terpadu - saham, emas, komoditas, kripto. Profit harian hingga 10%.",
+              "description": "The world's leading investment platform. Daily profits up to 10%. Stocks, gold, commodities, crypto.",
               "potentialAction": {
                 "@type": "SearchAction",
                 "target": "https://nexvo.id/?q={search_term_string}",
@@ -171,10 +171,10 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "FAQPage",
               "mainEntity": [
-                {"@type": "Question", "name": "Apa itu NEXVO?", "acceptedAnswer": {"@type": "Answer", "text": "NEXVO adalah platform investasi digital terpadu yang menyediakan layanan investasi saham, emas, komoditas, dan kripto dalam satu aplikasi."}},
-                {"@type": "Question", "name": "Bagaimana cara mendaftar di NEXVO?", "acceptedAnswer": {"@type": "Answer", "text": "Kunjungi nexvo.id, klik Daftar, masukkan email dan nomor HP, verifikasi kode OTP, dan akun langsung aktif."}},
-                {"@type": "Question", "name": "Apakah NEXVO aman?", "acceptedAnswer": {"@type": "Answer", "text": "Platform NEXVO dilengkapi enkripsi SSL 256-bit, verifikasi dua langkah (2FA), dan sistem monitoring 24/7."}},
-                {"@type": "Question", "name": "Bagaimana sistem profit harian bekerja?", "acceptedAnswer": {"@type": "Answer", "text": "Setiap paket investasi aktif menghasilkan profit harian secara otomatis berdasarkan jenis dan nominal paket."}}
+                {"@type": "Question", "name": "What is NEXVO?", "acceptedAnswer": {"@type": "Answer", "text": "NEXVO is the world's leading digital investment platform offering stocks, gold, commodities, and crypto in one place. Trusted by 50,000+ investors across 12+ countries."}},
+                {"@type": "Question", "name": "How do I get started with NEXVO?", "acceptedAnswer": {"@type": "Answer", "text": "Visit nexvo.id, click Start Investing, enter your email and phone number, verify with OTP, and your account is instantly active."}},
+                {"@type": "Question", "name": "Is NEXVO safe?", "acceptedAnswer": {"@type": "Answer", "text": "Absolutely. NEXVO uses SSL 256-bit encryption, two-factor authentication (2FA), and 24/7 fraud monitoring with bank-grade security standards."}},
+                {"@type": "Question", "name": "How does the daily profit system work?", "acceptedAnswer": {"@type": "Answer", "text": "Every active investment package generates automatic daily profits. The rate depends on the package type and amount. Monitor your profits in real-time from your dashboard."}}
               ]
             }),
           }}
