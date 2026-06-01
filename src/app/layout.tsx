@@ -18,6 +18,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://nexvo.id"),
   title: "NEXVO - Platform Manajemen Aset Digital & Investasi Komoditas Terpercaya",
   description: "NEXVO adalah platform investasi digital terpadu — saham, emas, komoditas, kripto. Raih profit harian hingga 10% dari paket investasi diversified. Deposito mudah via QRIS & USDT, penarikan cepat, keamanan SSL 256-bit. Build Value, Grow Future!",
   keywords: [
@@ -64,7 +65,7 @@ export const metadata: Metadata = {
     locale: "id_ID",
     images: [
       {
-        url: "https://nexvo.id/og-image.png",
+        url: "https://nexvo.id/api/files/nexvo-logo.png",
         width: 1200,
         height: 630,
         alt: "NEXVO - Build Value, Grow Future",
@@ -75,7 +76,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "NEXVO - Platform Investasi Aset Digital & Komoditas",
     description: "Profit harian hingga 10% dari paket investasi komoditas terpercaya. Build Value, Grow Future!",
-    images: ["https://nexvo.id/og-image.png"],
+    images: ["https://nexvo.id/api/files/nexvo-logo.png"],
   },
   robots: {
     index: true,
@@ -131,6 +132,51 @@ export default function RootLayout({
                 });
               }
             `,
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "NEXVO",
+              "url": "https://nexvo.id",
+              "logo": "https://nexvo.id/api/files/nexvo-logo.png",
+              "description": "Platform investasi digital terpadu - saham, emas, komoditas, kripto. Build Value, Grow Future!"
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "name": "NEXVO",
+              "url": "https://nexvo.id",
+              "description": "Platform investasi digital terpadu - saham, emas, komoditas, kripto. Profit harian hingga 10%.",
+              "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://nexvo.id/?q={search_term_string}",
+                "query-input": "required name=search_term_string"
+              }
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": [
+                {"@type": "Question", "name": "Apa itu NEXVO?", "acceptedAnswer": {"@type": "Answer", "text": "NEXVO adalah platform investasi digital terpadu yang menyediakan layanan investasi saham, emas, komoditas, dan kripto dalam satu aplikasi."}},
+                {"@type": "Question", "name": "Bagaimana cara mendaftar di NEXVO?", "acceptedAnswer": {"@type": "Answer", "text": "Kunjungi nexvo.id, klik Daftar, masukkan email dan nomor HP, verifikasi kode OTP, dan akun langsung aktif."}},
+                {"@type": "Question", "name": "Apakah NEXVO aman?", "acceptedAnswer": {"@type": "Answer", "text": "Platform NEXVO dilengkapi enkripsi SSL 256-bit, verifikasi dua langkah (2FA), dan sistem monitoring 24/7."}},
+                {"@type": "Question", "name": "Bagaimana sistem profit harian bekerja?", "acceptedAnswer": {"@type": "Answer", "text": "Setiap paket investasi aktif menghasilkan profit harian secara otomatis berdasarkan jenis dan nominal paket."}}
+              ]
+            }),
           }}
         />
       </head>

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useSiteStore } from '@/stores/site-store';
 import { useAppStore } from '@/stores/app-store';
 import ErrorBoundary from '@/components/nexvo/ErrorBoundary';
+import LandingPage from '@/components/nexvo/LandingPage';
 
 const PWAInstallPrompt = dynamic(
   () => import('@/components/nexvo/shared/PWAInstallPrompt'),
@@ -56,6 +57,7 @@ export default function App() {
   const { loadFromStorage, hydrateAdmin, hydrateUser } = useAuthStore();
   const { fetchSettings } = useSiteStore();
   const [mounted, setMounted] = useState(false);
+  const [showApp, setShowApp] = useState(false);
 
   useEffect(() => {
     loadFromStorage();
@@ -79,6 +81,7 @@ export default function App() {
       if (refCode && !token && !adminToken) {
         useAppStore.getState().navigate('register', { referralCode: refCode.toUpperCase() });
         window.history.replaceState({}, '', window.location.pathname);
+        setShowApp(true);
       } else if (adminToken) {
         // If admin already has a hash page, respect it; otherwise go to dashboard
         if (hasValidHashPage && hashPage.startsWith('admin')) {
@@ -86,6 +89,7 @@ export default function App() {
         } else {
           useAppStore.getState().navigate('admin-dashboard');
         }
+        setShowApp(true);
       } else if (token) {
         // If user already has a hash page, respect it; otherwise go to home
         if (hasValidHashPage && !hashPage.startsWith('admin')) {
@@ -93,22 +97,41 @@ export default function App() {
         } else {
           useAppStore.getState().navigate('home');
         }
+        setShowApp(true);
       }
+      // If no token and no adminToken, stay on landing page (showApp remains false)
     };
     init();
 
     return cleanup;
   }, []);
 
+  const handleLogin = () => {
+    useAppStore.getState().navigate('login');
+    setShowApp(true);
+  };
+
+  const handleRegister = () => {
+    useAppStore.getState().navigate('register');
+    setShowApp(true);
+  };
+
+  // Show landing page first (SSR content for Google) before mounting / auth check
   if (!mounted) {
-    return <AppLoader />;
+    return <LandingPage onLogin={handleLogin} onRegister={handleRegister} />;
   }
 
-  return (
-    <ErrorBoundary>
-      <AppShell />
-      <PWAInstallPrompt />
-      <PromoPopup />
-    </ErrorBoundary>
-  );
+  // If authenticated, show the full app
+  if (showApp) {
+    return (
+      <ErrorBoundary>
+        <AppShell />
+        <PWAInstallPrompt />
+        <PromoPopup />
+      </ErrorBoundary>
+    );
+  }
+
+  // Not authenticated - show landing page
+  return <LandingPage onLogin={handleLogin} onRegister={handleRegister} />;
 }
