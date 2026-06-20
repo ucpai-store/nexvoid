@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Clock, TrendingUp, Package, ShoppingBag,
   Minus, Plus, AlertTriangle, CheckCircle2, Loader2,
-  Wallet
+  Wallet, Coins, CalendarDays, AlertCircle, Info, Sparkles
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -77,6 +77,7 @@ export default function ProductDetailPage() {
 
   const totalPrice = product ? product.price * quantity : 0;
   const totalEstimatedProfit = product ? product.estimatedProfit * quantity : 0;
+  const dailyProfit = product && product.duration > 0 ? (product.estimatedProfit * quantity) / product.duration : 0;
   const quotaPercent = product && product.quota > 0 ? Math.round((product.quotaUsed / product.quota) * 100) : 0;
   const remaining = product ? Math.max(product.quota - product.quotaUsed, 0) : 0;
   const hasEnoughBalance = ((user?.depositBalance || 0) + (user?.mainBalance || 0)) >= totalPrice;
@@ -206,6 +207,13 @@ export default function ProductDetailPage() {
               <Package className="w-16 h-16 text-primary/20" />
             </div>
           )}
+          {/* Profit rate badge on banner */}
+          <div className="absolute top-3 right-3">
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs font-semibold backdrop-blur-sm">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              +{product.profitRate}%/hari
+            </Badge>
+          </div>
         </div>
       </motion.div>
 
@@ -217,29 +225,46 @@ export default function ProductDetailPage() {
         className="px-4 sm:px-6 lg:px-8"
       >
         {/* Name & Price */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass border border-primary/20 mb-2">
+          <Sparkles className="w-3 h-3 text-primary" />
+          <span className="text-primary text-[10px] font-semibold tracking-wider uppercase">Produk Investasi</span>
+        </div>
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gold-gradient mb-2">
           {product.name}
         </h1>
-        <div className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-          {formatRupiah(product.price)}
+        <div className="mb-1">
+          <p className="text-muted-foreground text-xs uppercase tracking-wider mb-0.5">Harga Produk</p>
+          <div className="text-3xl sm:text-4xl font-bold text-foreground">
+            {formatRupiah(product.price)}
+          </div>
+        </div>
+
+        {/* Modal tidak kembali warning banner */}
+        <div className="mt-3 p-3 rounded-xl bg-amber-400/5 border border-amber-400/15">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-amber-400/90 text-xs sm:text-sm leading-relaxed">
+              <strong>Modal tidak dikembalikan.</strong> Anda hanya menerima profit harian selama periode kontrak berlangsung.
+            </p>
+          </div>
         </div>
 
         {/* Key Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 sm:mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 mb-4 sm:mb-6">
           <div className="glass glow-gold rounded-2xl p-4 text-center">
-            <Clock className="w-5 h-5 text-primary mx-auto mb-2" />
+            <CalendarDays className="w-5 h-5 text-blue-400 mx-auto mb-2" />
             <p className="text-foreground font-semibold text-lg">{product.duration}</p>
-            <p className="text-muted-foreground text-xs">Hari Durasi</p>
+            <p className="text-muted-foreground text-xs">Hari Kontrak</p>
           </div>
           <div className="glass glow-gold rounded-2xl p-4 text-center">
             <TrendingUp className="w-5 h-5 text-emerald-400 mx-auto mb-2" />
-            <p className="text-emerald-400 font-semibold text-lg">{formatRupiah(product.estimatedProfit)}</p>
-            <p className="text-muted-foreground text-xs">Est. Profit</p>
+            <p className="text-emerald-400 font-semibold text-lg">{formatRupiah(product.estimatedProfit / product.duration)}</p>
+            <p className="text-muted-foreground text-xs">Profit/Hari</p>
           </div>
           <div className="glass glow-gold rounded-2xl p-4 text-center">
-            <TrendingUp className="w-5 h-5 text-primary mx-auto mb-2" />
-            <p className="text-foreground font-semibold text-lg">{product.profitRate}%</p>
-            <p className="text-muted-foreground text-xs">Profit Rate</p>
+            <Coins className="w-5 h-5 text-primary mx-auto mb-2" />
+            <p className="text-gold-gradient font-semibold text-lg">{formatRupiah(product.estimatedProfit)}</p>
+            <p className="text-muted-foreground text-xs">Total Profit</p>
           </div>
           <div className="glass glow-gold rounded-2xl p-4 text-center">
             <Package className="w-5 h-5 text-blue-400 mx-auto mb-2" />
@@ -276,6 +301,43 @@ export default function ProductDetailPage() {
           </p>
         </div>
 
+        {/* Profit Calculation Breakdown */}
+        <div className="glass-gold rounded-2xl p-3 sm:p-5 mb-4 sm:mb-6">
+          <h3 className="text-foreground font-semibold text-sm sm:text-base mb-3 flex items-center gap-2">
+            <Coins className="w-4 h-4 text-primary" />
+            Rincian Perhitungan Profit
+          </h3>
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Harga Produk (Modal)</span>
+              <span className="text-foreground font-medium">{formatRupiah(product.price)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Profit Rate</span>
+              <span className="text-primary font-medium">{product.profitRate}%/hari</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Profit Harian</span>
+              <span className="text-emerald-400 font-medium">{formatRupiah(product.estimatedProfit / product.duration)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Durasi Kontrak</span>
+              <span className="text-foreground font-medium">{product.duration} Hari</span>
+            </div>
+            <Separator className="bg-primary/10" />
+            <div className="flex justify-between text-sm">
+              <span className="text-foreground font-semibold">Total Profit ({product.duration} hari)</span>
+              <span className="text-emerald-400 font-bold text-base">{formatRupiah(product.estimatedProfit)}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15 mt-2">
+              <p className="text-amber-400/80 text-[10px] leading-tight flex items-center gap-1.5">
+                <AlertCircle className="w-3 h-3 shrink-0" />
+                Modal {formatRupiah(product.price)} tidak dikembalikan, hanya profit harian yang diterima
+              </p>
+            </div>
+          </div>
+        </div>
+
         <Separator className="bg-primary/10 mb-4 sm:mb-6" />
 
         {/* Quantity Selector */}
@@ -303,7 +365,11 @@ export default function ProductDetailPage() {
             </div>
           </div>
           {quantity > 1 && (
-            <div className="mt-3 pt-3 border-t border-primary/10">
+            <div className="mt-3 pt-3 border-t border-primary/10 space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total Profit Harian</span>
+                <span className="text-emerald-400 font-medium">{formatRupiah(dailyProfit)}</span>
+              </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total Est. Profit</span>
                 <span className="text-emerald-400 font-medium">{formatRupiah(totalEstimatedProfit)}</span>
@@ -348,7 +414,7 @@ export default function ProductDetailPage() {
           ) : hasEnoughBalance ? (
             <>
               <ShoppingBag className="w-5 h-5 mr-2" />
-              Buy Now - {formatRupiah(totalPrice)}
+              Beli Sekarang - {formatRupiah(totalPrice)}
             </>
           ) : (
             <>
@@ -375,7 +441,7 @@ export default function ProductDetailPage() {
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {hasEnoughBalance
-                ? 'Saldo akan dipotong dari saldo deposit & utama Anda'
+                ? 'Saldo akan dipotong untuk membayar harga produk'
                 : 'Saldo tidak mencukupi, Anda akan diarahkan ke deposit'}
             </DialogDescription>
           </DialogHeader>
@@ -393,11 +459,30 @@ export default function ProductDetailPage() {
               <span className="text-muted-foreground">Harga Satuan</span>
               <span className="text-foreground font-medium">{formatRupiah(product.price)}</span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Profit Harian</span>
+              <span className="text-emerald-400 font-medium">{formatRupiah(dailyProfit)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total Profit ({product.duration} hari)</span>
+              <span className="text-emerald-400 font-medium">{formatRupiah(totalEstimatedProfit)}</span>
+            </div>
             <Separator className="bg-primary/10" />
             <div className="flex justify-between text-base">
-              <span className="text-foreground font-semibold">Total</span>
+              <span className="text-foreground font-semibold">Total Bayar</span>
               <span className="text-gold-gradient font-bold text-lg">{formatRupiah(totalPrice)}</span>
             </div>
+
+            {/* Modal tidak kembali warning */}
+            <div className="p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-amber-400/90 text-[10px] leading-tight">
+                  <strong>Modal tidak dikembalikan.</strong> Anda hanya menerima profit harian {formatRupiah(dailyProfit)} selama {product.duration} hari.
+                </p>
+              </div>
+            </div>
+
             {hasEnoughBalance && (
               <>
                 <Separator className="bg-primary/10" />
@@ -449,7 +534,7 @@ export default function ProductDetailPage() {
       <Dialog open={successOpen} onOpenChange={(open) => { if (!open) navigate('history'); }}>
         <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
-            <div className="w-16 h-16 rounded-2xl bg-cardmerald-400/10 flex items-center justify-center mx-auto mb-2">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-400/10 flex items-center justify-center mx-auto mb-2">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             </div>
             <DialogTitle className="text-foreground text-center">Pembelian Berhasil!</DialogTitle>
@@ -463,8 +548,18 @@ export default function ProductDetailPage() {
               <span className="text-foreground font-semibold">{formatRupiah(totalPrice)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Est. Profit</span>
+              <span className="text-muted-foreground">Profit Harian</span>
+              <span className="text-emerald-400 font-semibold">{formatRupiah(dailyProfit)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total Profit ({product.duration} hari)</span>
               <span className="text-emerald-400 font-semibold">{formatRupiah(totalEstimatedProfit)}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15 mt-2">
+              <p className="text-amber-400/80 text-[10px] leading-tight flex items-center gap-1.5">
+                <AlertCircle className="w-3 h-3 shrink-0" />
+                Modal tidak dikembalikan, hanya profit harian yang diterima
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -480,4 +575,3 @@ export default function ProductDetailPage() {
     </div>
   );
 }
-

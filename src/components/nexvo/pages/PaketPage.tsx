@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, ShieldCheck, Clock, Loader2,
-  AlertTriangle, RefreshCw, Wallet, CheckCircle2
+  AlertTriangle, RefreshCw, Wallet, CheckCircle2,
+  Coins, CalendarDays, Info, Crown, Sparkles, AlertCircle
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAppStore } from '@/stores/app-store';
@@ -37,6 +38,51 @@ interface PackageItem {
   totalProfit: number;
 }
 
+/* ───────── Tier styling based on package order ───────── */
+const TIER_STYLES = [
+  { // Bronze / Starter
+    border: 'border-slate-400/20',
+    glow: 'hover:shadow-[0_0_30px_rgba(148,163,184,0.15)]',
+    badgeBg: 'bg-slate-400/10',
+    badgeText: 'text-slate-300',
+    badgeLabel: 'STARTER',
+    icon: Coins,
+  },
+  { // Silver
+    border: 'border-blue-400/30',
+    glow: 'hover:shadow-[0_0_30px_rgba(96,165,250,0.2)]',
+    badgeBg: 'bg-blue-400/10',
+    badgeText: 'text-blue-300',
+    badgeLabel: 'SILVER',
+    icon: ShieldCheck,
+  },
+  { // Gold
+    border: 'border-primary/40',
+    glow: 'hover:shadow-[0_0_40px_rgba(212,175,55,0.25)]',
+    badgeBg: 'bg-primary/15',
+    badgeText: 'text-primary',
+    badgeLabel: 'GOLD',
+    icon: Crown,
+    featured: true,
+  },
+  { // Platinum
+    border: 'border-emerald-400/30',
+    glow: 'hover:shadow-[0_0_30px_rgba(52,211,153,0.2)]',
+    badgeBg: 'bg-emerald-400/10',
+    badgeText: 'text-emerald-300',
+    badgeLabel: 'PLATINUM',
+    icon: Sparkles,
+  },
+  { // Diamond
+    border: 'border-purple-400/30',
+    glow: 'hover:shadow-[0_0_30px_rgba(168,85,247,0.2)]',
+    badgeBg: 'bg-purple-400/10',
+    badgeText: 'text-purple-300',
+    badgeLabel: 'DIAMOND',
+    icon: Sparkles,
+  },
+];
+
 /* ───────── Package Card Component ───────── */
 function PackageCard({
   pkg,
@@ -49,61 +95,95 @@ function PackageCard({
   onInvest: (pkg: PackageItem) => void;
   t: (key: string) => string;
 }) {
+  const tier = TIER_STYLES[index % TIER_STYLES.length];
+  const TierIcon = tier.icon;
+  const isFeatured = tier.featured;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08, duration: 0.4, ease: 'easeOut' }}
       whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-      className="group glass-strong rounded-2xl p-3 sm:p-5 lg:p-6 flex flex-col relative overflow-hidden hover:glow-gold hover:border-primary/30 transition-all duration-300"
+      className={`group glass-strong rounded-2xl p-4 sm:p-5 lg:p-6 flex flex-col relative overflow-hidden border-2 ${tier.border} ${tier.glow} transition-all duration-300 ${isFeatured ? 'ring-2 ring-primary/20' : ''}`}
     >
+      {/* Featured ribbon */}
+      {isFeatured && (
+        <div className="absolute top-0 right-0 bg-gold-gradient text-primary-foreground text-[9px] font-bold px-3 py-1 rounded-bl-xl">
+          ⭐ POPULER
+        </div>
+      )}
+
       {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-primary/3 blur-3xl group-hover:bg-primary/8 transition-colors" />
+      <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl group-hover:bg-primary/10 transition-colors pointer-events-none" />
 
-      {/* Package name */}
+      {/* Tier badge & name */}
       <div className="relative z-10">
-        <h3 className="text-foreground font-semibold text-sm mb-1">{pkg.name}</h3>
+        <div className="flex items-center justify-between mb-3">
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${tier.badgeBg} ${tier.badgeText} text-[10px] font-bold tracking-wider`}>
+            <TierIcon className="w-3 h-3" />
+            {tier.badgeLabel}
+          </div>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-400/10 text-emerald-400 text-[10px] font-semibold">
+            <TrendingUp className="w-3 h-3" />
+            +{pkg.profitRate}%/hari
+          </div>
+        </div>
 
-        {/* Amount */}
-        <div className="mb-3">
+        {/* Package name */}
+        <h3 className="text-foreground font-bold text-base sm:text-lg mb-2">{pkg.name}</h3>
+
+        {/* Price / Modal */}
+        <div className="mb-1">
+          <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-0.5">Modal Investasi</p>
           <span className="text-gold-gradient text-2xl sm:text-3xl font-bold tracking-tight">
             {formatRupiah(pkg.amount)}
           </span>
         </div>
 
-        {/* Details */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-cardmerald-400/10 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+        {/* Modal tidak kembali warning */}
+        <div className="flex items-start gap-1.5 mb-4 mt-2 p-2 rounded-lg bg-amber-400/5 border border-amber-400/15">
+          <AlertCircle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-amber-400/80 text-[10px] leading-tight">
+            Modal tidak dikembalikan, hanya menerima profit harian
+          </p>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {/* Daily Profit */}
+          <div className="glass rounded-xl p-2.5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <div className="w-6 h-6 rounded-lg bg-emerald-400/10 flex items-center justify-center">
+                <TrendingUp className="w-3 h-3 text-emerald-400" />
+              </div>
+              <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Profit/Hari</span>
             </div>
-            <div>
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Profit Harian</p>
-              <p className="text-emerald-400 text-sm font-semibold">{formatRupiah(pkg.dailyProfit)}</p>
-            </div>
+            <p className="text-emerald-400 text-sm sm:text-base font-bold">{formatRupiah(pkg.dailyProfit)}</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-400/10 flex items-center justify-center shrink-0">
-              <Clock className="w-3.5 h-3.5 text-blue-400" />
+          {/* Contract Days */}
+          <div className="glass rounded-xl p-2.5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <div className="w-6 h-6 rounded-lg bg-blue-400/10 flex items-center justify-center">
+                <CalendarDays className="w-3 h-3 text-blue-400" />
+              </div>
+              <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Kontrak</span>
             </div>
-            <div>
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Kontrak</p>
-              <p className="text-foreground text-sm font-medium">{pkg.contractDays} {t('paket.contractDays')}</p>
-            </div>
+            <p className="text-foreground text-sm sm:text-base font-bold">{pkg.contractDays} Hari</p>
           </div>
         </div>
 
-        {/* Capital Return badge */}
-        <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-medium mb-4">
-          <ShieldCheck className="w-3 h-3 mr-1" />
-          {t('paket.capitalReturn')}
-        </Badge>
-
-        {/* Total profit preview */}
-        <p className="text-muted-foreground text-[10px] mb-4">
-          {t('paket.totalProfitDays').replace('{days}', String(pkg.contractDays))}: <span className="text-emerald-400 font-semibold">{formatRupiah(pkg.totalProfit)}</span>
-        </p>
+        {/* Total Profit preview */}
+        <div className="glass-gold rounded-xl p-3 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-primary" />
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wider">Total Profit {pkg.contractDays} Hari</span>
+            </div>
+          </div>
+          <p className="text-gold-gradient text-lg sm:text-xl font-bold mt-0.5">{formatRupiah(pkg.totalProfit)}</p>
+        </div>
 
         {/* Invest button */}
         <Button
@@ -112,9 +192,33 @@ function PackageCard({
         >
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4" />
-            {t('paket.investNow')}
+            Invest Sekarang
           </div>
         </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ───────── Info Banner Component ───────── */
+function InfoBanner() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="glass rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6 border border-amber-400/15"
+    >
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center shrink-0">
+          <Info className="w-4 h-4 text-amber-400" />
+        </div>
+        <div className="flex-1">
+          <p className="text-foreground text-xs sm:text-sm font-semibold mb-0.5">Informasi Penting</p>
+          <p className="text-muted-foreground text-[10px] sm:text-xs leading-relaxed">
+            Modal investasi <span className="text-amber-400 font-medium">tidak dikembalikan</span>. Anda hanya akan menerima <span className="text-emerald-400 font-medium">profit harian</span> selama periode kontrak berlangsung.
+          </p>
+        </div>
       </div>
     </motion.div>
   );
@@ -251,20 +355,27 @@ export default function PaketPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-6 sm:space-y-8 pb-4 sm:pb-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
       {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <h1 className="text-gold-gradient text-3xl sm:text-4xl font-bold mb-2">
-          {t('paket.investmentPackages')}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass border border-primary/20 mb-3">
+          <Sparkles className="w-3 h-3 text-primary" />
+          <span className="text-primary text-[10px] font-semibold tracking-wider uppercase">Paket Investasi</span>
+        </div>
+        <h1 className="text-gold-gradient text-2xl sm:text-4xl font-bold mb-2">
+          Pilih Paket Investasi
         </h1>
-        <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto">
-          {t('paket.selectPackage')}
+        <p className="text-muted-foreground text-xs sm:text-base max-w-md mx-auto">
+          Investasi dengan profit harian tetap, konsisten, dan transparan
         </p>
       </motion.div>
+
+      {/* Important Info Banner */}
+      <InfoBanner />
 
       {/* Package Cards Grid */}
       {packages.length > 0 ? (
@@ -286,6 +397,54 @@ export default function PaketPage() {
         </div>
       )}
 
+      {/* How it works section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="glass rounded-2xl p-4 sm:p-6"
+      >
+        <h3 className="text-foreground font-semibold text-sm sm:text-base mb-4 flex items-center gap-2">
+          <Info className="w-4 h-4 text-primary" />
+          Cara Kerja Investasi
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="text-primary text-xs font-bold">1</span>
+            </div>
+            <div>
+              <p className="text-foreground text-xs font-medium mb-0.5">Pilih Paket</p>
+              <p className="text-muted-foreground text-[10px] leading-tight">Pilih paket sesuai modal & target profit</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="text-primary text-xs font-bold">2</span>
+            </div>
+            <div>
+              <p className="text-foreground text-xs font-medium mb-0.5">Bayar Modal</p>
+              <p className="text-muted-foreground text-[10px] leading-tight">Modal dipotong dari saldo deposit/utama</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="text-primary text-xs font-bold">3</span>
+            </div>
+            <div>
+              <p className="text-foreground text-xs font-medium mb-0.5">Terima Profit Harian</p>
+              <p className="text-muted-foreground text-[10px] leading-tight">Profit masuk otomatis setiap hari selama kontrak</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-primary/10">
+          <p className="text-amber-400/80 text-[10px] sm:text-xs flex items-center gap-1.5">
+            <AlertCircle className="w-3 h-3 shrink-0" />
+            <span><strong>Catatan:</strong> Modal investasi tidak dikembalikan. Hanya profit harian yang Anda terima selama periode kontrak.</span>
+          </p>
+        </div>
+      </motion.div>
+
       {/* Confirm Investment Dialog */}
       <Dialog open={!!confirmPkg} onOpenChange={(open) => { if (!open) setConfirmPkg(null); }}>
         <DialogContent className="glass-strong border-primary/20 max-w-sm">
@@ -296,47 +455,54 @@ export default function PaketPage() {
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {confirmPkg && totalAvailableBalance >= confirmPkg.amount
-                ? t('paket.balanceDeduct')
-                : t('paket.insufficientBalance')}
+                ? 'Saldo akan dipotong untuk membayar modal investasi'
+                : 'Saldo tidak mencukupi, Anda akan diarahkan ke deposit'}
             </DialogDescription>
           </DialogHeader>
 
           {confirmPkg && (
             <div className="space-y-3 py-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.packageLabel')}</span>
+                <span className="text-muted-foreground">Paket</span>
                 <span className="text-foreground font-medium">{confirmPkg.name}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.modal')}</span>
+                <span className="text-muted-foreground">Modal Investasi</span>
                 <span className="text-gold-gradient font-bold text-lg">{formatRupiah(confirmPkg.amount)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.dailyProfit')}</span>
+                <span className="text-muted-foreground">Profit Harian</span>
                 <span className="text-emerald-400 font-semibold">{formatRupiah(confirmPkg.dailyProfit)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.contractLabel')}</span>
+                <span className="text-muted-foreground">Kontrak</span>
                 <span className="text-foreground font-medium">{confirmPkg.contractDays} Hari</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Profit</span>
+                <span className="text-emerald-400 font-semibold">{formatRupiah(confirmPkg.totalProfit)}</span>
+              </div>
+
+              {/* Modal tidak kembali warning */}
+              <div className="p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-amber-400/90 text-[10px] leading-tight">
+                    <strong>Modal tidak dikembalikan.</strong> Anda hanya menerima profit harian {formatRupiah(confirmPkg.dailyProfit)} selama {confirmPkg.contractDays} hari.
+                  </p>
+                </div>
+              </div>
+
               <Separator className="bg-primary/10" />
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.yourBalance')}</span>
+                <span className="text-muted-foreground">Saldo Anda</span>
                 <span className={`font-medium ${totalAvailableBalance >= confirmPkg.amount ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatRupiah(totalAvailableBalance)}
                 </span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground/60">Saldo Deposit</span>
-                <span className="text-blue-400">{formatRupiah(user?.depositBalance || 0)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground/60">Saldo Utama</span>
-                <span className="text-primary">{formatRupiah(user?.mainBalance || 0)}</span>
-              </div>
               {totalAvailableBalance >= confirmPkg.amount && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t('paket.remainingBalance')}</span>
+                  <span className="text-muted-foreground">Sisa Saldo Setelah Invest</span>
                   <span className="text-foreground font-medium">
                     {formatRupiah(totalAvailableBalance - confirmPkg.amount)}
                   </span>
@@ -365,11 +531,11 @@ export default function PaketPage() {
               ) : confirmPkg && totalAvailableBalance >= confirmPkg.amount ? (
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" />
-                  {t('paket.confirmInvest')}</div>
+                  Konfirmasi Invest</div>
               ) : (
                 <div className="flex items-center gap-2">
                   <Wallet className="w-4 h-4" />
-                  {t('paket.depositInvest')}</div>
+                  Deposit & Invest</div>
               )}
             </Button>
           </DialogFooter>
@@ -380,27 +546,38 @@ export default function PaketPage() {
       <Dialog open={!!successPkg} onOpenChange={(open) => { if (!open) { setSuccessPkg(null); navigate('assets'); } }}>
         <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
-            <div className="w-16 h-16 rounded-2xl bg-cardmerald-400/10 flex items-center justify-center mx-auto mb-2">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-400/10 flex items-center justify-center mx-auto mb-2">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             </div>
-            <DialogTitle className="text-foreground text-center">{t('paket.investSuccessTitle')}</DialogTitle>
+            <DialogTitle className="text-foreground text-center">Investasi Berhasil!</DialogTitle>
             <DialogDescription className="text-muted-foreground text-center">
-              {successPkg && t('paket.investSuccessDesc').replace('{name}', successPkg?.name || '')}
+              {successPkg && `Selamat! Paket ${successPkg?.name} Anda telah aktif`}
             </DialogDescription>
           </DialogHeader>
           {successPkg && (
             <div className="space-y-2 py-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.modal')}</span>
+                <span className="text-muted-foreground">Modal Investasi</span>
                 <span className="text-foreground font-semibold">{formatRupiah(successPkg.amount)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.dailyProfit')}</span>
+                <span className="text-muted-foreground">Profit Harian</span>
                 <span className="text-emerald-400 font-semibold">{formatRupiah(successPkg.dailyProfit)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('paket.totalProfitDays').replace('{days}', String(successPkg?.contractDays || 0))}</span>
-                <span className="text-emerald-400 font-semibold">{formatRupiah(successPkg.totalProfit)}</span>
+                <span className="text-muted-foreground">Kontrak</span>
+                <span className="text-foreground font-semibold">{successPkg.contractDays} Hari</span>
+              </div>
+              <Separator className="bg-primary/10" />
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Profit Diterima</span>
+                <span className="text-emerald-400 font-bold">{formatRupiah(successPkg.totalProfit)}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15 mt-2">
+                <p className="text-amber-400/80 text-[10px] leading-tight flex items-center gap-1.5">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  Modal tidak dikembalikan, hanya profit harian yang diterima
+                </p>
               </div>
             </div>
           )}
@@ -409,7 +586,7 @@ export default function PaketPage() {
               onClick={() => { setSuccessPkg(null); navigate('assets'); }}
               className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
             >
-              {t('paket.viewMyAssets')}
+              Lihat Aset Saya
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -417,4 +594,3 @@ export default function PaketPage() {
     </div>
   );
 }
-
