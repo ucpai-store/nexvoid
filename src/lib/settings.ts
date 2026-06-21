@@ -1,7 +1,7 @@
 import { db } from './db';
 
 const DEFAULT_SETTINGS: Record<string, string> = {
-  min_withdraw: '50000',
+  min_withdraw: '100000',
   withdraw_fee: '10',
   deposit_fee: '500',
   work_start: '09:00',

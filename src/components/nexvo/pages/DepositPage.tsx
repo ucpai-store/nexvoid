@@ -56,11 +56,12 @@ interface WhatsAppAdmin {
 
 const presetAmounts = [
   { label: '100K', value: 100000 },
-  { label: '500K', value: 500000 },
-  { label: '1M', value: 1000000 },
-  { label: '2.5M', value: 2500000 },
-  { label: '5M', value: 5000000 },
-  { label: '10M', value: 10000000 },
+  { label: '160K', value: 160000 },
+  { label: '320K', value: 320000 },
+  { label: '640K', value: 640000 },
+  { label: '1.92M', value: 1920000 },
+  { label: '5.76M', value: 5760000 },
+  { label: '17.28M', value: 17280000 },
 ];
 
 const categoryTabKeys = [
@@ -629,8 +630,8 @@ export default function DepositPage() {
                   </div>
                 </div>
 
-                {/* Premium Preset Amounts */}
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {/* Premium Preset Amounts - Sesuai dengan Paket Investasi */}
+                <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
                   {presetAmounts.map((preset) => {
                     const isSelected = amount === preset.value.toString();
                     return (

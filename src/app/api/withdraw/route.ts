@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Withdrawals can only be made during working hours (Mon-Fri, 09:00-16:00 WIB)' }, { status: 400 });
     }
 
-    // Check minimum withdrawal
-    const minWithdraw = parseFloat(settings.min_withdraw || '50000');
+    // Check minimum withdrawal (enforce absolute minimum 100000)
+    const minWithdraw = Math.max(parseFloat(settings.min_withdraw || '100000'), 100000);
     if (amount < minWithdraw) {
       return NextResponse.json({ success: false, error: `Minimum withdrawal is Rp ${minWithdraw.toLocaleString('id-ID')}` }, { status: 400 });
     }

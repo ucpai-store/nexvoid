@@ -175,7 +175,7 @@ export default function WithdrawPage() {
 
   const numAmount = parseInt(amount.replace(/[^0-9]/g, '')) || 0;
   const feeRate = parseFloat(settings.withdraw_fee || '10') / 100;
-  const minWithdraw = parseInt(settings.min_withdraw || '50000');
+  const minWithdraw = Math.max(parseInt(settings.min_withdraw || '100000'), 100000);
   const fee = Math.round(numAmount * feeRate);
   const netAmount = numAmount - fee;
   const mainBalance = user?.mainBalance || 0;

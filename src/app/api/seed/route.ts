@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Seed system settings
     const settings = [
-      { key: 'min_withdraw', value: '50000' },
+      { key: 'min_withdraw', value: '100000' },
       { key: 'withdraw_fee', value: '10' },
       { key: 'deposit_fee', value: '500' },
       { key: 'work_start', value: '08:00' },
