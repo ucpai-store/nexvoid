@@ -229,13 +229,31 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
     const maxWeeks = config.maxWeeks;
     const requireActiveDeposit = config.requireActiveDeposit;
 
-    // CHECK 1: User themselves MUST have an active deposit (investment)
+    // ★ SYARAT 1 (CEK PERTAMA): Wajib invite minimal 10 referral (Level 1)
+    const minDirectRefs = config.minDirectRefs || 10;
+    const refCheck = await checkAllDirectRefsActive(userId);
+
+    if (refCheck.total === 0) {
+      return {
+        success: false,
+        message: `Anda belum memiliki referral langsung (Level 1). Minimal ${minDirectRefs} undangan aktif diperlukan.`,
+      };
+    }
+
+    if (refCheck.total < minDirectRefs) {
+      return {
+        success: false,
+        message: `Syarat 1 belum terpenuhi: minimal ${minDirectRefs} undangan langsung. Saat ini Anda baru ${refCheck.total} referral.`,
+      };
+    }
+
+    // ★ SYARAT 2 (CEK SETELAH SYARAT 1): Wajib aktif investasi (user sendiri)
     if (requireActiveDeposit) {
       const hasActiveDeposit = await userHasActiveDeposit(userId);
       if (!hasActiveDeposit) {
         return {
           success: false,
-          message: 'Anda harus memiliki deposit aktif (investasi) untuk mendapatkan bonus gaji',
+          message: 'Syarat 2 belum terpenuhi: Anda wajib memiliki investasi aktif untuk mengklaim bonus gaji.',
         };
       }
     }
@@ -263,31 +281,12 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
       };
     }
 
-    // CHECK 2: Must have minimum direct referrals (default 10)
-    const minDirectRefs = config.minDirectRefs || 10;
-    const refCheck = await checkAllDirectRefsActive(userId);
-    
-    if (refCheck.total === 0) {
-      return {
-        success: false,
-        message: `Anda belum memiliki referral langsung (Level 1). Minimal ${minDirectRefs} referral aktif diperlukan.`,
-      };
-    }
-
-    // Check minimum direct referrals count
-    if (refCheck.total < minDirectRefs) {
-      return {
-        success: false,
-        message: `Anda harus memiliki minimal ${minDirectRefs} referral langsung. Saat ini Anda memiliki ${refCheck.total} referral.`,
-      };
-    }
-
-    // Check active deposit referrals
+    // Check active deposit referrals (semua referral L1 wajib aktif investasi)
     const effectiveActiveRefs = requireActiveDeposit ? refCheck.active : refCheck.total;
     if (effectiveActiveRefs < minDirectRefs) {
       return {
         success: false,
-        message: `Minimal ${minDirectRefs} referral dengan deposit aktif diperlukan. Saat ini ${refCheck.active} dari ${refCheck.total} referral yang memiliki deposit aktif.`,
+        message: `Minimal ${minDirectRefs} referral dengan investasi aktif diperlukan. Saat ini ${refCheck.active} dari ${refCheck.total} referral yang aktif investasi.`,
       };
     }
 

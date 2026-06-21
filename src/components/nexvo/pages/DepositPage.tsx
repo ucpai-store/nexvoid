@@ -55,7 +55,6 @@ interface WhatsAppAdmin {
 }
 
 const presetAmounts = [
-  { label: '100K', value: 100000 },
   { label: '160K', value: 160000 },
   { label: '320K', value: 320000 },
   { label: '640K', value: 640000 },
@@ -631,7 +630,7 @@ export default function DepositPage() {
                 </div>
 
                 {/* Premium Preset Amounts - Sesuai dengan Paket Investasi */}
-                <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {presetAmounts.map((preset) => {
                     const isSelected = amount === preset.value.toString();
                     return (

@@ -225,6 +225,20 @@ export default function WithdrawPage() {
     setAmount(val.toString());
   };
 
+  // Preset nominal amounts — sama dengan paket investasi (tanpa 100K min)
+  const presetAmounts = [
+    { label: '160K', value: 160000 },
+    { label: '320K', value: 320000 },
+    { label: '640K', value: 640000 },
+    { label: '1.92M', value: 1920000 },
+    { label: '5.76M', value: 5760000 },
+    { label: '17.28M', value: 17280000 },
+  ];
+
+  const setPresetAmount = (val: number) => {
+    setAmount(val.toString());
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -636,19 +650,30 @@ export default function WithdrawPage() {
               />
               <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gold-gradient scale-x-0 group-focus-within:scale-x-100 transition-transform origin-left" />
             </div>
-            {/* Quick percentage buttons */}
-            <div className="grid grid-cols-4 gap-2">
-              {[25, 50, 75, 100].map((pct) => (
-                <motion.button
-                  key={pct}
-                  type="button"
-                  onClick={() => setPercentAmount(pct)}
-                  whileTap={{ scale: 0.95 }}
-                  className="py-1.5 rounded-lg glass text-muted-foreground hover:text-foreground hover:border-primary/30 border border-transparent text-[11px] font-semibold transition-all"
-                >
-                  {pct === 100 ? 'MAX' : `${pct}%`}
-                </motion.button>
-              ))}
+            {/* Preset nominal — sesuai paket investasi (sama kayak deposit) */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {presetAmounts.map((preset) => {
+                const disabled = mainBalance < preset.value;
+                const isSelected = amount === preset.value.toString();
+                return (
+                  <motion.button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => !disabled && setPresetAmount(preset.value)}
+                    disabled={disabled}
+                    whileTap={!disabled ? { scale: 0.95 } : undefined}
+                    className={`relative px-2 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all overflow-hidden border ${
+                      disabled
+                        ? 'glass text-muted-foreground/40 border-transparent cursor-not-allowed opacity-50'
+                        : isSelected
+                          ? 'bg-gold-gradient text-primary-foreground glow-gold border-transparent'
+                          : 'glass text-muted-foreground hover:text-foreground hover:border-primary/30 border-transparent'
+                      }`}
+                  >
+                    {preset.label}
+                  </motion.button>
+                );
+              })}
             </div>
           </div>
 

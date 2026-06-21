@@ -192,7 +192,7 @@ export default function SalaryBonusPage() {
           animate={{ opacity: 1, y: 0 }}
           className="glass rounded-2xl p-4 sm:p-6 lg:p-8 text-center border border-emerald-500/20"
         >
-          <div className="w-16 h-16 rounded-2xl bg-cardmerald-500/10 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-emerald-400" />
           </div>
           <h2 className="text-foreground text-lg font-bold mb-1">Program Gaji Selesai! 🎉</h2>
@@ -225,7 +225,7 @@ export default function SalaryBonusPage() {
                   </p>
                 </div>
               </div>
-              <Badge className={`${isEligible ? 'bg-cardmerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'} border text-xs font-bold px-3 py-1`}>
+              <Badge className={`${isEligible ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'} border text-xs font-bold px-3 py-1`}>
                 {isEligible ? (
                   <><CheckCircle2 className="w-3 h-3 mr-1" />Layak</>
                 ) : (
@@ -256,50 +256,59 @@ export default function SalaryBonusPage() {
               </div>
             </div>
 
-            {/* User Own Active Deposit Status */}
-            {!userHasActiveDeposit && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                <XCircle className="w-4 h-4 text-red-400" />
-                <span className="text-red-400 text-xs font-medium">
-                  Anda harus memiliki deposit aktif (investasi) untuk mendapatkan bonus gaji
-                </span>
-              </div>
-            )}
-
-            {/* Direct Referrals Progress - ALL must have active deposits */}
+            {/* ★ SYARAT 1: Wajib invite minimal 10 orang (dicek DULU) */}
             <div className="space-y-4">
-              {/* Min Direct Refs Requirement */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-foreground text-sm font-medium flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-primary" />
-                    Min. {minDirectRefs} Direct Invites
+                    Syarat 1: Min. {minDirectRefs} Undangan Langsung
                   </span>
                   <span className="text-muted-foreground text-xs">
-                    {activeRefDeposits} / {minDirectRefs} (Wajib {minDirectRefs} orang)
+                    {directRefs} / {minDirectRefs} orang
                   </span>
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-foreground/5 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((activeRefDeposits / minDirectRefs) * 100, 100)}%` }}
+                    animate={{ width: `${Math.min((directRefs / minDirectRefs) * 100, 100)}%` }}
                     transition={{ duration: 0.8, ease: 'easeOut' }}
-                    className={`h-full rounded-full ${meetsMinDirectRefs ? 'bg-cardmerald-400' : 'bg-primary'}`}
+                    className={`h-full rounded-full ${meetsMinDirectRefs ? 'bg-emerald-400' : 'bg-primary'}`}
                   />
                 </div>
-                {!meetsMinDirectRefs && (
+                {!meetsMinDirectRefs ? (
                   <p className="text-yellow-400 text-[10px] mt-1">
-                    ⚠️ Minimal {minDirectRefs} referral dengan deposit aktif diperlukan ({activeRefDeposits}/{minDirectRefs})
+                    ⚠️ Syarat 1 belum terpenuhi: undang minimal {minDirectRefs} orang ({directRefs}/{minDirectRefs})
                   </p>
-                )}
-                {meetsMinDirectRefs && (
+                ) : (
                   <p className="text-emerald-400 text-[10px] mt-1">
-                    ✅ Syarat {minDirectRefs} undangan langsung (Level 1) terpenuhi
+                    ✅ Syarat 1 terpenuhi: {directRefs} undangan langsung
                   </p>
                 )}
               </div>
 
-              {/* Estimated Salary Info - Only show when user meets minimum requirement */}
+              {/* ★ SYARAT 2: Wajib aktif investasi (hanya dicek kalau syarat 1 sudah terpenuhi) */}
+              {meetsMinDirectRefs && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border ${
+                  userHasActiveDeposit
+                    ? 'bg-emerald-500/10 border-emerald-500/20'
+                    : 'bg-red-500/10 border-red-500/20'
+                }`}>
+                  {userHasActiveDeposit ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  )}
+                  <span className={`text-xs font-medium ${userHasActiveDeposit ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {userHasActiveDeposit
+                      ? `✅ Syarat 2 terpenuhi: Anda punya investasi aktif`
+                      : `Syarat 2 belum terpenuhi: Wajib memiliki investasi aktif untuk klaim gaji`
+                    }
+                  </span>
+                </div>
+              )}
+
+              {/* Estimated Salary Info - HANYA muncul kalau KEDUA syarat terpenuhi */}
               {meetsMinDirectRefs && userHasActiveDeposit ? (
                 <>
                   <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
@@ -332,11 +341,18 @@ export default function SalaryBonusPage() {
                     </span>
                   </div>
                 </>
+              ) : !meetsMinDirectRefs ? (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
+                  <Users className="w-4 h-4 text-yellow-400 shrink-0" />
+                  <span className="text-yellow-400 text-xs font-medium">
+                    Gaji belum tersedia. Selesaikan Syarat 1: undang minimal {minDirectRefs} orang dulu.
+                  </span>
+                </div>
               ) : (
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/10">
                   <XCircle className="w-4 h-4 text-red-400 shrink-0" />
                   <span className="text-red-400 text-xs font-medium">
-                    Gaji belum tersedia. Undang minimal {minDirectRefs} orang dengan investasi aktif untuk mendapatkan gaji mingguan.
+                    Gaji belum tersedia. Selesaikan Syarat 2: wajib memiliki investasi aktif.
                   </span>
                 </div>
               )}
@@ -345,7 +361,7 @@ export default function SalaryBonusPage() {
             {/* Claim Button / Status */}
             <div className="mt-6">
               {data?.alreadyClaimedThisWeek ? (
-                <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-cardmerald-500/10 border border-emerald-500/20">
+                <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                   <span className="text-emerald-400 text-sm font-medium">Gaji minggu ini sudah dikreditkan otomatis</span>
                 </div>
@@ -363,27 +379,30 @@ export default function SalaryBonusPage() {
                 </Button>
               ) : (
                 <div className="space-y-2">
-                  {!userHasActiveDeposit && (
+                  {/* Syarat 1 belum terpenuhi */}
+                  {!meetsMinDirectRefs && (
+                    <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                      <XCircle className="w-5 h-5 text-yellow-400" />
+                      <span className="text-yellow-400 text-sm font-medium">
+                        Syarat 1: Undang minimal {minDirectRefs} orang ({directRefs}/{minDirectRefs})
+                      </span>
+                    </div>
+                  )}
+                  {/* Syarat 1 OK, tapi Syarat 2 belum */}
+                  {meetsMinDirectRefs && !userHasActiveDeposit && (
                     <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
                       <XCircle className="w-5 h-5 text-red-400" />
                       <span className="text-red-400 text-sm font-medium">
-                        Anda harus memiliki deposit aktif
+                        Syarat 2: Wajib memiliki investasi aktif
                       </span>
                     </div>
                   )}
-                  {!meetsMinDirectRefs && userHasActiveDeposit && (
+                  {/* Kedua syarat OK, tapi ada referral yang belum aktif investasi */}
+                  {meetsMinDirectRefs && userHasActiveDeposit && !allRefsActive && (
                     <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
                       <XCircle className="w-5 h-5 text-yellow-400" />
                       <span className="text-yellow-400 text-sm font-medium">
-                        Minimal {minDirectRefs} undangan langsung diperlukan ({activeRefDeposits}/{minDirectRefs} terpenuhi)
-                      </span>
-                    </div>
-                  )}
-                  {meetsMinDirectRefs && !allRefsActive && userHasActiveDeposit && (
-                    <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                      <XCircle className="w-5 h-5 text-yellow-400" />
-                      <span className="text-yellow-400 text-sm font-medium">
-                        Semua undangan langsung (Level 1) harus memiliki investasi aktif ({activeRefDeposits}/{directRefs} aktif)
+                        Semua undangan langsung (Level 1) wajib aktif investasi ({activeRefDeposits}/{directRefs} aktif)
                       </span>
                     </div>
                   )}
@@ -475,7 +494,7 @@ export default function SalaryBonusPage() {
                     <p className="text-foreground text-sm font-medium">
                       Minggu {bonus.weekOfTotal}/{maxWeeks}
                     </p>
-                    <Badge className="bg-cardmerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
+                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
                       Lunas
                     </Badge>
                     <Badge className="bg-primary/10 text-primary border-primary/20 border text-[10px] px-1.5 py-0">
@@ -517,15 +536,15 @@ export default function SalaryBonusPage() {
         <div className="space-y-2 text-muted-foreground text-xs">
           <div className="flex items-start gap-2">
             <span className="text-primary font-bold">1.</span>
-            <span>Wajib memiliki <strong className="text-foreground">deposit aktif (investasi)</strong> sendiri</span>
+            <span><strong className="text-foreground">Syarat 1:</strong> Wajib mengundang minimal <strong className="text-foreground">{minDirectRefs} orang</strong> (Level 1)</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-primary font-bold">2.</span>
-            <span>Wajib mengundang minimal <strong className="text-foreground">{minDirectRefs} orang</strong> (Level 1) dengan investasi aktif</span>
+            <span><strong className="text-foreground">Syarat 2:</strong> Wajib memiliki <strong className="text-foreground">investasi aktif</strong> + semua undangan Level 1 juga wajib aktif investasi</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-primary font-bold">3.</span>
-            <span>Setelah memenuhi syarat, gaji <strong className="text-foreground">{salaryRate}%</strong> dari omzet grup dikreditkan setiap <strong className="text-foreground\">Senin pukul 00:00 WIB</strong></span>
+            <span>Setelah <strong className="text-foreground">kedua syarat</strong> terpenuhi, gaji <strong className="text-foreground">{salaryRate}%</strong> dari omzet grup dikreditkan setiap <strong className="text-foreground\">Senin pukul 00:00 WIB</strong></span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-primary font-bold">4.</span>
