@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import {
   Shield, Key, UserPlus, ScrollText, Lock, Eye, EyeOff,
   Loader2, AlertTriangle, CheckCircle2,
-  Trash2, Users, Clock, Unlock, Phone, Plus, Pencil, MessageCircle, DollarSign, Banknote
+  Trash2, Users, Clock, Unlock, Phone, Plus, Pencil, MessageCircle, DollarSign, Banknote,
+  Database, RotateCcw, AlertOctagon
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -109,7 +110,74 @@ export default function AdminSettingsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Factory Reset state
+  const [resetPreview, setResetPreview] = useState<{
+    willDelete: Record<string, number>;
+    willKeep: Record<string, number>;
+  } | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
   const isSuperAdmin = admin?.role === 'super_admin';
+
+  const fetchResetPreview = async () => {
+    setResetLoading(true);
+    try {
+      const res = await fetch('/api/admin/factory-reset', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('adminToken') || ''}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResetPreview({ willDelete: data.willDelete, willKeep: data.willKeep });
+      } else {
+        toast({ title: 'Error', description: data.error || 'Gagal memuat preview', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Error', description: 'Gagal memuat preview', variant: 'destructive' });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleFactoryReset = async () => {
+    if (resetConfirmText !== 'RESET ALL USER DATA') {
+      toast({
+        title: 'Konfirmasi salah',
+        description: 'Ketik ulang: RESET ALL USER DATA',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await fetch('/api/admin/factory-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('adminToken') || ''}`,
+        },
+        body: JSON.stringify({ confirm: resetConfirmText }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({
+          title: 'Factory Reset Berhasil',
+          description: data.message,
+        });
+        setResetConfirmText('');
+        setResetDialogOpen(false);
+        await fetchResetPreview();
+      } else {
+        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Error', description: 'Gagal melakukan reset', variant: 'destructive' });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const fetchData = async () => {
     if (!adminToken) return;
@@ -179,6 +247,7 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     fetchData();
     fetchWhatsAppAdmins();
+    fetchResetPreview();
   }, [adminToken]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -466,6 +535,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="logs" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary text-xs sm:text-sm shrink-0">
             <ScrollText className="w-4 h-4 mr-2" />
             Log Aktivitas
+          </TabsTrigger>
+          <TabsTrigger value="reset" className="rounded-lg data-[state=active]:bg-red-500/10 data-[state=active]:text-red-500 text-xs sm:text-sm shrink-0" disabled={!isSuperAdmin}>
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset Data
           </TabsTrigger>
         </TabsList>
 
@@ -1193,6 +1266,150 @@ export default function AdminSettingsPage() {
                 </div>
               )}
             </div>
+          </motion.div>
+        </TabsContent>
+
+        {/* Reset Data Tab */}
+        <TabsContent value="reset">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl">
+            {!isSuperAdmin ? (
+              <div className="glass rounded-2xl p-6 sm:p-8 text-center">
+                <Lock className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-muted-foreground text-sm">Hanya Super Admin yang dapat melakukan factory reset.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Warning header */}
+                <div className="glass rounded-2xl p-4 sm:p-6 border border-red-500/20 bg-red-500/5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
+                      <AlertOctagon className="w-6 h-6 text-red-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-foreground font-semibold text-base sm:text-lg">Factory Reset — Hapus Semua Data User</h3>
+                      <p className="text-muted-foreground text-xs sm:text-sm mt-1">
+                        Tindakan ini akan <span className="text-red-500 font-semibold">menghapus permanen</span> semua akun user,
+                        deposit, withdraw, investasi, referral, bonus, dan profit log. Konfigurasi sistem (paket, payment method,
+                        admin, banner, testimonial, settings) akan tetap utuh.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview willDelete */}
+                <div className="glass rounded-2xl p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-foreground font-semibold text-sm flex items-center gap-2">
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                      Data yang akan dihapus
+                    </h4>
+                    <Button
+                      variant="outline"
+                      onClick={fetchResetPreview}
+                      disabled={resetLoading}
+                      className="rounded-xl border-primary/20 text-foreground hover:bg-foreground/5 text-xs"
+                    >
+                      {resetLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                      Refresh
+                    </Button>
+                  </div>
+                  {resetLoading ? (
+                    <div className="py-8 text-center">
+                      <Loader2 className="w-6 h-6 text-muted-foreground/40 animate-spin mx-auto mb-2" />
+                      <p className="text-muted-foreground text-xs">Memuat preview data...</p>
+                    </div>
+                  ) : resetPreview ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {Object.entries(resetPreview.willDelete).map(([key, val]) => (
+                        <div key={key} className="rounded-xl bg-red-500/5 border border-red-500/10 p-3">
+                          <p className="text-muted-foreground text-[10px] capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
+                          <p className="text-foreground font-bold text-lg">{formatNumber(val)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">Gagal memuat preview</p>
+                  )}
+                </div>
+
+                {/* Preview willKeep */}
+                <div className="glass rounded-2xl p-4 sm:p-6">
+                  <h4 className="text-foreground font-semibold text-sm flex items-center gap-2 mb-3">
+                    <Database className="w-4 h-4 text-emerald-500" />
+                    Konfigurasi sistem yang tetap utuh
+                  </h4>
+                  {resetPreview ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {Object.entries(resetPreview.willKeep).map(([key, val]) => (
+                        <div key={key} className="rounded-xl bg-emerald-500/5 border border-emerald-500/10 p-3">
+                          <p className="text-muted-foreground text-[10px] capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
+                          <p className="text-foreground font-bold text-lg">{formatNumber(val)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">Gagal memuat preview</p>
+                  )}
+                </div>
+
+                {/* Action button */}
+                <div className="glass rounded-2xl p-4 sm:p-6 border border-red-500/20">
+                  <h4 className="text-foreground font-semibold text-sm mb-2">Eksekusi Factory Reset</h4>
+                  <p className="text-muted-foreground text-xs mb-4">
+                    Klik tombol di bawah, lalu ketik <code className="px-1.5 py-0.5 rounded bg-muted text-red-500 font-mono text-[10px]">RESET ALL USER DATA</code> untuk konfirmasi.
+                  </p>
+                  <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                    <button
+                      onClick={() => setResetDialogOpen(true)}
+                      disabled={resetting}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      {resetting ? 'Meriset...' : 'Factory Reset Sekarang'}
+                    </button>
+                    <AlertDialogContent className="max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-500 flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5" />
+                          Konfirmasi Factory Reset
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-left">
+                          Tindakan ini <span className="text-red-500 font-semibold">tidak dapat dibatalkan</span>. Semua data user,
+                          transaksi, dan bonus akan dihapus permanen. Untuk konfirmasi, ketik teks berikut persis:
+                          <br />
+                          <code className="block mt-2 px-2 py-1.5 rounded bg-muted text-red-500 font-mono text-[11px] text-center">
+                            RESET ALL USER DATA
+                          </code>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <Input
+                        value={resetConfirmText}
+                        onChange={(e) => setResetConfirmText(e.target.value)}
+                        placeholder="Ketik RESET ALL USER DATA"
+                        className="font-mono text-xs"
+                        autoComplete="off"
+                      />
+                      <AlertDialogFooter>
+                        <AlertDialogCancel
+                          onClick={() => setResetConfirmText('')}
+                          className="rounded-xl"
+                        >
+                          Batal
+                        </AlertDialogCancel>
+                        <button
+                          onClick={handleFactoryReset}
+                          disabled={resetting || resetConfirmText !== 'RESET ALL USER DATA'}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          Ya, Hapus Semua
+                        </button>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            )}
           </motion.div>
         </TabsContent>
       </Tabs>
