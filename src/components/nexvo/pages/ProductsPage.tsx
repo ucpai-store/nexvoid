@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   ShoppingBag, ChevronRight, Clock, TrendingUp, Coins,
-  CalendarDays, AlertCircle, Info, Sparkles, Wallet, RefreshCw
+  CalendarDays, AlertCircle, Sparkles
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -216,49 +216,6 @@ export default function ProductsPage() {
         </p>
       </motion.div>
 
-      {/* Important Info Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="px-4 sm:px-6 lg:px-8 mb-4"
-      >
-        <div className="glass rounded-2xl p-3 sm:p-4 border border-amber-400/15">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center shrink-0">
-              <Info className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-foreground text-xs sm:text-sm font-semibold mb-1">Informasi Penting</p>
-              <p className="text-muted-foreground text-[10px] sm:text-xs leading-relaxed">
-                Profit <span className="text-emerald-400 font-medium">didapat setiap hari</span> selama periode kontrak. Harga produk <span className="text-amber-400 font-medium">tidak dikembalikan</span>, hanya menerima profit harian saja.
-              </p>
-            </div>
-          </div>
-          {/* Min deposit & withdraw info */}
-          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-amber-400/10">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-400/10 flex items-center justify-center shrink-0">
-                <Wallet className="w-3.5 h-3.5 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-muted-foreground text-[9px] uppercase tracking-wider">Min Deposit</p>
-                <p className="text-foreground text-xs font-bold">Rp 100.000</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-400/10 flex items-center justify-center shrink-0">
-                <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-muted-foreground text-[9px] uppercase tracking-wider">Min Withdraw</p>
-                <p className="text-foreground text-xs font-bold">Rp 100.000</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
       {/* Products Grid */}
       <div className="px-4 sm:px-6 lg:px-8 pb-4">
         {loading ? (
@@ -292,55 +249,6 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* How it works section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="px-4 sm:px-6 lg:px-8 mt-4"
-      >
-        <div className="glass rounded-2xl p-4 sm:p-6">
-          <h3 className="text-foreground font-semibold text-sm sm:text-base mb-4 flex items-center gap-2">
-            <Info className="w-4 h-4 text-primary" />
-            Cara Kerja Produk Investasi
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-primary text-xs font-bold">1</span>
-              </div>
-              <div>
-                <p className="text-foreground text-xs font-medium mb-0.5">Pilih Produk</p>
-                <p className="text-muted-foreground text-[10px] leading-tight">Pilih produk sesuai harga & target profit</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-primary text-xs font-bold">2</span>
-              </div>
-              <div>
-                <p className="text-foreground text-xs font-medium mb-0.5">Bayar Harga</p>
-                <p className="text-muted-foreground text-[10px] leading-tight">Harga dipotong dari saldo deposit/utama</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-primary text-xs font-bold">3</span>
-              </div>
-              <div>
-                <p className="text-foreground text-xs font-medium mb-0.5">Terima Profit Harian</p>
-                <p className="text-muted-foreground text-[10px] leading-tight">Profit masuk otomatis setiap hari selama kontrak</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t border-primary/10">
-            <p className="text-amber-400/80 text-[10px] sm:text-xs flex items-center gap-1.5">
-              <AlertCircle className="w-3 h-3 shrink-0" />
-              <span><strong>Catatan:</strong> Harga produk tidak dikembalikan. Hanya profit harian yang Anda terima selama periode kontrak.</span>
-            </p>
-          </div>
-        </div>
-      </motion.div>
     </div>
   );
 }
