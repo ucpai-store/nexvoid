@@ -85,6 +85,25 @@ export default function AdminPaymentPage() {
     }
   };
 
+  // Silently purge legacy (bank/ewallet/crypto) methods from the database
+  // so the admin page only ever shows QRIS and USDT. Runs once on mount.
+  const cleanupLegacyMethods = async () => {
+    if (!adminToken) return;
+    try {
+      const res = await fetch('/api/admin/payment-methods/cleanup-legacy', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const data = await res.json();
+      // If anything was deleted, refresh the list so the UI stays in sync.
+      if (data.success && data.data?.deletedCount > 0) {
+        fetchPaymentMethods();
+      }
+    } catch {
+      // Silent — cleanup is best-effort, should not block the page.
+    }
+  };
+
   const fetchSettings = async () => {
     if (!adminToken) return;
     try {
@@ -102,6 +121,7 @@ export default function AdminPaymentPage() {
   };
 
   useEffect(() => {
+    cleanupLegacyMethods();
     fetchPaymentMethods();
     fetchSettings();
   }, [adminToken]);
@@ -291,8 +311,6 @@ export default function AdminPaymentPage() {
     key,
     methods: visibleMethods.filter((pm) => pm.type === key),
   }));
-  // Legacy/hidden methods note (bank/ewallet/crypto are no longer manageable)
-  const hiddenMethods = paymentMethods.filter((pm) => !allowedTypes.includes(pm.type));
 
   if (loading) {
     return (
@@ -453,36 +471,6 @@ export default function AdminPaymentPage() {
             </motion.div>
           );
         })}
-
-        {/* Hidden legacy methods (bank/ewallet/crypto) — deposit only uses QRIS + USDT now */}
-        {hiddenMethods.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-2xl p-3 sm:p-4 border border-yellow-400/15"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-yellow-400/10 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-4 h-4 text-yellow-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-foreground text-sm font-semibold">
-                  {hiddenMethods.length} metode lama disembunyikan
-                </p>
-                <p className="text-muted-foreground text-xs mt-0.5 leading-relaxed">
-                  Metode bank/e-wallet/crypto lama tidak ditampilkan ke pengguna. Hanya QRIS & USDT yang aktif untuk deposit.
-                </p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {hiddenMethods.map((pm) => (
-                    <Badge key={pm.id} className="bg-yellow-400/10 text-yellow-400 text-[9px] border-yellow-400/20">
-                      {pm.name} ({pm.type})
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
 
         {/* Auto Payment Toggle */}
         <motion.div

@@ -74,3 +74,4 @@ ecosystem.config.js
 .github-token
 nexvo-guide-ebook.pdf
 tool-results/
+upload/
