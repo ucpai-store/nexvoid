@@ -103,18 +103,18 @@ async function main() {
   }
 
   // ==========================================================================
-  // 4. INVESTMENT PACKAGES (6 packages, minimum 100k)
+  // 4. INVESTMENT PACKAGES (6 packages, minimum 160k)
   // ==========================================================================
-  console.log('\n4. Investment packages (6 paket, min 100k)...');
+  console.log('\n4. Investment packages (6 paket, min 160k)...');
   const pkgCount = await prisma.investmentPackage.count();
   
-  // Always update/insert to ensure 6 packages exist
+  // Always update/insert to ensure 6 packages exist (MIN 160k)
   const packages = [
-    { name: 'Paket Pemula',     amount: 100000,    profitRate: 8,  contractDays: 90, order: 1 },
-    { name: 'Paket Bronze',     amount: 300000,    profitRate: 9,  contractDays: 90, order: 2 },
-    { name: 'Paket Silver',     amount: 1000000,   profitRate: 10, contractDays: 90, order: 3 },
-    { name: 'Paket Gold',       amount: 3000000,   profitRate: 12, contractDays: 90, order: 4 },
-    { name: 'Paket Platinum',   amount: 10000000,  profitRate: 15, contractDays: 90, order: 5 },
+    { name: 'Paket Pemula',     amount: 160000,    profitRate: 8,  contractDays: 90, order: 1 },
+    { name: 'Paket Bronze',     amount: 500000,    profitRate: 9,  contractDays: 90, order: 2 },
+    { name: 'Paket Silver',     amount: 1600000,   profitRate: 10, contractDays: 90, order: 3 },
+    { name: 'Paket Gold',       amount: 5000000,   profitRate: 12, contractDays: 90, order: 4 },
+    { name: 'Paket Platinum',   amount: 16000000,  profitRate: 15, contractDays: 90, order: 5 },
     { name: 'Paket Diamond',    amount: 50000000,  profitRate: 18, contractDays: 90, order: 6 },
   ];
   
@@ -141,47 +141,47 @@ async function main() {
   const products = [
     {
       name: 'Bot Trading Pemula',
-      price: 100000,
+      price: 160000,
       duration: 60,
-      estimatedProfit: 180000,
+      estimatedProfit: 288000,
       quota: 100,
-      description: 'Bot trading otomatis untuk pemula. Profit estimasi Rp 180.000 dalam 60 hari (ROI 80%).',
+      description: 'Bot trading otomatis untuk pemula. Profit estimasi Rp 288.000 dalam 60 hari (ROI 80%).',
       profitRate: 1.33,
     },
     {
       name: 'Bot Trading Bronze',
-      price: 300000,
+      price: 500000,
       duration: 60,
-      estimatedProfit: 600000,
+      estimatedProfit: 1000000,
       quota: 100,
-      description: 'Bot trading dengan algoritma enhanced. Profit estimasi Rp 600.000 dalam 60 hari (ROI 100%).',
+      description: 'Bot trading dengan algoritma enhanced. Profit estimasi Rp 1.000.000 dalam 60 hari (ROI 100%).',
       profitRate: 1.67,
     },
     {
       name: 'Bot Trading Silver',
-      price: 1000000,
+      price: 1600000,
       duration: 90,
-      estimatedProfit: 2500000,
+      estimatedProfit: 4000000,
       quota: 100,
-      description: 'Bot trading profesional dengan AI prediction. Profit estimasi Rp 2.500.000 dalam 90 hari (ROI 150%).',
+      description: 'Bot trading profesional dengan AI prediction. Profit estimasi Rp 4.000.000 dalam 90 hari (ROI 150%).',
       profitRate: 1.67,
     },
     {
       name: 'Bot Trading Gold',
-      price: 3000000,
+      price: 5000000,
       duration: 90,
-      estimatedProfit: 9000000,
+      estimatedProfit: 15000000,
       quota: 50,
-      description: 'Bot trading premium dengan multi-strategy. Profit estimasi Rp 9.000.000 dalam 90 hari (ROI 200%).',
+      description: 'Bot trading premium dengan multi-strategy. Profit estimasi Rp 15.000.000 dalam 90 hari (ROI 200%).',
       profitRate: 2.22,
     },
     {
       name: 'Bot Trading Platinum',
-      price: 10000000,
+      price: 16000000,
       duration: 120,
-      estimatedProfit: 35000000,
+      estimatedProfit: 56000000,
       quota: 30,
-      description: 'Bot trading VIP dengan akses market global. Profit estimasi Rp 35.000.000 dalam 120 hari (ROI 250%).',
+      description: 'Bot trading VIP dengan akses market global. Profit estimasi Rp 56.000.000 dalam 120 hari (ROI 250%).',
       profitRate: 2.08,
     },
     {
