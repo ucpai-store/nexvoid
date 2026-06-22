@@ -2,8 +2,15 @@
 //  NEXVO - SEED ALL DATA (Packages + Products + Settings)
 // ----------------------------------------------------------------------------
 //  Jalankan dengan: bun run seed-all.js
-//  Membuat: 6 paket investasi (min 100k), produk, payment methods, banners,
-//  system settings, matching config, salary config
+//  Membuat: 6 paket investasi (kontrak 180 hari, modal TIDAK dikembalikan),
+//  produk, payment methods, banners, system settings, matching config,
+//  salary config.
+//
+//  ATURAN INVESTASI:
+//   - Kontrak: 180 hari
+//   - Profit harian dikredit tiap hari (cron 00:00 WIB)
+//   - Modal awal TIDAK dikembalikan saat kontrak berakhir
+//   - User hanya menerima profit harian
 // ============================================================================
 
 const { PrismaClient } = require('@prisma/client');
@@ -11,8 +18,11 @@ const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
+// Kontrak 180 hari — modal awal TIDAK dikembalikan, user hanya dapat profit
+const CONTRACT_DAYS = 180;
+
 async function main() {
-  console.log('🌱 NEXVO - SEED ALL DATA\n');
+  console.log('🌱 NEXVO - SEED ALL DATA (Kontrak 180 Hari • Modal Tidak Dikembalikan)\n');
   console.log('='.repeat(60));
 
   // ==========================================================================
@@ -103,34 +113,42 @@ async function main() {
   }
 
   // ==========================================================================
-  // 4. INVESTMENT PACKAGES (6 packages, minimum 160k)
+  // 4. INVESTMENT PACKAGES (6 packages, kontrak 180 hari, modal tidak kembali)
   // ==========================================================================
-  console.log('\n4. Investment packages (6 paket, min 160k)...');
-  const pkgCount = await prisma.investmentPackage.count();
-  
+  console.log(`\n4. Investment packages (6 paket, kontrak ${CONTRACT_DAYS} hari, modal TIDAK dikembalikan)...`);
+
   // 6 packages persis sesuai request user: Gold Premium Aset 1 - Gold Premium Aset 6
   const packages = [
-    { name: 'Gold Premium Aset 1',  amount: 160000,    profitRate: 2,   contractDays: 90, order: 1 },
-    { name: 'Gold Premium Aset 2',  amount: 320000,    profitRate: 2.5, contractDays: 90, order: 2 },
-    { name: 'Gold Premium Aset 3',  amount: 640000,    profitRate: 3,   contractDays: 90, order: 3 },
-    { name: 'Gold Premium Aset 4',  amount: 1920000,   profitRate: 3.5, contractDays: 90, order: 4 },
-    { name: 'Gold Premium Aset 5',  amount: 5760000,   profitRate: 4,   contractDays: 90, order: 5 },
-    { name: 'Gold Premium Aset 6',  amount: 17280000,  profitRate: 5,   contractDays: 90, order: 6 },
+    { name: 'Gold Premium Aset 1',  amount: 160000,    profitRate: 2,   contractDays: CONTRACT_DAYS, order: 1 },
+    { name: 'Gold Premium Aset 2',  amount: 320000,    profitRate: 2.5, contractDays: CONTRACT_DAYS, order: 2 },
+    { name: 'Gold Premium Aset 3',  amount: 640000,    profitRate: 3,   contractDays: CONTRACT_DAYS, order: 3 },
+    { name: 'Gold Premium Aset 4',  amount: 1920000,   profitRate: 3.5, contractDays: CONTRACT_DAYS, order: 4 },
+    { name: 'Gold Premium Aset 5',  amount: 5760000,   profitRate: 4,   contractDays: CONTRACT_DAYS, order: 5 },
+    { name: 'Gold Premium Aset 6',  amount: 17280000,  profitRate: 5,   contractDays: CONTRACT_DAYS, order: 6 },
   ];
-  
+
   // Cleanup: hapus semua paket lama yang namanya TIDAK termasuk 6 nama baru
+  // (Gold VIP 1-6, Gold Premium Aset VIP 1-6, Bot Trading, Paket Pemula, dll)
   const validPkgNames = packages.map(p => p.name);
   const oldPkgs = await prisma.investmentPackage.findMany();
   let deletedPkgs = 0;
   for (const old of oldPkgs) {
     if (!validPkgNames.includes(old.name)) {
-      await prisma.investmentPackage.delete({ where: { id: old.id } });
-      console.log(`   🗑️  Hapus paket lama: ${old.name}`);
-      deletedPkgs++;
+      try {
+        // Hapus investments terkait dulu (jika ada) untuk hindari constraint error
+        try {
+          await prisma.investment.deleteMany({ where: { packageId: old.id } });
+        } catch (_) { /* ignore — biarkan cascade */ }
+        await prisma.investmentPackage.delete({ where: { id: old.id } });
+        console.log(`   🗑️  Hapus paket lama: ${old.name}`);
+        deletedPkgs++;
+      } catch (e) {
+        console.log(`   ⚠️  Gagal hapus paket lama "${old.name}": ${e.message}`);
+      }
     }
   }
   if (deletedPkgs > 0) console.log(`   ✓ ${deletedPkgs} paket lama dihapus`);
-  
+
   for (const pkg of packages) {
     const existing = await prisma.investmentPackage.findFirst({ where: { name: pkg.name } });
     if (existing) {
@@ -147,81 +165,91 @@ async function main() {
   console.log(`   📦 Total: ${packages.length} investment packages`);
 
   // ==========================================================================
-  // 5. PRODUCTS (6 produk investasi)
+  // 5. PRODUCTS (6 produk investasi, kontrak 180 hari, modal tidak kembali)
   // ==========================================================================
-  console.log('\n5. Products (produk investasi)...');
-  
-  // 6 products dengan nama SAMA dengan packages: Gold Premium Aset 1 - Gold Premium Aset 6
+  console.log(`\n5. Products (produk investasi, kontrak ${CONTRACT_DAYS} hari)...`);
+
+  // Hitung estimatedProfit otomatis: price × profitRate% × CONTRACT_DAYS
+  // Modal TIDAK dikembalikan — estimatedProfit = total profit selama kontrak
+  const fmt = (n) => n.toLocaleString('id-ID');
   const products = [
     {
       name: 'Gold Premium Aset 1',
       price: 160000,
-      duration: 90,
-      estimatedProfit: 288000,
+      duration: CONTRACT_DAYS,
+      estimatedProfit: Math.round(160000 * 0.02 * CONTRACT_DAYS),
       quota: 1000,
-      description: 'Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari selama 90 hari. Total profit Rp 288.000.',
+      description: `Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 576.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 2,
     },
     {
       name: 'Gold Premium Aset 2',
       price: 320000,
-      duration: 90,
-      estimatedProfit: 720000,
+      duration: CONTRACT_DAYS,
+      estimatedProfit: Math.round(320000 * 0.025 * CONTRACT_DAYS),
       quota: 1000,
-      description: 'Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari selama 90 hari. Total profit Rp 720.000.',
+      description: `Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 1.440.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 2.5,
     },
     {
       name: 'Gold Premium Aset 3',
       price: 640000,
-      duration: 90,
-      estimatedProfit: 1728000,
+      duration: CONTRACT_DAYS,
+      estimatedProfit: Math.round(640000 * 0.03 * CONTRACT_DAYS),
       quota: 1000,
-      description: 'Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari selama 90 hari. Total profit Rp 1.728.000.',
+      description: `Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 3.456.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 3,
     },
     {
       name: 'Gold Premium Aset 4',
       price: 1920000,
-      duration: 90,
-      estimatedProfit: 6048000,
+      duration: CONTRACT_DAYS,
+      estimatedProfit: Math.round(1920000 * 0.035 * CONTRACT_DAYS),
       quota: 500,
-      description: 'Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari selama 90 hari. Total profit Rp 6.048.000.',
+      description: `Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 12.096.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 3.5,
     },
     {
       name: 'Gold Premium Aset 5',
       price: 5760000,
-      duration: 90,
-      estimatedProfit: 20736000,
+      duration: CONTRACT_DAYS,
+      estimatedProfit: Math.round(5760000 * 0.04 * CONTRACT_DAYS),
       quota: 200,
-      description: 'Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari selama 90 hari. Total profit Rp 20.736.000.',
+      description: `Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 41.472.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 4,
     },
     {
       name: 'Gold Premium Aset 6',
       price: 17280000,
-      duration: 90,
-      estimatedProfit: 77760000,
+      duration: CONTRACT_DAYS,
+      estimatedProfit: Math.round(17280000 * 0.05 * CONTRACT_DAYS),
       quota: 100,
-      description: 'Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari selama 90 hari. Total profit Rp 77.760.000.',
+      description: `Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 155.520.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 5,
     },
   ];
-  
+
   // Cleanup: hapus semua produk lama yang namanya TIDAK termasuk 6 nama baru
   const validProdNames = products.map(p => p.name);
   const oldProds = await prisma.product.findMany();
   let deletedProds = 0;
   for (const old of oldProds) {
     if (!validProdNames.includes(old.name)) {
-      await prisma.product.delete({ where: { id: old.id } });
-      console.log(`   🗑️  Hapus produk lama: ${old.name}`);
-      deletedProds++;
+      try {
+        // Hapus purchases terkait dulu (jika ada) untuk hindari constraint error
+        try {
+          await prisma.purchase.deleteMany({ where: { productId: old.id } });
+        } catch (_) { /* ignore — biarkan cascade */ }
+        await prisma.product.delete({ where: { id: old.id } });
+        console.log(`   🗑️  Hapus produk lama: ${old.name}`);
+        deletedProds++;
+      } catch (e) {
+        console.log(`   ⚠️  Gagal hapus produk lama "${old.name}": ${e.message}`);
+      }
     }
   }
   if (deletedProds > 0) console.log(`   ✓ ${deletedProds} produk lama dihapus`);
-  
+
   for (const prod of products) {
     const existing = await prisma.product.findFirst({ where: { name: prod.name } });
     if (existing) {
@@ -229,10 +257,10 @@ async function main() {
         where: { id: existing.id },
         data: { ...prod, isActive: true, isStopped: false }
       });
-      console.log(`   ✏️  Update: ${prod.name} - Rp ${prod.price.toLocaleString('id-ID')}`);
+      console.log(`   ✏️  Update: ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari)`);
     } else {
       await prisma.product.create({ data: prod });
-      console.log(`   ✅ Buat: ${prod.name} - Rp ${prod.price.toLocaleString('id-ID')}`);
+      console.log(`   ✅ Buat: ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari)`);
     }
   }
   console.log(`   📦 Total: ${products.length} products`);
@@ -256,9 +284,9 @@ async function main() {
           isActive: true,
         },
         {
-          title: 'Profit Harian Hingga 18%',
+          title: 'Profit Harian Hingga 5%',
           subtitle: 'Investasi Cerdas, Hasil Maksimal',
-          description: 'Dapatkan profit harian hingga 18% selama 90 hari kontrak. Modal kembali setelah kontrak berakhir.',
+          description: `Dapatkan profit harian hingga 5% selama ${CONTRACT_DAYS} hari kontrak. Hanya profit yang dibayarkan — modal awal TIDAK dikembalikan.`,
           ctaText: 'Lihat Paket',
           ctaLink: 'paket',
           image: '/images/banner-2.jpg',
@@ -332,23 +360,30 @@ async function main() {
   console.log(`   Banners           : ${await prisma.banner.count()}`);
   console.log(`   Matching configs  : ${await prisma.matchingConfig.count()}`);
   console.log(`   Salary configs    : ${await prisma.salaryConfig.count()}`);
-  
+
   console.log('\n📋 Admin login:');
   console.log('   Username: admin');
   console.log('   Password: Admin@2024');
   console.log('   URL: https://nexvo.id/#admin-login');
-  
-  console.log('\n📦 Investment Packages (6):');
+
+  console.log(`\n📦 Investment Packages (6) — Kontrak ${CONTRACT_DAYS} hari • Modal TIDAK dikembalikan:`);
   const allPkgs = await prisma.investmentPackage.findMany({ orderBy: { order: 'asc' } });
   for (const p of allPkgs) {
-    console.log(`   ${p.order}. ${p.name}: Rp ${p.amount.toLocaleString('id-ID')} - ${p.profitRate}% × ${p.contractDays} hari`);
+    const daily = Math.round(p.amount * (p.profitRate / 100));
+    const total = Math.round(p.amount * (p.profitRate / 100) * p.contractDays);
+    console.log(`   ${p.order}. ${p.name}: Rp ${fmt(p.amount)} - ${p.profitRate}%/hari = Rp ${fmt(daily)}/hari × ${p.contractDays} hari = Rp ${fmt(total)} total profit`);
   }
-  
-  console.log('\n🛒 Products (6):');
+
+  console.log(`\n🛒 Products (6) — Kontrak ${CONTRACT_DAYS} hari • Modal TIDAK dikembalikan:`);
   const allProds = await prisma.product.findMany({ orderBy: { price: 'asc' } });
   for (const p of allProds) {
-    console.log(`   - ${p.name}: Rp ${p.price.toLocaleString('id-ID')} → ${p.estimatedProfit.toLocaleString('id-ID')} (${p.duration} hari)`);
+    console.log(`   - ${p.name}: Rp ${fmt(p.price)} → profit Rp ${fmt(p.estimatedProfit)} (${p.duration} hari)`);
   }
+
+  console.log('\nℹ️  Catatan:');
+  console.log(`   - Kontrak investasi: ${CONTRACT_DAYS} hari`);
+  console.log('   - Modal awal TIDAK dikembalikan saat kontrak berakhir');
+  console.log('   - User hanya menerima profit harian (dikredit cron 00:00 WIB)');
 }
 
 main()
