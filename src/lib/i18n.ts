@@ -2,6 +2,60 @@ import { useCallback } from 'react';
 import { useLangStore } from '@/stores/lang-store';
 import type { Language } from '@/stores/lang-store';
 
+// ─── New-locale imports (for supplementary translations) ───
+// These locale files use a slightly different key structure but share many
+// common keys (common.*, nav.*, withdraw.title, etc.). We deep-merge them
+// over the English base so that overlapping keys get real translations,
+// while old-system-only keys gracefully fall back to English.
+import idLocale from '@/lib/i18n/locales/id';
+import enLocale from '@/lib/i18n/locales/en';
+import zhLocale from '@/lib/i18n/locales/zh';
+import jaLocale from '@/lib/i18n/locales/ja';
+import koLocale from '@/lib/i18n/locales/ko';
+import arLocale from '@/lib/i18n/locales/ar';
+import hiLocale from '@/lib/i18n/locales/hi';
+import thLocale from '@/lib/i18n/locales/th';
+import viLocale from '@/lib/i18n/locales/vi';
+import msLocale from '@/lib/i18n/locales/ms';
+import filLocale from '@/lib/i18n/locales/fil';
+import ptLocale from '@/lib/i18n/locales/pt';
+import esLocale from '@/lib/i18n/locales/es';
+import frLocale from '@/lib/i18n/locales/fr';
+import deLocale from '@/lib/i18n/locales/de';
+import ruLocale from '@/lib/i18n/locales/ru';
+import trLocale from '@/lib/i18n/locales/tr';
+import itLocale from '@/lib/i18n/locales/it';
+import nlLocale from '@/lib/i18n/locales/nl';
+import ukLocale from '@/lib/i18n/locales/uk';
+
+// ─── Deep merge: base (old-structure English) + override (new locale) ───
+// Only merges keys that exist in BOTH; extra keys from override are added.
+function deepMerge<T>(base: T, override: unknown): T {
+  if (
+    base === null || base === undefined ||
+    typeof base !== 'object' ||
+    override === null || override === undefined ||
+    typeof override !== 'object'
+  ) {
+    return (override !== undefined && override !== null ? (override as T) : base);
+  }
+  const baseObj = base as Record<string, unknown>;
+  const overrideObj = override as Record<string, unknown>;
+  const result: Record<string, unknown> = { ...baseObj };
+  for (const key of Object.keys(overrideObj)) {
+    if (
+      key in baseObj &&
+      typeof baseObj[key] === 'object' && baseObj[key] !== null &&
+      typeof overrideObj[key] === 'object' && overrideObj[key] !== null
+    ) {
+      result[key] = deepMerge(baseObj[key], overrideObj[key]);
+    } else {
+      result[key] = overrideObj[key];
+    }
+  }
+  return result as T;
+}
+
 type TranslationKeys = {
   common: {
     loading: string;
@@ -576,7 +630,10 @@ type TranslationKeys = {
   };
 };
 
-const translations: Record<Language, TranslationKeys> = {
+// Base translations (old key structure) — fully translated for en/id/zh.
+// Other languages are built by deep-merging these English values with the
+// new-locale files (which share many but not all keys).
+const baseTranslations: Record<'id' | 'en' | 'zh', TranslationKeys> = {
   id: {
     common: {
       loading: 'Memuat...',
@@ -2298,13 +2355,66 @@ const translations: Record<Language, TranslationKeys> = {
   },
 };
 
+// ─── Full 20-language registry ───
+// en/id/zh use the base (old-structure, fully translated).
+// Other 17 languages = deep-merge(English base, new-locale file) so that
+// overlapping keys get real translations while old-system-only keys fall
+// back to English gracefully.
+const enBase = baseTranslations.en;
+const translations: Record<Language, TranslationKeys> = {
+  en: enBase,
+  id: baseTranslations.id,
+  zh: baseTranslations.zh,
+  ja: deepMerge(enBase, jaLocale),
+  ko: deepMerge(enBase, koLocale),
+  ar: deepMerge(enBase, arLocale),
+  hi: deepMerge(enBase, hiLocale),
+  th: deepMerge(enBase, thLocale),
+  vi: deepMerge(enBase, viLocale),
+  ms: deepMerge(enBase, msLocale),
+  fil: deepMerge(enBase, filLocale),
+  pt: deepMerge(enBase, ptLocale),
+  es: deepMerge(enBase, esLocale),
+  fr: deepMerge(enBase, frLocale),
+  de: deepMerge(enBase, deLocale),
+  ru: deepMerge(enBase, ruLocale),
+  tr: deepMerge(enBase, trLocale),
+  it: deepMerge(enBase, itLocale),
+  nl: deepMerge(enBase, nlLocale),
+  uk: deepMerge(enBase, ukLocale),
+};
+
+// Resolve a dotted key path against a dictionary; returns undefined if missing.
+function resolveKey(dict: unknown, keys: string[]): unknown {
+  let result: unknown = dict;
+  for (const k of keys) {
+    if (result === null || result === undefined || typeof result !== 'object') {
+      return undefined;
+    }
+    result = (result as Record<string, unknown>)[k];
+  }
+  return result;
+}
+
 export function t(lang: Language, key: string): string {
   const keys = key.split('.');
-  let result: unknown = translations[lang];
-  for (const k of keys) {
-    result = (result as Record<string, unknown>)?.[k];
+
+  // 1. Try the selected language
+  let value = resolveKey(translations[lang], keys);
+  if (typeof value === 'string') return value;
+
+  // 2. Fall back to English (primary language)
+  if (lang !== 'en') {
+    value = resolveKey(enBase, keys);
+    if (typeof value === 'string') return value;
   }
-  return (typeof result === 'string' ? result : key);
+
+  // 3. Fall back to Indonesian (base language)
+  value = resolveKey(baseTranslations.id, keys);
+  if (typeof value === 'string') return value;
+
+  // 4. Finally return the key itself
+  return key;
 }
 
 export function useT() {
