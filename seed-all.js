@@ -90,27 +90,41 @@ async function main() {
   }
 
   // ==========================================================================
-  // 3. PAYMENT METHODS
+  // 3. PAYMENT METHODS (dengan logo asli)
   // ==========================================================================
-  console.log('\n3. Payment methods...');
-  const pmCount = await prisma.paymentMethod.count();
-  if (pmCount === 0) {
-    await prisma.paymentMethod.createMany({
-      data: [
-        { type: 'bank', name: 'Bank BCA', accountNo: '', holderName: 'NEXVO', color: '#003D79', isActive: true, order: 1 },
-        { type: 'bank', name: 'Bank Mandiri', accountNo: '', holderName: 'NEXVO', color: '#003366', isActive: true, order: 2 },
-        { type: 'bank', name: 'Bank BNI', accountNo: '', holderName: 'NEXVO', color: '#F37021', isActive: true, order: 3 },
-        { type: 'bank', name: 'Bank BRI', accountNo: '', holderName: 'NEXVO', color: '#00529B', isActive: true, order: 4 },
-        { type: 'ewallet', name: 'DANA', accountNo: '', holderName: 'NEXVO', color: '#108EE9', isActive: true, order: 5 },
-        { type: 'ewallet', name: 'OVO', accountNo: '', holderName: 'NEXVO', color: '#4C3494', isActive: true, order: 6 },
-        { type: 'ewallet', name: 'GoPay', accountNo: '', holderName: 'NEXVO', color: '#00AED6', isActive: true, order: 7 },
-        { type: 'ewallet', name: 'ShopeePay', accountNo: '', holderName: 'NEXVO', color: '#EE4D2D', isActive: true, order: 8 },
-      ]
-    });
-    console.log('   ✅ 8 payment methods dibuat (BCA, Mandiri, BNI, BRI, DANA, OVO, GoPay, ShopeePay)');
-  } else {
-    console.log(`   ⏭️  ${pmCount} payment methods sudah ada`);
+  console.log('\n3. Payment methods (dengan logo asli)...');
+
+  // 8 payment methods dengan path logo lokal di /images/payment/
+  // Logo file harus sudah didownload oleh setup-payment-logos.sh
+  const paymentMethods = [
+    { type: 'bank',    name: 'Bank BCA',    accountNo: '', holderName: 'NEXVO', color: '#003D79', iconUrl: '/images/payment/bca.png',        isActive: true, order: 1 },
+    { type: 'bank',    name: 'Bank Mandiri',accountNo: '', holderName: 'NEXVO', color: '#003366', iconUrl: '/images/payment/mandiri.png',    isActive: true, order: 2 },
+    { type: 'bank',    name: 'Bank BNI',    accountNo: '', holderName: 'NEXVO', color: '#F37021', iconUrl: '/images/payment/bni.png',        isActive: true, order: 3 },
+    { type: 'bank',    name: 'Bank BRI',    accountNo: '', holderName: 'NEXVO', color: '#00529B', iconUrl: '/images/payment/bri.png',        isActive: true, order: 4 },
+    { type: 'ewallet', name: 'DANA',        accountNo: '', holderName: 'NEXVO', color: '#108EE9', iconUrl: '/images/payment/dana.png',       isActive: true, order: 5 },
+    { type: 'ewallet', name: 'OVO',         accountNo: '', holderName: 'NEXVO', color: '#4C3494', iconUrl: '/images/payment/ovo.jpg',        isActive: true, order: 6 },
+    { type: 'ewallet', name: 'GoPay',       accountNo: '', holderName: 'NEXVO', color: '#00AED6', iconUrl: '/images/payment/gopay.png',      isActive: true, order: 7 },
+    { type: 'ewallet', name: 'ShopeePay',   accountNo: '', holderName: 'NEXVO', color: '#EE4D2D', iconUrl: '/images/payment/shopeepay.png',  isActive: true, order: 8 },
+  ];
+
+  // Upsert: kalau sudah ada (by name), update iconUrl+color; kalau belum, buat baru
+  let pmCreated = 0, pmUpdated = 0;
+  for (const pm of paymentMethods) {
+    const existing = await prisma.paymentMethod.findFirst({ where: { name: pm.name } });
+    if (existing) {
+      await prisma.paymentMethod.update({
+        where: { id: existing.id },
+        data: { iconUrl: pm.iconUrl, color: pm.color, type: pm.type, holderName: pm.holderName, isActive: true, order: pm.order }
+      });
+      pmUpdated++;
+    } else {
+      await prisma.paymentMethod.create({ data: pm });
+      pmCreated++;
+    }
   }
+  console.log(`   ✅ ${paymentMethods.length} payment methods: ${pmCreated} dibuat, ${pmUpdated} di-update (logo asli)`);
+  console.log('   📁 Logo path: /images/payment/{bca,mandiri,bni,bri,dana,ovo,gopay,shopeepay}.*');
+  console.log('   ⚠️  Jalankan setup-payment-logos.sh untuk download logo ke public/images/payment/');
 
   // ==========================================================================
   // 4. INVESTMENT PACKAGES (6 packages, kontrak 180 hari, modal tidak kembali)
