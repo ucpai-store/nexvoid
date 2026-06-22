@@ -1,0 +1,802 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useState, useEffect, useCallback } from 'react';
+     4→     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→     5→import {
+     6→     6→  ArrowUpCircle, AlertTriangle, Clock, CheckCircle2,
+     7→     7→  XCircle, Landmark, Loader2, Info, RefreshCw,
+     8→     8→  Building2, Wallet, Smartphone, Coins, Sparkles, Shield, Zap, Check
+     9→     9→} from 'lucide-react';
+    10→    10→import { useAuthStore } from '@/stores/auth-store';
+    11→    11→import { formatRupiah } from '@/lib/auth';
+    12→    12→import { Button } from '@/components/ui/button';
+    13→    13→import { Input } from '@/components/ui/input';
+    14→    14→import { Label } from '@/components/ui/label';
+    15→    15→import { Badge } from '@/components/ui/badge';
+    16→    16→import { toast } from '@/hooks/use-toast';
+    17→    17→import { useT } from '@/lib/i18n';
+    18→    18→
+    19→    19→// ─── Withdrawal Payment Method Definitions ───
+    20→    20→const WITHDRAW_PAYMENT_CATEGORIES = [
+    21→    21→  { key: 'bank', label: 'Bank Transfer', icon: Building2, color: '#3B82F6' },
+    22→    22→  { key: 'ewallet', label: 'E-Wallet', icon: Smartphone, color: '#8B5CF6' },
+    23→    23→  { key: 'usdt', label: 'USDT (BEP20)', icon: Coins, color: '#26A17B' },
+    24→    24→] as const;
+    25→    25→
+    26→    26→type PaymentCategory = 'bank' | 'ewallet' | 'usdt';
+    27→    27→
+    28→    28→const BANK_OPTIONS = [
+    29→    29→  { value: 'BCA', label: 'Bank BCA', color: '#003D79', logo: '/images/payment/bca.png' },
+    30→    30→  { value: 'BNI', label: 'Bank BNI', color: '#F15A22', logo: '/images/payment/bni.png' },
+    31→    31→  { value: 'BRI', label: 'Bank BRI', color: '#00529C', logo: '/images/payment/bri.png' },
+    32→    32→  { value: 'Mandiri', label: 'Bank Mandiri', color: '#003066', logo: '/images/payment/mandiri.png' },
+    33→    33→  { value: 'BSI', label: 'Bank BSI', color: '#00A650', logo: '/images/payment/bsi.jpg' },
+    34→    34→  { value: 'CIMB', label: 'CIMB Niaga', color: '#7B0E24', logo: '/images/payment/cimb.png' },
+    35→    35→  { value: 'Danamon', label: 'Bank Danamon', color: '#FDDA24', logo: '/images/payment/danamon.jpg' },
+    36→    36→  { value: 'Permata', label: 'Bank Permata', color: '#005BAA', logo: '/images/payment/permata.png' },
+    37→    37→  { value: 'Bukopin', label: 'Bank KB Bukopin', color: '#006B3F', logo: '/images/payment/bukopin.jpg' },
+    38→    38→  { value: 'OCBC', label: 'OCBC NISP', color: '#E31937', logo: '/images/payment/ocbc.jpeg' },
+    39→    39→  { value: 'Panin', label: 'Panin Bank', color: '#003366', logo: '/images/payment/panin.png' },
+    40→    40→  { value: 'Sinarmas', label: 'Bank Sinarmas', color: '#FF6600', logo: '/images/payment/sinarmas.png' },
+    41→    41→  { value: 'Maybank', label: 'Maybank', color: '#003366', logo: '/images/payment/maybank.png' },
+    42→    42→  { value: 'UOB', label: 'UOB Indonesia', color: '#E31937', logo: '/images/payment/uob.png' },
+    43→    43→  { value: 'BTN', label: 'Bank BTN', color: '#F7941D', logo: '/images/payment/btn.png' },
+    44→    44→] as const;
+    45→    45→
+    46→    46→const EWALLET_OPTIONS = [
+    47→    47→  { value: 'DANA', label: 'DANA', color: '#118EEA', logo: '/images/payment/dana.png' },
+    48→    48→  { value: 'OVO', label: 'OVO', color: '#4C2A86', logo: '/images/payment/ovo.jpg' },
+    49→    49→  { value: 'GoPay', label: 'GoPay', color: '#00AED6', logo: '/images/payment/gopay.png' },
+    50→    50→  { value: 'ShopeePay', label: 'ShopeePay', color: '#EE4D2D', logo: '/images/payment/shopeepay.png' },
+    51→    51→  { value: 'LinkAja', label: 'LinkAja', color: '#E82529', logo: '/images/payment/linkaja.jpg' },
+    52→    52→  { value: 'Doku', label: 'Doku', color: '#FF6C00', logo: '/images/payment/doku.png' },
+    53→    53→  { value: 'Sakuku', label: 'Sakuku', color: '#003D79', logo: '/images/payment/sakuku.jpg' },
+    54→    54→  { value: 'Jenius', label: 'Jenius', color: '#F7941D', logo: '/images/payment/jenius.png' },
+    55→    55→  { value: 'Flip', label: 'Flip', color: '#FF5722', logo: '/images/payment/flip.jpeg' },
+    56→    56→] as const;
+    57→    57→
+    58→    58→interface Withdrawal {
+    59→    59→  id: string;
+    60→    60→  amount: number;
+    61→    61→  fee: number;
+    62→    62→  netAmount: number;
+    63→    63→  bankName: string;
+    64→    64→  accountNo: string;
+    65→    65→  holderName: string;
+    66→    66→  paymentType: string;
+    67→    67→  status: string;
+    68→    68→  note: string;
+    69→    69→  createdAt: string;
+    70→    70→}
+    71→    71→
+    72→    72→interface SystemSettings {
+    73→    73→  [key: string]: string;
+    74→    74→}
+    75→    75→
+    76→    76→function getStatusBadge(status: string, t: (key: string) => string) {
+    77→    77→  switch (status) {
+    78→    78→    case 'success':
+    79→    79→    case 'approved':
+    80→    80→      return <Badge className="bg-emerald-400/10 text-emerald-400 border border-emerald-400/20 text-[10px]"><CheckCircle2 className="w-3 h-3 mr-0.5" />{t('dashboard.success')}</Badge>;
+    81→    81→    case 'pending':
+    82→    82→      return <Badge className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 text-[10px]"><Clock className="w-3 h-3 mr-0.5" />{t('dashboard.pending')}</Badge>;
+    83→    83→    case 'failed':
+    84→    84→    case 'rejected':
+    85→    85→      return <Badge className="bg-red-400/10 text-red-400 border border-red-400/20 text-[10px]"><XCircle className="w-3 h-3 mr-0.5" />{t('dashboard.failed')}</Badge>;
+    86→    86→    default:
+    87→    87→      return <Badge className="bg-foreground/5 text-muted-foreground text-[10px]">{status}</Badge>;
+    88→    88→  }
+    89→    89→}
+    90→    90→
+    91→    91→function formatDate(dateStr: string) {
+    92→    92→  const d = new Date(dateStr);
+    93→    93→  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    94→    94→}
+    95→    95→
+    96→    96→function isWorkingHours(t: (key: string) => string): { isWorking: boolean; message: string } {
+    97→    97→  const now = new Date();
+    98→    98→  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    99→    99→  const wibNow = new Date(utcMs + 7 * 3600000);
+   100→   100→  const day = wibNow.getDay();
+   101→   101→  const hours = wibNow.getHours();
+   102→   102→  const minutes = wibNow.getMinutes();
+   103→   103→  const currentTime = hours * 60 + minutes;
+   104→   104→
+   105→   105→  if (day === 0 || day === 6) {
+   106→   106→    return { isWorking: false, message: 'Withdrawal can only be done on weekdays (Monday-Friday), 09:00-16:00 WIB' };
+   107→   107→  }
+   108→   108→  if (currentTime < 9 * 60 || currentTime > 16 * 60) {
+   109→   109→    return { isWorking: false, message: 'Withdrawal can only be done 09:00-16:00 WIB (weekdays)' };
+   110→   110→  }
+   111→   111→  return { isWorking: true, message: '' };
+   112→   112→}
+   113→   113→
+   114→   114→function getPaymentTypeIcon(type: string) {
+   115→   115→  switch (type) {
+   116→   116→    case 'bank': return Building2;
+   117→   117→    case 'ewallet': return Smartphone;
+   118→   118→    case 'usdt': return Coins;
+   119→   119→    default: return Landmark;
+   120→   120→  }
+   121→   121→}
+   122→   122→
+   123→   123→export default function WithdrawPage() {
+   124→   124→  const { token, user, hydrateUser } = useAuthStore();
+   125→   125→  const t = useT();
+   126→   126→  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+   127→   127→  const [settings, setSettings] = useState<SystemSettings>({});
+   128→   128→  const [loading, setLoading] = useState(true);
+   129→   129→  const [error, setError] = useState<string | null>(null);
+   130→   130→  const [submitting, setSubmitting] = useState(false);
+   131→   131→  const [showSuccessModal, setShowSuccessModal] = useState(false);
+   132→   132→  const [lastWithdrawAmount, setLastWithdrawAmount] = useState(0);
+   133→   133→  const [lastWithdrawNet, setLastWithdrawNet] = useState(0);
+   134→   134→  const [lastWithdrawMethod, setLastWithdrawMethod] = useState('');
+   135→   135→
+   136→   136→  // Form state
+   137→   137→  const [selectedCategory, setSelectedCategory] = useState<PaymentCategory>('bank');
+   138→   138→  const [selectedBank, setSelectedBank] = useState('');
+   139→   139→  const [selectedEwallet, setSelectedEwallet] = useState('');
+   140→   140→  const [usdtAddress, setUsdtAddress] = useState('');
+   141→   141→  const [accountNo, setAccountNo] = useState('');
+   142→   142→  const [holderName, setHolderName] = useState('');
+   143→   143→  const [amount, setAmount] = useState('');
+   144→   144→
+   145→   145→  const fetchData = useCallback(async () => {
+   146→   146→    if (!token) return;
+   147→   147→    try {
+   148→   148→      const [withdrawRes, settingsRes] = await Promise.all([
+   149→   149→        fetch('/api/withdraw', { headers: { Authorization: `Bearer ${token}` } }),
+   150→   150→        fetch('/api/system'),
+   151→   151→      ]);
+   152→   152→      const withdrawData = await withdrawRes.json();
+   153→   153→      const settingsData = await settingsRes.json();
+   154→   154→
+   155→   155→      if (withdrawData.success) setWithdrawals(withdrawData.data || []);
+   156→   156→      if (settingsData.success) setSettings(settingsData.data || {});
+   157→   157→    } catch {
+   158→   158→      setError(t('common.error'));
+   159→   159→    } finally {
+   160→   160→      setLoading(false);
+   161→   161→    }
+   162→   162→  }, [token]);
+   163→   163→
+   164→   164→  useEffect(() => {
+   165→   165→    fetchData();
+   166→   166→  }, [fetchData]);
+   167→   167→
+   168→   168→  useEffect(() => {
+   169→   169→    setSelectedBank('');
+   170→   170→    setSelectedEwallet('');
+   171→   171→    setUsdtAddress('');
+   172→   172→    setAccountNo('');
+   173→   173→    setHolderName('');
+   174→   174→  }, [selectedCategory]);
+   175→   175→
+   176→   176→  const numAmount = parseInt(amount.replace(/[^0-9]/g, '')) || 0;
+   177→   177→  const feeRate = parseFloat(settings.withdraw_fee || '10') / 100;
+   178→   178→  const minWithdraw = Math.max(parseInt(settings.min_withdraw || '100000'), 100000);
+   179→   179→  const fee = Math.round(numAmount * feeRate);
+   180→   180→  const netAmount = numAmount - fee;
+   181→   181→  const mainBalance = user?.mainBalance || 0;
+   182→   182→
+   183→   183→  const workingHours = isWorkingHours(t);
+   184→   184→
+   185→   185→  const getPaymentMethodName = (): string => {
+   186→   186→    switch (selectedCategory) {
+   187→   187→      case 'bank': return selectedBank;
+   188→   188→      case 'ewallet': return selectedEwallet;
+   189→   189→      case 'usdt': return 'USDT (BEP20)';
+   190→   190→      default: return '';
+   191→   191→    }
+   192→   192→  };
+   193→   193→
+   194→   194→  const getAccountLabel = (): string => {
+   195→   195→    switch (selectedCategory) {
+   196→   196→      case 'bank': return 'Nomor Rekening';
+   197→   197→      case 'ewallet': return 'Nomor HP / E-Wallet ID';
+   198→   198→      case 'usdt': return 'Wallet Address (BEP20)';
+   199→   199→      default: return 'Nomor Rekening';
+   200→   200→    }
+   201→   201→  };
+   202→   202→
+   203→   203→  const getAccountPlaceholder = (): string => {
+   204→   204→    switch (selectedCategory) {
+   205→   205→      case 'bank': return 'Contoh: 1234567890';
+   206→   206→      case 'ewallet': return 'Contoh: 081234567890';
+   207→   207→      case 'usdt': return '0x...';
+   208→   208→      default: return '';
+   209→   209→    }
+   210→   210→  };
+   211→   211→
+   212→   212→  const isFormValid = (): boolean => {
+   213→   213→    if (!numAmount || numAmount < minWithdraw) return false;
+   214→   214→    if (numAmount > mainBalance) return false;
+   215→   215→    switch (selectedCategory) {
+   216→   216→      case 'bank': return !!selectedBank && !!accountNo && !!holderName;
+   217→   217→      case 'ewallet': return !!selectedEwallet && !!accountNo && !!holderName;
+   218→   218→      case 'usdt': return !!usdtAddress;
+   219→   219→      default: return false;
+   220→   220→    }
+   221→   221→  };
+   222→   222→
+   223→   223→  const setPercentAmount = (percent: number) => {
+   224→   224→    const val = Math.floor((mainBalance * percent) / 100);
+   225→   225→    setAmount(val.toString());
+   226→   226→  };
+   227→   227→
+   228→   228→  // Preset nominal amounts — sama dengan paket investasi (tanpa 100K min)
+   229→   229→  const presetAmounts = [
+   230→   230→    { label: '160K', value: 160000 },
+   231→   231→    { label: '320K', value: 320000 },
+   232→   232→    { label: '640K', value: 640000 },
+   233→   233→    { label: '1.92M', value: 1920000 },
+   234→   234→    { label: '5.76M', value: 5760000 },
+   235→   235→    { label: '17.28M', value: 17280000 },
+   236→   236→  ];
+   237→   237→
+   238→   238→  const setPresetAmount = (val: number) => {
+   239→   239→    setAmount(val.toString());
+   240→   240→  };
+   241→   241→
+   242→   242→  const handleSubmit = async (e: React.FormEvent) => {
+   243→   243→    e.preventDefault();
+   244→   244→
+   245→   245→    if (!isFormValid()) {
+   246→   246→      toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
+   247→   247→      return;
+   248→   248→    }
+   249→   249→
+   250→   250→    const paymentMethod = getPaymentMethodName();
+   251→   251→    const finalAccountNo = selectedCategory === 'usdt' ? usdtAddress : accountNo;
+   252→   252→    const finalHolderName = selectedCategory === 'usdt' ? 'USDT Wallet' : holderName;
+   253→   253→
+   254→   254→    setSubmitting(true);
+   255→   255→    try {
+   256→   256→      const res = await fetch('/api/withdraw', {
+   257→   257→        method: 'POST',
+   258→   258→        headers: {
+   259→   259→          'Content-Type': 'application/json',
+   260→   260→          Authorization: `Bearer ${token}`,
+   261→   261→        },
+   262→   262→        body: JSON.stringify({
+   263→   263→          paymentType: selectedCategory,
+   264→   264→          paymentMethod,
+   265→   265→          accountNo: finalAccountNo,
+   266→   266→          holderName: finalHolderName,
+   267→   267→          amount: numAmount,
+   268→   268→        }),
+   269→   269→      });
+   270→   270→      const data = await res.json();
+   271→   271→
+   272→   272→      if (data.success) {
+   273→   273→        setLastWithdrawAmount(numAmount);
+   274→   274→        setLastWithdrawNet(netAmount);
+   275→   275→        setLastWithdrawMethod(paymentMethod || 'USDT');
+   276→   276→        setShowSuccessModal(true);
+   277→   277→        toast({ title: 'Success', description: t('withdraw.withdrawSuccess') });
+   278→   278→        setAmount('');
+   279→   279→        setAccountNo('');
+   280→   280→        setHolderName('');
+   281→   281→        setUsdtAddress('');
+   282→   282→        await hydrateUser();
+   283→   283→        fetchData();
+   284→   284→      } else {
+   285→   285→        toast({ title: 'Gagal', description: data.error || 'Withdrawal failed', variant: 'destructive' });
+   286→   286→      }
+   287→   287→    } catch {
+   288→   288→      toast({ title: 'Error', description: 'Network error occurred', variant: 'destructive' });
+   289→   289→    } finally {
+   290→   290→      setSubmitting(false);
+   291→   291→    }
+   292→   292→  };
+   293→   293→
+   294→   294→  const formatAmountDisplay = (val: string) => {
+   295→   295→    const num = val.replace(/[^0-9]/g, '');
+   296→   296→    if (!num) return '';
+   297→   297→    return parseInt(num).toLocaleString('id-ID');
+   298→   298→  };
+   299→   299→
+   300→   300→  const retry = () => {
+   301→   301→    setError(null);
+   302→   302→    setLoading(true);
+   303→   303→    fetchData();
+   304→   304→  };
+   305→   305→
+   306→   306→  if (loading) {
+   307→   307→    return (
+   308→   308→      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
+   309→   309→        <div className="animate-pulse space-y-4">
+   310→   310→          <div className="glass rounded-3xl p-4 sm:p-6 h-48 sm:h-64" />
+   311→   311→          <div className="glass rounded-3xl p-4 sm:p-6 h-36 sm:h-48" />
+   312→   312→        </div>
+   313→   313→      </div>
+   314→   314→    );
+   315→   315→  }
+   316→   316→
+   317→   317→  if (error) {
+   318→   318→    return (
+   319→   319→      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
+   320→   320→        <div className="glass glow-gold rounded-3xl p-5 sm:p-8 lg:p-12 text-center">
+   321→   321→          <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+   322→   322→            <AlertTriangle className="w-7 h-7 text-red-400" />
+   323→   323→          </div>
+   324→   324→          <h3 className="text-foreground font-semibold mb-1">{t('dashboard.loadFailed')}</h3>
+   325→   325→          <p className="text-muted-foreground text-sm mb-4 sm:mb-6">{error}</p>
+   326→   326→          <Button onClick={retry} className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold">
+   327→   327→            <RefreshCw className="w-4 h-4 mr-2" />{t('dashboard.tryAgain')}
+   328→   328→          </Button>
+   329→   329→        </div>
+   330→   330→      </div>
+   331→   331→    );
+   332→   332→  }
+   333→   333→
+   334→   334→  return (
+   335→   335→    <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
+   336→   336→      {/* ─── Success Modal ─── */}
+   337→   337→      <AnimatePresence>
+   338→   338→        {showSuccessModal && (
+   339→   339→          <motion.div
+   340→   340→            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+   341→   341→            className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/70 backdrop-blur-md"
+   342→   342→            onClick={() => setShowSuccessModal(false)}
+   343→   343→          >
+   344→   344→            <motion.div
+   345→   345→              initial={{ scale: 0.85, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.85, opacity: 0 }}
+   346→   346→              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+   347→   347→              onClick={(e) => e.stopPropagation()}
+   348→   348→              className="glass-strong rounded-3xl p-5 sm:p-7 max-w-sm w-full glow-gold-strong border border-primary/20 relative overflow-hidden"
+   349→   349→            >
+   350→   350→              <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-blue-400/10 blur-3xl" />
+   351→   351→              <div className="absolute -bottom-20 -left-20 w-40 h-40 rounded-full bg-primary/10 blur-3xl" />
+   352→   352→
+   353→   353→              <div className="text-center relative z-10">
+   354→   354→                <motion.div
+   355→   355→                  initial={{ scale: 0 }} animate={{ scale: 1 }}
+   356→   356→                  transition={{ delay: 0.2, type: 'spring', damping: 12, stiffness: 200 }}
+   357→   357→                  className="w-20 h-20 rounded-full bg-blue-400/15 flex items-center justify-center mx-auto mb-4 relative"
+   358→   358→                >
+   359→   359→                  <div className="absolute inset-0 rounded-full bg-blue-400/10 animate-ping" />
+   360→   360→                  <ArrowUpCircle className="w-11 h-11 text-blue-400 relative z-10" />
+   361→   361→                </motion.div>
+   362→   362→
+   363→   363→                <h2 className="text-foreground text-xl font-bold mb-1">Withdrawal Berhasil!</h2>
+   364→   364→                <p className="text-muted-foreground text-sm mb-5">Permintaan withdrawal Anda sedang diproses. Dana akan masuk ke rekening Anda dalam 1×24 jam.</p>
+   365→   365→
+   366→   366→                <div className="glass rounded-2xl p-4 mb-5 space-y-3 border border-primary/10">
+   367→   367→                  <div>
+   368→   368→                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Metode</p>
+   369→   369→                    <p className="text-foreground text-sm font-semibold">{lastWithdrawMethod}</p>
+   370→   370→                  </div>
+   371→   371→                  <div className="border-t border-white/5 pt-3">
+   372→   372→                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Jumlah Withdraw</p>
+   373→   373→                    <p className="text-foreground text-xl font-bold">{formatRupiah(lastWithdrawAmount)}</p>
+   374→   374→                  </div>
+   375→   375→                  <div className="border-t border-white/5 pt-3">
+   376→   376→                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Diterima</p>
+   377→   377→                    <p className="text-emerald-400 text-2xl font-bold">{formatRupiah(lastWithdrawNet)}</p>
+   378→   378→                  </div>
+   379→   379→                </div>
+   380→   380→
+   381→   381→                <button onClick={() => setShowSuccessModal(false)} className="text-muted-foreground text-sm hover:text-foreground transition-colors">
+   382→   382→                  Tutup
+   383→   383→                </button>
+   384→   384→              </div>
+   385→   385→            </motion.div>
+   386→   386→          </motion.div>
+   387→   387→        )}
+   388→   388→      </AnimatePresence>
+   389→   389→
+   390→   390→      {/* ─── Premium Header ─── */}
+   391→   391→      <motion.div
+   392→   392→        initial={{ opacity: 0, y: -20 }}
+   393→   393→        animate={{ opacity: 1, y: 0 }}
+   394→   394→        className="flex items-center gap-3"
+   395→   395→      >
+   396→   396→        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gold-gradient flex items-center justify-center shrink-0 glow-gold">
+   397→   397→          <ArrowUpCircle className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+   398→   398→        </div>
+   399→   399→        <div>
+   400→   400→          <h1 className="text-foreground text-xl sm:text-2xl font-bold">{t('withdraw.title')}</h1>
+   401→   401→          <p className="text-muted-foreground text-xs sm:text-sm">{t('withdraw.withdrawFunds')}</p>
+   402→   402→        </div>
+   403→   403→      </motion.div>
+   404→   404→
+   405→   405→      {/* ─── Premium Balance Showcase ─── */}
+   406→   406→      <motion.div
+   407→   407→        initial={{ opacity: 0, y: 20 }}
+   408→   408→        animate={{ opacity: 1, y: 0 }}
+   409→   409→        className="relative overflow-hidden rounded-3xl bg-card-gradient border border-primary/20 p-5 sm:p-6"
+   410→   410→      >
+   411→   411→        <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-primary/8 blur-3xl" />
+   412→   412→        <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-[#1E3A5F]/15 blur-3xl" />
+   413→   413→        <div className="relative z-10 flex items-center justify-between">
+   414→   414→          <div>
+   415→   415→            <div className="flex items-center gap-2 mb-2">
+   416→   416→              <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center">
+   417→   417→                <Wallet className="w-4 h-4 text-primary" />
+   418→   418→              </div>
+   419→   419→              <span className="text-muted-foreground text-xs sm:text-sm font-medium">Saldo Tersedia</span>
+   420→   420→            </div>
+   421→   421→            <p className="text-3xl sm:text-4xl font-bold text-gold-gradient">{formatRupiah(mainBalance)}</p>
+   422→   422→            <p className="text-muted-foreground text-[10px] sm:text-xs mt-1">Min withdraw: {formatRupiah(minWithdraw)}</p>
+   423→   423→          </div>
+   424→   424→          <div className="hidden sm:flex flex-col items-center gap-1 px-4 py-3 rounded-2xl glass border border-primary/10">
+   425→   425→            <Shield className="w-5 h-5 text-primary" />
+   426→   426→            <span className="text-[10px] text-muted-foreground font-medium">Aman</span>
+   427→   427→          </div>
+   428→   428→        </div>
+   429→   429→      </motion.div>
+   430→   430→
+   431→   431→      {/* ─── Working Hours Banner ─── */}
+   432→   432→      <AnimatePresence>
+   433→   433→        {!workingHours.isWorking && (
+   434→   434→          <motion.div
+   435→   435→            initial={{ opacity: 0, y: -10, height: 0 }}
+   436→   436→            animate={{ opacity: 1, y: 0, height: 'auto' }}
+   437→   437→            exit={{ opacity: 0, height: 0 }}
+   438→   438→            className="glass-gold rounded-2xl p-4 flex items-center gap-3 border border-yellow-400/20"
+   439→   439→          >
+   440→   440→            <div className="w-10 h-10 rounded-xl bg-yellow-400/15 flex items-center justify-center shrink-0">
+   441→   441→              <AlertTriangle className="w-5 h-5 text-yellow-400" />
+   442→   442→            </div>
+   443→   443→            <div>
+   444→   444→              <p className="text-foreground text-sm font-semibold">{t('withdraw.outsideHours')}</p>
+   445→   445→              <p className="text-muted-foreground text-xs">{workingHours.message}</p>
+   446→   446→            </div>
+   447→   447→          </motion.div>
+   448→   448→        )}
+   449→   449→      </AnimatePresence>
+   450→   450→
+   451→   451→      {/* ─── Premium Withdraw Form ─── */}
+   452→   452→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+   453→   453→        className="glass glow-gold rounded-3xl p-4 sm:p-6 border border-primary/10">
+   454→   454→        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+   455→   455→
+   456→   456→          {/* Premium Payment Category Tabs */}
+   457→   457→          <div className="space-y-2">
+   458→   458→            <Label className="text-foreground text-sm font-medium flex items-center gap-1.5">
+   459→   459→              <Zap className="w-3.5 h-3.5 text-primary" />
+   460→   460→              Metode Withdrawal
+   461→   461→            </Label>
+   462→   462→            <div className="flex gap-2 p-1 glass rounded-2xl">
+   463→   463→              {WITHDRAW_PAYMENT_CATEGORIES.map((cat) => {
+   464→   464→                const Icon = cat.icon;
+   465→   465→                const isActive = selectedCategory === cat.key;
+   466→   466→                return (
+   467→   467→                  <button
+   468→   468→                    key={cat.key}
+   469→   469→                    type="button"
+   470→   470→                    onClick={() => setSelectedCategory(cat.key as PaymentCategory)}
+   471→   471→                    className={`flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+   472→   472→                      isActive
+   473→   473→                        ? 'bg-gold-gradient text-primary-foreground glow-gold'
+   474→   474→                        : 'text-muted-foreground hover:text-foreground'
+   475→   475→                    }`}
+   476→   476→                  >
+   477→   477→                    <Icon className="w-4 h-4" />
+   478→   478→                    <span className="hidden sm:inline">{cat.label}</span>
+   479→   479→                    <span className="sm:hidden">{cat.key === 'bank' ? 'Bank' : cat.key === 'ewallet' ? 'E-Wallet' : 'USDT'}</span>
+   480→   480→                  </button>
+   481→   481→                );
+   482→   482→              })}
+   483→   483→            </div>
+   484→   484→          </div>
+   485→   485→
+   486→   486→          {/* ── Bank Transfer Options ── */}
+   487→   487→          <AnimatePresence mode="wait">
+   488→   488→            {selectedCategory === 'bank' && (
+   489→   489→              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
+   490→   490→                <Label className="text-foreground text-sm font-medium">Pilih Bank</Label>
+   491→   491→                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+   492→   492→                  {BANK_OPTIONS.map((bank) => {
+   493→   493→                    const isSelected = selectedBank === bank.value;
+   494→   494→                    return (
+   495→   495→                      <motion.button
+   496→   496→                        key={bank.value}
+   497→   497→                        type="button"
+   498→   498→                        onClick={() => setSelectedBank(bank.value)}
+   499→   499→                        whileHover={{ scale: 1.03, y: -2 }}
+   500→   500→                        whileTap={{ scale: 0.97 }}
+   501→   501→                        className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all text-center border-2 ${
+   502→   502→                          isSelected
+   503→   503→                            ? 'glass-gold glow-gold border-primary'
+   504→   504→                            : 'glass border-transparent hover:border-primary/30'
+   505→   505→                        }`}
+   506→   506→                      >
+   507→   507→                        {isSelected && (
+   508→   508→                          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center ring-2 ring-background">
+   509→   509→                            <Check className="w-2.5 h-2.5 text-primary-foreground" />
+   510→   510→                          </div>
+   511→   511→                        )}
+   512→   512→                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white/95 p-1"
+   513→   513→                          style={{ backgroundColor: bank.color ? `${bank.color}15` : 'rgba(255,255,255,0.95)' }}>
+   514→   514→                          {'logo' in bank && bank.logo ? (
+   515→   515→                            <img src={bank.logo} alt={bank.label} className="w-full h-full object-contain" />
+   516→   516→                          ) : (
+   517→   517→                            <Building2 className="w-4 h-4" style={{ color: bank.color }} />
+   518→   518→                          )}
+   519→   519→                        </div>
+   520→   520→                        <span className="text-foreground text-[10px] sm:text-xs font-medium leading-tight">{bank.label}</span>
+   521→   521→                      </motion.button>
+   522→   522→                    );
+   523→   523→                  })}
+   524→   524→                </div>
+   525→   525→              </motion.div>
+   526→   526→            )}
+   527→   527→          </AnimatePresence>
+   528→   528→
+   529→   529→          {/* ── E-Wallet Options ── */}
+   530→   530→          <AnimatePresence mode="wait">
+   531→   531→            {selectedCategory === 'ewallet' && (
+   532→   532→              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
+   533→   533→                <Label className="text-foreground text-sm font-medium">Pilih E-Wallet</Label>
+   534→   534→                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+   535→   535→                  {EWALLET_OPTIONS.map((ew) => {
+   536→   536→                    const isSelected = selectedEwallet === ew.value;
+   537→   537→                    return (
+   538→   538→                      <motion.button
+   539→   539→                        key={ew.value}
+   540→   540→                        type="button"
+   541→   541→                        onClick={() => setSelectedEwallet(ew.value)}
+   542→   542→                        whileHover={{ scale: 1.03, y: -2 }}
+   543→   543→                        whileTap={{ scale: 0.97 }}
+   544→   544→                        className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all text-center border-2 ${
+   545→   545→                          isSelected
+   546→   546→                            ? 'glass-gold glow-gold border-primary'
+   547→   547→                            : 'glass border-transparent hover:border-primary/30'
+   548→   548→                        }`}
+   549→   549→                      >
+   550→   550→                        {isSelected && (
+   551→   551→                          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center ring-2 ring-background">
+   552→   552→                            <Check className="w-2.5 h-2.5 text-primary-foreground" />
+   553→   553→                          </div>
+   554→   554→                        )}
+   555→   555→                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white/95 p-1"
+   556→   556→                          style={{ backgroundColor: ew.color ? `${ew.color}15` : 'rgba(255,255,255,0.95)' }}>
+   557→   557→                          {'logo' in ew && ew.logo ? (
+   558→   558→                            <img src={ew.logo} alt={ew.label} className="w-full h-full object-contain" />
+   559→   559→                          ) : (
+   560→   560→                            <Smartphone className="w-4 h-4" style={{ color: ew.color }} />
+   561→   561→                          )}
+   562→   562→                        </div>
+   563→   563→                        <span className="text-foreground text-[10px] sm:text-xs font-medium leading-tight">{ew.label}</span>
+   564→   564→                      </motion.button>
+   565→   565→                    );
+   566→   566→                  })}
+   567→   567→                </div>
+   568→   568→              </motion.div>
+   569→   569→            )}
+   570→   570→          </AnimatePresence>
+   571→   571→
+   572→   572→          {/* ── USDT BEP20 ── */}
+   573→   573→          <AnimatePresence mode="wait">
+   574→   574→            {selectedCategory === 'usdt' && (
+   575→   575→              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
+   576→   576→                <div className="glass rounded-2xl p-4 border border-[#26A17B]/20">
+   577→   577→                  <div className="flex items-center gap-3 mb-3">
+   578→   578→                    <div className="w-10 h-10 rounded-xl bg-[#26A17B]/10 flex items-center justify-center">
+   579→   579→                      <Coins className="w-5 h-5 text-[#26A17B]" />
+   580→   580→                    </div>
+   581→   581→                    <div>
+   582→   582→                      <p className="text-foreground text-sm font-semibold">USDT (BEP20)</p>
+   583→   583→                      <p className="text-muted-foreground text-[10px]">Binance Smart Chain Network</p>
+   584→   584→                    </div>
+   585→   585→                  </div>
+   586→   586→                  <div className="space-y-2">
+   587→   587→                    <Label className="text-foreground text-xs">Wallet Address (BEP20)</Label>
+   588→   588→                    <Input
+   589→   589→                      placeholder="0x..."
+   590→   590→                      value={usdtAddress}
+   591→   591→                      onChange={(e) => setUsdtAddress(e.target.value)}
+   592→   592→                      className="h-11 bg-input/50 border-border/50 rounded-xl text-foreground font-mono text-sm placeholder:text-muted-foreground/50 focus:border-[#26A17B]/50 focus:ring-[#26A17B]/20"
+   593→   593→                    />
+   594→   594→                  </div>
+   595→   595→                  <div className="mt-3 p-3 rounded-xl bg-[#26A17B]/5 border border-[#26A17B]/10">
+   596→   596→                    <p className="text-[#26A17B] text-[10px] font-semibold mb-1">⚠️ Penting:</p>
+   597→   597→                    <ul className="text-muted-foreground text-[10px] space-y-0.5">
+   598→   598→                      <li>• Kirim hanya USDT via jaringan BEP20 (BSC)</li>
+   599→   599→                      <li>• Pastikan wallet address benar sebelum submit</li>
+   600→   600→                      <li>• Jangan kirim aset selain USDT</li>
+   601→   601→                    </ul>
+   602→   602→                  </div>
+   603→   603→                </div>
+   604→   604→              </motion.div>
+   605→   605→            )}
+   606→   606→          </AnimatePresence>
+   607→   607→
+   608→   608→          {/* Account Number / Holder Name (for bank & ewallet) */}
+   609→   609→          <AnimatePresence mode="wait">
+   610→   610→            {(selectedCategory === 'bank' || selectedCategory === 'ewallet') && (
+   611→   611→              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+   612→   612→                <div className="space-y-2">
+   613→   613→                  <Label className="text-foreground text-sm font-medium">{getAccountLabel()}</Label>
+   614→   614→                  <Input
+   615→   615→                    type="text"
+   616→   616→                    inputMode={selectedCategory === 'ewallet' ? 'tel' : 'numeric'}
+   617→   617→                    placeholder={getAccountPlaceholder()}
+   618→   618→                    value={accountNo}
+   619→   619→                    onChange={(e) => setAccountNo(e.target.value.replace(selectedCategory === 'bank' ? /[^0-9]/g : /[^0-9+]/g, ''))}
+   620→   620→                    className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
+   621→   621→                  />
+   622→   622→                </div>
+   623→   623→                <div className="space-y-2">
+   624→   624→                  <Label className="text-foreground text-sm font-medium">Nama Pemilik Rekening</Label>
+   625→   625→                  <Input
+   626→   626→                    type="text"
+   627→   627→                    placeholder="Nama sesuai buku tabungan / akun"
+   628→   628→                    value={holderName}
+   629→   629→                    onChange={(e) => setHolderName(e.target.value)}
+   630→   630→                    className="h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"
+   631→   631→                  />
+   632→   632→                </div>
+   633→   633→              </motion.div>
+   634→   634→            )}
+   635→   635→          </AnimatePresence>
+   636→   636→
+   637→   637→          {/* Premium Amount Input */}
+   638→   638→          <div className="space-y-2">
+   639→   639→            <div className="flex items-center justify-between">
+   640→   640→              <Label className="text-foreground text-sm font-medium flex items-center gap-1.5">
+   641→   641→                <Wallet className="w-3.5 h-3.5 text-primary" />
+   642→   642→                {t('withdraw.withdrawAmount')}
+   643→   643→              </Label>
+   644→   644→              <span className="text-[10px] text-muted-foreground">Saldo: {formatRupiah(mainBalance)}</span>
+   645→   645→            </div>
+   646→   646→            <div className="relative group">
+   647→   647→              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary text-base sm:text-lg font-bold">Rp</span>
+   648→   648→              <Input
+   649→   649→                type="text"
+   650→   650→                inputMode="numeric"
+   651→   651→                placeholder="0"
+   652→   652→                value={amount ? formatAmountDisplay(amount) : ''}
+   653→   653→                onChange={(e) => {
+   654→   654→                  const raw = e.target.value.replace(/[^0-9]/g, '');
+   655→   655→                  setAmount(raw);
+   656→   656→                }}
+   657→   657→                className="pl-12 h-14 sm:h-16 text-2xl sm:text-3xl font-bold bg-input/50 border-primary/20 rounded-2xl text-foreground placeholder:text-muted-foreground/20 focus:border-primary/50 focus:ring-primary/20 transition-all"
+   658→   658→              />
+   659→   659→              <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gold-gradient scale-x-0 group-focus-within:scale-x-100 transition-transform origin-left" />
+   660→   660→            </div>
+   661→   661→            {/* Preset nominal — sesuai paket investasi (sama kayak deposit) */}
+   662→   662→            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+   663→   663→              {presetAmounts.map((preset) => {
+   664→   664→                const disabled = mainBalance < preset.value;
+   665→   665→                const isSelected = amount === preset.value.toString();
+   666→   666→                return (
+   667→   667→                  <motion.button
+   668→   668→                    key={preset.value}
+   669→   669→                    type="button"
+   670→   670→                    onClick={() => !disabled && setPresetAmount(preset.value)}
+   671→   671→                    disabled={disabled}
+   672→   672→                    whileTap={!disabled ? { scale: 0.95 } : undefined}
+   673→   673→                    className={`relative px-2 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all overflow-hidden border ${
+   674→   674→                      disabled
+   675→   675→                        ? 'glass text-muted-foreground/40 border-transparent cursor-not-allowed opacity-50'
+   676→   676→                        : isSelected
+   677→   677→                          ? 'bg-gold-gradient text-primary-foreground glow-gold border-transparent'
+   678→   678→                          : 'glass text-muted-foreground hover:text-foreground hover:border-primary/30 border-transparent'
+   679→   679→                      }`}
+   680→   680→                  >
+   681→   681→                    {preset.label}
+   682→   682→                  </motion.button>
+   683→   683→                );
+   684→   684→              })}
+   685→   685→            </div>
+   686→   686→          </div>
+   687→   687→
+   688→   688→          {/* Premium Fee & Net Summary */}
+   689→   689→          {numAmount > 0 && (
+   690→   690→            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+   691→   691→              className="glass-gold rounded-2xl p-4 space-y-2.5 border border-primary/15">
+   692→   692→              <h4 className="text-foreground font-semibold text-sm mb-1.5 flex items-center gap-1.5">
+   693→   693→                <Sparkles className="w-3.5 h-3.5 text-primary" />
+   694→   694→                Ringkasan Withdrawal
+   695→   695→              </h4>
+   696→   696→              <div className="flex items-center justify-between text-sm">
+   697→   697→                <span className="text-muted-foreground">{t('withdraw.amount')}</span>
+   698→   698→                <span className="text-foreground font-medium">{formatRupiah(numAmount)}</span>
+   699→   699→              </div>
+   700→   700→              <div className="flex items-center justify-between text-sm">
+   701→   701→                <span className="text-muted-foreground flex items-center gap-1">
+   702→   702→                  {t('withdraw.adminFee')}
+   703→   703→                  <Info className="w-3 h-3" />
+   704→   704→                </span>
+   705→   705→                <span className="text-red-400 font-medium">-{formatRupiah(fee)}</span>
+   706→   706→              </div>
+   707→   707→              <div className="border-t border-primary/10 pt-2.5 flex items-center justify-between">
+   708→   708→                <span className="text-foreground font-semibold text-sm">{t('withdraw.received')}</span>
+   709→   709→                <span className="text-emerald-400 font-bold text-base">{formatRupiah(netAmount)}</span>
+   710→   710→              </div>
+   711→   711→              {numAmount > mainBalance && (
+   712→   712→                <p className="text-red-400 text-[10px]">⚠️ Jumlah melebihi saldo tersedia</p>
+   713→   713→              )}
+   714→   714→            </motion.div>
+   715→   715→          )}
+   716→   716→
+   717→   717→          {/* Premium Submit */}
+   718→   718→          <Button
+   719→   719→            type="submit"
+   720→   720→            disabled={submitting || !isFormValid()}
+   721→   721→            className="w-full h-14 bg-gold-gradient text-primary-foreground font-semibold rounded-2xl hover:opacity-90 transition-all glow-gold-strong text-base disabled:opacity-50"
+   722→   722→          >
+   723→   723→            {submitting ? (
+   724→   724→              <div className="flex items-center gap-2">
+   725→   725→                <Loader2 className="w-5 h-5 animate-spin" />
+   726→   726→                {t('common.processing')}
+   727→   727→              </div>
+   728→   728→            ) : (
+   729→   729→              <div className="flex items-center gap-2">
+   730→   730→                <ArrowUpCircle className="w-5 h-5" />
+   731→   731→                Withdraw {amount ? formatRupiah(numAmount) : ''}
+   732→   732→              </div>
+   733→   733→            )}
+   734→   734→          </Button>
+   735→   735→        </form>
+   736→   736→      </motion.div>
+   737→   737→
+   738→   738→      {/* ─── Premium Withdrawal History ─── */}
+   739→   739→      <motion.div
+   740→   740→        initial={{ opacity: 0, y: 20 }}
+   741→   741→        animate={{ opacity: 1, y: 0 }}
+   742→   742→        transition={{ delay: 0.1 }}
+   743→   743→        className="glass rounded-3xl p-4 sm:p-6 border border-primary/10"
+   744→   744→      >
+   745→   745→        <div className="flex items-center justify-between mb-4">
+   746→   746→          <h3 className="text-foreground font-semibold text-sm sm:text-base flex items-center gap-2">
+   747→   747→            <Clock className="w-4 h-4 text-primary" />
+   748→   748→            {t('withdraw.withdrawHistory')}
+   749→   749→          </h3>
+   750→   750→          {withdrawals.length > 0 && <Badge className="bg-primary/10 text-primary text-[10px]">{withdrawals.length} transaksi</Badge>}
+   751→   751→        </div>
+   752→   752→
+   753→   753→        {withdrawals.length > 0 ? (
+   754→   754→          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+   755→   755→            {withdrawals.map((wd, idx) => {
+   756→   756→              const PayIcon = getPaymentTypeIcon(wd.paymentType || 'bank');
+   757→   757→              return (
+   758→   758→                <motion.div
+   759→   759→                  key={wd.id}
+   760→   760→                  initial={{ opacity: 0, x: -20 }}
+   761→   761→                  animate={{ opacity: 1, x: 0 }}
+   762→   762→                  transition={{ delay: idx * 0.05 }}
+   763→   763→                  className="relative flex items-center gap-3 p-3 sm:p-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] transition-all border border-white/5"
+   764→   764→                >
+   765→   765→                  <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl bg-blue-400/50" />
+   766→   766→                  <div className="w-10 h-10 rounded-xl bg-blue-400/10 flex items-center justify-center shrink-0">
+   767→   767→                    <PayIcon className="w-5 h-5 text-blue-400" />
+   768→   768→                  </div>
+   769→   769→                  <div className="flex-1 min-w-0">
+   770→   770→                    <p className="text-foreground text-sm font-semibold">{wd.bankName}</p>
+   771→   771→                    <p className="text-muted-foreground text-xs">{wd.accountNo?.slice(-8) || '****'}</p>
+   772→   772→                    <p className="text-muted-foreground text-[10px]">{formatDate(wd.createdAt)}</p>
+   773→   773→                    {wd.note && (
+   774→   774→                      <p className="text-muted-foreground text-xs mt-0.5 italic">{wd.note}</p>
+   775→   775→                    )}
+   776→   776→                  </div>
+   777→   777→                  <div className="text-right shrink-0 space-y-1">
+   778→   778→                    <p className="text-blue-400 text-sm font-bold">
+   779→   779→                      {formatRupiah(wd.amount)}
+   780→   780→                    </p>
+   781→   781→                    <p className="text-muted-foreground text-[10px]">
+   782→   782→                      Net: {formatRupiah(wd.netAmount)}
+   783→   783→                    </p>
+   784→   784→                    {getStatusBadge(wd.status, t)}
+   785→   785→                  </div>
+   786→   786→                </motion.div>
+   787→   787→              );
+   788→   788→            })}
+   789→   789→          </div>
+   790→   790→        ) : (
+   791→   791→          <div className="text-center py-10">
+   792→   792→            <div className="w-16 h-16 rounded-2xl bg-foreground/5 flex items-center justify-center mx-auto mb-3">
+   793→   793→              <Clock className="w-8 h-8 text-muted-foreground/30" />
+   794→   794→            </div>
+   795→   795→            <p className="text-muted-foreground text-sm">{t('withdraw.noWithdrawHistory')}</p>
+   796→   796→          </div>
+   797→   797→        )}
+   798→   798→      </motion.div>
+   799→   799→    </div>
+   800→   800→  );
+   801→   801→}
+   802→   802→
