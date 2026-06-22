@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowUpCircle, AlertTriangle, Clock, CheckCircle2,
   XCircle, Landmark, Loader2, Info, RefreshCw,
-  Building2, Wallet, Smartphone, Coins, Sparkles, Shield, Zap, Check
+  Building2, Wallet, Smartphone, Coins, Sparkles, Shield, Zap, Check,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatRupiah } from '@/lib/auth';
@@ -18,42 +19,50 @@ import { useT } from '@/lib/i18n';
 
 // ─── Withdrawal Payment Method Definitions ───
 const WITHDRAW_PAYMENT_CATEGORIES = [
-  { key: 'bank', label: 'Bank Transfer', icon: Building2, color: '#3B82F6' },
+  { key: 'bank', label: 'Bank', icon: Building2, color: '#3B82F6' },
   { key: 'ewallet', label: 'E-Wallet', icon: Smartphone, color: '#8B5CF6' },
-  { key: 'usdt', label: 'USDT (BEP20)', icon: Coins, color: '#26A17B' },
+  { key: 'usdt', label: 'USDT', icon: Coins, color: '#26A17B' },
 ] as const;
 
 type PaymentCategory = 'bank' | 'ewallet' | 'usdt';
 
-const BANK_OPTIONS = [
-  { value: 'BCA', label: 'Bank BCA', color: '#003D79', logo: '/images/payment/bca.png' },
-  { value: 'BNI', label: 'Bank BNI', color: '#F15A22', logo: '/images/payment/bni.png' },
-  { value: 'BRI', label: 'Bank BRI', color: '#00529C', logo: '/images/payment/bri.png' },
-  { value: 'Mandiri', label: 'Bank Mandiri', color: '#003066', logo: '/images/payment/mandiri.png' },
-  { value: 'BSI', label: 'Bank BSI', color: '#00A650', logo: '/images/payment/bsi.jpg' },
-  { value: 'CIMB', label: 'CIMB Niaga', color: '#7B0E24', logo: '/images/payment/cimb.png' },
-  { value: 'Danamon', label: 'Bank Danamon', color: '#FDDA24', logo: '/images/payment/danamon.jpg' },
-  { value: 'Permata', label: 'Bank Permata', color: '#005BAA', logo: '/images/payment/permata.png' },
-  { value: 'Bukopin', label: 'Bank KB Bukopin', color: '#006B3F', logo: '/images/payment/bukopin.jpg' },
-  { value: 'OCBC', label: 'OCBC NISP', color: '#E31937', logo: '/images/payment/ocbc.jpeg' },
-  { value: 'Panin', label: 'Panin Bank', color: '#003366', logo: '/images/payment/panin.png' },
-  { value: 'Sinarmas', label: 'Bank Sinarmas', color: '#FF6600', logo: '/images/payment/sinarmas.png' },
-  { value: 'Maybank', label: 'Maybank', color: '#003366', logo: '/images/payment/maybank.png' },
-  { value: 'UOB', label: 'UOB Indonesia', color: '#E31937', logo: '/images/payment/uob.png' },
-  { value: 'BTN', label: 'Bank BTN', color: '#F7941D', logo: '/images/payment/btn.png' },
-] as const;
+interface PaymentOption {
+  value: string;
+  label: string;
+  shortLabel: string;
+  color: string;
+  logo: string;
+}
 
-const EWALLET_OPTIONS = [
-  { value: 'DANA', label: 'DANA', color: '#118EEA', logo: '/images/payment/dana.png' },
-  { value: 'OVO', label: 'OVO', color: '#4C2A86', logo: '/images/payment/ovo.jpg' },
-  { value: 'GoPay', label: 'GoPay', color: '#00AED6', logo: '/images/payment/gopay.png' },
-  { value: 'ShopeePay', label: 'ShopeePay', color: '#EE4D2D', logo: '/images/payment/shopeepay.png' },
-  { value: 'LinkAja', label: 'LinkAja', color: '#E82529', logo: '/images/payment/linkaja.jpg' },
-  { value: 'Doku', label: 'Doku', color: '#FF6C00', logo: '/images/payment/doku.png' },
-  { value: 'Sakuku', label: 'Sakuku', color: '#003D79', logo: '/images/payment/sakuku.jpg' },
-  { value: 'Jenius', label: 'Jenius', color: '#F7941D', logo: '/images/payment/jenius.png' },
-  { value: 'Flip', label: 'Flip', color: '#FF5722', logo: '/images/payment/flip.jpeg' },
-] as const;
+const BANK_OPTIONS: PaymentOption[] = [
+  { value: 'BCA',       label: 'Bank BCA',          shortLabel: 'BCA',       color: '#003D79', logo: '/images/payment/bca.png' },
+  { value: 'BNI',       label: 'Bank BNI',          shortLabel: 'BNI',       color: '#F15A22', logo: '/images/payment/bni.png' },
+  { value: 'BRI',       label: 'Bank BRI',          shortLabel: 'BRI',       color: '#00529C', logo: '/images/payment/bri.png' },
+  { value: 'Mandiri',   label: 'Bank Mandiri',      shortLabel: 'Mandiri',   color: '#003066', logo: '/images/payment/mandiri.png' },
+  { value: 'BSI',       label: 'Bank BSI',          shortLabel: 'BSI',       color: '#00A650', logo: '/images/payment/bsi.jpg' },
+  { value: 'CIMB',      label: 'CIMB Niaga',        shortLabel: 'CIMB',      color: '#7B0E24', logo: '/images/payment/cimb.png' },
+  { value: 'Danamon',   label: 'Bank Danamon',      shortLabel: 'Danamon',   color: '#FDDA24', logo: '/images/payment/danamon.jpg' },
+  { value: 'Permata',   label: 'Bank Permata',      shortLabel: 'Permata',   color: '#005BAA', logo: '/images/payment/permata.png' },
+  { value: 'Bukopin',   label: 'Bank KB Bukopin',   shortLabel: 'Bukopin',   color: '#006B3F', logo: '/images/payment/bukopin.jpg' },
+  { value: 'OCBC',      label: 'OCBC NISP',         shortLabel: 'OCBC',      color: '#E31937', logo: '/images/payment/ocbc.jpeg' },
+  { value: 'Panin',     label: 'Panin Bank',        shortLabel: 'Panin',     color: '#003366', logo: '/images/payment/panin.png' },
+  { value: 'Sinarmas',  label: 'Bank Sinarmas',     shortLabel: 'Sinarmas',  color: '#FF6600', logo: '/images/payment/sinarmas.png' },
+  { value: 'Maybank',   label: 'Maybank',           shortLabel: 'Maybank',   color: '#003366', logo: '/images/payment/maybank.png' },
+  { value: 'UOB',       label: 'UOB Indonesia',     shortLabel: 'UOB',       color: '#E31937', logo: '/images/payment/uob.png' },
+  { value: 'BTN',       label: 'Bank BTN',          shortLabel: 'BTN',       color: '#F7941D', logo: '/images/payment/btn.png' },
+];
+
+const EWALLET_OPTIONS: PaymentOption[] = [
+  { value: 'DANA',       label: 'DANA',       shortLabel: 'DANA',       color: '#118EEA', logo: '/images/payment/dana.png' },
+  { value: 'OVO',        label: 'OVO',        shortLabel: 'OVO',        color: '#4C2A86', logo: '/images/payment/ovo.jpg' },
+  { value: 'GoPay',      label: 'GoPay',      shortLabel: 'GoPay',      color: '#00AED6', logo: '/images/payment/gopay.png' },
+  { value: 'ShopeePay',  label: 'ShopeePay',  shortLabel: 'ShopeePay',  color: '#EE4D2D', logo: '/images/payment/shopeepay.png' },
+  { value: 'LinkAja',    label: 'LinkAja',    shortLabel: 'LinkAja',    color: '#E82529', logo: '/images/payment/linkaja.jpg' },
+  { value: 'Doku',       label: 'Doku',       shortLabel: 'Doku',       color: '#FF6C00', logo: '/images/payment/doku.png' },
+  { value: 'Sakuku',     label: 'Sakuku',     shortLabel: 'Sakuku',     color: '#003D79', logo: '/images/payment/sakuku.jpg' },
+  { value: 'Jenius',     label: 'Jenius',     shortLabel: 'Jenius',     color: '#F7941D', logo: '/images/payment/jenius.png' },
+  { value: 'Flip',       label: 'Flip',       shortLabel: 'Flip',       color: '#FF5722', logo: '/images/payment/flip.jpeg' },
+];
 
 interface Withdrawal {
   id: string;
@@ -93,7 +102,7 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function isWorkingHours(t: (key: string) => string): { isWorking: boolean; message: string } {
+function isWorkingHours(): { isWorking: boolean; message: string } {
   const now = new Date();
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
   const wibNow = new Date(utcMs + 7 * 3600000);
@@ -118,6 +127,130 @@ function getPaymentTypeIcon(type: string) {
     case 'usdt': return Coins;
     default: return Landmark;
   }
+}
+
+// ─── Scrollable Payment Method Carousel ───
+function PaymentMethodScroll({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: PaymentOption[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [failedLogos, setFailedLogos] = useState<Set<string>>(new Set());
+
+  const scrollBy = (dir: -1 | 1) => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollBy({ left: dir * 260, behavior: 'smooth' });
+  };
+
+  const markFailed = (value: string) => {
+    setFailedLogos((prev) => {
+      const next = new Set(prev);
+      next.add(value);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-foreground text-sm font-medium">
+          Pilih Metode
+          <span className="text-muted-foreground text-[11px] ml-2 font-normal">
+            {options.length} tersedia
+          </span>
+        </Label>
+        {/* Desktop scroll arrows */}
+        <div className="hidden sm:flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => scrollBy(-1)}
+            className="w-7 h-7 rounded-lg glass flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollBy(1)}
+            className="w-7 h-7 rounded-lg glass flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="flex gap-2.5 overflow-x-auto pb-2 -mx-1 px-1 scroll-smooth snap-x snap-mandatory nexvo-scroll"
+        style={{ scrollbarWidth: 'thin' }}
+      >
+        {options.map((opt) => {
+          const isSelected = selected === opt.value;
+          const logoFailed = failedLogos.has(opt.value);
+          return (
+            <motion.button
+              key={opt.value}
+              type="button"
+              onClick={() => onSelect(opt.value)}
+              whileTap={{ scale: 0.96 }}
+              className={`relative shrink-0 snap-start w-[88px] sm:w-[96px] flex flex-col items-center gap-2 p-3 rounded-2xl transition-all border-2 ${
+                isSelected
+                  ? 'glass-gold glow-gold border-primary'
+                  : 'glass border-transparent hover:border-primary/30'
+              }`}
+            >
+              {isSelected && (
+                <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center ring-2 ring-background z-10">
+                  <Check className="w-3 h-3 text-primary-foreground" />
+                </div>
+              )}
+              {/* Logo container — white bg so logos always visible */}
+              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden p-1.5 shadow-sm">
+                {logoFailed ? (
+                  <span
+                    className="text-lg font-bold"
+                    style={{ color: opt.color }}
+                  >
+                    {opt.shortLabel.charAt(0)}
+                  </span>
+                ) : (
+                  <img
+                    src={opt.logo}
+                    alt={opt.label}
+                    className="w-full h-full object-contain"
+                    onError={() => markFailed(opt.value)}
+                  />
+                )}
+              </div>
+              <span className="text-foreground text-[11px] font-medium leading-tight text-center line-clamp-2 min-h-[28px]">
+                {opt.shortLabel}
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Selected method summary chip */}
+      {selected && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-gold border border-primary/20"
+        >
+          <Check className="w-3.5 h-3.5 text-primary" />
+          <span className="text-foreground text-xs font-medium">
+            Terpilih: <span className="text-primary font-semibold">{options.find((o) => o.value === selected)?.label}</span>
+          </span>
+        </motion.div>
+      )}
+    </div>
+  );
 }
 
 export default function WithdrawPage() {
@@ -159,7 +292,7 @@ export default function WithdrawPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     fetchData();
@@ -180,7 +313,7 @@ export default function WithdrawPage() {
   const netAmount = numAmount - fee;
   const mainBalance = user?.mainBalance || 0;
 
-  const workingHours = isWorkingHours(t);
+  const workingHours = isWorkingHours();
 
   const getPaymentMethodName = (): string => {
     switch (selectedCategory) {
@@ -225,7 +358,7 @@ export default function WithdrawPage() {
     setAmount(val.toString());
   };
 
-  // Preset nominal amounts — sama dengan paket investasi (tanpa 100K min)
+  // Preset nominal amounts — sama dengan paket investasi
   const presetAmounts = [
     { label: '160K', value: 160000 },
     { label: '320K', value: 320000 },
@@ -453,11 +586,11 @@ export default function WithdrawPage() {
         className="glass glow-gold rounded-3xl p-4 sm:p-6 border border-primary/10">
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
 
-          {/* Premium Payment Category Tabs */}
+          {/* ── Category Tabs (Bank / E-Wallet / USDT) ── */}
           <div className="space-y-2">
             <Label className="text-foreground text-sm font-medium flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5 text-primary" />
-              Metode Withdrawal
+              Kategori Penarikan
             </Label>
             <div className="flex gap-2 p-1 glass rounded-2xl">
               {WITHDRAW_PAYMENT_CATEGORIES.map((cat) => {
@@ -475,96 +608,45 @@ export default function WithdrawPage() {
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{cat.label}</span>
-                    <span className="sm:hidden">{cat.key === 'bank' ? 'Bank' : cat.key === 'ewallet' ? 'E-Wallet' : 'USDT'}</span>
+                    <span>{cat.label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* ── Bank Transfer Options ── */}
+          {/* ── Scrollable Bank Selector ── */}
           <AnimatePresence mode="wait">
             {selectedCategory === 'bank' && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
-                <Label className="text-foreground text-sm font-medium">Pilih Bank</Label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
-                  {BANK_OPTIONS.map((bank) => {
-                    const isSelected = selectedBank === bank.value;
-                    return (
-                      <motion.button
-                        key={bank.value}
-                        type="button"
-                        onClick={() => setSelectedBank(bank.value)}
-                        whileHover={{ scale: 1.03, y: -2 }}
-                        whileTap={{ scale: 0.97 }}
-                        className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all text-center border-2 ${
-                          isSelected
-                            ? 'glass-gold glow-gold border-primary'
-                            : 'glass border-transparent hover:border-primary/30'
-                        }`}
-                      >
-                        {isSelected && (
-                          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center ring-2 ring-background">
-                            <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                          </div>
-                        )}
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white/95 p-1"
-                          style={{ backgroundColor: bank.color ? `${bank.color}15` : 'rgba(255,255,255,0.95)' }}>
-                          {'logo' in bank && bank.logo ? (
-                            <img src={bank.logo} alt={bank.label} className="w-full h-full object-contain" />
-                          ) : (
-                            <Building2 className="w-4 h-4" style={{ color: bank.color }} />
-                          )}
-                        </div>
-                        <span className="text-foreground text-[10px] sm:text-xs font-medium leading-tight">{bank.label}</span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+              <motion.div
+                key="bank-scroll"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <PaymentMethodScroll
+                  options={BANK_OPTIONS}
+                  selected={selectedBank}
+                  onSelect={setSelectedBank}
+                />
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* ── E-Wallet Options ── */}
+          {/* ── Scrollable E-Wallet Selector ── */}
           <AnimatePresence mode="wait">
             {selectedCategory === 'ewallet' && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
-                <Label className="text-foreground text-sm font-medium">Pilih E-Wallet</Label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
-                  {EWALLET_OPTIONS.map((ew) => {
-                    const isSelected = selectedEwallet === ew.value;
-                    return (
-                      <motion.button
-                        key={ew.value}
-                        type="button"
-                        onClick={() => setSelectedEwallet(ew.value)}
-                        whileHover={{ scale: 1.03, y: -2 }}
-                        whileTap={{ scale: 0.97 }}
-                        className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all text-center border-2 ${
-                          isSelected
-                            ? 'glass-gold glow-gold border-primary'
-                            : 'glass border-transparent hover:border-primary/30'
-                        }`}
-                      >
-                        {isSelected && (
-                          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center ring-2 ring-background">
-                            <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                          </div>
-                        )}
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white/95 p-1"
-                          style={{ backgroundColor: ew.color ? `${ew.color}15` : 'rgba(255,255,255,0.95)' }}>
-                          {'logo' in ew && ew.logo ? (
-                            <img src={ew.logo} alt={ew.label} className="w-full h-full object-contain" />
-                          ) : (
-                            <Smartphone className="w-4 h-4" style={{ color: ew.color }} />
-                          )}
-                        </div>
-                        <span className="text-foreground text-[10px] sm:text-xs font-medium leading-tight">{ew.label}</span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+              <motion.div
+                key="ewallet-scroll"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <PaymentMethodScroll
+                  options={EWALLET_OPTIONS}
+                  selected={selectedEwallet}
+                  onSelect={setSelectedEwallet}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -572,11 +654,17 @@ export default function WithdrawPage() {
           {/* ── USDT BEP20 ── */}
           <AnimatePresence mode="wait">
             {selectedCategory === 'usdt' && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
+              <motion.div
+                key="usdt"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="space-y-3"
+              >
                 <div className="glass rounded-2xl p-4 border border-[#26A17B]/20">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#26A17B]/10 flex items-center justify-center">
-                      <Coins className="w-5 h-5 text-[#26A17B]" />
+                    <div className="w-12 h-12 rounded-xl bg-[#26A17B]/10 flex items-center justify-center shadow-sm">
+                      <Coins className="w-6 h-6 text-[#26A17B]" />
                     </div>
                     <div>
                       <p className="text-foreground text-sm font-semibold">USDT (BEP20)</p>
@@ -605,10 +693,16 @@ export default function WithdrawPage() {
             )}
           </AnimatePresence>
 
-          {/* Account Number / Holder Name (for bank & ewallet) */}
+          {/* ── Account Number / Holder Name (for bank & ewallet) ── */}
           <AnimatePresence mode="wait">
             {(selectedCategory === 'bank' || selectedCategory === 'ewallet') && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+              <motion.div
+                key="account-fields"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-3"
+              >
                 <div className="space-y-2">
                   <Label className="text-foreground text-sm font-medium">{getAccountLabel()}</Label>
                   <Input
@@ -634,7 +728,7 @@ export default function WithdrawPage() {
             )}
           </AnimatePresence>
 
-          {/* Premium Amount Input */}
+          {/* ── Premium Amount Input ── */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-foreground text-sm font-medium flex items-center gap-1.5">
@@ -658,7 +752,20 @@ export default function WithdrawPage() {
               />
               <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gold-gradient scale-x-0 group-focus-within:scale-x-100 transition-transform origin-left" />
             </div>
-            {/* Preset nominal — sesuai paket investasi (sama kayak deposit) */}
+            {/* Percent quick-fill */}
+            <div className="flex gap-2">
+              {[25, 50, 75, 100].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPercentAmount(p)}
+                  className="flex-1 px-2 py-1.5 rounded-lg glass text-muted-foreground text-[11px] font-medium hover:text-foreground hover:bg-white/5 transition-all"
+                >
+                  {p}%
+                </button>
+              ))}
+            </div>
+            {/* Preset nominal — sesuai paket investasi */}
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {presetAmounts.map((preset) => {
                 const disabled = mainBalance < preset.value;
@@ -685,7 +792,7 @@ export default function WithdrawPage() {
             </div>
           </div>
 
-          {/* Premium Fee & Net Summary */}
+          {/* ── Premium Fee & Net Summary ── */}
           {numAmount > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
               className="glass-gold rounded-2xl p-4 space-y-2.5 border border-primary/15">
@@ -714,7 +821,7 @@ export default function WithdrawPage() {
             </motion.div>
           )}
 
-          {/* Premium Submit */}
+          {/* ── Premium Submit ── */}
           <Button
             type="submit"
             disabled={submitting || !isFormValid()}
@@ -751,7 +858,7 @@ export default function WithdrawPage() {
         </div>
 
         {withdrawals.length > 0 ? (
-          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-1 nexvo-scroll">
             {withdrawals.map((wd, idx) => {
               const PayIcon = getPaymentTypeIcon(wd.paymentType || 'bank');
               return (
