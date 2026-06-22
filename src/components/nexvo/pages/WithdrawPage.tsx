@@ -26,33 +26,33 @@ const WITHDRAW_PAYMENT_CATEGORIES = [
 type PaymentCategory = 'bank' | 'ewallet' | 'usdt';
 
 const BANK_OPTIONS = [
-  { value: 'BCA', label: 'Bank BCA', color: '#003D79' },
-  { value: 'BNI', label: 'Bank BNI', color: '#F15A22' },
-  { value: 'BRI', label: 'Bank BRI', color: '#00529C' },
-  { value: 'Mandiri', label: 'Bank Mandiri', color: '#003066' },
-  { value: 'BSI', label: 'Bank BSI', color: '#00A650' },
-  { value: 'CIMB', label: 'CIMB Niaga', color: '#7B0E24' },
-  { value: 'Danamon', label: 'Bank Danamon', color: '#FDDA24' },
-  { value: 'Permata', label: 'Bank Permata', color: '#005BAA' },
-  { value: 'Bukopin', label: 'Bank KB Bukopin', color: '#006B3F' },
-  { value: 'OCBC', label: 'OCBC NISP', color: '#E31937' },
-  { value: 'Panin', label: 'Panin Bank', color: '#003366' },
-  { value: 'Sinarmas', label: 'Bank Sinarmas', color: '#FF6600' },
-  { value: 'Maybank', label: 'Maybank', color: '#003366' },
-  { value: 'UOB', label: 'UOB Indonesia', color: '#E31937' },
-  { value: 'BTN', label: 'Bank BTN', color: '#F7941D' },
+  { value: 'BCA', label: 'Bank BCA', color: '#003D79', logo: '/images/payment/bca.png' },
+  { value: 'BNI', label: 'Bank BNI', color: '#F15A22', logo: '/images/payment/bni.png' },
+  { value: 'BRI', label: 'Bank BRI', color: '#00529C', logo: '/images/payment/bri.png' },
+  { value: 'Mandiri', label: 'Bank Mandiri', color: '#003066', logo: '/images/payment/mandiri.png' },
+  { value: 'BSI', label: 'Bank BSI', color: '#00A650', logo: '/images/payment/bsi.jpg' },
+  { value: 'CIMB', label: 'CIMB Niaga', color: '#7B0E24', logo: '/images/payment/cimb.png' },
+  { value: 'Danamon', label: 'Bank Danamon', color: '#FDDA24', logo: '/images/payment/danamon.jpg' },
+  { value: 'Permata', label: 'Bank Permata', color: '#005BAA', logo: '/images/payment/permata.png' },
+  { value: 'Bukopin', label: 'Bank KB Bukopin', color: '#006B3F', logo: '/images/payment/bukopin.jpg' },
+  { value: 'OCBC', label: 'OCBC NISP', color: '#E31937', logo: '/images/payment/ocbc.jpeg' },
+  { value: 'Panin', label: 'Panin Bank', color: '#003366', logo: '/images/payment/panin.png' },
+  { value: 'Sinarmas', label: 'Bank Sinarmas', color: '#FF6600', logo: '/images/payment/sinarmas.png' },
+  { value: 'Maybank', label: 'Maybank', color: '#003366', logo: '/images/payment/maybank.png' },
+  { value: 'UOB', label: 'UOB Indonesia', color: '#E31937', logo: '/images/payment/uob.png' },
+  { value: 'BTN', label: 'Bank BTN', color: '#F7941D', logo: '/images/payment/btn.png' },
 ] as const;
 
 const EWALLET_OPTIONS = [
-  { value: 'DANA', label: 'DANA', color: '#118EEA' },
-  { value: 'OVO', label: 'OVO', color: '#4C2A86' },
-  { value: 'GoPay', label: 'GoPay', color: '#00AED6' },
-  { value: 'ShopeePay', label: 'ShopeePay', color: '#EE4D2D' },
-  { value: 'LinkAja', label: 'LinkAja', color: '#E82529' },
-  { value: 'Doku', label: 'Doku', color: '#FF6C00' },
-  { value: 'Sakuku', label: 'Sakuku', color: '#003D79' },
-  { value: 'Jenius', label: 'Jenius', color: '#F7941D' },
-  { value: 'Flip', label: 'Flip', color: '#FF5722' },
+  { value: 'DANA', label: 'DANA', color: '#118EEA', logo: '/images/payment/dana.png' },
+  { value: 'OVO', label: 'OVO', color: '#4C2A86', logo: '/images/payment/ovo.jpg' },
+  { value: 'GoPay', label: 'GoPay', color: '#00AED6', logo: '/images/payment/gopay.png' },
+  { value: 'ShopeePay', label: 'ShopeePay', color: '#EE4D2D', logo: '/images/payment/shopeepay.png' },
+  { value: 'LinkAja', label: 'LinkAja', color: '#E82529', logo: '/images/payment/linkaja.jpg' },
+  { value: 'Doku', label: 'Doku', color: '#FF6C00', logo: '/images/payment/doku.png' },
+  { value: 'Sakuku', label: 'Sakuku', color: '#003D79', logo: '/images/payment/sakuku.jpg' },
+  { value: 'Jenius', label: 'Jenius', color: '#F7941D', logo: '/images/payment/jenius.png' },
+  { value: 'Flip', label: 'Flip', color: '#FF5722', logo: '/images/payment/flip.jpeg' },
 ] as const;
 
 interface Withdrawal {
@@ -509,9 +509,13 @@ export default function WithdrawPage() {
                             <Check className="w-2.5 h-2.5 text-primary-foreground" />
                           </div>
                         )}
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
-                          style={{ backgroundColor: `${bank.color}15` }}>
-                          <Building2 className="w-4 h-4" style={{ color: bank.color }} />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white/95 p-1"
+                          style={{ backgroundColor: bank.color ? `${bank.color}15` : 'rgba(255,255,255,0.95)' }}>
+                          {'logo' in bank && bank.logo ? (
+                            <img src={bank.logo} alt={bank.label} className="w-full h-full object-contain" />
+                          ) : (
+                            <Building2 className="w-4 h-4" style={{ color: bank.color }} />
+                          )}
                         </div>
                         <span className="text-foreground text-[10px] sm:text-xs font-medium leading-tight">{bank.label}</span>
                       </motion.button>
@@ -548,9 +552,13 @@ export default function WithdrawPage() {
                             <Check className="w-2.5 h-2.5 text-primary-foreground" />
                           </div>
                         )}
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
-                          style={{ backgroundColor: `${ew.color}15` }}>
-                          <Smartphone className="w-4 h-4" style={{ color: ew.color }} />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white/95 p-1"
+                          style={{ backgroundColor: ew.color ? `${ew.color}15` : 'rgba(255,255,255,0.95)' }}>
+                          {'logo' in ew && ew.logo ? (
+                            <img src={ew.logo} alt={ew.label} className="w-full h-full object-contain" />
+                          ) : (
+                            <Smartphone className="w-4 h-4" style={{ color: ew.color }} />
+                          )}
                         </div>
                         <span className="text-foreground text-[10px] sm:text-xs font-medium leading-tight">{ew.label}</span>
                       </motion.button>
