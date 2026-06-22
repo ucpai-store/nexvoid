@@ -108,15 +108,28 @@ async function main() {
   console.log('\n4. Investment packages (6 paket, min 160k)...');
   const pkgCount = await prisma.investmentPackage.count();
   
-  // 6 packages persis sesuai request user: Gold Premium Aset VIP 1 - Gold Premium Aset VIP 6
+  // 6 packages persis sesuai request user: Gold Premium Aset 1 - Gold Premium Aset 6
   const packages = [
-    { name: 'Gold Premium Aset VIP 1',  amount: 160000,    profitRate: 2,   contractDays: 90, order: 1 },
-    { name: 'Gold Premium Aset VIP 2',  amount: 320000,    profitRate: 2.5, contractDays: 90, order: 2 },
-    { name: 'Gold Premium Aset VIP 3',  amount: 640000,    profitRate: 3,   contractDays: 90, order: 3 },
-    { name: 'Gold Premium Aset VIP 4',  amount: 1920000,   profitRate: 3.5, contractDays: 90, order: 4 },
-    { name: 'Gold Premium Aset VIP 5',  amount: 5760000,   profitRate: 4,   contractDays: 90, order: 5 },
-    { name: 'Gold Premium Aset VIP 6',  amount: 17280000,  profitRate: 5,   contractDays: 90, order: 6 },
+    { name: 'Gold Premium Aset 1',  amount: 160000,    profitRate: 2,   contractDays: 90, order: 1 },
+    { name: 'Gold Premium Aset 2',  amount: 320000,    profitRate: 2.5, contractDays: 90, order: 2 },
+    { name: 'Gold Premium Aset 3',  amount: 640000,    profitRate: 3,   contractDays: 90, order: 3 },
+    { name: 'Gold Premium Aset 4',  amount: 1920000,   profitRate: 3.5, contractDays: 90, order: 4 },
+    { name: 'Gold Premium Aset 5',  amount: 5760000,   profitRate: 4,   contractDays: 90, order: 5 },
+    { name: 'Gold Premium Aset 6',  amount: 17280000,  profitRate: 5,   contractDays: 90, order: 6 },
   ];
+  
+  // Cleanup: hapus semua paket lama yang namanya TIDAK termasuk 6 nama baru
+  const validPkgNames = packages.map(p => p.name);
+  const oldPkgs = await prisma.investmentPackage.findMany();
+  let deletedPkgs = 0;
+  for (const old of oldPkgs) {
+    if (!validPkgNames.includes(old.name)) {
+      await prisma.investmentPackage.delete({ where: { id: old.id } });
+      console.log(`   🗑️  Hapus paket lama: ${old.name}`);
+      deletedPkgs++;
+    }
+  }
+  if (deletedPkgs > 0) console.log(`   ✓ ${deletedPkgs} paket lama dihapus`);
   
   for (const pkg of packages) {
     const existing = await prisma.investmentPackage.findFirst({ where: { name: pkg.name } });
@@ -138,63 +151,76 @@ async function main() {
   // ==========================================================================
   console.log('\n5. Products (produk investasi)...');
   
-  // 6 products dengan nama SAMA dengan packages: Gold Premium Aset VIP 1 - Gold Premium Aset VIP 6
+  // 6 products dengan nama SAMA dengan packages: Gold Premium Aset 1 - Gold Premium Aset 6
   const products = [
     {
-      name: 'Gold Premium Aset VIP 1',
+      name: 'Gold Premium Aset 1',
       price: 160000,
       duration: 90,
       estimatedProfit: 288000,
       quota: 1000,
-      description: 'Gold Premium Aset VIP 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari selama 90 hari. Total profit Rp 288.000.',
+      description: 'Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari selama 90 hari. Total profit Rp 288.000.',
       profitRate: 2,
     },
     {
-      name: 'Gold Premium Aset VIP 2',
+      name: 'Gold Premium Aset 2',
       price: 320000,
       duration: 90,
       estimatedProfit: 720000,
       quota: 1000,
-      description: 'Gold Premium Aset VIP 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari selama 90 hari. Total profit Rp 720.000.',
+      description: 'Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari selama 90 hari. Total profit Rp 720.000.',
       profitRate: 2.5,
     },
     {
-      name: 'Gold Premium Aset VIP 3',
+      name: 'Gold Premium Aset 3',
       price: 640000,
       duration: 90,
       estimatedProfit: 1728000,
       quota: 1000,
-      description: 'Gold Premium Aset VIP 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari selama 90 hari. Total profit Rp 1.728.000.',
+      description: 'Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari selama 90 hari. Total profit Rp 1.728.000.',
       profitRate: 3,
     },
     {
-      name: 'Gold Premium Aset VIP 4',
+      name: 'Gold Premium Aset 4',
       price: 1920000,
       duration: 90,
       estimatedProfit: 6048000,
       quota: 500,
-      description: 'Gold Premium Aset VIP 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari selama 90 hari. Total profit Rp 6.048.000.',
+      description: 'Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari selama 90 hari. Total profit Rp 6.048.000.',
       profitRate: 3.5,
     },
     {
-      name: 'Gold Premium Aset VIP 5',
+      name: 'Gold Premium Aset 5',
       price: 5760000,
       duration: 90,
       estimatedProfit: 20736000,
       quota: 200,
-      description: 'Gold Premium Aset VIP 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari selama 90 hari. Total profit Rp 20.736.000.',
+      description: 'Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari selama 90 hari. Total profit Rp 20.736.000.',
       profitRate: 4,
     },
     {
-      name: 'Gold Premium Aset VIP 6',
+      name: 'Gold Premium Aset 6',
       price: 17280000,
       duration: 90,
       estimatedProfit: 77760000,
       quota: 100,
-      description: 'Gold Premium Aset VIP 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari selama 90 hari. Total profit Rp 77.760.000.',
+      description: 'Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari selama 90 hari. Total profit Rp 77.760.000.',
       profitRate: 5,
     },
   ];
+  
+  // Cleanup: hapus semua produk lama yang namanya TIDAK termasuk 6 nama baru
+  const validProdNames = products.map(p => p.name);
+  const oldProds = await prisma.product.findMany();
+  let deletedProds = 0;
+  for (const old of oldProds) {
+    if (!validProdNames.includes(old.name)) {
+      await prisma.product.delete({ where: { id: old.id } });
+      console.log(`   🗑️  Hapus produk lama: ${old.name}`);
+      deletedProds++;
+    }
+  }
+  if (deletedProds > 0) console.log(`   ✓ ${deletedProds} produk lama dihapus`);
   
   for (const prod of products) {
     const existing = await prisma.product.findFirst({ where: { name: prod.name } });
