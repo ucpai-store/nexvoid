@@ -484,10 +484,89 @@ async function processDailyInvestmentProfits(): Promise<{
   return result;
 }
 
+// ──────────── Product Quota Bump (Fake "Kuota Terisi" Activity) ────────────
+
+/**
+ * Auto-bump product quotaUsed so the "Kuota Terisi" counter keeps climbing
+ * and looks busy/real (like nav.live). Runs every ~15 minutes.
+ *
+ * Behavior per product:
+ *  - If quotaUsed >= quota (full): reset to random 5-12% of quota (new batch)
+ *  - Otherwise: increment by random 2-9 (simulate new buyers)
+ *  - Clamp so it never exceeds quota
+ *
+ * Returns summary of changes.
+ */
+async function bumpProductQuotas(): Promise<{
+  processed: number;
+  incremented: number;
+  reset: number;
+  totalBumped: number;
+  details: Array<{ name: string; before: number; after: number; quota: number; action: 'increment' | 'reset' }>;
+}> {
+  const result = {
+    processed: 0,
+    incremented: 0,
+    reset: 0,
+    totalBumped: 0,
+    details: [] as Array<{ name: string; before: number; after: number; quota: number; action: 'increment' | 'reset' }>,
+  };
+
+  let products;
+  try {
+    products = await db.product.findMany({
+      where: { isActive: true, isStopped: false },
+    });
+  } catch (e: any) {
+    console.error('[Quota Bump] ❌ Gagal query products:', e.message);
+    return result;
+  }
+
+  for (const p of products) {
+    try {
+      result.processed++;
+      const before = p.quotaUsed;
+      let after = before;
+      let action: 'increment' | 'reset' = 'increment';
+
+      if (before >= p.quota) {
+        // Full → reset ke 5-12% of quota (batch baru)
+        const minUsed = Math.floor(p.quota * 0.05);
+        const maxUsed = Math.floor(p.quota * 0.12);
+        after = Math.floor(Math.random() * (maxUsed - minUsed + 1)) + minUsed;
+        action = 'reset';
+        result.reset++;
+      } else {
+        // Increment random 2-9 (simulate pembeli baru)
+        const inc = Math.floor(Math.random() * 8) + 2; // 2..9
+        after = Math.min(before + inc, p.quota);
+        result.incremented++;
+        result.totalBumped += (after - before);
+      }
+
+      if (after !== before) {
+        await db.product.update({
+          where: { id: p.id },
+          data: { quotaUsed: after },
+        });
+      }
+
+      result.details.push({ name: p.name, before, after, quota: p.quota, action });
+      console.log(`[Quota Bump] ${p.name}: ${before}/${p.quota} → ${after}/${p.quota} (${action})`);
+    } catch (e: any) {
+      console.error(`[Quota Bump] ❌ ${p.name}: ${e.message}`);
+    }
+  }
+
+  console.log(`[Quota Bump] Done. Processed: ${result.processed}, Incremented: ${result.incremented}, Reset: ${result.reset}, Total bumped: ${result.totalBumped}`);
+  return result;
+}
+
 // ──────────── Cron Scheduler ────────────
 
 let lastSalaryRunDate = '';
 let lastProfitRunDate = '';
+let lastQuotaBumpDateStr = '';
 
 function checkAndRunCrons() {
   const wibNow = getWibNow();
@@ -511,6 +590,18 @@ function checkAndRunCrons() {
     console.log(`\n[CRON] 💰 Running weekly salary bonus distribution at ${wibNow.toISOString()}...`);
     processAllSalaryBonuses().then((result) => {
       console.log(`[CRON] 💰 Salary done: ${result.eligible} eligible, ${formatRupiahSimple(result.totalAmount)} total, ${result.skipped} skipped, ${result.errors} errors`);
+    }).catch(console.error);
+  }
+
+  // Quota bump: every 15 minutes (minute 0, 15, 30, 45) — fake "Kuota Terisi" activity
+  // Trigger sekali per slot 15-menit (window 2 menit)
+  const slot15 = Math.floor(minute / 15); // 0,1,2,3
+  const slotKey = `${dateStr}-q${slot15}`;
+  if (minute % 15 <= 1 && lastQuotaBumpDateStr !== slotKey) {
+    lastQuotaBumpDateStr = slotKey;
+    console.log(`\n[CRON] 📈 Running product quota bump at ${wibNow.toISOString()}...`);
+    bumpProductQuotas().then((r) => {
+      console.log(`[CRON] 📈 Quota bump done: ${r.incremented} incremented, ${r.reset} reset, +${r.totalBumped} total`);
     }).catch(console.error);
   }
 }
@@ -539,6 +630,7 @@ const server = Bun.serve({
         wibTime: getWibNow().toISOString(),
         lastSalaryRun: lastSalaryRunDate || 'never',
         lastProfitRun: lastProfitRunDate || 'never',
+        lastQuotaBump: lastQuotaBumpDateStr || 'never',
         matchingMode: 'event-driven (credited with daily profit)',
       }, { headers: corsHeaders });
     }
@@ -571,6 +663,13 @@ const server = Bun.serve({
       }, { headers: corsHeaders });
     }
 
+    // Manual trigger: Quota bump (fake "Kuota Terisi" activity)
+    if (url.pathname === '/api/trigger/quota-bump' && req.method === 'POST') {
+      console.log('\n[CRON] 📌 Manual trigger: Quota bump');
+      const result = await bumpProductQuotas();
+      return Response.json({ success: true, data: result }, { headers: corsHeaders });
+    }
+
     // Status endpoint
     if (url.pathname === '/api/status') {
       return Response.json({
@@ -578,6 +677,7 @@ const server = Bun.serve({
         dayOfWeek: getWibNow().getDay(),
         lastSalaryRun: lastSalaryRunDate || 'never',
         lastProfitRun: lastProfitRunDate || 'never',
+        lastQuotaBump: lastQuotaBumpDateStr || 'never',
         matchingMode: 'event-driven',
       }, { headers: corsHeaders });
     }
@@ -593,10 +693,17 @@ console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every day`);
 console.log(`  - Weekly Salary: 00:00 WIB every Monday`);
+console.log(`  - Quota Bump: every 15 minutes (auto-increment Kuota Terisi, reset when full)`);
 console.log(`  - Matching: Event-driven (credited automatically with daily profit)`);
 console.log(`  - Level 6+ matching: AUTO DISCONNECT (no bonus)`);
 
-// Check every 10 seconds for precise 00:00 WIB triggers
+// Check every 10 seconds for precise 00:00 WIB triggers + 15-min quota bump
 setInterval(checkAndRunCrons, 10000);
 checkAndRunCrons(); // Initial check
+
+// Initial quota bump on startup (so counter moves immediately)
+setTimeout(() => {
+  console.log('\n[CRON] 📈 Initial quota bump on startup...');
+  bumpProductQuotas().catch(console.error);
+}, 5000);
 
