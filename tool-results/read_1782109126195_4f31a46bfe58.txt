@@ -1,0 +1,2002 @@
+     1→     1→import { useCallback } from 'react';
+     2→     2→import { useLangStore } from '@/stores/lang-store';
+     3→     3→import type { Language } from '@/stores/lang-store';
+     4→     4→
+     5→     5→type TranslationKeys = {
+     6→     6→  common: {
+     7→     7→    loading: string;
+     8→     8→    error: string;
+     9→     9→    success: string;
+    10→    10→    retry: string;
+    11→    11→    save: string;
+    12→    12→    cancel: string;
+    13→    13→    delete: string;
+    14→    14→    edit: string;
+    15→    15→    add: string;
+    16→    16→    search: string;
+    17→    17→    noData: string;
+    18→    18→    confirm: string;
+    19→    19→    back: string;
+    20→    20→    next: string;
+    21→    21→    submit: string;
+    22→    22→    close: string;
+    23→    23→    copy: string;
+    24→    24→    copied: string;
+    25→    25→    share: string;
+    26→    26→    download: string;
+    27→    27→    upload: string;
+    28→    28→    viewAll: string;
+    29→    29→    processing: string;
+    30→    30→    allFieldsRequired: string;
+    31→    31→    networkError: string;
+    32→    32→    operationFailed: string;
+    33→    33→  };
+    34→    34→  auth: {
+    35→    35→    login: string;
+    36→    36→    register: string;
+    37→    37→    logout: string;
+    38→    38→    whatsapp: string;
+    39→    39→    email: string;
+    40→    40→    password: string;
+    41→    41→    oldPassword: string;
+    42→    42→    newPassword: string;
+    43→    43→    confirmPassword: string;
+    44→    44→    forgotPassword: string;
+    45→    45→    noAccount: string;
+    46→    46→    hasAccount: string;
+    47→    47→    loginSuccess: string;
+    48→    48→    registerSuccess: string;
+    49→    49→    otpVerification: string;
+    50→    50→    enterOtp: string;
+    51→    51→    resendOtp: string;
+    52→    52→    referralCode: string;
+    53→    53→    referralCodeOptional: string;
+    54→    54→    loginSubtitle: string;
+    55→    55→    registerSubtitle: string;
+    56→    56→    whatsappOrEmail: string;
+    57→    57→    enterWhatsappOrEmail: string;
+    58→    58→    enterPassword: string;
+    59→    59→    minChars: string;
+    60→    60→    passwordMismatch: string;
+    61→    61→    passwordNotMatch: string;
+    62→    62→    registerNow: string;
+    63→    63→    signIn: string;
+    64→    64→    adminPanel: string;
+    65→    65→    strengthWeak: string;
+    66→    66→    strengthMedium: string;
+    67→    67→    strengthStrong: string;
+    68→    68→    passwordStrength: string;
+    69→    69→    haveCode: string;
+    70→    70→    hide: string;
+    71→    71→    registering: string;
+    72→    72→    whatsappNumber: string;
+    73→    73→    emailAddress: string;
+    74→    74→    validWhatsApp: string;
+    75→    75→    validEmail: string;
+    76→    76→  };
+    77→    77→  dashboard: {
+    78→    78→    title: string;
+    79→    79→    mainBalance: string;
+    80→    80→    profitBalance: string;
+    81→    81→    totalDeposit: string;
+    82→    82→    totalWithdraw: string;
+    83→    83→    totalProfit: string;
+    84→    84→    level: string;
+    85→    85→    activeAssets: string;
+    86→    86→    recentActivity: string;
+    87→    87→    memberSince: string;
+    88→    88→    quickNav: string;
+    89→    89→    noActivity: string;
+    90→    90→    depositBtn: string;
+    91→    91→    withdrawBtn: string;
+    92→    92→    buyProduct: string;
+    93→    93→    investment: string;
+    94→    94→    bonus: string;
+    95→    95→    profit: string;
+    96→    96→    success: string;
+    97→    97→    completed: string;
+    98→    98→    pending: string;
+    99→    99→    failed: string;
+   100→   100→    loadFailed: string;
+   101→   101→    tryAgain: string;
+   102→   102→    active: string;
+   103→   103→    perDay: string;
+   104→   104→    viewAll: string;
+   105→   105→  };
+   106→   106→  products: {
+   107→   107→    title: string;
+   108→   108→    investmentProducts: string;
+   109→   109→    filter: string;
+   110→   110→    all: string;
+   111→   111→    gold: string;
+   112→   112→    silver: string;
+   113→   113→    diamond: string;
+   114→   114→    duration: string;
+   115→   115→    estProfit: string;
+   116→   116→    quota: string;
+   117→   117→    quotaFilled: string;
+   118→   118→    remaining: string;
+   119→   119→    buyNow: string;
+   120→   120→    viewDetail: string;
+   121→   121→    noProducts: string;
+   122→   122→    noCategory: string;
+   123→   123→    selectProduct: string;
+   124→   124→    perDay: string;
+   125→   125→    days: string;
+   126→   126→  };
+   127→   127→  paket: {
+   128→   128→    title: string;
+   129→   129→    investmentPackages: string;
+   130→   130→    dailyProfit: string;
+   131→   131→    contract: string;
+   132→   132→    contractDays: string;
+   133→   133→    capitalReturn: string;
+   134→   134→    investNow: string;
+   135→   135→    confirmInvest: string;
+   136→   136→    investSuccess: string;
+   137→   137→    totalProfit: string;
+   138→   138→    bonusStructure: string;
+   139→   139→    sponsorBonus: string;
+   140→   140→    levelBonus: string;
+   141→   141→    rewardBonus: string;
+   142→   142→    solarNetwork: string;
+   143→   143→    selectPackage: string;
+   144→   144→    confirmInvestTitle: string;
+   145→   145→    balanceDeduct: string;
+   146→   146→    insufficientBalance: string;
+   147→   147→    packageLabel: string;
+   148→   148→    modal: string;
+   149→   149→    contractLabel: string;
+   150→   150→    yourBalance: string;
+   151→   151→    remainingBalance: string;
+   152→   152→    cancel: string;
+   153→   153→    depositInvest: string;
+   154→   154→    investSuccessTitle: string;
+   155→   155→    investSuccessDesc: string;
+   156→   156→    viewMyAssets: string;
+   157→   157→    noPackages: string;
+   158→   158→    totalProfitDays: string;
+   159→   159→    fromReferral: string;
+   160→   160→    basedOnGroupOmzet: string;
+   161→   161→    basedOnGroupOmzet2: string;
+   162→   162→    networkBonus: string;
+   163→   163→  };
+   164→   164→  assets: {
+   165→   165→    title: string;
+   166→   166→    myAssets: string;
+   167→   167→    investNew: string;
+   168→   168→    activeAsset: string;
+   169→   169→    totalCapital: string;
+   170→   170→    profitPerDay: string;
+   171→   171→    totalProfit: string;
+   172→   172→    modal: string;
+   173→   173→    contractProgress: string;
+   174→   174→    daysRemaining: string;
+   175→   175→    estimatedReturn: string;
+   176→   176→    lastProfit: string;
+   177→   177→    statusActive: string;
+   178→   178→    statusCompleted: string;
+   179→   179→    statusStopped: string;
+   180→   180→    statusCancelled: string;
+   181→   181→    noAssets: string;
+   182→   182→    investmentPackage: string;
+   183→   183→    product: string;
+   184→   184→    contract: string;
+   185→   185→    profitRate: string;
+   186→   186→    endDate: string;
+   187→   187→    daysLeft: string;
+   188→   188→    all: string;
+   189→   189→    investment: string;
+   190→   190→    products: string;
+   191→   191→    viewPackages: string;
+   192→   192→    startInvesting: string;
+   193→   193→    loadFailed: string;
+   194→   194→    tryAgain: string;
+   195→   195→  };
+   196→   196→  deposit: {
+   197→   197→    title: string;
+   198→   198→    topUpBalance: string;
+   199→   199→    paymentMethod: string;
+   200→   200→    bankTransfer: string;
+   201→   201→    eWallet: string;
+   202→   202→    qris: string;
+   203→   203→    crypto: string;
+   204→   204→    usdt: string;
+   205→   205→    amount: string;
+   206→   206→    minDeposit: string;
+   207→   207→    uploadProof: string;
+   208→   208→    proofOptional: string;
+   209→   209→    submitDeposit: string;
+   210→   210→    depositHistory: string;
+   211→   211→    accountNo: string;
+   212→   212→    holderName: string;
+   213→   213→    scanQR: string;
+   214→   214→    balanceSufficient: string;
+   215→   215→    payFromBalance: string;
+   216→   216→    productPayment: string;
+   217→   217→    investmentPayment: string;
+   218→   218→    back: string;
+   219→   219→    totalPayment: string;
+   220→   220→    sufficientBalance: string;
+   221→   221→    sufficientBalanceDesc: string;
+   222→   222→    paymentAmount: string;
+   223→   223→    uploadTransfer: string;
+   224→   224→    maxFileSize: string;
+   225→   225→    depositSuccess: string;
+   226→   226→    depositProductSuccess: string;
+   227→   227→    depositInvestSuccess: string;
+   228→   228→    depositPending: string;
+   229→   229→    minDepositAmount: string;
+   230→   230→    selectPayment: string;
+   231→   231→    uploadFailed: string;
+   232→   232→    noPaymentMethods: string;
+   233→   233→    noDepositHistory: string;
+   234→   234→    uploadProofLabel: string;
+   235→   235→    bankAccountNo: string;
+   236→   236→    eWalletAccount: string;
+   237→   237→    atName: string;
+   238→   238→    scanQRDesc: string;
+   239→   239→    pay: string;
+   240→   240→    deposit: string;
+   241→   241→    quantity: string;
+   242→   242→    contractDays: string;
+   243→   243→    buyProduct: string;
+   244→   244→    invest: string;
+   245→   245→    loadFailed: string;
+   246→   246→    tryAgain: string;
+   247→   247→  };
+   248→   248→  withdraw: {
+   249→   249→    title: string;
+   250→   250→    withdrawFunds: string;
+   251→   251→    bankAccount: string;
+   252→   252→    addBank: string;
+   253→   253→    noBankAccount: string;
+   254→   254→    fee: string;
+   255→   255→    netAmount: string;
+   256→   256→    minWithdraw: string;
+   257→   257→    outsideHours: string;
+   258→   258→    workingHours: string;
+   259→   259→    withdrawHistory: string;
+   260→   260→    selectBank: string;
+   261→   261→    withdrawAmount: string;
+   262→   262→    profitBalance: string;
+   263→   263→    amount: string;
+   264→   264→    adminFee: string;
+   265→   265→    received: string;
+   266→   266→    noBankYet: string;
+   267→   267→    addBankFirst: string;
+   268→   268→    addBankBtn: string;
+   269→   269→    selectBankAccount: string;
+   270→   270→    minWithFee: string;
+   271→   271→    insufficientProfit: string;
+   272→   272→    withdrawSuccess: string;
+   273→   273→    noWithdrawHistory: string;
+   274→   274→    weekdaysOnly: string;
+   275→   275→    hoursOnly: string;
+   276→   276→    loadFailed: string;
+   277→   277→    tryAgain: string;
+   278→   278→  };
+   279→   279→  history: {
+   280→   280→    title: string;
+   281→   281→    transactionHistory: string;
+   282→   282→    all: string;
+   283→   283→    deposit: string;
+   284→   284→    withdrawal: string;
+   285→   285→    purchase: string;
+   286→   286→    investment: string;
+   287→   287→    bonus: string;
+   288→   288→    profit: string;
+   289→   289→    noTransactions: string;
+   290→   290→    loadFailed: string;
+   291→   291→    tryAgain: string;
+   292→   292→    product: string;
+   293→   293→    wd: string;
+   294→   294→    allActivity: string;
+   295→   295→    success: string;
+   296→   296→    completed: string;
+   297→   297→    pending: string;
+   298→   298→    failed: string;
+   299→   299→    cancelled: string;
+   300→   300→    stopped: string;
+   301→   301→    buyProduct: string;
+   302→   302→  };
+   303→   303→  referral: {
+   304→   304→    title: string;
+   305→   305→    inviteFriends: string;
+   306→   306→    yourCode: string;
+   307→   307→    yourLink: string;
+   308→   308→    copyLink: string;
+   309→   309→    shareVia: string;
+   310→   310→    totalReferrals: string;
+   311→   311→    bonusEarned: string;
+   312→   312→    teamList: string;
+   313→   313→    level: string;
+   314→   314→    noTeam: string;
+   315→   315→    shareCode: string;
+   316→   316→    copied: string;
+   317→   317→    copyFailed: string;
+   318→   318→    directInvite: string;
+   319→   319→    level1Invite: string;
+   320→   320→    level2Invite: string;
+   321→   321→    level3Invite: string;
+   322→   322→    level4Invite: string;
+   323→   323→    referralLevel: string;
+   324→   324→    bonusReferral: string;
+   325→   325→    shareViaWhatsApp: string;
+   326→   326→    loadFailed: string;
+   327→   327→    tryAgain: string;
+   328→   328→    oneReferralLimit: string;
+   329→   329→    referralSlotUsed: string;
+   330→   330→    referralSlotAvailable: string;
+   331→   331→  };
+   332→   332→  network: {
+   333→   333→    title: string;
+   334→   334→    solarNetwork: string;
+   335→   335→    groupOmzet: string;
+   336→   336→    directReferrals: string;
+   337→   337→    totalNetwork: string;
+   338→   338→    levelDetail: string;
+   339→   339→    bonusSummary: string;
+   340→   340→    totalSponsorBonus: string;
+   341→   341→    totalLevelBonus: string;
+   342→   342→    totalRewardBonus: string;
+   343→   343→    milestone: string;
+   344→   344→    referralList: string;
+   345→   345→    networkVisualization: string;
+   346→   346→    atCenter: string;
+   347→   347→    totalMembers: string;
+   348→   348→    detailPerLevel: string;
+   349→   349→    infoOmzetBonus: string;
+   350→   350→    bonusSummaryDesc: string;
+   351→   351→    fromInvestmentReferral: string;
+   352→   352→    basedOnOmzet: string;
+   353→   353→    milestoneAchievement: string;
+   354→   354→    milestoneDesc: string;
+   355→   355→    achieveTarget: string;
+   356→   356→    noMilestone: string;
+   357→   357→    clickToView: string;
+   358→   358→    noMembers: string;
+   359→   359→    inviteFriendsNow: string;
+   360→   360→    members: string;
+   361→   361→    omzetGroup: string;
+   362→   362→    sponsorBonusRate: string;
+   363→   363→    levelBonusRate: string;
+   364→   364→    achieved: string;
+   365→   365→    bonusReceived: string;
+   366→   366→    referral: string;
+   367→   367→    loadFailed: string;
+   368→   368→    tryAgain: string;
+   369→   369→    copyCode: string;
+   370→   370→    codeCopied: string;
+   371→   371→    copyFailed: string;
+   372→   372→    networkUnavailable: string;
+   373→   373→    omzet: string;
+   374→   374→  };
+   375→   375→  bank: {
+   376→   376→    title: string;
+   377→   377→    addBank: string;
+   378→   378→    editBank: string;
+   379→   379→    bankName: string;
+   380→   380→    accountNo: string;
+   381→   381→    holderName: string;
+   382→   382→    primary: string;
+   383→   383→    noBanks: string;
+   384→   384→    bankExample: string;
+   385→   385→    enterAccountNo: string;
+   386→   386→    namePerBook: string;
+   387→   387→    saveBank: string;
+   388→   388→    addBtn: string;
+   389→   389→    deleteBank: string;
+   390→   390→    deleteConfirm: string;
+   391→   391→    deleted: string;
+   392→   392→    updated: string;
+   393→   393→    added: string;
+   394→   394→    allFieldsRequired: string;
+   395→   395→    loadFailed: string;
+   396→   396→    tryAgain: string;
+   397→   397→  };
+   398→   398→  settings: {
+   399→   399→    title: string;
+   400→   400→    changeName: string;
+   401→   401→    changeWhatsapp: string;
+   402→   402→    changePassword: string;
+   403→   403→    saveName: string;
+   404→   404→    saveWhatsapp: string;
+   405→   405→    changePasswordBtn: string;
+   406→   406→    logoutAccount: string;
+   407→   407→    profileInfo: string;
+   408→   408→    whatsapp: string;
+   409→   409→    mainBalance: string;
+   410→   410→    totalDeposit: string;
+   411→   411→    totalProfit: string;
+   412→   412→    nameRequired: string;
+   413→   413→    nameUpdated: string;
+   414→   414→    whatsappRequired: string;
+   415→   415→    whatsappUpdated: string;
+   416→   416→    avatarUpdated: string;
+   417→   417→    avatarUploadFailed: string;
+   418→   418→    oldPassword: string;
+   419→   419→    newPassword: string;
+   420→   420→    confirmPassword: string;
+   421→   421→    passwordMin6: string;
+   422→   422→    passwordMismatch: string;
+   423→   423→    passwordUpdated: string;
+   424→   424→    bankAccount: string;
+   425→   425→    referral: string;
+   426→   426→    notSet: string;
+   427→   427→    nameEmpty: string;
+   428→   428→    loadFailed: string;
+   429→   429→  };
+   430→   430→  nav: {
+   431→   431→    home: string;
+   432→   432→    dashboard: string;
+   433→   433→    products: string;
+   434→   434→    paket: string;
+   435→   435→    assets: string;
+   436→   436→    deposit: string;
+   437→   437→    withdraw: string;
+   438→   438→    history: string;
+   439→   439→    referral: string;
+   440→   440→    network: string;
+   441→   441→    bank: string;
+   442→   442→    settings: string;
+   443→   443→    download: string;
+   444→   444→    wallet: string;
+   445→   445→    profile: string;
+   446→   446→    logout: string;
+   447→   447→    salaryBonus: string;
+   448→   448→    matchingBonus: string;
+   449→   449→  };
+   450→   450→  landing: {
+   451→   451→    welcome: string;
+   452→   452→    subtitle: string;
+   453→   453→    aboutTitle: string;
+   454→   454→    aboutSubtitle: string;
+   455→   455→    howItWorks: string;
+   456→   456→    easySteps: string;
+   457→   457→    statistics: string;
+   458→   458→    liveActivity: string;
+   459→   459→    testimonials: string;
+   460→   460→    startNow: string;
+   461→   461→    viewProducts: string;
+   462→   462→    security: string;
+   463→   463→    dailyProfit: string;
+   464→   464→    fastTransaction: string;
+   465→   465→    globalAccess: string;
+   466→   466→    trusted: string;
+   467→   467→    cuttingEdge: string;
+   468→   468→    registerStep: string;
+   469→   469→    verifyStep: string;
+   470→   470→    depositStep: string;
+   471→   471→    selectProduct: string;
+   472→   472→    monitorProfit: string;
+   473→   473→    totalMembers: string;
+   474→   474→    totalTransactions: string;
+   475→   475→    uptime: string;
+   476→   476→    satisfaction: string;
+   477→   477→    aboutNexvo: string;
+   478→   478→    digitalPlatform: string;
+   479→   479→    trustedWorldwide: string;
+   480→   480→    startInvestNow: string;
+   481→   481→    viewAllProducts: string;
+   482→   482→    noProductsAvailable: string;
+   483→   483→    recentTransactions: string;
+   484→   484→    monitorRealTime: string;
+   485→   485→    noRecentActivity: string;
+   486→   486→    whatTheySay: string;
+   487→   487→    realTestimonials: string;
+   488→   488→    featuredProducts: string;
+   489→   489→    choosePackage: string;
+   490→   490→    choosePackageDesc: string;
+   491→   491→    minutesToStart: string;
+   492→   492→    serverUptime: string;
+   493→   493→    onlineSupport: string;
+   494→   494→    sslEncryption: string;
+   495→   495→    verificationProcess: string;
+   496→   496→    quotaFilled: string;
+   497→   497→    remaining: string;
+   498→   498→    days: string;
+   499→   499→    estProfit: string;
+   500→   500→    viewDetail: string;
+   501→   501→    duration: string;
+   502→   502→  };
+   503→   503→  admin: {
+   504→   504→    mainGroup: string;
+   505→   505→    managementGroup: string;
+   506→   506→    transactionGroup: string;
+   507→   507→    systemGroup: string;
+   508→   508→    contentGroup: string;
+   509→   509→    securityGroup: string;
+   510→   510→    otherGroup: string;
+   511→   511→    systemOnline: string;
+   512→   512→    adminPanel: string;
+   513→   513→    logout: string;
+   514→   514→  };
+   515→   515→  otp: {
+   516→   516→    title: string;
+   517→   517→    subtitle: string;
+   518→   518→    verifyBtn: string;
+   519→   519→    resendOtp: string;
+   520→   520→    sentTo: string;
+   521→   521→  };
+   522→   522→  salary: {
+   523→   523→    title: string;
+   524→   524→    subtitle: string;
+   525→   525→    eligibility: string;
+   526→   526→    eligible: string;
+   527→   527→    notEligible: string;
+   528→   528→    directRefs: string;
+   529→   529→    groupOmzet: string;
+   530→   530→    required: string;
+   531→   531→    current: string;
+   532→   532→    salaryAmount: string;
+   533→   533→    perWeek: string;
+   534→   534→    claimSalary: string;
+   535→   535→    claimSuccess: string;
+   536→   536→    alreadyClaimed: string;
+   537→   537→    notEligibleMsg: string;
+   538→   538→    salaryHistory: string;
+   539→   539→    weekNumber: string;
+   540→   540→    year: string;
+   541→   541→    amount: string;
+   542→   542→    status: string;
+   543→   543→    paid: string;
+   544→   544→    noHistory: string;
+   545→   545→    totalEarned: string;
+   546→   546→    lastClaimed: string;
+   547→   547→    neverClaimed: string;
+   548→   548→    loadFailed: string;
+   549→   549→    tryAgain: string;
+   550→   550→    claiming: string;
+   551→   551→  };
+   552→   552→  matching: {
+   553→   553→    title: string;
+   554→   554→    subtitle: string;
+   555→   555→    members: string;
+   556→   556→    potentialBonus: string;
+   557→   557→    levelRates: string;
+   558→   558→    level: string;
+   559→   559→    rate: string;
+   560→   560→    bonus: string;
+   561→   561→    claimMatching: string;
+   562→   562→    claimSuccess: string;
+   563→   563→    noBonus: string;
+   564→   564→    matchingHistory: string;
+   565→   565→    noHistory: string;
+   566→   566→    totalEarned: string;
+   567→   567→    loadFailed: string;
+   568→   568→    tryAgain: string;
+   569→   569→    claiming: string;
+   570→   570→    profitOverview: string;
+   571→   571→    profitOverviewDesc: string;
+   572→   572→    downlineProfit: string;
+   573→   573→    downlineMembers: string;
+   574→   574→    profitDownline: string;
+   575→   575→    totalProfitMatched: string;
+   576→   576→  };
+   577→   577→};
+   578→   578→
+   579→   579→const translations: Record<Language, TranslationKeys> = {
+   580→   580→  id: {
+   581→   581→    common: {
+   582→   582→      loading: 'Memuat...',
+   583→   583→      error: 'Terjadi kesalahan',
+   584→   584→      success: 'Berhasil',
+   585→   585→      retry: 'Coba Lagi',
+   586→   586→      save: 'Simpan',
+   587→   587→      cancel: 'Batal',
+   588→   588→      delete: 'Hapus',
+   589→   589→      edit: 'Edit',
+   590→   590→      add: 'Tambah',
+   591→   591→      search: 'Cari',
+   592→   592→      noData: 'Tidak ada data',
+   593→   593→      confirm: 'Konfirmasi',
+   594→   594→      back: 'Kembali',
+   595→   595→      next: 'Selanjutnya',
+   596→   596→      submit: 'Kirim',
+   597→   597→      close: 'Tutup',
+   598→   598→      copy: 'Salin',
+   599→   599→      copied: 'Disalin',
+   600→   600→      share: 'Bagikan',
+   601→   601→      download: 'Unduh',
+   602→   602→      upload: 'Unggah',
+   603→   603→      viewAll: 'Lihat Semua',
+   604→   604→      processing: 'Memproses...',
+   605→   605→      allFieldsRequired: 'Semua field harus diisi',
+   606→   606→      networkError: 'Terjadi kesalahan jaringan',
+   607→   607→      operationFailed: 'Operasi gagal',
+   608→   608→    },
+   609→   609→    auth: {
+   610→   610→      login: 'Masuk',
+   611→   611→      register: 'Daftar',
+   612→   612→      logout: 'Keluar',
+   613→   613→      whatsapp: 'WhatsApp',
+   614→   614→      email: 'Email',
+   615→   615→      password: 'Password',
+   616→   616→      oldPassword: 'Password Lama',
+   617→   617→      newPassword: 'Password Baru',
+   618→   618→      confirmPassword: 'Konfirmasi Password',
+   619→   619→      forgotPassword: 'Lupa Password',
+   620→   620→      noAccount: 'Belum punya akun?',
+   621→   621→      hasAccount: 'Sudah punya akun?',
+   622→   622→      loginSuccess: 'Selamat datang kembali!',
+   623→   623→      registerSuccess: 'Akun berhasil dibuat! Selamat datang di NEXVO.',
+   624→   624→      otpVerification: 'Verifikasi OTP',
+   625→   625→      enterOtp: 'Masukkan kode OTP',
+   626→   626→      resendOtp: 'Kirim ulang OTP',
+   627→   627→      referralCode: 'Kode Referral',
+   628→   628→      referralCodeOptional: 'Masukkan kode referral (opsional)',
+   629→   629→      loginSubtitle: 'Masuk untuk mengakses platform NEXVO',
+   630→   630→      registerSubtitle: 'Daftar akun baru di platform NEXVO',
+   631→   631→      whatsappOrEmail: 'WhatsApp / Email',
+   632→   632→      enterWhatsappOrEmail: 'Nomor WhatsApp atau Email',
+   633→   633→      enterPassword: 'Masukkan password',
+   634→   634→      minChars: 'Minimal 6 karakter',
+   635→   635→      passwordMismatch: 'Password tidak cocok',
+   636→   636→      passwordNotMatch: 'Konfirmasi password tidak cocok',
+   637→   637→      registerNow: 'Daftar Sekarang',
+   638→   638→      signIn: 'Masuk',
+   639→   639→      adminPanel: 'Admin Panel',
+   640→   640→      strengthWeak: 'Lemah',
+   641→   641→      strengthMedium: 'Sedang',
+   642→   642→      strengthStrong: 'Kuat',
+   643→   643→      passwordStrength: 'Kekuatan',
+   644→   644→      haveCode: 'Punya kode?',
+   645→   645→      hide: 'Sembunyikan',
+   646→   646→      registering: 'Mendaftar...',
+   647→   647→      whatsappNumber: 'Nomor WhatsApp',
+   648→   648→      emailAddress: 'Alamat Email',
+   649→   649→      validWhatsApp: 'Masukkan nomor WhatsApp yang valid',
+   650→   650→      validEmail: 'Masukkan email yang valid',
+   651→   651→    },
+   652→   652→    dashboard: {
+   653→   653→      title: 'Dashboard',
+   654→   654→      mainBalance: 'Saldo Utama',
+   655→   655→      profitBalance: 'Saldo Profit',
+   656→   656→      totalDeposit: 'Total Deposit',
+   657→   657→      totalWithdraw: 'Total Withdraw',
+   658→   658→      totalProfit: 'Total Profit',
+   659→   659→      level: 'Level',
+   660→   660→      activeAssets: 'Aset Aktif',
+   661→   661→      recentActivity: 'Aktivitas Terbaru',
+   662→   662→      memberSince: 'Member sejak',
+   663→   663→      quickNav: 'Navigasi Cepat',
+   664→   664→      noActivity: 'Belum ada aktivitas',
+   665→   665→      depositBtn: 'Deposit',
+   666→   666→      withdrawBtn: 'Withdraw',
+   667→   667→      buyProduct: 'Beli Produk',
+   668→   668→      investment: 'Investasi',
+   669→   669→      bonus: 'Bonus',
+   670→   670→      profit: 'Profit',
+   671→   671→      success: 'Berhasil',
+   672→   672→      completed: 'Selesai',
+   673→   673→      pending: 'Pending',
+   674→   674→      failed: 'Gagal',
+   675→   675→      loadFailed: 'Gagal Memuat Data',
+   676→   676→      tryAgain: 'Coba Lagi',
+   677→   677→      active: 'Aktif',
+   678→   678→      perDay: '/hari',
+   679→   679→      viewAll: 'Lihat Semua',
+   680→   680→    },
+   681→   681→    products: {
+   682→   682→      title: 'Produk',
+   683→   683→      investmentProducts: 'Produk Investasi',
+   684→   684→      filter: 'Filter',
+   685→   685→      all: 'Semua',
+   686→   686→      gold: 'Emas',
+   687→   687→      silver: 'Perak',
+   688→   688→      diamond: 'Berlian',
+   689→   689→      duration: 'Durasi',
+   690→   690→      estProfit: 'Est. Profit',
+   691→   691→      quota: 'Kuota',
+   692→   692→      quotaFilled: 'Kuota Terisi',
+   693→   693→      remaining: 'Tersisa',
+   694→   694→      buyNow: 'Beli Sekarang',
+   695→   695→      viewDetail: 'Lihat Detail',
+   696→   696→      noProducts: 'Belum Ada Produk',
+   697→   697→      noCategory: 'Tidak ada produk dalam kategori',
+   698→   698→      selectProduct: 'Pilih paket yang sesuai dengan tujuan investasi Anda',
+   699→   699→      perDay: '/ hari',
+   700→   700→      days: 'Hari',
+   701→   701→    },
+   702→   702→    paket: {
+   703→   703→      title: 'Paket',
+   704→   704→      investmentPackages: 'Paket Investasi',
+   705→   705→      dailyProfit: 'Profit Harian',
+   706→   706→      contract: 'Kontrak',
+   707→   707→      contractDays: 'Hari',
+   708→   708→      capitalReturn: 'Modal Kembali',
+   709→   709→      investNow: 'Invest Sekarang',
+   710→   710→      confirmInvest: 'Invest Sekarang',
+   711→   711→      investSuccess: 'Investasi Berhasil!',
+   712→   712→      totalProfit: 'Total Profit',
+   713→   713→      bonusStructure: 'Struktur Bonus',
+   714→   714→      sponsorBonus: 'Bonus Sponsor',
+   715→   715→      levelBonus: 'Bonus Level',
+   716→   716→      rewardBonus: 'Bonus Reward',
+   717→   717→      solarNetwork: 'Matching Profit',
+   718→   718→      selectPackage: 'Pilih paket investasi yang sesuai dengan kebutuhan Anda',
+   719→   719→      confirmInvestTitle: 'Konfirmasi Investasi',
+   720→   720→      balanceDeduct: 'Saldo akan dipotong dari saldo utama Anda',
+   721→   721→      insufficientBalance: 'Saldo tidak mencukupi, Anda akan diarahkan ke deposit',
+   722→   722→      packageLabel: 'Paket',
+   723→   723→      modal: 'Modal',
+   724→   724→      contractLabel: 'Kontrak',
+   725→   725→      yourBalance: 'Saldo Anda',
+   726→   726→      remainingBalance: 'Sisa Saldo',
+   727→   727→      cancel: 'Batal',
+   728→   728→      depositInvest: 'Deposit & Invest',
+   729→   729→      investSuccessTitle: 'Investasi Berhasil!',
+   730→   730→      investSuccessDesc: 'berhasil diaktifkan',
+   731→   731→      viewMyAssets: 'Lihat Aset Saya',
+   732→   732→      noPackages: 'Belum ada paket investasi tersedia',
+   733→   733→      totalProfitDays: 'Total profit {days} hari',
+   734→   734→      fromReferral: 'Dari deposit referral',
+   735→   735→      basedOnGroupOmzet: 'Berdasarkan omzet grup',
+   736→   736→      basedOnGroupOmzet2: 'Berdasarkan omzet grup',
+   737→   737→      networkBonus: 'Sistem bonus Matching Profit 5 level dari profit downline Anda',
+   738→   738→    },
+   739→   739→    assets: {
+   740→   740→      title: 'Aset',
+   741→   741→      myAssets: 'Aset Saya',
+   742→   742→      investNew: 'Invest Baru',
+   743→   743→      activeAsset: 'Aset Aktif',
+   744→   744→      totalCapital: 'Total Modal',
+   745→   745→      profitPerDay: 'Profit/Hari',
+   746→   746→      totalProfit: 'Total Profit',
+   747→   747→      modal: 'Modal',
+   748→   748→      contractProgress: 'Progress Kontrak',
+   749→   749→      daysRemaining: 'hari tersisa',
+   750→   750→      estimatedReturn: 'Estimasi Total Return',
+   751→   751→      lastProfit: 'Profit terakhir',
+   752→   752→      statusActive: 'Aktif',
+   753→   753→      statusCompleted: 'Selesai',
+   754→   754→      statusStopped: 'Dihentikan',
+   755→   755→      statusCancelled: 'Dibatalkan',
+   756→   756→      noAssets: 'Belum Ada Aset',
+   757→   757→      investmentPackage: 'Paket Investasi',
+   758→   758→      product: 'Produk',
+   759→   759→      contract: 'Kontrak',
+   760→   760→      profitRate: 'Profit Rate',
+   761→   761→      endDate: 'Selesai',
+   762→   762→      daysLeft: 'hari tersisa',
+   763→   763→      all: 'Semua',
+   764→   764→      investment: 'Investasi',
+   765→   765→      products: 'Produk',
+   766→   766→      viewPackages: 'Lihat Paket Investasi',
+   767→   767→      startInvesting: 'Mulai investasi untuk menambah aset Anda',
+   768→   768→      loadFailed: 'Gagal Memuat Data',
+   769→   769→      tryAgain: 'Coba Lagi',
+   770→   770→    },
+   771→   771→    deposit: {
+   772→   772→      title: 'Deposit',
+   773→   773→      topUpBalance: 'Top up saldo akun Anda',
+   774→   774→      paymentMethod: 'Metode Pembayaran',
+   775→   775→      bankTransfer: 'Bank Transfer',
+   776→   776→      eWallet: 'E-Wallet',
+   777→   777→      qris: 'QRIS',
+   778→   778→      crypto: 'USDT (BEP20)',
+   779→   779→      usdt: 'USDT (BEP20)',
+   780→   780→      amount: 'Jumlah Pembayaran',
+   781→   781→      minDeposit: 'Minimal deposit Rp100.000',
+   782→   782→      uploadProof: 'Bukti Transfer (Opsional)',
+   783→   783→      proofOptional: 'Bukti Transfer (Opsional)',
+   784→   784→      submitDeposit: 'Deposit',
+   785→   785→      depositHistory: 'Riwayat Deposit',
+   786→   786→      accountNo: 'Nomor Rekening',
+   787→   787→      holderName: 'Atas Nama',
+   788→   788→      scanQR: 'Scan QR',
+   789→   789→      balanceSufficient: 'Saldo Mencukupi!',
+   790→   790→      payFromBalance: 'Bayar Langsung dari Saldo',
+   791→   791→      productPayment: 'Pembayaran Produk',
+   792→   792→      investmentPayment: 'Pembayaran Investasi',
+   793→   793→      back: 'Kembali',
+   794→   794→      totalPayment: 'Total Pembayaran',
+   795→   795→      sufficientBalance: 'Saldo Mencukupi!',
+   796→   796→      sufficientBalanceDesc: 'Saldo utama Anda cukup untuk',
+   797→   797→      paymentAmount: 'Jumlah Pembayaran',
+   798→   798→      uploadTransfer: 'Upload Bukti Transfer',
+   799→   799→      maxFileSize: 'PNG, JPG maks. 5MB',
+   800→   800→      depositSuccess: 'Deposit berhasil diajukan. Menunggu konfirmasi admin.',
+   801→   801→      depositProductSuccess: 'Deposit berhasil diajukan. Setelah disetujui, saldo bisa langsung digunakan untuk membeli produk.',
+   802→   802→      depositInvestSuccess: 'Deposit berhasil diajukan. Setelah disetujui, saldo bisa langsung digunakan untuk investasi.',
+   803→   803→      depositPending: 'Deposit berhasil diajukan. Menunggu konfirmasi admin.',
+   804→   804→      minDepositAmount: 'Minimal deposit Rp100.000',
+   805→   805→      selectPayment: 'Pilih metode pembayaran terlebih dahulu',
+   806→   806→      uploadFailed: 'Gagal mengupload bukti transfer',
+   807→   807→      noPaymentMethods: 'Metode pembayaran belum tersedia',
+   808→   808→      noDepositHistory: 'Belum ada riwayat deposit',
+   809→   809→      uploadProofLabel: 'Bukti Transfer (Opsional)',
+   810→   810→      bankAccountNo: 'Nomor Rekening',
+   811→   811→      eWalletAccount: 'Nomor Akun',
+   812→   812→      atName: 'Atas Nama',
+   813→   813→      scanQRDesc: 'Scan kode QR di atas menggunakan aplikasi e-wallet atau mobile banking Anda',
+   814→   814→      pay: 'Bayar',
+   815→   815→      deposit: 'Deposit',
+   816→   816→      quantity: 'Jumlah',
+   817→   817→      contractDays: 'Kontrak',
+   818→   818→      buyProduct: 'membeli produk',
+   819→   819→      invest: 'berinvestasi',
+   820→   820→      loadFailed: 'Gagal Memuat Data',
+   821→   821→      tryAgain: 'Coba Lagi',
+   822→   822→    },
+   823→   823→    withdraw: {
+   824→   824→      title: 'Withdraw',
+   825→   825→      withdrawFunds: 'Tarik saldo dari akun Anda',
+   826→   826→      bankAccount: 'Rekening Tujuan',
+   827→   827→      addBank: 'Tambah Rekening',
+   828→   828→      noBankAccount: 'Belum Ada Rekening',
+   829→   829→      fee: 'Biaya Admin',
+   830→   830→      netAmount: 'Diterima',
+   831→   831→      minWithdraw: 'Minimal Withdraw',
+   832→   832→      outsideHours: 'Di Luar Jam Operasional',
+   833→   833→      workingHours: 'Withdraw hanya tersedia Senin - Jumat, jam 08:00 - 17:00',
+   834→   834→      withdrawHistory: 'Riwayat Withdraw',
+   835→   835→      selectBank: 'Pilih rekening bank',
+   836→   836→      withdrawAmount: 'Jumlah Withdraw',
+   837→   837→      profitBalance: 'Saldo Profit',
+   838→   838→      amount: 'Jumlah',
+   839→   839→      adminFee: 'Biaya Admin',
+   840→   840→      received: 'Diterima',
+   841→   841→      noBankYet: 'Belum Ada Rekening',
+   842→   842→      addBankFirst: 'Tambahkan rekening bank terlebih dahulu untuk melakukan withdrawal',
+   843→   843→      addBankBtn: 'Tambah Rekening',
+   844→   844→      selectBankAccount: 'Pilih rekening bank',
+   845→   845→      minWithFee: 'Minimal',
+   846→   846→      insufficientProfit: 'Saldo profit tidak mencukupi',
+   847→   847→      withdrawSuccess: 'Withdraw berhasil diajukan',
+   848→   848→      noWithdrawHistory: 'Belum ada riwayat withdraw',
+   849→   849→      weekdaysOnly: 'Withdraw hanya tersedia Senin - Jumat',
+   850→   850→      hoursOnly: 'Withdraw hanya tersedia jam 08:00 - 17:00',
+   851→   851→      loadFailed: 'Gagal Memuat Data',
+   852→   852→      tryAgain: 'Coba Lagi',
+   853→   853→    },
+   854→   854→    history: {
+   855→   855→      title: 'Riwayat',
+   856→   856→      transactionHistory: 'Riwayat Transaksi',
+   857→   857→      all: 'Semua',
+   858→   858→      deposit: 'Deposit',
+   859→   859→      withdrawal: 'Withdraw',
+   860→   860→      purchase: 'Produk',
+   861→   861→      investment: 'Investasi',
+   862→   862→      bonus: 'Bonus',
+   863→   863→      profit: 'Profit',
+   864→   864→      noTransactions: 'Belum ada transaksi',
+   865→   865→      loadFailed: 'Gagal Memuat Data',
+   866→   866→      tryAgain: 'Coba Lagi',
+   867→   867→      product: 'Produk',
+   868→   868→      wd: 'WD',
+   869→   869→      allActivity: 'Semua riwayat aktivitas keuangan Anda',
+   870→   870→      success: 'Berhasil',
+   871→   871→      completed: 'Selesai',
+   872→   872→      pending: 'Pending',
+   873→   873→      failed: 'Gagal',
+   874→   874→      cancelled: 'Dibatalkan',
+   875→   875→      stopped: 'Dihentikan',
+   876→   876→      buyProduct: 'Beli Produk',
+   877→   877→    },
+   878→   878→    referral: {
+   879→   879→      title: 'Referral',
+   880→   880→      inviteFriends: 'Ajak teman dan dapatkan bonus',
+   881→   881→      yourCode: 'Kode Referral Anda',
+   882→   882→      yourLink: 'Link Referral Anda',
+   883→   883→      copyLink: 'Salin Link',
+   884→   884→      shareVia: 'Bagikan',
+   885→   885→      totalReferrals: 'Total Referral',
+   886→   886→      bonusEarned: 'Bonus Earned',
+   887→   887→      teamList: 'Tim Referral',
+   888→   888→      level: 'Level',
+   889→   889→      noTeam: 'Belum ada tim referral',
+   890→   890→      shareCode: 'Bagikan kode Anda untuk mulai mendapatkan bonus',
+   891→   891→      copied: 'Link referral disalin!',
+   892→   892→      copyFailed: 'Gagal menyalin link',
+   893→   893→      directInvite: 'Undangan langsung',
+   894→   894→      level1Invite: 'Undangan dari Level 1',
+   895→   895→      level2Invite: 'Undangan dari Level 2',
+   896→   896→      level3Invite: 'Undangan dari Level 3',
+   897→   897→      level4Invite: 'Undangan dari Level 4',
+   898→   898→      referralLevel: 'Level Bonus Referral',
+   899→   899→      bonusReferral: 'Bonus Referral',
+   900→   900→      shareViaWhatsApp: 'WhatsApp',
+   901→   901→      loadFailed: 'Gagal Memuat Data',
+   902→   902→      tryAgain: 'Coba Lagi',
+   903→   903→      oneReferralLimit: 'Maksimal 1 referral langsung',
+   904→   904→      referralSlotUsed: 'Slot referral sudah terpakai',
+   905→   905→      referralSlotAvailable: 'Slot referral tersedia',
+   906→   906→    },
+   907→   907→    network: {
+   908→   908→      title: 'Jaringan',
+   909→   909→      solarNetwork: 'Matching Profit',
+   910→   910→      groupOmzet: 'Total Group Omzet',
+   911→   911→      directReferrals: 'Referral Langsung',
+   912→   912→      totalNetwork: 'Total Network',
+   913→   913→      levelDetail: 'Detail Per Level',
+   914→   914→      bonusSummary: 'Ringkasan Bonus',
+   915→   915→      totalSponsorBonus: 'Total Bonus Sponsor',
+   916→   916→      totalLevelBonus: 'Total Bonus Level',
+   917→   917→      totalRewardBonus: 'Total Bonus Reward',
+   918→   918→      milestone: 'Reward Milestone',
+   919→   919→      referralList: 'Daftar Referral',
+   920→   920→      networkVisualization: 'Visualisasi Jaringan',
+   921→   921→      atCenter: 'Anda berada di pusat jaringan',
+   922→   922→      totalMembers: 'total anggota jaringan',
+   923→   923→      detailPerLevel: 'Detail Per Level',
+   924→   924→      infoOmzetBonus: 'Informasi omzet dan bonus di setiap level jaringan',
+   925→   925→      bonusSummaryDesc: 'Total bonus yang telah Anda terima dari berbagai sumber',
+   926→   926→      fromInvestmentReferral: 'Dari investasi referral',
+   927→   927→      basedOnOmzet: 'Berdasarkan omzet grup',
+   928→   928→      milestoneAchievement: 'Pencapaian milestone',
+   929→   929→      milestoneDesc: 'Capai target omzet grup untuk mendapatkan bonus reward',
+   930→   930→      achieveTarget: 'Capai target omzet grup untuk mendapatkan bonus reward',
+   931→   931→      noMilestone: 'Belum ada data milestone',
+   932→   932→      clickToView: 'Klik level untuk melihat daftar anggota',
+   933→   933→      noMembers: 'Belum ada anggota di jaringan Anda',
+   934→   934→      inviteFriendsNow: 'Ajak Teman Sekarang',
+   935→   935→      members: 'anggota',
+   936→   936→      omzetGroup: 'Omzet Grup',
+   937→   937→      sponsorBonusRate: 'Bonus Sponsor',
+   938→   938→      levelBonusRate: 'Bonus Level',
+   939→   939→      achieved: 'Tercapai!',
+   940→   940→      bonusReceived: 'Bonus diterima',
+   941→   941→      referral: 'referral',
+   942→   942→      loadFailed: 'Gagal Memuat Data',
+   943→   943→      tryAgain: 'Coba Lagi',
+   944→   944→      copyCode: 'Salin kode',
+   945→   945→      codeCopied: 'Kode Referral Disalin!',
+   946→   946→      copyFailed: 'Gagal Menyalin',
+   947→   947→      networkUnavailable: 'Data jaringan tidak tersedia',
+   948→   948→      omzet: 'Omzet',
+   949→   949→    },
+   950→   950→    bank: {
+   951→   951→      title: 'Rekening Bank',
+   952→   952→      addBank: 'Tambah Rekening',
+   953→   953→      editBank: 'Edit Rekening',
+   954→   954→      bankName: 'Nama Bank',
+   955→   955→      accountNo: 'Nomor Rekening',
+   956→   956→      holderName: 'Nama Pemilik',
+   957→   957→      primary: 'Utama',
+   958→   958→      noBanks: 'Belum Ada Rekening',
+   959→   959→      bankExample: 'Contoh: BCA, Mandiri, BNI',
+   960→   960→      enterAccountNo: 'Masukkan nomor rekening',
+   961→   961→      namePerBook: 'Nama sesuai buku rekening',
+   962→   962→      saveBank: 'Simpan',
+   963→   963→      addBtn: 'Tambah',
+   964→   964→      deleteBank: 'Hapus Rekening?',
+   965→   965→      deleteConfirm: 'akan dihapus secara permanen.',
+   966→   966→      deleted: 'Rekening dihapus',
+   967→   967→      updated: 'Rekening diperbarui',
+   968→   968→      added: 'Rekening ditambahkan',
+   969→   969→      allFieldsRequired: 'Semua field harus diisi',
+   970→   970→      loadFailed: 'Gagal Memuat Data',
+   971→   971→      tryAgain: 'Coba Lagi',
+   972→   972→    },
+   973→   973→    settings: {
+   974→   974→      title: 'Pengaturan',
+   975→   975→      changeName: 'Ubah Nama',
+   976→   976→      changeWhatsapp: 'Ubah WhatsApp',
+   977→   977→      changePassword: 'Ubah Password',
+   978→   978→      saveName: 'Simpan Nama',
+   979→   979→      saveWhatsapp: 'Simpan',
+   980→   980→      changePasswordBtn: 'Ubah Password',
+   981→   981→      logoutAccount: 'Keluar dari Akun',
+   982→   982→      profileInfo: 'Kelola akun dan profil Anda',
+   983→   983→      whatsapp: 'WhatsApp',
+   984→   984→      mainBalance: 'Saldo Utama',
+   985→   985→      totalDeposit: 'Total Deposit',
+   986→   986→      totalProfit: 'Total Profit',
+   987→   987→      nameRequired: 'Nama tidak boleh kosong',
+   988→   988→      nameUpdated: 'Nama berhasil diperbarui',
+   989→   989→      whatsappRequired: 'Nomor WhatsApp tidak boleh kosong',
+   990→   990→      whatsappUpdated: 'Nomor WhatsApp berhasil diperbarui',
+   991→   991→      avatarUpdated: 'Avatar berhasil diperbarui',
+   992→   992→      avatarUploadFailed: 'Gagal mengupload avatar',
+   993→   993→      oldPassword: 'Password Lama',
+   994→   994→      newPassword: 'Password Baru',
+   995→   995→      confirmPassword: 'Konfirmasi Password Baru',
+   996→   996→      passwordMin6: 'Password baru minimal 6 karakter',
+   997→   997→      passwordMismatch: 'Password tidak cocok',
+   998→   998→      passwordUpdated: 'Password berhasil diperbarui',
+   999→   999→      bankAccount: 'Rekening Bank',
+  1000→  1000→      referral: 'Referral',
+  1001→  1001→      notSet: 'Belum diatur',
+  1002→  1002→      nameEmpty: 'Nama tidak boleh kosong',
+  1003→  1003→      loadFailed: 'Terjadi kesalahan',
+  1004→  1004→    },
+  1005→  1005→    nav: {
+  1006→  1006→      home: 'Beranda',
+  1007→  1007→      dashboard: 'Dashboard',
+  1008→  1008→      products: 'Produk',
+  1009→  1009→      paket: 'Paket',
+  1010→  1010→      assets: 'Aset',
+  1011→  1011→      deposit: 'Deposit',
+  1012→  1012→      withdraw: 'Withdraw',
+  1013→  1013→      history: 'Riwayat',
+  1014→  1014→      referral: 'Referral',
+  1015→  1015→      network: 'Jaringan',
+  1016→  1016→      bank: 'Bank',
+  1017→  1017→      settings: 'Pengaturan',
+  1018→  1018→      download: 'Unduh',
+  1019→  1019→      wallet: 'Wallet',
+  1020→  1020→      profile: 'Profil',
+  1021→  1021→      logout: 'Keluar',
+  1022→  1022→      salaryBonus: 'Gaji',
+  1023→  1023→      matchingBonus: 'M.Profit',
+  1024→  1024→    },
+  1025→  1025→    landing: {
+  1026→  1026→      welcome: 'Selamat Datang di NEXVO',
+  1027→  1027→      subtitle: 'Platform Manajemen Aset Digital #1',
+  1028→  1028→      aboutTitle: 'Tentang NEXVO',
+  1029→  1029→      aboutSubtitle: 'Platform Investasi Digital',
+  1030→  1030→      howItWorks: 'Cara Kerja',
+  1031→  1031→      easySteps: '5 Langkah Mudah',
+  1032→  1032→      statistics: 'Statistik',
+  1033→  1033→      liveActivity: 'Aktivitas Live',
+  1034→  1034→      testimonials: 'Testimoni',
+  1035→  1035→      startNow: 'Mulai Sekarang',
+  1036→  1036→      viewProducts: 'Lihat Produk',
+  1037→  1037→      security: 'Keamanan Tingkat Tinggi',
+  1038→  1038→      dailyProfit: 'Profit Harian Terukur',
+  1039→  1039→      fastTransaction: 'Transaksi Cepat & Mudah',
+  1040→  1040→      globalAccess: 'Akses Global 24/7',
+  1041→  1041→      trusted: 'Terpercaya & Transparan',
+  1042→  1042→      cuttingEdge: 'Teknologi Terdepan',
+  1043→  1043→      registerStep: 'Daftar Akun',
+  1044→  1044→      verifyStep: 'Verifikasi OTP',
+  1045→  1045→      depositStep: 'Deposit Saldo',
+  1046→  1046→      selectProduct: 'Pilih Produk',
+  1047→  1047→      monitorProfit: 'Pantau Profit',
+  1048→  1048→      totalMembers: 'Total Member',
+  1049→  1049→      totalTransactions: 'Total Transaksi',
+  1050→  1050→      uptime: 'Uptime',
+  1051→  1051→      satisfaction: 'Kepuasan',
+  1052→  1052→      aboutNexvo: 'Tentang NEXVO',
+  1053→  1053→      digitalPlatform: 'Platform Investasi Digital',
+  1054→  1054→      trustedWorldwide: 'Terpercaya di Seluruh Dunia',
+  1055→  1055→      startInvestNow: 'Mulai Investasi Sekarang',
+  1056→  1056→      viewAllProducts: 'Lihat Semua Produk',
+  1057→  1057→      noProductsAvailable: 'Belum ada produk tersedia',
+  1058→  1058→      recentTransactions: 'Transaksi Terkini',
+  1059→  1059→      monitorRealTime: 'Pantau aktivitas terbaru dari seluruh pengguna NEXVO secara real-time',
+  1060→  1060→      noRecentActivity: 'Belum ada aktivitas terbaru',
+  1061→  1061→      whatTheySay: 'Apa Kata Mereka',
+  1062→  1062→      realTestimonials: 'Testimoni nyata dari pengguna NEXVO yang telah merasakan manfaatnya',
+  1063→  1063→      featuredProducts: 'Produk Unggulan',
+  1064→  1064→      choosePackage: 'Pilih Paket Investasi',
+  1065→  1065→      choosePackageDesc: 'Pilih paket yang sesuai dengan kemampuan dan tujuan investasi Anda',
+  1066→  1066→      minutesToStart: 'Mulai perjalanan investasi digital Anda dalam hitungan menit',
+  1067→  1067→      serverUptime: 'Uptime Server',
+  1068→  1068→      onlineSupport: 'Support Online',
+  1069→  1069→      sslEncryption: 'Enkripsi SSL',
+  1070→  1070→      verificationProcess: 'Proses Verifikasi',
+  1071→  1071→      quotaFilled: 'Kuota Terisi',
+  1072→  1072→      remaining: 'Tersisa',
+  1073→  1073→      days: 'Hari',
+  1074→  1074→      estProfit: 'Est. profit',
+  1075→  1075→      viewDetail: 'Lihat Detail',
+  1076→  1076→      duration: 'Durasi',
+  1077→  1077→    },
+  1078→  1078→    admin: {
+  1079→  1079→      mainGroup: 'Utama',
+  1080→  1080→      managementGroup: 'Manajemen',
+  1081→  1081→      transactionGroup: 'Transaksi',
+  1082→  1082→      systemGroup: 'Sistem',
+  1083→  1083→      contentGroup: 'Konten',
+  1084→  1084→      securityGroup: 'Keamanan',
+  1085→  1085→      otherGroup: 'Lainnya',
+  1086→  1086→      systemOnline: 'System Online',
+  1087→  1087→      adminPanel: 'Panel Admin NEXVO',
+  1088→  1088→      logout: 'Keluar',
+  1089→  1089→    },
+  1090→  1090→    otp: {
+  1091→  1091→      title: 'Verifikasi OTP',
+  1092→  1092→      subtitle: 'Masukkan kode OTP yang dikirim ke WhatsApp/Email Anda',
+  1093→  1093→      verifyBtn: 'Verifikasi',
+  1094→  1094→      resendOtp: 'Kirim Ulang OTP',
+  1095→  1095→      sentTo: 'Kode dikirim ke',
+  1096→  1096→    },
+  1097→  1097→    salary: {
+  1098→  1098→      title: 'Gaji Mingguan',
+  1099→  1099→      subtitle: 'Dapatkan gaji mingguan dengan memenuhi syarat',
+  1100→  1100→      eligibility: 'Syarat Kelayakan',
+  1101→  1101→      eligible: 'Memenuhi Syarat',
+  1102→  1102→      notEligible: 'Belum Memenuhi',
+  1103→  1103→      directRefs: 'Referral Langsung',
+  1104→  1104→      groupOmzet: 'Omzet Grup',
+  1105→  1105→      required: 'Dibutuhkan',
+  1106→  1106→      current: 'Saat ini',
+  1107→  1107→      salaryAmount: 'Jumlah Gaji',
+  1108→  1108→      perWeek: '/minggu',
+  1109→  1109→      claimSalary: 'Klaim Gaji Mingguan',
+  1110→  1110→      claimSuccess: 'Gaji mingguan berhasil diklaim!',
+  1111→  1111→      alreadyClaimed: 'Sudah diklaim minggu ini',
+  1112→  1112→      notEligibleMsg: 'Anda belum memenuhi syarat untuk mendapatkan gaji mingguan',
+  1113→  1113→      salaryHistory: 'Riwayat Gaji',
+  1114→  1114→      weekNumber: 'Minggu',
+  1115→  1115→      year: 'Tahun',
+  1116→  1116→      amount: 'Jumlah',
+  1117→  1117→      status: 'Status',
+  1118→  1118→      paid: 'Dibayar',
+  1119→  1119→      noHistory: 'Belum ada riwayat gaji',
+  1120→  1120→      totalEarned: 'Total Gaji Diterima',
+  1121→  1121→      lastClaimed: 'Terakhir Diklaim',
+  1122→  1122→      neverClaimed: 'Belum pernah diklaim',
+  1123→  1123→      loadFailed: 'Gagal Memuat Data',
+  1124→  1124→      tryAgain: 'Coba Lagi',
+  1125→  1125→      claiming: 'Mengklaim...',
+  1126→  1126→    },
+  1127→  1127→    matching: {
+  1128→  1128→      title: 'Bonus Matching Profit',
+  1129→  1129→      subtitle: 'Dapatkan bonus dari profit downline Anda',
+  1130→  1130→      members: 'anggota',
+  1131→  1131→      potentialBonus: 'Bonus Potensial',
+  1132→  1132→      levelRates: 'Tarif Per Level',
+  1133→  1133→      level: 'Level',
+  1134→  1134→      rate: 'Tarif',
+  1135→  1135→      bonus: 'Bonus',
+  1136→  1136→      claimMatching: 'Klaim Bonus Matching Profit',
+  1137→  1137→      claimSuccess: 'Bonus matching profit berhasil diklaim!',
+  1138→  1138→      noBonus: 'Tidak ada bonus matching profit yang bisa diklaim saat ini',
+  1139→  1139→      matchingHistory: 'Riwayat Matching Profit',
+  1140→  1140→      noHistory: 'Belum ada riwayat matching profit',
+  1141→  1141→      totalEarned: 'Total Matching Diterima',
+  1142→  1142→      loadFailed: 'Gagal Memuat Data',
+  1143→  1143→      tryAgain: 'Coba Lagi',
+  1144→  1144→      claiming: 'Mengklaim...',
+  1145→  1145→      profitOverview: 'Ringkasan Matching Profit',
+  1146→  1146→      profitOverviewDesc: 'Bonus dari profit yang dihasilkan downline Anda',
+  1147→  1147→      downlineProfit: 'Profit Downline',
+  1148→  1148→      downlineMembers: 'Anggota Downline',
+  1149→  1149→      profitDownline: 'Profit Downline',
+  1150→  1150→      totalProfitMatched: 'Total Profit Dimatching',
+  1151→  1151→    },
+  1152→  1152→  },
+  1153→  1153→  en: {
+  1154→  1154→    common: {
+  1155→  1155→      loading: 'Loading...',
+  1156→  1156→      error: 'An error occurred',
+  1157→  1157→      success: 'Success',
+  1158→  1158→      retry: 'Try Again',
+  1159→  1159→      save: 'Save',
+  1160→  1160→      cancel: 'Cancel',
+  1161→  1161→      delete: 'Delete',
+  1162→  1162→      edit: 'Edit',
+  1163→  1163→      add: 'Add',
+  1164→  1164→      search: 'Search',
+  1165→  1165→      noData: 'No data',
+  1166→  1166→      confirm: 'Confirm',
+  1167→  1167→      back: 'Back',
+  1168→  1168→      next: 'Next',
+  1169→  1169→      submit: 'Submit',
+  1170→  1170→      close: 'Close',
+  1171→  1171→      copy: 'Copy',
+  1172→  1172→      copied: 'Copied',
+  1173→  1173→      share: 'Share',
+  1174→  1174→      download: 'Download',
+  1175→  1175→      upload: 'Upload',
+  1176→  1176→      viewAll: 'View All',
+  1177→  1177→      processing: 'Processing...',
+  1178→  1178→      allFieldsRequired: 'All fields are required',
+  1179→  1179→      networkError: 'Network error occurred',
+  1180→  1180→      operationFailed: 'Operation failed',
+  1181→  1181→    },
+  1182→  1182→    auth: {
+  1183→  1183→      login: 'Login',
+  1184→  1184→      register: 'Register',
+  1185→  1185→      logout: 'Logout',
+  1186→  1186→      whatsapp: 'WhatsApp',
+  1187→  1187→      email: 'Email',
+  1188→  1188→      password: 'Password',
+  1189→  1189→      oldPassword: 'Old Password',
+  1190→  1190→      newPassword: 'New Password',
+  1191→  1191→      confirmPassword: 'Confirm Password',
+  1192→  1192→      forgotPassword: 'Forgot Password',
+  1193→  1193→      noAccount: "Don't have an account?",
+  1194→  1194→      hasAccount: 'Already have an account?',
+  1195→  1195→      loginSuccess: 'Welcome back!',
+  1196→  1196→      registerSuccess: 'Account created! Welcome to NEXVO.',
+  1197→  1197→      otpVerification: 'OTP Verification',
+  1198→  1198→      enterOtp: 'Enter OTP code',
+  1199→  1199→      resendOtp: 'Resend OTP',
+  1200→  1200→      referralCode: 'Referral Code',
+  1201→  1201→      referralCodeOptional: 'Enter referral code (optional)',
+  1202→  1202→      loginSubtitle: 'Sign in to access the NEXVO platform',
+  1203→  1203→      registerSubtitle: 'Create a new account on NEXVO platform',
+  1204→  1204→      whatsappOrEmail: 'WhatsApp / Email',
+  1205→  1205→      enterWhatsappOrEmail: 'WhatsApp number or Email',
+  1206→  1206→      enterPassword: 'Enter password',
+  1207→  1207→      minChars: 'Minimum 6 characters',
+  1208→  1208→      passwordMismatch: 'Passwords do not match',
+  1209→  1209→      passwordNotMatch: 'Password confirmation does not match',
+  1210→  1210→      registerNow: 'Register Now',
+  1211→  1211→      signIn: 'Sign In',
+  1212→  1212→      adminPanel: 'Admin Panel',
+  1213→  1213→      strengthWeak: 'Weak',
+  1214→  1214→      strengthMedium: 'Medium',
+  1215→  1215→      strengthStrong: 'Strong',
+  1216→  1216→      passwordStrength: 'Strength',
+  1217→  1217→      haveCode: 'Have a code?',
+  1218→  1218→      hide: 'Hide',
+  1219→  1219→      registering: 'Registering...',
+  1220→  1220→      whatsappNumber: 'WhatsApp Number',
+  1221→  1221→      emailAddress: 'Email Address',
+  1222→  1222→      validWhatsApp: 'Enter a valid WhatsApp number',
+  1223→  1223→      validEmail: 'Enter a valid email address',
+  1224→  1224→    },
+  1225→  1225→    dashboard: {
+  1226→  1226→      title: 'Dashboard',
+  1227→  1227→      mainBalance: 'Main Balance',
+  1228→  1228→      profitBalance: 'Profit Balance',
+  1229→  1229→      totalDeposit: 'Total Deposit',
+  1230→  1230→      totalWithdraw: 'Total Withdraw',
+  1231→  1231→      totalProfit: 'Total Profit',
+  1232→  1232→      level: 'Level',
+  1233→  1233→      activeAssets: 'Active Assets',
+  1234→  1234→      recentActivity: 'Recent Activity',
+  1235→  1235→      memberSince: 'Member since',
+  1236→  1236→      quickNav: 'Quick Navigation',
+  1237→  1237→      noActivity: 'No activity yet',
+  1238→  1238→      depositBtn: 'Deposit',
+  1239→  1239→      withdrawBtn: 'Withdraw',
+  1240→  1240→      buyProduct: 'Buy Product',
+  1241→  1241→      investment: 'Investment',
+  1242→  1242→      bonus: 'Bonus',
+  1243→  1243→      profit: 'Profit',
+  1244→  1244→      success: 'Success',
+  1245→  1245→      completed: 'Completed',
+  1246→  1246→      pending: 'Pending',
+  1247→  1247→      failed: 'Failed',
+  1248→  1248→      loadFailed: 'Failed to Load Data',
+  1249→  1249→      tryAgain: 'Try Again',
+  1250→  1250→      active: 'Active',
+  1251→  1251→      perDay: '/day',
+  1252→  1252→      viewAll: 'View All',
+  1253→  1253→    },
+  1254→  1254→    products: {
+  1255→  1255→      title: 'Products',
+  1256→  1256→      investmentProducts: 'Investment Products',
+  1257→  1257→      filter: 'Filter',
+  1258→  1258→      all: 'All',
+  1259→  1259→      gold: 'Gold',
+  1260→  1260→      silver: 'Silver',
+  1261→  1261→      diamond: 'Diamond',
+  1262→  1262→      duration: 'Duration',
+  1263→  1263→      estProfit: 'Est. Profit',
+  1264→  1264→      quota: 'Quota',
+  1265→  1265→      quotaFilled: 'Quota Filled',
+  1266→  1266→      remaining: 'Remaining',
+  1267→  1267→      buyNow: 'Buy Now',
+  1268→  1268→      viewDetail: 'View Detail',
+  1269→  1269→      noProducts: 'No Products Available',
+  1270→  1270→      noCategory: 'No products in category',
+  1271→  1271→      selectProduct: 'Choose a package that suits your investment goals',
+  1272→  1272→      perDay: ' / day',
+  1273→  1273→      days: 'Days',
+  1274→  1274→    },
+  1275→  1275→    paket: {
+  1276→  1276→      title: 'Packages',
+  1277→  1277→      investmentPackages: 'Investment Packages',
+  1278→  1278→      dailyProfit: 'Daily Profit',
+  1279→  1279→      contract: 'Contract',
+  1280→  1280→      contractDays: 'Days',
+  1281→  1281→      capitalReturn: 'Capital Return',
+  1282→  1282→      investNow: 'Invest Now',
+  1283→  1283→      confirmInvest: 'Invest Now',
+  1284→  1284→      investSuccess: 'Investment Successful!',
+  1285→  1285→      totalProfit: 'Total Profit',
+  1286→  1286→      bonusStructure: 'Bonus Structure',
+  1287→  1287→      sponsorBonus: 'Sponsor Bonus',
+  1288→  1288→      levelBonus: 'Level Bonus',
+  1289→  1289→      rewardBonus: 'Reward Bonus',
+  1290→  1290→      solarNetwork: 'Matching Profit',
+  1291→  1291→      selectPackage: 'Choose an investment package that suits your needs',
+  1292→  1292→      confirmInvestTitle: 'Confirm Investment',
+  1293→  1293→      balanceDeduct: 'Balance will be deducted from your main balance',
+  1294→  1294→      insufficientBalance: 'Insufficient balance, you will be redirected to deposit',
+  1295→  1295→      packageLabel: 'Package',
+  1296→  1296→      modal: 'Capital',
+  1297→  1297→      contractLabel: 'Contract',
+  1298→  1298→      yourBalance: 'Your Balance',
+  1299→  1299→      remainingBalance: 'Remaining Balance',
+  1300→  1300→      cancel: 'Cancel',
+  1301→  1301→      depositInvest: 'Deposit & Invest',
+  1302→  1302→      investSuccessTitle: 'Investment Successful!',
+  1303→  1303→      investSuccessDesc: 'successfully activated',
+  1304→  1304→      viewMyAssets: 'View My Assets',
+  1305→  1305→      noPackages: 'No investment packages available yet',
+  1306→  1306→      totalProfitDays: 'Total profit {days} days',
+  1307→  1307→      fromReferral: 'From referral deposits',
+  1308→  1308→      basedOnGroupOmzet: 'Based on group omzet',
+  1309→  1309→      basedOnGroupOmzet2: 'Based on group omzet',
+  1310→  1310→      networkBonus: '5-level Matching Profit bonus system from your downline profit',
+  1311→  1311→    },
+  1312→  1312→    assets: {
+  1313→  1313→      title: 'Assets',
+  1314→  1314→      myAssets: 'My Assets',
+  1315→  1315→      investNew: 'New Investment',
+  1316→  1316→      activeAsset: 'Active Assets',
+  1317→  1317→      totalCapital: 'Total Capital',
+  1318→  1318→      profitPerDay: 'Profit/Day',
+  1319→  1319→      totalProfit: 'Total Profit',
+  1320→  1320→      modal: 'Capital',
+  1321→  1321→      contractProgress: 'Contract Progress',
+  1322→  1322→      daysRemaining: 'days remaining',
+  1323→  1323→      estimatedReturn: 'Estimated Total Return',
+  1324→  1324→      lastProfit: 'Last profit',
+  1325→  1325→      statusActive: 'Active',
+  1326→  1326→      statusCompleted: 'Completed',
+  1327→  1327→      statusStopped: 'Stopped',
+  1328→  1328→      statusCancelled: 'Cancelled',
+  1329→  1329→      noAssets: 'No Assets Yet',
+  1330→  1330→      investmentPackage: 'Investment Package',
+  1331→  1331→      product: 'Product',
+  1332→  1332→      contract: 'Contract',
+  1333→  1333→      profitRate: 'Profit Rate',
+  1334→  1334→      endDate: 'End Date',
+  1335→  1335→      daysLeft: 'days left',
+  1336→  1336→      all: 'All',
+  1337→  1337→      investment: 'Investment',
+  1338→  1338→      products: 'Products',
+  1339→  1339→      viewPackages: 'View Investment Packages',
+  1340→  1340→      startInvesting: 'Start investing to add to your assets',
+  1341→  1341→      loadFailed: 'Failed to Load Data',
+  1342→  1342→      tryAgain: 'Try Again',
+  1343→  1343→    },
+  1344→  1344→    deposit: {
+  1345→  1345→      title: 'Deposit',
+  1346→  1346→      topUpBalance: 'Top up your account balance',
+  1347→  1347→      paymentMethod: 'Payment Method',
+  1348→  1348→      bankTransfer: 'Bank Transfer',
+  1349→  1349→      eWallet: 'E-Wallet',
+  1350→  1350→      qris: 'QRIS',
+  1351→  1351→      crypto: 'USDT (BEP20)',
+  1352→  1352→      usdt: 'USDT (BEP20)',
+  1353→  1353→      amount: 'Payment Amount',
+  1354→  1354→      minDeposit: 'Minimum deposit Rp100,000',
+  1355→  1355→      uploadProof: 'Transfer Proof (Optional)',
+  1356→  1356→      proofOptional: 'Transfer Proof (Optional)',
+  1357→  1357→      submitDeposit: 'Deposit',
+  1358→  1358→      depositHistory: 'Deposit History',
+  1359→  1359→      accountNo: 'Account Number',
+  1360→  1360→      holderName: 'Account Holder',
+  1361→  1361→      scanQR: 'Scan QR',
+  1362→  1362→      balanceSufficient: 'Balance Sufficient!',
+  1363→  1363→      payFromBalance: 'Pay Directly from Balance',
+  1364→  1364→      productPayment: 'Product Payment',
+  1365→  1365→      investmentPayment: 'Investment Payment',
+  1366→  1366→      back: 'Back',
+  1367→  1367→      totalPayment: 'Total Payment',
+  1368→  1368→      sufficientBalance: 'Balance Sufficient!',
+  1369→  1369→      sufficientBalanceDesc: 'Your main balance is sufficient for',
+  1370→  1370→      paymentAmount: 'Payment Amount',
+  1371→  1371→      uploadTransfer: 'Upload Transfer Proof',
+  1372→  1372→      maxFileSize: 'PNG, JPG max. 5MB',
+  1373→  1373→      depositSuccess: 'Deposit submitted successfully. Awaiting admin confirmation.',
+  1374→  1374→      depositProductSuccess: 'Deposit submitted. Once approved, balance can be used to purchase products.',
+  1375→  1375→      depositInvestSuccess: 'Deposit submitted. Once approved, balance can be used for investment.',
+  1376→  1376→      depositPending: 'Deposit submitted. Awaiting admin confirmation.',
+  1377→  1377→      minDepositAmount: 'Minimum deposit Rp100,000',
+  1378→  1378→      selectPayment: 'Please select a payment method first',
+  1379→  1379→      uploadFailed: 'Failed to upload transfer proof',
+  1380→  1380→      noPaymentMethods: 'No payment methods available',
+  1381→  1381→      noDepositHistory: 'No deposit history yet',
+  1382→  1382→      uploadProofLabel: 'Transfer Proof (Optional)',
+  1383→  1383→      bankAccountNo: 'Account Number',
+  1384→  1384→      eWalletAccount: 'Account Number',
+  1385→  1385→      atName: 'Account Holder',
+  1386→  1386→      scanQRDesc: 'Scan the QR code above using your e-wallet or mobile banking app',
+  1387→  1387→      pay: 'Pay',
+  1388→  1388→      deposit: 'Deposit',
+  1389→  1389→      quantity: 'Qty',
+  1390→  1390→      contractDays: 'Contract',
+  1391→  1391→      buyProduct: 'purchase this product',
+  1392→  1392→      invest: 'invest',
+  1393→  1393→      loadFailed: 'Failed to Load Data',
+  1394→  1394→      tryAgain: 'Try Again',
+  1395→  1395→    },
+  1396→  1396→    withdraw: {
+  1397→  1397→      title: 'Withdraw',
+  1398→  1398→      withdrawFunds: 'Withdraw funds from your account',
+  1399→  1399→      bankAccount: 'Destination Account',
+  1400→  1400→      addBank: 'Add Account',
+  1401→  1401→      noBankAccount: 'No Bank Account',
+  1402→  1402→      fee: 'Admin Fee',
+  1403→  1403→      netAmount: 'Received',
+  1404→  1404→      minWithdraw: 'Minimum Withdraw',
+  1405→  1405→      outsideHours: 'Outside Operating Hours',
+  1406→  1406→      workingHours: 'Withdrawal is only available Monday - Friday, 08:00 - 17:00',
+  1407→  1407→      withdrawHistory: 'Withdrawal History',
+  1408→  1408→      selectBank: 'Select bank account',
+  1409→  1409→      withdrawAmount: 'Withdrawal Amount',
+  1410→  1410→      profitBalance: 'Profit Balance',
+  1411→  1411→      amount: 'Amount',
+  1412→  1412→      adminFee: 'Admin Fee',
+  1413→  1413→      received: 'Received',
+  1414→  1414→      noBankYet: 'No Bank Account Yet',
+  1415→  1415→      addBankFirst: 'Add a bank account first to make a withdrawal',
+  1416→  1416→      addBankBtn: 'Add Account',
+  1417→  1417→      selectBankAccount: 'Select bank account',
+  1418→  1418→      minWithFee: 'Minimum',
+  1419→  1419→      insufficientProfit: 'Insufficient profit balance',
+  1420→  1420→      withdrawSuccess: 'Withdrawal submitted successfully',
+  1421→  1421→      noWithdrawHistory: 'No withdrawal history yet',
+  1422→  1422→      weekdaysOnly: 'Withdrawal only available Monday - Friday',
+  1423→  1423→      hoursOnly: 'Withdrawal only available 08:00 - 17:00',
+  1424→  1424→      loadFailed: 'Failed to Load Data',
+  1425→  1425→      tryAgain: 'Try Again',
+  1426→  1426→    },
+  1427→  1427→    history: {
+  1428→  1428→      title: 'History',
+  1429→  1429→      transactionHistory: 'Transaction History',
+  1430→  1430→      all: 'All',
+  1431→  1431→      deposit: 'Deposit',
+  1432→  1432→      withdrawal: 'Withdraw',
+  1433→  1433→      purchase: 'Product',
+  1434→  1434→      investment: 'Investment',
+  1435→  1435→      bonus: 'Bonus',
+  1436→  1436→      profit: 'Profit',
+  1437→  1437→      noTransactions: 'No transactions yet',
+  1438→  1438→      loadFailed: 'Failed to Load Data',
+  1439→  1439→      tryAgain: 'Try Again',
+  1440→  1440→      product: 'Product',
+  1441→  1441→      wd: 'WD',
+  1442→  1442→      allActivity: 'All your financial activity history',
+  1443→  1443→      success: 'Success',
+  1444→  1444→      completed: 'Completed',
+  1445→  1445→      pending: 'Pending',
+  1446→  1446→      failed: 'Failed',
+  1447→  1447→      cancelled: 'Cancelled',
+  1448→  1448→      stopped: 'Stopped',
+  1449→  1449→      buyProduct: 'Buy Product',
+  1450→  1450→    },
+  1451→  1451→    referral: {
+  1452→  1452→      title: 'Referral',
+  1453→  1453→      inviteFriends: 'Invite friends and earn bonuses',
+  1454→  1454→      yourCode: 'Your Referral Code',
+  1455→  1455→      yourLink: 'Your Referral Link',
+  1456→  1456→      copyLink: 'Copy Link',
+  1457→  1457→      shareVia: 'Share',
+  1458→  1458→      totalReferrals: 'Total Referrals',
+  1459→  1459→      bonusEarned: 'Bonus Earned',
+  1460→  1460→      teamList: 'Referral Team',
+  1461→  1461→      level: 'Level',
+  1462→  1462→      noTeam: 'No referral team yet',
+  1463→  1463→      shareCode: 'Share your code to start earning bonuses',
+  1464→  1464→      copied: 'Referral link copied!',
+  1465→  1465→      copyFailed: 'Failed to copy link',
+  1466→  1466→      directInvite: 'Direct invite',
+  1467→  1467→      level1Invite: 'Invite from Level 1',
+  1468→  1468→      level2Invite: 'Invite from Level 2',
+  1469→  1469→      level3Invite: 'Invite from Level 3',
+  1470→  1470→      level4Invite: 'Invite from Level 4',
+  1471→  1471→      referralLevel: 'Referral Bonus Levels',
+  1472→  1472→      bonusReferral: 'Referral Bonus',
+  1473→  1473→      shareViaWhatsApp: 'WhatsApp',
+  1474→  1474→      loadFailed: 'Failed to Load Data',
+  1475→  1475→      tryAgain: 'Try Again',
+  1476→  1476→      oneReferralLimit: 'Maximum 1 direct referral',
+  1477→  1477→      referralSlotUsed: 'Referral slot used',
+  1478→  1478→      referralSlotAvailable: 'Referral slot available',
+  1479→  1479→    },
+  1480→  1480→    network: {
+  1481→  1481→      title: 'Network',
+  1482→  1482→      solarNetwork: 'Matching Profit',
+  1483→  1483→      groupOmzet: 'Total Group Omzet',
+  1484→  1484→      directReferrals: 'Direct Referrals',
+  1485→  1485→      totalNetwork: 'Total Network',
+  1486→  1486→      levelDetail: 'Detail Per Level',
+  1487→  1487→      bonusSummary: 'Bonus Summary',
+  1488→  1488→      totalSponsorBonus: 'Total Sponsor Bonus',
+  1489→  1489→      totalLevelBonus: 'Total Level Bonus',
+  1490→  1490→      totalRewardBonus: 'Total Reward Bonus',
+  1491→  1491→      milestone: 'Reward Milestone',
+  1492→  1492→      referralList: 'Referral List',
+  1493→  1493→      networkVisualization: 'Network Visualization',
+  1494→  1494→      atCenter: 'You are at the center of your network',
+  1495→  1495→      totalMembers: 'total network members',
+  1496→  1496→      detailPerLevel: 'Detail Per Level',
+  1497→  1497→      infoOmzetBonus: 'Omzet and bonus info at each network level',
+  1498→  1498→      bonusSummaryDesc: 'Total bonuses you have received from various sources',
+  1499→  1499→      fromInvestmentReferral: 'From referral investments',
+  1500→  1500→      basedOnOmzet: 'Based on group omzet',
+  1501→  1501→      milestoneAchievement: 'Milestone achievement',
+  1502→  1502→      milestoneDesc: 'Achieve group omzet targets to earn reward bonuses',
+  1503→  1503→      achieveTarget: 'Achieve group omzet targets to earn reward bonuses',
+  1504→  1504→      noMilestone: 'No milestone data yet',
+  1505→  1505→      clickToView: 'Click level to view member list',
+  1506→  1506→      noMembers: 'No members in your network yet',
+  1507→  1507→      inviteFriendsNow: 'Invite Friends Now',
+  1508→  1508→      members: 'members',
+  1509→  1509→      omzetGroup: 'Group Omzet',
+  1510→  1510→      sponsorBonusRate: 'Sponsor Bonus',
+  1511→  1511→      levelBonusRate: 'Level Bonus',
+  1512→  1512→      achieved: 'Achieved!',
+  1513→  1513→      bonusReceived: 'Bonus received',
+  1514→  1514→      referral: 'referral',
+  1515→  1515→      loadFailed: 'Failed to Load Data',
+  1516→  1516→      tryAgain: 'Try Again',
+  1517→  1517→      copyCode: 'Copy code',
+  1518→  1518→      codeCopied: 'Referral Code Copied!',
+  1519→  1519→      copyFailed: 'Failed to Copy',
+  1520→  1520→      networkUnavailable: 'Network data unavailable',
+  1521→  1521→      omzet: 'Omzet',
+  1522→  1522→    },
+  1523→  1523→    bank: {
+  1524→  1524→      title: 'Bank Accounts',
+  1525→  1525→      addBank: 'Add Account',
+  1526→  1526→      editBank: 'Edit Account',
+  1527→  1527→      bankName: 'Bank Name',
+  1528→  1528→      accountNo: 'Account Number',
+  1529→  1529→      holderName: 'Account Holder',
+  1530→  1530→      primary: 'Primary',
+  1531→  1531→      noBanks: 'No Bank Accounts',
+  1532→  1532→      bankExample: 'e.g. BCA, Mandiri, BNI',
+  1533→  1533→      enterAccountNo: 'Enter account number',
+  1534→  1534→      namePerBook: 'Name as per bank book',
+  1535→  1535→      saveBank: 'Save',
+  1536→  1536→      addBtn: 'Add',
+  1537→  1537→      deleteBank: 'Delete Account?',
+  1538→  1538→      deleteConfirm: 'will be permanently deleted.',
+  1539→  1539→      deleted: 'Account deleted',
+  1540→  1540→      updated: 'Account updated',
+  1541→  1541→      added: 'Account added',
+  1542→  1542→      allFieldsRequired: 'All fields are required',
+  1543→  1543→      loadFailed: 'Failed to Load Data',
+  1544→  1544→      tryAgain: 'Try Again',
+  1545→  1545→    },
+  1546→  1546→    settings: {
+  1547→  1547→      title: 'Settings',
+  1548→  1548→      changeName: 'Change Name',
+  1549→  1549→      changeWhatsapp: 'Change WhatsApp',
+  1550→  1550→      changePassword: 'Change Password',
+  1551→  1551→      saveName: 'Save Name',
+  1552→  1552→      saveWhatsapp: 'Save',
+  1553→  1553→      changePasswordBtn: 'Change Password',
+  1554→  1554→      logoutAccount: 'Logout',
+  1555→  1555→      profileInfo: 'Manage your account and profile',
+  1556→  1556→      whatsapp: 'WhatsApp',
+  1557→  1557→      mainBalance: 'Main Balance',
+  1558→  1558→      totalDeposit: 'Total Deposit',
+  1559→  1559→      totalProfit: 'Total Profit',
+  1560→  1560→      nameRequired: 'Name cannot be empty',
+  1561→  1561→      nameUpdated: 'Name updated successfully',
+  1562→  1562→      whatsappRequired: 'WhatsApp number cannot be empty',
+  1563→  1563→      whatsappUpdated: 'WhatsApp number updated successfully',
+  1564→  1564→      avatarUpdated: 'Avatar updated successfully',
+  1565→  1565→      avatarUploadFailed: 'Failed to upload avatar',
+  1566→  1566→      oldPassword: 'Old Password',
+  1567→  1567→      newPassword: 'New Password',
+  1568→  1568→      confirmPassword: 'Confirm New Password',
+  1569→  1569→      passwordMin6: 'New password must be at least 6 characters',
+  1570→  1570→      passwordMismatch: 'Passwords do not match',
+  1571→  1571→      passwordUpdated: 'Password updated successfully',
+  1572→  1572→      bankAccount: 'Bank Account',
+  1573→  1573→      referral: 'Referral',
+  1574→  1574→      notSet: 'Not set',
+  1575→  1575→      nameEmpty: 'Name cannot be empty',
+  1576→  1576→      loadFailed: 'An error occurred',
+  1577→  1577→    },
+  1578→  1578→    nav: {
+  1579→  1579→      home: 'Home',
+  1580→  1580→      dashboard: 'Dashboard',
+  1581→  1581→      products: 'Products',
+  1582→  1582→      paket: 'Packages',
+  1583→  1583→      assets: 'Assets',
+  1584→  1584→      deposit: 'Deposit',
+  1585→  1585→      withdraw: 'Withdraw',
+  1586→  1586→      history: 'History',
+  1587→  1587→      referral: 'Referral',
+  1588→  1588→      network: 'Network',
+  1589→  1589→      bank: 'Bank',
+  1590→  1590→      settings: 'Settings',
+  1591→  1591→      download: 'Download',
+  1592→  1592→      wallet: 'Wallet',
+  1593→  1593→      profile: 'Profile',
+  1594→  1594→      logout: 'Logout',
+  1595→  1595→      salaryBonus: 'Salary',
+  1596→  1596→      matchingBonus: 'M.Profit',
+  1597→  1597→    },
+  1598→  1598→    landing: {
+  1599→  1599→      welcome: 'Welcome to NEXVO',
+  1600→  1600→      subtitle: '#1 Digital Asset Management Platform',
+  1601→  1601→      aboutTitle: 'About NEXVO',
+  1602→  1602→      aboutSubtitle: 'Digital Investment Platform',
+  1603→  1603→      howItWorks: 'How It Works',
+  1604→  1604→      easySteps: '5 Easy Steps',
+  1605→  1605→      statistics: 'Statistics',
+  1606→  1606→      liveActivity: 'Live Activity',
+  1607→  1607→      testimonials: 'Testimonials',
+  1608→  1608→      startNow: 'Start Now',
+  1609→  1609→      viewProducts: 'View Products',
+  1610→  1610→      security: 'Enterprise-Grade Security',
+  1611→  1611→      dailyProfit: 'Measurable Daily Profit',
+  1612→  1612→      fastTransaction: 'Fast & Easy Transactions',
+  1613→  1613→      globalAccess: '24/7 Global Access',
+  1614→  1614→      trusted: 'Trusted & Transparent',
+  1615→  1615→      cuttingEdge: 'Cutting-Edge Technology',
+  1616→  1616→      registerStep: 'Register Account',
+  1617→  1617→      verifyStep: 'OTP Verification',
+  1618→  1618→      depositStep: 'Deposit Funds',
+  1619→  1619→      selectProduct: 'Select Product',
+  1620→  1620→      monitorProfit: 'Monitor Profit',
+  1621→  1621→      totalMembers: 'Total Members',
+  1622→  1622→      totalTransactions: 'Total Transactions',
+  1623→  1623→      uptime: 'Uptime',
+  1624→  1624→      satisfaction: 'Satisfaction',
+  1625→  1625→      aboutNexvo: 'About NEXVO',
+  1626→  1626→      digitalPlatform: 'Digital Investment Platform',
+  1627→  1627→      trustedWorldwide: 'Trusted Worldwide',
+  1628→  1628→      startInvestNow: 'Start Investing Now',
+  1629→  1629→      viewAllProducts: 'View All Products',
+  1630→  1630→      noProductsAvailable: 'No products available yet',
+  1631→  1631→      recentTransactions: 'Recent Transactions',
+  1632→  1632→      monitorRealTime: 'Monitor the latest activity from all NEXVO users in real-time',
+  1633→  1633→      noRecentActivity: 'No recent activity',
+  1634→  1634→      whatTheySay: 'What They Say',
+  1635→  1635→      realTestimonials: 'Real testimonials from NEXVO users who have experienced the benefits',
+  1636→  1636→      featuredProducts: 'Featured Products',
+  1637→  1637→      choosePackage: 'Choose Investment Package',
+  1638→  1638→      choosePackageDesc: 'Choose a package that suits your capabilities and investment goals',
+  1639→  1639→      minutesToStart: 'Start your digital investment journey in minutes',
+  1640→  1640→      serverUptime: 'Server Uptime',
+  1641→  1641→      onlineSupport: 'Online Support',
+  1642→  1642→      sslEncryption: 'SSL Encryption',
+  1643→  1643→      verificationProcess: 'Verification Process',
+  1644→  1644→      quotaFilled: 'Quota Filled',
+  1645→  1645→      remaining: 'Remaining',
+  1646→  1646→      days: 'Days',
+  1647→  1647→      estProfit: 'Est. profit',
+  1648→  1648→      viewDetail: 'View Detail',
+  1649→  1649→      duration: 'Duration',
+  1650→  1650→    },
+  1651→  1651→    admin: {
+  1652→  1652→      mainGroup: 'Main',
+  1653→  1653→      managementGroup: 'Management',
+  1654→  1654→      transactionGroup: 'Transactions',
+  1655→  1655→      systemGroup: 'System',
+  1656→  1656→      contentGroup: 'Content',
+  1657→  1657→      securityGroup: 'Security',
+  1658→  1658→      otherGroup: 'Other',
+  1659→  1659→      systemOnline: 'System Online',
+  1660→  1660→      adminPanel: 'NEXVO Admin Panel',
+  1661→  1661→      logout: 'Logout',
+  1662→  1662→    },
+  1663→  1663→    otp: {
+  1664→  1664→      title: 'OTP Verification',
+  1665→  1665→      subtitle: 'Enter the OTP code sent to your WhatsApp/Email',
+  1666→  1666→      verifyBtn: 'Verify',
+  1667→  1667→      resendOtp: 'Resend OTP',
+  1668→  1668→      sentTo: 'Code sent to',
+  1669→  1669→    },
+  1670→  1670→    salary: {
+  1671→  1671→      title: 'Weekly Salary',
+  1672→  1672→      subtitle: 'Earn weekly salary by meeting requirements',
+  1673→  1673→      eligibility: 'Eligibility',
+  1674→  1674→      eligible: 'Eligible',
+  1675→  1675→      notEligible: 'Not Eligible',
+  1676→  1676→      directRefs: 'Direct Referrals',
+  1677→  1677→      groupOmzet: 'Group Omzet',
+  1678→  1678→      required: 'Required',
+  1679→  1679→      current: 'Current',
+  1680→  1680→      salaryAmount: 'Salary Amount',
+  1681→  1681→      perWeek: '/week',
+  1682→  1682→      claimSalary: 'Claim Weekly Salary',
+  1683→  1683→      claimSuccess: 'Weekly salary claimed successfully!',
+  1684→  1684→      alreadyClaimed: 'Already claimed this week',
+  1685→  1685→      notEligibleMsg: 'You do not meet the requirements for weekly salary yet',
+  1686→  1686→      salaryHistory: 'Salary History',
+  1687→  1687→      weekNumber: 'Week',
+  1688→  1688→      year: 'Year',
+  1689→  1689→      amount: 'Amount',
+  1690→  1690→      status: 'Status',
+  1691→  1691→      paid: 'Paid',
+  1692→  1692→      noHistory: 'No salary history yet',
+  1693→  1693→      totalEarned: 'Total Salary Earned',
+  1694→  1694→      lastClaimed: 'Last Claimed',
+  1695→  1695→      neverClaimed: 'Never claimed',
+  1696→  1696→      loadFailed: 'Failed to Load Data',
+  1697→  1697→      tryAgain: 'Try Again',
+  1698→  1698→      claiming: 'Claiming...',
+  1699→  1699→    },
+  1700→  1700→    matching: {
+  1701→  1701→      title: 'Matching Profit Bonus',
+  1702→  1702→      subtitle: 'Earn bonuses from your downline profits',
+  1703→  1703→      members: 'members',
+  1704→  1704→      potentialBonus: 'Potential Bonus',
+  1705→  1705→      levelRates: 'Level Rates',
+  1706→  1706→      level: 'Level',
+  1707→  1707→      rate: 'Rate',
+  1708→  1708→      bonus: 'Bonus',
+  1709→  1709→      claimMatching: 'Claim Matching Profit',
+  1710→  1710→      claimSuccess: 'Matching profit bonus claimed successfully!',
+  1711→  1711→      noBonus: 'No matching profit bonus available to claim at this time',
+  1712→  1712→      matchingHistory: 'Matching Profit History',
+  1713→  1713→      noHistory: 'No matching profit history yet',
+  1714→  1714→      totalEarned: 'Total Matching Earned',
+  1715→  1715→      loadFailed: 'Failed to Load Data',
+  1716→  1716→      tryAgain: 'Try Again',
+  1717→  1717→      claiming: 'Claiming...',
+  1718→  1718→      profitOverview: 'Matching Profit Overview',
+  1719→  1719→      profitOverviewDesc: 'Bonuses from profits generated by your downline',
+  1720→  1720→      downlineProfit: 'Downline Profit',
+  1721→  1721→      downlineMembers: 'Downline Members',
+  1722→  1722→      profitDownline: 'Downline Profit',
+  1723→  1723→      totalProfitMatched: 'Total Profit Matched',
+  1724→  1724→    },
+  1725→  1725→  },
+  1726→  1726→  zh: {
+  1727→  1727→    common: {
+  1728→  1728→      loading: '加载中...',
+  1729→  1729→      error: '发生错误',
+  1730→  1730→      success: '成功',
+  1731→  1731→      retry: '重试',
+  1732→  1732→      save: '保存',
+  1733→  1733→      cancel: '取消',
+  1734→  1734→      delete: '删除',
+  1735→  1735→      edit: '编辑',
+  1736→  1736→      add: '添加',
+  1737→  1737→      search: '搜索',
+  1738→  1738→      noData: '暂无数据',
+  1739→  1739→      confirm: '确认',
+  1740→  1740→      back: '返回',
+  1741→  1741→      next: '下一步',
+  1742→  1742→      submit: '提交',
+  1743→  1743→      close: '关闭',
+  1744→  1744→      copy: '复制',
+  1745→  1745→      copied: '已复制',
+  1746→  1746→      share: '分享',
+  1747→  1747→      download: '下载',
+  1748→  1748→      upload: '上传',
+  1749→  1749→      viewAll: '查看全部',
+  1750→  1750→      processing: '处理中...',
+  1751→  1751→      allFieldsRequired: '所有字段均为必填',
+  1752→  1752→      networkError: '网络错误',
+  1753→  1753→      operationFailed: '操作失败',
+  1754→  1754→    },
+  1755→  1755→    auth: {
+  1756→  1756→      login: '登录',
+  1757→  1757→      register: '注册',
+  1758→  1758→      logout: '退出',
+  1759→  1759→      whatsapp: 'WhatsApp',
+  1760→  1760→      email: '邮箱',
+  1761→  1761→      password: '密码',
+  1762→  1762→      oldPassword: '旧密码',
+  1763→  1763→      newPassword: '新密码',
+  1764→  1764→      confirmPassword: '确认密码',
+  1765→  1765→      forgotPassword: '忘记密码',
+  1766→  1766→      noAccount: '还没有账号？',
+  1767→  1767→      hasAccount: '已有账号？',
+  1768→  1768→      loginSuccess: '欢迎回来！',
+  1769→  1769→      registerSuccess: '账号创建成功！欢迎来到 NEXVO。',
+  1770→  1770→      otpVerification: 'OTP 验证',
+  1771→  1771→      enterOtp: '输入 OTP 验证码',
+  1772→  1772→      resendOtp: '重新发送 OTP',
+  1773→  1773→      referralCode: '推荐码',
+  1774→  1774→      referralCodeOptional: '输入推荐码（可选）',
+  1775→  1775→      loginSubtitle: '登录以访问 NEXVO 平台',
+  1776→  1776→      registerSubtitle: '在 NEXVO 平台注册新账号',
+  1777→  1777→      whatsappOrEmail: 'WhatsApp / 邮箱',
+  1778→  1778→      enterWhatsappOrEmail: 'WhatsApp 号码或邮箱',
+  1779→  1779→      enterPassword: '输入密码',
+  1780→  1780→      minChars: '最少 6 个字符',
+  1781→  1781→      passwordMismatch: '密码不匹配',
+  1782→  1782→      passwordNotMatch: '确认密码不匹配',
+  1783→  1783→      registerNow: '立即注册',
+  1784→  1784→      signIn: '登录',
+  1785→  1785→      adminPanel: '管理面板',
+  1786→  1786→      strengthWeak: '弱',
+  1787→  1787→      strengthMedium: '中',
+  1788→  1788→      strengthStrong: '强',
+  1789→  1789→      passwordStrength: '强度',
+  1790→  1790→      haveCode: '有推荐码？',
+  1791→  1791→      hide: '隐藏',
+  1792→  1792→      registering: '注册中...',
+  1793→  1793→      whatsappNumber: 'WhatsApp 号码',
+  1794→  1794→      emailAddress: '邮箱地址',
+  1795→  1795→      validWhatsApp: '请输入有效的 WhatsApp 号码',
+  1796→  1796→      validEmail: '请输入有效的邮箱地址',
+  1797→  1797→    },
+  1798→  1798→    dashboard: {
+  1799→  1799→      title: '仪表盘',
+  1800→  1800→      mainBalance: '主余额',
+  1801→  1801→      profitBalance: '收益余额',
+  1802→  1802→      totalDeposit: '总充值',
+  1803→  1803→      totalWithdraw: '总提现',
+  1804→  1804→      totalProfit: '总收益',
+  1805→  1805→      level: '等级',
+  1806→  1806→      activeAssets: '活跃资产',
+  1807→  1807→      recentActivity: '最近活动',
+  1808→  1808→      memberSince: '加入时间',
+  1809→  1809→      quickNav: '快捷导航',
+  1810→  1810→      noActivity: '暂无活动',
+  1811→  1811→      depositBtn: '充值',
+  1812→  1812→      withdrawBtn: '提现',
+  1813→  1813→      buyProduct: '购买产品',
+  1814→  1814→      investment: '投资',
+  1815→  1815→      bonus: '奖金',
+  1816→  1816→      profit: '收益',
+  1817→  1817→      success: '成功',
+  1818→  1818→      completed: '已完成',
+  1819→  1819→      pending: '待处理',
+  1820→  1820→      failed: '失败',
+  1821→  1821→      loadFailed: '加载数据失败',
+  1822→  1822→      tryAgain: '重试',
+  1823→  1823→      active: '活跃',
+  1824→  1824→      perDay: '/天',
+  1825→  1825→      viewAll: '查看全部',
+  1826→  1826→    },
+  1827→  1827→    products: {
+  1828→  1828→      title: '产品',
+  1829→  1829→      investmentProducts: '投资产品',
+  1830→  1830→      filter: '筛选',
+  1831→  1831→      all: '全部',
+  1832→  1832→      gold: '黄金',
+  1833→  1833→      silver: '白银',
+  1834→  1834→      diamond: '钻石',
+  1835→  1835→      duration: '期限',
+  1836→  1836→      estProfit: '预计收益',
+  1837→  1837→      quota: '配额',
+  1838→  1838→      quotaFilled: '已认购配额',
+  1839→  1839→      remaining: '剩余',
+  1840→  1840→      buyNow: '立即购买',
+  1841→  1841→      viewDetail: '查看详情',
+  1842→  1842→      noProducts: '暂无产品',
+  1843→  1843→      noCategory: '该分类下暂无产品',
+  1844→  1844→      selectProduct: '选择适合您投资目标的产品',
+  1845→  1845→      perDay: ' / 天',
+  1846→  1846→      days: '天',
+  1847→  1847→    },
+  1848→  1848→    paket: {
+  1849→  1849→      title: '套餐',
+  1850→  1850→      investmentPackages: '投资套餐',
+  1851→  1851→      dailyProfit: '每日收益',
+  1852→  1852→      contract: '合约',
+  1853→  1853→      contractDays: '天',
+  1854→  1854→      capitalReturn: '本金返还',
+  1855→  1855→      investNow: '立即投资',
+  1856→  1856→      confirmInvest: '立即投资',
+  1857→  1857→      investSuccess: '投资成功！',
+  1858→  1858→      totalProfit: '总收益',
+  1859→  1859→      bonusStructure: '奖金结构',
+  1860→  1860→      sponsorBonus: '推荐奖金',
+  1861→  1861→      levelBonus: '级差奖金',
+  1862→  1862→      rewardBonus: '奖励奖金',
+  1863→  1863→      solarNetwork: '匹配利润',
+  1864→  1864→      selectPackage: '选择适合您需求的投资套餐',
+  1865→  1865→      confirmInvestTitle: '确认投资',
+  1866→  1866→      balanceDeduct: '将从您的主余额中扣除',
+  1867→  1867→      insufficientBalance: '余额不足，将跳转到充值页面',
+  1868→  1868→      packageLabel: '套餐',
+  1869→  1869→      modal: '本金',
+  1870→  1870→      contractLabel: '合约',
+  1871→  1871→      yourBalance: '您的余额',
+  1872→  1872→      remainingBalance: '剩余余额',
+  1873→  1873→      cancel: '取消',
+  1874→  1874→      depositInvest: '充值并投资',
+  1875→  1875→      investSuccessTitle: '投资成功！',
+  1876→  1876→      investSuccessDesc: '已成功激活',
+  1877→  1877→      viewMyAssets: '查看我的资产',
+  1878→  1878→      noPackages: '暂无可用投资套餐',
+  1879→  1879→      totalProfitDays: '{days}天总收益',
+  1880→  1880→      fromReferral: '来自推荐充值',
+  1881→  1881→      basedOnGroupOmzet: '基于团队业绩',
+  1882→  1882→      basedOnGroupOmzet2: '基于团队业绩',
+  1883→  1883→      networkBonus: '来自下线利润的5级匹配利润奖金体系',
+  1884→  1884→    },
+  1885→  1885→    assets: {
+  1886→  1886→      title: '资产',
+  1887→  1887→      myAssets: '我的资产',
+  1888→  1888→      investNew: '新投资',
+  1889→  1889→      activeAsset: '活跃资产',
+  1890→  1890→      totalCapital: '总本金',
+  1891→  1891→      profitPerDay: '每日收益',
+  1892→  1892→      totalProfit: '总收益',
+  1893→  1893→      modal: '本金',
+  1894→  1894→      contractProgress: '合约进度',
+  1895→  1895→      daysRemaining: '天剩余',
+  1896→  1896→      estimatedReturn: '预计总回报',
+  1897→  1897→      lastProfit: '最近收益',
+  1898→  1898→      statusActive: '活跃',
+  1899→  1899→      statusCompleted: '已完成',
+  1900→  1900→      statusStopped: '已停止',
+  1901→  1901→      statusCancelled: '已取消',
+  1902→  1902→      noAssets: '暂无资产',
+  1903→  1903→      investmentPackage: '投资套餐',
+  1904→  1904→      product: '产品',
+  1905→  1905→      contract: '合约',
+  1906→  1906→      profitRate: '收益率',
+  1907→  1907→      endDate: '到期日',
+  1908→  1908→      daysLeft: '天剩余',
+  1909→  1909→      all: '全部',
+  1910→  1910→      investment: '投资',
+  1911→  1911→      products: '产品',
+  1912→  1912→      viewPackages: '查看投资套餐',
+  1913→  1913→      startInvesting: '开始投资以增加您的资产',
+  1914→  1914→      loadFailed: '加载数据失败',
+  1915→  1915→      tryAgain: '重试',
+  1916→  1916→    },
+  1917→  1917→    deposit: {
+  1918→  1918→      title: '充值',
+  1919→  1919→      topUpBalance: '为您的账户余额充值',
+  1920→  1920→      paymentMethod: '支付方式',
+  1921→  1921→      bankTransfer: '银行转账',
+  1922→  1922→      eWallet: '电子钱包',
+  1923→  1923→      qris: 'QRIS',
+  1924→  1924→      crypto: 'USDT (BEP20)',
+  1925→  1925→      usdt: 'USDT (BEP20)',
+  1926→  1926→      amount: '支付金额',
+  1927→  1927→      minDeposit: '最低充值 100,000 印尼盾',
+  1928→  1928→      uploadProof: '转账凭证（可选）',
+  1929→  1929→      proofOptional: '转账凭证（可选）',
+  1930→  1930→      submitDeposit: '充值',
+  1931→  1931→      depositHistory: '充值记录',
+  1932→  1932→      accountNo: '账号',
+  1933→  1933→      holderName: '账户持有人',
+  1934→  1934→      scanQR: '扫码支付',
+  1935→  1935→      balanceSufficient: '余额充足！',
+  1936→  1936→      payFromBalance: '从余额直接支付',
+  1937→  1937→      productPayment: '产品付款',
+  1938→  1938→      investmentPayment: '投资付款',
+  1939→  1939→      back: '返回',
+  1940→  1940→      totalPayment: '应付总额',
+  1941→  1941→      sufficientBalance: '余额充足！',
+  1942→  1942→      sufficientBalanceDesc: '您的主余额足以支付',
+  1943→  1943→      paymentAmount: '支付金额',
+  1944→  1944→      uploadTransfer: '上传转账凭证',
+  1945→  1945→      maxFileSize: 'PNG, JPG 最大 5MB',
+  1946→  1946→      depositSuccess: '充值已提交，等待管理员确认。',
+  1947→  1947→      depositProductSuccess: '充值已提交，批准后余额可直接用于购买产品。',
+  1948→  1948→      depositInvestSuccess: '充值已提交，批准后余额可直接用于投资。',
+  1949→  1949→      depositPending: '充值已提交，等待管理员确认。',
+  1950→  1950→      minDepositAmount: '最低充值 100,000 印尼盾',
+  1951→  1951→      selectPayment: '请先选择支付方式',
+  1952→  1952→      uploadFailed: '上传转账凭证失败',
+  1953→  1953→      noPaymentMethods: '暂无可用支付方式',
+  1954→  1954→      noDepositHistory: '暂无充值记录',
+  1955→  1955→      uploadProofLabel: '转账凭证（可选）',
+  1956→  1956→      bankAccountNo: '银行账号',
+  1957→  1957→      eWalletAccount: '电子钱包账号',
+  1958→  1958→      atName: '持有人姓名',
+  1959→  1959→      scanQRDesc: '使用您的电子钱包或手机银行应用扫描上方二维码',
+  1960→  1960→      pay: '支付',
+  1961→  1961→      deposit: '充值',
+  1962→  1962→      quantity: '数量',
+  1963→  1963→      contractDays: '合约',
+  1964→  1964→      buyProduct: '购买此产品',
+  1965→  1965→      invest: '投资',
+  1966→  1966→      loadFailed: '加载数据失败',
+  1967→  1967→      tryAgain: '重试',
+  1968→  1968→    },
+  1969→  1969→    withdraw: {
+  1970→  1970→      title: '提现',
+  1971→  1971→      withdrawFunds: '从您的账户提现',
+  1972→  1972→      bankAccount: '收款账户',
+  1973→  1973→      addBank: '添加账户',
+  1974→  1974→      noBankAccount: '暂无银行账户',
+  1975→  1975→      fee: '手续费',
+  1976→  1976→      netAmount: '到账金额',
+  1977→  1977→      minWithdraw: '最低提现',
+  1978→  1978→      outsideHours: '非工作时间',
+  1979→  1979→      workingHours: '提现仅限周一至周五 08:00 - 17:00',
+  1980→  1980→      withdrawHistory: '提现记录',
+  1981→  1981→      selectBank: '选择银行账户',
+  1982→  1982→      withdrawAmount: '提现金额',
+  1983→  1983→      profitBalance: '收益余额',
+  1984→  1984→      amount: '金额',
+  1985→  1985→      adminFee: '手续费',
+  1986→  1986→      received: '到账',
+  1987→  1987→      noBankYet: '暂无银行账户',
+  1988→  1988→      addBankFirst: '请先添加银行账户以进行提现',
+  1989→  1989→      addBankBtn: '添加账户',
+  1990→  1990→      selectBankAccount: '选择银行账户',
+  1991→  1991→      minWithFee: '最低',
+  1992→  1992→      insufficientProfit: '收益余额不足',
+  1993→  1993→      withdrawSuccess: '提现已成功提交',
+  1994→  1994→      noWithdrawHistory: '暂无提现记录',
+  1995→  1995→      weekdaysOnly: '提现仅限周一至周五',
+  1996→  1996→      hoursOnly: '提现仅限 08:00 - 17:00',
+  1997→  1997→      loadFailed: '加载数据失败',
+  1998→  1998→      tryAgain: '重试',
+  1999→  1999→    },
+  2000→  2000→    history: {
+
+[showing lines 1-2000 of 2002; use offset=2001 with limit to continue reading]

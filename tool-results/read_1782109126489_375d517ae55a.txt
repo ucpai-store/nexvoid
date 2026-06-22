@@ -1,0 +1,1258 @@
+     1→     1→/**
+     2→     2→ * NEXVO i18n Type Definitions
+     3→     3→ * Supports 20 languages for the financial platform
+     4→     4→ */
+     5→     5→
+     6→     6→export type LanguageCode =
+     7→     7→  | 'id'    // Bahasa Indonesia
+     8→     8→  | 'en'    // English
+     9→     9→  | 'zh'    // 中文 (Chinese Simplified)
+    10→    10→  | 'ja'    // 日本語 (Japanese)
+    11→    11→  | 'ko'    // 한국어 (Korean)
+    12→    12→  | 'ar'    // العربية (Arabic)
+    13→    13→  | 'hi'    // हिन्दी (Hindi)
+    14→    14→  | 'th'    // ไทย (Thai)
+    15→    15→  | 'vi'    // Tiếng Việt (Vietnamese)
+    16→    16→  | 'ms'    // Bahasa Melayu (Malay)
+    17→    17→  | 'fil'   // Filipino
+    18→    18→  | 'pt'    // Português (Portuguese)
+    19→    19→  | 'es'    // Español (Spanish)
+    20→    20→  | 'fr'    // Français (French)
+    21→    21→  | 'de'    // Deutsch (German)
+    22→    22→  | 'ru'    // Русский (Russian)
+    23→    23→  | 'tr'    // Türkçe (Turkish)
+    24→    24→  | 'it'    // Italiano (Italian)
+    25→    25→  | 'nl'    // Nederlands (Dutch)
+    26→    26→  | 'uk';   // Українська (Ukrainian)
+    27→    27→
+    28→    28→export interface LanguageOption {
+    29→    29→  code: LanguageCode;
+    30→    30→  name: string;         // Native name
+    31→    31→  englishName: string;  // English name
+    32→    32→  flag: string;         // Emoji flag
+    33→    33→  dir?: 'ltr' | 'rtl'; // Text direction
+    34→    34→}
+    35→    35→
+    36→    36→export const LANGUAGES: LanguageOption[] = [
+    37→    37→  { code: 'id', name: 'Bahasa Indonesia', englishName: 'Indonesian', flag: '🇮🇩' },
+    38→    38→  { code: 'en', name: 'English', englishName: 'English', flag: '🇬🇧' },
+    39→    39→  { code: 'zh', name: '简体中文', englishName: 'Chinese (Simplified)', flag: '🇨🇳' },
+    40→    40→  { code: 'ja', name: '日本語', englishName: 'Japanese', flag: '🇯🇵' },
+    41→    41→  { code: 'ko', name: '한국어', englishName: 'Korean', flag: '🇰🇷' },
+    42→    42→  { code: 'ar', name: 'العربية', englishName: 'Arabic', flag: '🇸🇦', dir: 'rtl' },
+    43→    43→  { code: 'hi', name: 'हिन्दी', englishName: 'Hindi', flag: '🇮🇳' },
+    44→    44→  { code: 'th', name: 'ไทย', englishName: 'Thai', flag: '🇹🇭' },
+    45→    45→  { code: 'vi', name: 'Tiếng Việt', englishName: 'Vietnamese', flag: '🇻🇳' },
+    46→    46→  { code: 'ms', name: 'Bahasa Melayu', englishName: 'Malay', flag: '🇲🇾' },
+    47→    47→  { code: 'fil', name: 'Filipino', englishName: 'Filipino', flag: '🇵🇭' },
+    48→    48→  { code: 'pt', name: 'Português', englishName: 'Portuguese', flag: '🇧🇷' },
+    49→    49→  { code: 'es', name: 'Español', englishName: 'Spanish', flag: '🇪🇸' },
+    50→    50→  { code: 'fr', name: 'Français', englishName: 'French', flag: '🇫🇷' },
+    51→    51→  { code: 'de', name: 'Deutsch', englishName: 'German', flag: '🇩🇪' },
+    52→    52→  { code: 'ru', name: 'Русский', englishName: 'Russian', flag: '🇷🇺' },
+    53→    53→  { code: 'tr', name: 'Türkçe', englishName: 'Turkish', flag: '🇹🇷' },
+    54→    54→  { code: 'it', name: 'Italiano', englishName: 'Italian', flag: '🇮🇹' },
+    55→    55→  { code: 'nl', name: 'Nederlands', englishName: 'Dutch', flag: '🇳🇱' },
+    56→    56→  { code: 'uk', name: 'Українська', englishName: 'Ukrainian', flag: '🇺🇦' },
+    57→    57→];
+    58→    58→
+    59→    59→export const DEFAULT_LANGUAGE: LanguageCode = 'id';
+    60→    60→
+    61→    61→export interface TranslationStrings {
+    62→    62→  // ─── Common ───
+    63→    63→  common: {
+    64→    64→    home: string;
+    65→    65→    login: string;
+    66→    66→    register: string;
+    67→    67→    logout: string;
+    68→    68→    settings: string;
+    69→    69→    save: string;
+    70→    70→    cancel: string;
+    71→    71→    delete: string;
+    72→    72→    edit: string;
+    73→    73→    search: string;
+    74→    74→    loading: string;
+    75→    75→    processing: string;
+    76→    76→    success: string;
+    77→    77→    failed: string;
+    78→    78→    error: string;
+    79→    79→    retry: string;
+    80→    80→    back: string;
+    81→    81→    next: string;
+    82→    82→    close: string;
+    83→    83→    confirm: string;
+    84→    84→    yes: string;
+    85→    85→    no: string;
+    86→    86→    all: string;
+    87→    87→    active: string;
+    88→    88→    inactive: string;
+    89→    89→    pending: string;
+    90→    90→    approved: string;
+    91→    91→    rejected: string;
+    92→    92→    noData: string;
+    93→    93→    copy: string;
+    94→    94→    copied: string;
+    95→    95→    language: string;
+    96→    96→    version: string;
+    97→    97→    change: string;
+    98→    98→    memberSince: string;
+    99→    99→    perDay: string;
+   100→   100→    days: string;
+   101→   101→    hours: string;
+   102→   102→    fee: string;
+   103→   103→    net: string;
+   104→   104→    received: string;
+   105→   105→    minimal: string;
+   106→   106→    notYet: string;
+   107→   107→    insufficient: string;
+   108→   108→    page: string;
+   109→   109→    of: string;
+   110→   110→    total: string;
+   111→   111→  };
+   112→   112→  // ─── Auth ───
+   113→   113→  auth: {
+   114→   114→    loginTitle: string;
+   115→   115→    loginSubtitle: string;
+   116→   116→    registerTitle: string;
+   117→   117→    registerSubtitle: string;
+   118→   118→    whatsappEmail: string;
+   119→   119→    password: string;
+   120→   120→    enterPassword: string;
+   121→   121→    enterWhatsappEmail: string;
+   122→   122→    fullName: string;
+   123→   123→    email: string;
+   124→   124→    whatsapp: string;
+   125→   125→    confirmPassword: string;
+   126→   126→    referralCode: string;
+   127→   127→    forgotPassword: string;
+   128→   128→    noAccount: string;
+   129→   129→    hasAccount: string;
+   130→   130→    registerNow: string;
+   131→   131→    loginNow: string;
+   132→   132→    adminPanel: string;
+   133→   133→    welcomeBack: string;
+   134→   134→    networkError: string;
+   135→   135→    allFieldsRequired: string;
+   136→   136→    otpVerification: string;
+   137→   137→    otpSent: string;
+   138→   138→    verifyOtp: string;
+   139→   139→    resendOtp: string;
+   140→   140→    passwordMin6: string;
+   141→   141→    passwordNotMatch: string;
+   142→   142→    passwordStrength: string;
+   143→   143→    strengthWeak: string;
+   144→   144→    strengthMedium: string;
+   145→   145→    strengthStrong: string;
+   146→   146→    enterReferralOptional: string;
+   147→   147→    haveCode: string;
+   148→   148→    hide: string;
+   149→   149→    whatsappValid: string;
+   150→   150→    emailValid: string;
+   151→   151→    passwordMin: string;
+   152→   152→    nameRequired: string;
+   153→   153→    whatsappRequired: string;
+   154→   154→    avatarMaxSize: string;
+   155→   155→    avatarUpdated: string;
+   156→   156→    avatarUpdateFailed: string;
+   157→   157→    avatarUploadFailed: string;
+   158→   158→    nameUpdated: string;
+   159→   159→    nameUpdateFailed: string;
+   160→   160→    whatsappUpdated: string;
+   161→   161→    whatsappUpdateFailed: string;
+   162→   162→    passwordUpdated: string;
+   163→   163→    passwordUpdateFailed: string;
+   164→   164→    oldPassword: string;
+   165→   165→    newPassword: string;
+   166→   166→    confirmNewPassword: string;
+   167→   167→    enterOldPassword: string;
+   168→   168→    enterNewPassword: string;
+   169→   169→    repeatNewPassword: string;
+   170→   170→    changePassword: string;
+   171→   171→    saveName: string;
+   172→   172→    logoutSuccess: string;
+   173→   173→  };
+   174→   174→  // ─── OTP Page ───
+   175→   175→  otp: {
+   176→   176→    backToLogin: string;
+   177→   177→    verifyWhatsappEmail: string;
+   178→   178→    verified: string;
+   179→   179→    notVerified: string;
+   180→   180→    enter6DigitOtp: string;
+   181→   181→    verify: string;
+   182→   182→    resendIn: string;
+   183→   183→    resendCode: string;
+   184→   184→    whatsappVerified: string;
+   185→   185→    allVerified: string;
+   186→   186→    redirectingToLogin: string;
+   187→   187→    goToLogin: string;
+   188→   188→    allVerificationComplete: string;
+   189→   189→    pleaseLogin: string;
+   190→   190→    otpCodeWrong: string;
+   191→   191→    whatsappVerifySuccess: string;
+   192→   192→    emailVerifySuccess: string;
+   193→   193→    newOtpSentToWhatsapp: string;
+   194→   194→    newOtpSentToEmail: string;
+   195→   195→    resendFailed: string;
+   196→   196→  };
+   197→   197→  // ─── Navigation ───
+   198→   198→  nav: {
+   199→   199→    home: string;
+   200→   200→    dashboard: string;
+   201→   201→    products: string;
+   202→   202→    packages: string;
+   203→   203→    assets: string;
+   204→   204→    deposit: string;
+   205→   205→    withdraw: string;
+   206→   206→    history: string;
+   207→   207→    referral: string;
+   208→   208→    network: string;
+   209→   209→    bank: string;
+   210→   210→    download: string;
+   211→   211→    about: string;
+   212→   212→    howItWorks: string;
+   213→   213→    testimonials: string;
+   214→   214→    liveActivity: string;
+   215→   215→    profile: string;
+   216→   216→    wallet: string;
+   217→   217→    profit: string;
+   218→   218→    live: string;
+   219→   219→    paket: string;
+   220→   220→    salaryBonus: string;
+   221→   221→    matchingBonus: string;
+   222→   222→    settings: string;
+   223→   223→    logout: string;
+   224→   224→  };
+   225→   225→  // ─── Admin Navigation ───
+   226→   226→  adminNav: {
+   227→   227→    main: string;
+   228→   228→    management: string;
+   229→   229→    transactions: string;
+   230→   230→    system: string;
+   231→   231→    content: string;
+   232→   232→    security: string;
+   233→   233→    dashboard: string;
+   234→   234→    users: string;
+   235→   235→    products: string;
+   236→   236→    packages: string;
+   237→   237→    salary: string;
+   238→   238→    deposits: string;
+   239→   239→    withdrawals: string;
+   240→   240→    asset: string;
+   241→   241→    payment: string;
+   242→   242→    app: string;
+   243→   243→    appearance: string;
+   244→   244→    banners: string;
+   245→   245→    settings: string;
+   246→   246→    apiKeys: string;
+   247→   247→    live: string;
+   248→   248→    systemOnline: string;
+   249→   249→    panelAdmin: string;
+   250→   250→  };
+   251→   251→  // ─── Home Page ───
+   252→   252→  home: {
+   253→   253→    heroWelcome: string;
+   254→   254→    heroSubtitle: string;
+   255→   255→    heroDescription: string;
+   256→   256→    heroCta: string;
+   257→   257→    viewProducts: string;
+   258→   258→    aboutNexvo: string;
+   259→   259→    investmentPlatform: string;
+   260→   260→    trustedInIndonesia: string;
+   261→   261→    totalMembers: string;
+   262→   262→    totalTransactions: string;
+   263→   263→    uptime: string;
+   264→   264→    satisfaction: string;
+   265→   265→    howItWorks: string;
+   266→   266→    easySteps: string;
+   267→   267→    stepRegister: string;
+   268→   268→    stepRegisterDesc: string;
+   269→   269→    stepOtp: string;
+   270→   270→    stepOtpDesc: string;
+   271→   271→    stepDeposit: string;
+   272→   272→    stepDepositDesc: string;
+   273→   273→    stepChooseProduct: string;
+   274→   274→    stepChooseProductDesc: string;
+   275→   275→    stepMonitorProfit: string;
+   276→   276→    stepMonitorProfitDesc: string;
+   277→   277→    startInvesting: string;
+   278→   278→    featuredProducts: string;
+   279→   279→    choosePackage: string;
+   280→   280→    choosePackageDesc: string;
+   281→   281→    viewAllProducts: string;
+   282→   282→    noProducts: string;
+   283→   283→    liveActivity: string;
+   284→   284→    recentTransactions: string;
+   285→   285→    recentTransactionsDesc: string;
+   286→   286→    noRecentActivity: string;
+   287→   287→    testimonials: string;
+   288→   288→    whatTheySay: string;
+   289→   289→    whatTheySayDesc: string;
+   290→   290→    highSecurity: string;
+   291→   291→    highSecurityDesc: string;
+   292→   292→    dailyProfit: string;
+   293→   293→    dailyProfitDesc: string;
+   294→   294→    fastTransaction: string;
+   295→   295→    fastTransactionDesc: string;
+   296→   296→    globalAccess: string;
+   297→   297→    globalAccessDesc: string;
+   298→   298→    trustedTransparent: string;
+   299→   299→    trustedTransparentDesc: string;
+   300→   300→    cuttingEdgeTech: string;
+   301→   301→    cuttingEdgeTechDesc: string;
+   302→   302→    serverUptime: string;
+   303→   303→    supportOnline: string;
+   304→   304→    sslEncryption: string;
+   305→   305→    verificationProcess: string;
+   306→   306→    estProfit: string;
+   307→   307→    duration: string;
+   308→   308→    days: string;
+   309→   309→    quotaFilled: string;
+   310→   310→    remaining: string;
+   311→   311→    viewDetail: string;
+   312→   312→    navigation: string;
+   313→   313→    services: string;
+   314→   314→    contact: string;
+   315→   315→    assetManagement: string;
+   316→   316→    commodityInvestment: string;
+   317→   317→    dailyProfitShort: string;
+   318→   318→    referralProgram: string;
+   319→   319→    madeIn: string;
+   320→   320→    allRightsReserved: string;
+   321→   321→    narrativeP1: string;
+   322→   322→    narrativeP2Before: string;
+   323→   323→    narrativeP2Highlight: string;
+   324→   324→    narrativeP2After: string;
+   325→   325→    narrativeP3Before: string;
+   326→   326→    narrativeP3After: string;
+   327→   327→    narrativeP4Before: string;
+   328→   328→    narrativeP4Highlight: string;
+   329→   329→    investMinutes: string;
+   330→   330→    memberNexvo: string;
+   331→   331→    joinNow: string;
+   332→   332→    ctaDescription: string;
+   333→   333→    registerFree: string;
+   334→   334→    alreadyHaveAccount: string;
+   335→   335→    safeTrusted: string;
+   336→   336→    support247: string;
+   337→   337→  };
+   338→   338→  // ─── Deposit Page ───
+   339→   339→  deposit: {
+   340→   340→    title: string;
+   341→   341→    subtitle: string;
+   342→   342→    paymentMethod: string;
+   343→   343→    paymentAmount: string;
+   344→   344→    minimum: string;
+   345→   345→    importantInfo: string;
+   346→   346→    depositHistory: string;
+   347→   347→    noHistory: string;
+   348→   348→    depositSuccess: string;
+   349→   349→    depositId: string;
+   350→   350→    processingHours: string;
+   351→   351→    needHelp: string;
+   352→   352→    needHelpDesc: string;
+   353→   353→    screenshotProof: string;
+   354→   354→    selectPaymentFirst: string;
+   355→   355→    minDeposit: string;
+   356→   356→    scanQr: string;
+   357→   357→    usdtAddress: string;
+   358→   358→    usdtWarning: string;
+   359→   359→    usdtWarningDesc: string;
+   360→   360→    important: string;
+   361→   361→    depositInfo1: string;
+   362→   362→    depositInfo2: string;
+   363→   363→    depositInfo3: string;
+   364→   364→    depositInfo4: string;
+   365→   365→    payDirectly: string;
+   366→   366→    balanceSufficient: string;
+   367→   367→    balanceSufficientDesc: string;
+   368→   368→    productPayment: string;
+   369→   369→    investmentPayment: string;
+   370→   370→    totalPayment: string;
+   371→   371→    contract: string;
+   372→   372→    quantity: string;
+   373→   373→    failedToLoad: string;
+   374→   374→    paymentNotAvailable: string;
+   375→   375→    pay: string;
+   376→   376→    copiedToClipboard: string;
+   377→   377→    copyFailed: string;
+   378→   378→    depositProcessAbout: string;
+   379→   379→    depositUniqueId: string;
+   380→   380→    depositNotYet: string;
+   381→   381→    depositMustContact: string;
+   382→   382→    depositAndTransferMatch: string;
+   383→   383→    paymentFor: string;
+   384→   384→    investmentPackage: string;
+   385→   385→    product: string;
+   386→   386→    afterApprovedCanUse: string;
+   387→   387→    afterApprovedCanInvest: string;
+   388→   388→    processAbout: string;
+   389→   389→  };
+   390→   390→  // ─── Packages Page ───
+   391→   391→  packages: {
+   392→   392→    title: string;
+   393→   393→    subtitle: string;
+   394→   394→    dailyProfitLabel: string;
+   395→   395→    contract: string;
+   396→   396→    capitalReturn: string;
+   397→   397→    totalProfit: string;
+   398→   398→    investNow: string;
+   399→   399→    selectDuration: string;
+   400→   400→    todayRate: string;
+   401→   401→    canChangeTomorrow: string;
+   402→   402→    autoProfit: string;
+   403→   403→    autoProfitActive: string;
+   404→   404→    solarNetwork: string;
+   405→   405→    solarNetworkDesc: string;
+   406→   406→    bonusStructure: string;
+   407→   407→    bonusStructureDesc: string;
+   408→   408→    sponsorBonus: string;
+   409→   409→    sponsorBonusDesc: string;
+   410→   410→    levelBonus: string;
+   411→   411→    levelBonusDesc: string;
+   412→   412→    rewardBonus: string;
+   413→   413→    rewardBonusDesc: string;
+   414→   414→    confirmInvestment: string;
+   415→   415→    balanceWillDeduct: string;
+   416→   416→    balanceInsufficient: string;
+   417→   417→    modal: string;
+   418→   418→    profitRate: string;
+   419→   419→    yourBalance: string;
+   420→   420→    remainingBalance: string;
+   421→   421→    depositAndInvest: string;
+   422→   422→    investmentSuccess: string;
+   423→   423→    investmentSuccessDesc: string;
+   424→   424→    noPackages: string;
+   425→   425→    level: string;
+   426→   426→  };
+   427→   427→  // ─── Dashboard ───
+   428→   428→  dashboard: {
+   429→   429→    mainBalance: string;
+   430→   430→    profitBalance: string;
+   431→   431→    totalInvestment: string;
+   432→   432→    totalProfit: string;
+   433→   433→    activeAssets: string;
+   434→   434→    referralCount: string;
+   435→   435→    recentActivity: string;
+   436→   436→    quickActions: string;
+   437→   437→    topUp: string;
+   438→   438→    invest: string;
+   439→   439→    refer: string;
+   440→   440→    totalDeposit: string;
+   441→   441→    totalWithdraw: string;
+   442→   442→    level: string;
+   443→   443→    viewAll: string;
+   444→   444→    noActivity: string;
+   445→   445→    failedToLoad: string;
+   446→   446→    tryAgain: string;
+   447→   447→    productPurchased: string;
+   448→   448→    investmentLabel: string;
+   449→   449→    bonusLabel: string;
+   450→   450→    matchingLabel: string;
+   451→   451→    profitLabel: string;
+   452→   452→    salaryLabel: string;
+   453→   453→  };
+   454→   454→  // ─── Withdraw ───
+   455→   455→  withdraw: {
+   456→   456→    title: string;
+   457→   457→    subtitle: string;
+   458→   458→    amount: string;
+   459→   459→    bankAccount: string;
+   460→   460→    withdrawHistory: string;
+   461→   461→    noHistory: string;
+   462→   462→    minWithdraw: string;
+   463→   463→    processingTime: string;
+   464→   464→    selectBankAccount: string;
+   465→   465→    destinationAccount: string;
+   466→   466→    chooseBank: string;
+   467→   467→    bank: string;
+   468→   468→    accountNo: string;
+   469→   469→    holderName: string;
+   470→   470→    withdrawAmount: string;
+   471→   471→    profitBalance: string;
+   472→   472→    adminFee: string;
+   473→   473→    estimatedProcess: string;
+   474→   474→    withdrawProcessInfo: string;
+   475→   475→    withdrawNotYet: string;
+   476→   476→    contactAdminWithdraw: string;
+   477→   477→    withdrawWeekdayOnly: string;
+   478→   478→    withdrawHoursOnly: string;
+   479→   479→    outsideWorkingHours: string;
+   480→   480→    noBankAccount: string;
+   481→   481→    addBankFirst: string;
+   482→   482→    addBankAccount: string;
+   483→   483→    withdrawSubmitted: string;
+   484→   484→    withdrawFailed: string;
+   485→   485→    profitInsufficient: string;
+   486→   486→  };
+   487→   487→  // ─── Asset Page ───
+   488→   488→  assets: {
+   489→   489→    title: string;
+   490→   490→    subtitle: string;
+   491→   491→    activeAssets: string;
+   492→   492→    completedAssets: string;
+   493→   493→    dailyProfit: string;
+   494→   494→    totalReturn: string;
+   495→   495→    remainingDays: string;
+   496→   496→    contractEnd: string;
+   497→   497→    noAssets: string;
+   498→   498→    totalModal: string;
+   499→   499→    profitPerDay: string;
+   500→   500→    totalProfitEarned: string;
+   501→   501→    investNew: string;
+   502→   502→    allAssets: string;
+   503→   503→    investment: string;
+   504→   504→    product: string;
+   505→   505→    noAssetsYet: string;
+   506→   506→    startInvesting: string;
+   507→   507→    viewPackages: string;
+   508→   508→    modal: string;
+   509→   509→    duration: string;
+   510→   510→    profitRate: string;
+   511→   511→    completed: string;
+   512→   512→    contractProgress: string;
+   513→   513→    daysRemaining: string;
+   514→   514→    estimatedTotalReturn: string;
+   515→   515→    lastProfit: string;
+   516→   516→    stopped: string;
+   517→   517→    cancelled: string;
+   518→   518→    failedToLoad: string;
+   519→   519→    tryAgain: string;
+   520→   520→  };
+   521→   521→  // ─── History Page ───
+   522→   522→  history: {
+   523→   523→    title: string;
+   524→   524→    subtitle: string;
+   525→   525→    all: string;
+   526→   526→    deposits: string;
+   527→   527→    withdrawals: string;
+   528→   528→    investments: string;
+   529→   529→    bonuses: string;
+   530→   530→    noHistory: string;
+   531→   531→    transactionHistory: string;
+   532→   532→    financialActivity: string;
+   533→   533→    failedToLoad: string;
+   534→   534→    tryAgain: string;
+   535→   535→    noTransactions: string;
+   536→   536→    wd: string;
+   537→   537→    productLabel: string;
+   538→   538→    investmentLabel: string;
+   539→   539→    bonusLabel: string;
+   540→   540→    matchingLabel: string;
+   541→   541→    profitLabel: string;
+   542→   542→    salaryLabel: string;
+   543→   543→    processed: string;
+   544→   544→    stopped: string;
+   545→   545→  };
+   546→   546→  // ─── Network / Referral ───
+   547→   547→  networkPage: {
+   548→   548→    title: string;
+   549→   549→    subtitle: string;
+   550→   550→    myReferralCode: string;
+   551→   551→    shareReferral: string;
+   552→   552→    totalReferrals: string;
+   553→   553→    totalBonus: string;
+   554→   554→    downlines: string;
+   555→   555→    level: string;
+   556→   556→    yourReferralLink: string;
+   557→   557→    copyLink: string;
+   558→   558→    share: string;
+   559→   559→    bonusReferral: string;
+   560→   560→    bonusMatching: string;
+   561→   561→    bonusSalary: string;
+   562→   562→    referralLevel: string;
+   563→   563→    directInvite: string;
+   564→   564→    inviteFromL1: string;
+   565→   565→    inviteFromL2: string;
+   566→   566→    inviteFromL3: string;
+   567→   567→    inviteFromL4: string;
+   568→   568→    matchingProfitL1: string;
+   569→   569→    matchingProfitL2: string;
+   570→   570→    matchingProfitL3: string;
+   571→   571→    matchingProfitL4: string;
+   572→   572→    matchingProfitL5: string;
+   573→   573→    matchingBonusProfit: string;
+   574→   574→    matchingBonusDesc: string;
+   575→   575→    weeklySalaryBonus: string;
+   576→   576→    weeklySalaryDesc: string;
+   577→   577→    directReferrals10: string;
+   578→   578→    member: string;
+   579→   579→    missing: string;
+   580→   580→    minOmzet1M: string;
+   581→   581→    weeklySalary: string;
+   582→   582→    omzetMin25: string;
+   583→   583→    eligibleForSalary: string;
+   584→   584→    meetRequirements: string;
+   585→   585→    totalSalaryReceived: string;
+   586→   586→    referralTeam: string;
+   587→   587→    noTeam: string;
+   588→   588→    shareCodeForBonus: string;
+   589→   589→    failedToLoad: string;
+   590→   590→    tryAgain: string;
+   591→   591→    linkCopied: string;
+   592→   592→    copyFailed: string;
+   593→   593→    shareText: string;
+   594→   594→  };
+   595→   595→  // ─── Settings ───
+   596→   596→  settingsPage: {
+   597→   597→    title: string;
+   598→   598→    subtitle: string;
+   599→   599→    profile: string;
+   600→   600→    changePassword: string;
+   601→   601→    bankInfo: string;
+   602→   602→    notification: string;
+   603→   603→    languageSettings: string;
+   604→   604→    selectLanguage: string;
+   605→   605→    languageChanged: string;
+   606→   606→    changeName: string;
+   607→   607→    changeWhatsapp: string;
+   608→   608→    saveName: string;
+   609→   609→    notSet: string;
+   610→   610→    bankAccount: string;
+   611→   611→    logoutAccount: string;
+   612→   612→    whatsapp: string;
+   613→   613→    mainBalance: string;
+   614→   614→    totalDeposit: string;
+   615→   615→    totalProfit: string;
+   616→   616→    nameUpdated: string;
+   617→   617→    whatsappUpdated: string;
+   618→   618→    passwordUpdated: string;
+   619→   619→    nameEmpty: string;
+   620→   620→    whatsappEmpty: string;
+   621→   621→    allFieldsRequired: string;
+   622→   622→    newPasswordMin6: string;
+   623→   623→    confirmPasswordMismatch: string;
+   624→   624→  };
+   625→   625→  // ─── AI Chat ───
+   626→   626→  aiChat: {
+   627→   627→    assistantName: string;
+   628→   628→    assistantStatus: string;
+   629→   629→    placeholder: string;
+   630→   630→    greeting: string;
+   631→   631→    errorResponse: string;
+   632→   632→    connectionError: string;
+   633→   633→  };
+   634→   634→  // ─── Statuses ───
+   635→   635→  status: {
+   636→   636→    success: string;
+   637→   637→    pending: string;
+   638→   638→    processing: string;
+   639→   639→    failed: string;
+   640→   640→    rejected: string;
+   641→   641→    approved: string;
+   642→   642→    expired: string;
+   643→   643→    active: string;
+   644→   644→    completed: string;
+   645→   645→    cancelled: string;
+   646→   646→    stopped: string;
+   647→   647→  };
+   648→   648→  // ─── Admin Common ───
+   649→   649→  admin: {
+   650→   650→    manageAssets: string;
+   651→   651→    manageProducts: string;
+   652→   652→    managePackages: string;
+   653→   653→    manageUsers: string;
+   654→   654→    manageDeposits: string;
+   655→   655→    manageWithdrawals: string;
+   656→   656→    managePayment: string;
+   657→   657→    manageApp: string;
+   658→   658→    manageBanners: string;
+   659→   659→    manageSettings: string;
+   660→   660→    manageApiKeys: string;
+   661→   661→    manageLive: string;
+   662→   662→    manageAppearance: string;
+   663→   663→    manageSalary: string;
+   664→   664→    totalAssets: string;
+   665→   665→    totalValue: string;
+   666→   666→    totalProfit: string;
+   667→   667→    activeAssets: string;
+   668→   668→    searchUserProduct: string;
+   669→   669→    registeredCount: string;
+   670→   670→    addProfit: string;
+   671→   671→    stopAsset: string;
+   672→   672→    completeAsset: string;
+   673→   673→    activateAsset: string;
+   674→   674→    addNew: string;
+   675→   675→    updateInfo: string;
+   676→   676→    fillDetails: string;
+   677→   677→    amountInvalid: string;
+   678→   678→    profitAdded: string;
+   679→   679→    assetStopped: string;
+   680→   680→    assetCompleted: string;
+   681→   681→    assetActivated: string;
+   682→   682→    saveFailed: string;
+   683→   683→    deleteFailed: string;
+   684→   684→    updateFailed: string;
+   685→   685→    createFailed: string;
+   686→   686→    loadFailed: string;
+   687→   687→    networkError: string;
+   688→   688→    allFieldsRequired: string;
+   689→   689→    completeAllFields: string;
+   690→   690→    confirmDelete: string;
+   691→   691→    cannotUndo: string;
+   692→   692→    activeInvestmentsExist: string;
+   693→   693→    registered: string;
+   694→   694→    noDataFound: string;
+   695→   695→    statusLabel: string;
+   696→   696→    actionLabel: string;
+   697→   697→    userLabel: string;
+   698→   698→    productLabel: string;
+   699→   699→    quantityLabel: string;
+   700→   700→    totalPriceLabel: string;
+   701→   701→    profitLabel: string;
+   702→   702→    dateLabel: string;
+   703→   703→    nameLabel: string;
+   704→   704→    emailLabel: string;
+   705→   705→    whatsappLabel: string;
+   706→   706→    levelLabel: string;
+   707→   707→    amountLabel: string;
+   708→   708→    balanceLabel: string;
+   709→   709→    descriptionLabel: string;
+   710→   710→    orderLabel: string;
+   711→   711→    imageLabel: string;
+   712→   712→    bannerLabel: string;
+   713→   713→    activeLabel: string;
+   714→   714→    inactiveLabel: string;
+   715→   715→    filterAll: string;
+   716→   716→    filterActive: string;
+   717→   717→    filterInactive: string;
+   718→   718→    filterCompleted: string;
+   719→   719→    filterStopped: string;
+   720→   720→    filterPending: string;
+   721→   721→    filterApproved: string;
+   722→   722→    filterRejected: string;
+   723→   723→    filterSuspended: string;
+   724→   724→    quickSelect: string;
+   725→   725→    previewLabel: string;
+   726→   726→    yesDelete: string;
+   727→   727→    noCancel: string;
+   728→   728→  };
+   729→   729→  // ─── Admin Dashboard ───
+   730→   730→  adminDashboard: {
+   731→   731→    title: string;
+   732→   732→    subtitle: string;
+   733→   733→    totalUsers: string;
+   734→   734→    activeUsers: string;
+   735→   735→    totalDeposits: string;
+   736→   736→    totalWithdrawals: string;
+   737→   737→    pendingDeposits: string;
+   738→   738→    pendingWithdrawals: string;
+   739→   739→    totalInvestments: string;
+   740→   740→    activeInvestments: string;
+   741→   741→    totalProfit: string;
+   742→   742→    totalOmzet: string;
+   743→   743→    recentActivities: string;
+   744→   744→    systemHealth: string;
+   745→   745→    uptimeLabel: string;
+   746→   746→    dbStatus: string;
+   747→   747→    apiStatus: string;
+   748→   748→    onlineUsers: string;
+   749→   749→    newUsersToday: string;
+   750→   750→    depositsToday: string;
+   751→   751→    withdrawalsToday: string;
+   752→   752→  };
+   753→   753→  // ─── Admin Users ───
+   754→   754→  adminUsers: {
+   755→   755→    title: string;
+   756→   756→    subtitle: string;
+   757→   757→    searchUser: string;
+   758→   758→    addUser: string;
+   759→   759→    editUser: string;
+   760→   760→    deleteUser: string;
+   761→   761→    suspendUser: string;
+   762→   762→    activateUser: string;
+   763→   763→    totalUsers: string;
+   764→   764→    activeUsersLabel: string;
+   765→   765→    suspendedUsers: string;
+   766→   766→    userDetails: string;
+   767→   767→    nameRequired: string;
+   768→   768→    whatsappRequired: string;
+   769→   769→    emailRequired: string;
+   770→   770→    passwordMin: string;
+   771→   771→    userCreated: string;
+   772→   772→    userUpdated: string;
+   773→   773→    userDeleted: string;
+   774→   774→    userSuspended: string;
+   775→   775→    userActivated: string;
+   776→   776→    cannotDeleteSelf: string;
+   777→   777→    confirmDeleteUser: string;
+   778→   778→    deleteUserWarning: string;
+   779→   779→  };
+   780→   780→  // ─── Admin Deposits ───
+   781→   781→  adminDeposits: {
+   782→   782→    title: string;
+   783→   783→    subtitle: string;
+   784→   784→    approveDeposit: string;
+   785→   785→    rejectDeposit: string;
+   786→   786→    processDeposit: string;
+   787→   787→    depositAmount: string;
+   788→   788→    paymentMethod: string;
+   789→   789→    depositId: string;
+   790→   790→    userDeposited: string;
+   791→   791→    approvedBy: string;
+   792→   792→    rejectedBy: string;
+   793→   793→    noPendingDeposits: string;
+   794→   794→    depositApproved: string;
+   795→   795→    depositRejected: string;
+   796→   796→    depositProcessed: string;
+   797→   797→    confirmApprove: string;
+   798→   798→    confirmReject: string;
+   799→   799→    rejectReason: string;
+   800→   800→  };
+   801→   801→  // ─── Admin Withdrawals ───
+   802→   802→  adminWithdrawals: {
+   803→   803→    title: string;
+   804→   804→    subtitle: string;
+   805→   805→    approveWithdrawal: string;
+   806→   806→    rejectWithdrawal: string;
+   807→   807→    processWithdrawal: string;
+   808→   808→    withdrawalAmount: string;
+   809→   809→    bankAccount: string;
+   810→   810→    accountHolder: string;
+   811→   811→    adminFee: string;
+   812→   812→    netAmount: string;
+   813→   813→    noPendingWithdrawals: string;
+   814→   814→    withdrawalApproved: string;
+   815→   815→    withdrawalRejected: string;
+   816→   816→    withdrawalProcessed: string;
+   817→   817→    confirmApprove: string;
+   818→   818→    confirmReject: string;
+   819→   819→    rejectReason: string;
+   820→   820→  };
+   821→   821→  // ─── Admin Asset ───
+   822→   822→  adminAsset: {
+   823→   823→    title: string;
+   824→   824→    subtitle: string;
+   825→   825→    assetType: string;
+   826→   826→    investmentType: string;
+   827→   827→    productType: string;
+   828→   828→    addProfitManually: string;
+   829→   829→    enterProfitAmount: string;
+   830→   830→    profitAmount: string;
+   831→   831→    stopAssetConfirm: string;
+   832→   832→    completeAssetConfirm: string;
+   833→   833→    activateAssetConfirm: string;
+   834→   834→    noAssetsFound: string;
+   835→   835→    profitAddedSuccess: string;
+   836→   836→    assetStoppedSuccess: string;
+   837→   837→    assetCompletedSuccess: string;
+   838→   838→    assetActivatedSuccess: string;
+   839→   839→  };
+   840→   840→  // ─── Admin Products ───
+   841→   841→  adminProducts: {
+   842→   842→    title: string;
+   843→   843→    subtitle: string;
+   844→   844→    addProduct: string;
+   845→   845→    editProduct: string;
+   846→   846→    newProduct: string;
+   847→   847→    updateProductInfo: string;
+   848→   848→    fillNewProduct: string;
+   849→   849→    productName: string;
+   850→   850→    price: string;
+   851→   851→    duration: string;
+   852→   852→    estProfit: string;
+   853→   853→    profitRate: string;
+   854→   854→    quota: string;
+   855→   855→    description: string;
+   856→   856→    productBanner: string;
+   857→   857→    productActive: string;
+   858→   858→    noProductsYet: string;
+   859→   859→    addProductCta: string;
+   860→   860→    productUpdated: string;
+   861→   861→    productCreated: string;
+   862→   862→    productDeleted: string;
+   863→   863→    confirmDeleteProduct: string;
+   864→   864→    deleteProductWarning: string;
+   865→   865→    imageUploaded: string;
+   866→   866→    imageUploadFailed: string;
+   867→   867→  };
+   868→   868→  // ─── Admin Packages ───
+   869→   869→  adminPackages: {
+   870→   870→    title: string;
+   871→   871→    subtitle: string;
+   872→   872→    addPackage: string;
+   873→   873→    editPackage: string;
+   874→   874→    newPackage: string;
+   875→   875→    updatePackageInfo: string;
+   876→   876→    fillNewPackage: string;
+   877→   877→    packageName: string;
+   878→   878→    capitalAmount: string;
+   879→   879→    currentRate: string;
+   880→   880→    minRate: string;
+   881→   881→    maxRate: string;
+   882→   882→    defaultContractDays: string;
+   883→   883→    displayOrder: string;
+   884→   884→    autoCreateDuration: string;
+   885→   885→    packageActive: string;
+   886→   886→    autoProfitEnabled: string;
+   887→   887→    autoProfitLabel: string;
+   888→   888→    profitPerDay: string;
+   889→   889→    defaultLabel: string;
+   890→   890→    investmentLabel: string;
+   891→   891→    durationLabel: string;
+   892→   892→    previewProfit: string;
+   893→   893→    dailyProfitPreview: string;
+   894→   894→    minMaxProfit: string;
+   895→   895→    editDuration: string;
+   896→   896→    addDuration: string;
+   897→   897→    durationDays: string;
+   898→   898→    durationLabelName: string;
+   899→   899→    profitRatePerDay: string;
+   900→   900→    quickSelectLabel: string;
+   901→   901→    profitRateHistory: string;
+   902→   902→    rateChangeLast30Days: string;
+   903→   903→    noRateHistory: string;
+   904→   904→    confirmDeletePackage: string;
+   905→   905→    activeInvestmentsWarning: string;
+   906→   906→    rateUpdated: string;
+   907→   907→    packageUpdated: string;
+   908→   908→    packageCreated: string;
+   909→   909→    packageDeleted: string;
+   910→   910→    durationAdded: string;
+   911→   911→    durationUpdated: string;
+   912→   912→    durationDeleted: string;
+   913→   913→    autoUpdateRate: string;
+   914→   914→    packageDeactivated: string;
+   915→   915→    packageActivated: string;
+   916→   916→    autoProfitDisabled: string;
+   917→   917→    autoProfitEnabledToast: string;
+   918→   918→    autoUpdateSuccess: string;
+   919→   919→    durationDeactivated: string;
+   920→   920→    noPackagesYet: string;
+   921→   921→    addPackageCta: string;
+   922→   922→    selectDurationDesc: string;
+   923→   923→    autoCreateDurationDesc: string;
+   924→   924→    rateWillChangeAuto: string;
+   925→   925→    willChangeAuto: string;
+   926→   926→    deactivateLabel: string;
+   927→   927→    activateLabel: string;
+   928→   928→    totalProfitLabel: string;
+   929→   929→    minProfitPerDay: string;
+   930→   930→    maxProfitPerDay: string;
+   931→   931→    autoChangeInfo: string;
+   932→   932→  };
+   933→   933→  // ─── Admin Payment ───
+   934→   934→  adminPayment: {
+   935→   935→    title: string;
+   936→   936→    subtitle: string;
+   937→   937→    addPayment: string;
+   938→   938→    editPayment: string;
+   939→   939→    paymentType: string;
+   940→   940→    bankType: string;
+   941→   941→    ewalletType: string;
+   942→   942→    qrisType: string;
+   943→   943→    bankName: string;
+   944→   944→    accountNo: string;
+   945→   945→    holderName: string;
+   946→   946→    qrImage: string;
+   947→   947→    paymentActive: string;
+   948→   948→    noPaymentMethods: string;
+   949→   949→    paymentCreated: string;
+   950→   950→    paymentUpdated: string;
+   951→   951→    paymentDeleted: string;
+   952→   952→    confirmDeletePayment: string;
+   953→   953→  };
+   954→   954→  // ─── Admin App ───
+   955→   955→  adminApp: {
+   956→   956→    title: string;
+   957→   957→    subtitle: string;
+   958→   958→    appName: string;
+   959→   959→    appVersion: string;
+   960→   960→    appDescription: string;
+   961→   961→    maintenanceMode: string;
+   962→   962→    forceUpdate: string;
+   963→   963→    apkFile: string;
+   964→   964→    uploadApk: string;
+   965→   965→    currentApk: string;
+   966→   966→    noApkFile: string;
+   967→   967→    appSettingsSaved: string;
+   968→   968→    apkUploaded: string;
+   969→   969→  };
+   970→   970→  // ─── Admin Banners ───
+   971→   971→  adminBanners: {
+   972→   972→    title: string;
+   973→   973→    subtitle: string;
+   974→   974→    addBanner: string;
+   975→   975→    editBanner: string;
+   976→   976→    bannerTitle: string;
+   977→   977→    bannerSubtitle: string;
+   978→   978→    bannerImage: string;
+   979→   979→    ctaText: string;
+   980→   980→    bannerOrder: string;
+   981→   981→    bannerActive: string;
+   982→   982→    noBanners: string;
+   983→   983→    bannerCreated: string;
+   984→   984→    bannerUpdated: string;
+   985→   985→    bannerDeleted: string;
+   986→   986→    confirmDeleteBanner: string;
+   987→   987→    imageRequired: string;
+   988→   988→  };
+   989→   989→  // ─── Admin Settings ───
+   990→   990→  adminSettings: {
+   991→   991→    title: string;
+   992→   992→    subtitle: string;
+   993→   993→    systemSettings: string;
+   994→   994→    smtpSettings: string;
+   995→   995→    emailHost: string;
+   996→   996→    emailPort: string;
+   997→   997→    emailUser: string;
+   998→   998→    emailPassword: string;
+   999→   999→    emailFrom: string;
+  1000→  1000→    testEmail: string;
+  1001→  1001→    testSmtp: string;
+  1002→  1002→    emailSent: string;
+  1003→  1003→    emailFailed: string;
+  1004→  1004→    settingsSaved: string;
+  1005→  1005→    smtpConfig: string;
+  1006→  1006→  };
+  1007→  1007→  // ─── Admin API Keys ───
+  1008→  1008→  adminApiKeys: {
+  1009→  1009→    title: string;
+  1010→  1010→    subtitle: string;
+  1011→  1011→    addApiKey: string;
+  1012→  1012→    keyName: string;
+  1013→  1013→    apiKey: string;
+  1014→  1014→    keyPrefix: string;
+  1015→  1015→    lastUsed: string;
+  1016→  1016→    createdAt: string;
+  1017→  1017→    noApiKeys: string;
+  1018→  1018→    keyCreated: string;
+  1019→  1019→    keyDeleted: string;
+  1020→  1020→    confirmDeleteKey: string;
+  1021→  1021→    copyKey: string;
+  1022→  1022→    keyCopied: string;
+  1023→  1023→    showKey: string;
+  1024→  1024→    hideKey: string;
+  1025→  1025→    keyWarning: string;
+  1026→  1026→  };
+  1027→  1027→  // ─── Admin Live ───
+  1028→  1028→  adminLive: {
+  1029→  1029→    title: string;
+  1030→  1030→    subtitle: string;
+  1031→  1031→    addActivity: string;
+  1032→  1032→    activityType: string;
+  1033→  1033→    userName: string;
+  1034→  1034→    amountLabel: string;
+  1035→  1035→    isFake: string;
+  1036→  1036→    liveActive: string;
+  1037→  1037→    noActivities: string;
+  1038→  1038→    activityCreated: string;
+  1039→  1039→    activityUpdated: string;
+  1040→  1040→    activityDeleted: string;
+  1041→  1041→    confirmDeleteActivity: string;
+  1042→  1042→  };
+  1043→  1043→  // ─── Admin Appearance ───
+  1044→  1044→  adminAppearance: {
+  1045→  1045→    title: string;
+  1046→  1046→    subtitle: string;
+  1047→  1047→    logoUpload: string;
+  1048→  1048→    faviconUpload: string;
+  1049→  1049→    primaryColor: string;
+  1050→  1050→    secondaryColor: string;
+  1051→  1051→    accentColor: string;
+  1052→  1052→    darkMode: string;
+  1053→  1053→    lightMode: string;
+  1054→  1054→    customCss: string;
+  1055→  1055→    appearanceSaved: string;
+  1056→  1056→    logoUploaded: string;
+  1057→  1057→    faviconUploaded: string;
+  1058→  1058→  };
+  1059→  1059→  // ─── Admin Salary ───
+  1060→  1060→  adminSalary: {
+  1061→  1061→    title: string;
+  1062→  1062→    subtitle: string;
+  1063→  1063→    weekNumber: string;
+  1064→  1064→    directReferrals: string;
+  1065→  1065→    omzetAmount: string;
+  1066→  1066→    salaryAmount: string;
+  1067→  1067→    salaryStatus: string;
+  1068→  1068→    paidLabel: string;
+  1069→  1069→    unpaidLabel: string;
+  1070→  1070→    noSalaryRecords: string;
+  1071→  1071→    markAsPaid: string;
+  1072→  1072→    salaryMarkedPaid: string;
+  1073→  1073→    salarySettings: string;
+  1074→  1074→    minDirectReferrals: string;
+  1075→  1075→    minOmzet: string;
+  1076→  1076→    salaryAmountSetting: string;
+  1077→  1077→    salarySettingsSaved: string;
+  1078→  1078→  };
+  1079→  1079→  // ─── Admin Login ───
+  1080→  1080→  adminLogin: {
+  1081→  1081→    title: string;
+  1082→  1082→    subtitle: string;
+  1083→  1083→    secureLogin: string;
+  1084→  1084→    encryptedConnection: string;
+  1085→  1085→    identityStep: string;
+  1086→  1086→    verificationStep: string;
+  1087→  1087→    authorizationStep: string;
+  1088→  1088→    verifyingCredentials: string;
+  1089→  1089→    validatingIdentity: string;
+  1090→  1090→    verifyingPassword: string;
+  1091→  1091→    checkingAuthorization: string;
+  1092→  1092→    superAdmin: string;
+  1093→  1093→    usernameEmail: string;
+  1094→  1094→    enterUsernameEmail: string;
+  1095→  1095→    defaultUsernameHint: string;
+  1096→  1096→    enterPassword: string;
+  1097→  1097→    passwordHint: string;
+  1098→  1098→    passwordStrength: string;
+  1099→  1099→    strengthWeak: string;
+  1100→  1100→    strengthFair: string;
+  1101→  1101→    strengthStrong: string;
+  1102→  1102→    strengthVeryStrong: string;
+  1103→  1103→    strengthMaximum: string;
+  1104→  1104→    charsLabel: string;
+  1105→  1105→    accountLocked: string;
+  1106→  1106→    securityWarning: string;
+  1107→  1107→    attemptsRemaining: string;
+  1108→  1108→    waitBeforeRetry: string;
+  1109→  1109→    sslTls: string;
+  1110→  1110→    antiBrute: string;
+  1111→  1111→    monitoring: string;
+  1112→  1112→    restrictedArea: string;
+  1113→  1113→    accessLogged: string;
+  1114→  1114→    orLabel: string;
+  1115→  1115→    loginAsUser: string;
+  1116→  1116→    accessAuthorized: string;
+  1117→  1117→    welcomeAdmin: string;
+  1118→  1118→    accessDenied: string;
+  1119→  1119→    securityScore: string;
+  1120→  1120→    loginToAdminPanel: string;
+  1121→  1121→    loadingSecurityInfo: string;
+  1122→  1122→    encrypted: string;
+  1123→  1123→    digitalAssetManagement: string;
+  1124→  1124→    usernamePasswordRequired: string;
+  1125→  1125→    waitSeconds: string;
+  1126→  1126→    securityNotice: string;
+  1127→  1127→  };
+  1128→  1128→  // ─── Products Page (User) ───
+  1129→  1129→  productsPage: {
+  1130→  1130→    title: string;
+  1131→  1131→    subtitle: string;
+  1132→  1132→    filterAll: string;
+  1133→  1133→    filterGold: string;
+  1134→  1134→    filterSilver: string;
+  1135→  1135→    filterDiamond: string;
+  1136→  1136→    durationLabel: string;
+  1137→  1137→    estProfitLabel: string;
+  1138→  1138→    quotaFilled: string;
+  1139→  1139→    remaining: string;
+  1140→  1140→    buyNow: string;
+  1141→  1141→    noProducts: string;
+  1142→  1142→    noProductsInCategory: string;
+  1143→  1143→    noProductsAvailable: string;
+  1144→  1144→  };
+  1145→  1145→  // ─── Product Detail (User) ───
+  1146→  1146→  productDetail: {
+  1147→  1147→    notFound: string;
+  1148→  1148→    loadFailed: string;
+  1149→  1149→    notFoundTitle: string;
+  1150→  1150→    notFoundDesc: string;
+  1151→  1151→    backToProducts: string;
+  1152→  1152→    backLabel: string;
+  1153→  1153→    durationDays: string;
+  1154→  1154→    estProfit: string;
+  1155→  1155→    profitRate: string;
+  1156→  1156→    quotaRemaining: string;
+  1157→  1157→    quotaFilled: string;
+  1158→  1158→    filledLabel: string;
+  1159→  1159→    totalLabel: string;
+  1160→  1160→    productDescription: string;
+  1161→  1161→    noDescription: string;
+  1162→  1162→    purchaseQuantity: string;
+  1163→  1163→    totalPrice: string;
+  1164→  1164→    totalEstProfit: string;
+  1165→  1165→    yourBalance: string;
+  1166→  1166→    balanceInsufficient: string;
+  1167→  1167→    quotaExhausted: string;
+  1168→  1168→    buyNow: string;
+  1169→  1169→    depositAndBuy: string;
+  1170→  1170→    balanceDeductInfo: string;
+  1171→  1171→    redirectToDeposit: string;
+  1172→  1172→    confirmPurchase: string;
+  1173→  1173→    balanceDeductConfirm: string;
+  1174→  1174→    insufficientBalance: string;
+  1175→  1175→    productLabel: string;
+  1176→  1176→    quantityLabel: string;
+  1177→  1177→    unitPrice: string;
+  1178→  1178→    totalLabel2: string;
+  1179→  1179→    balanceAfterPurchase: string;
+  1180→  1180→    confirmBuy: string;
+  1181→  1181→    depositNow: string;
+  1182→  1182→    processing: string;
+  1183→  1183→    purchaseSuccess: string;
+  1184→  1184→    viewHistory: string;
+  1185→  1185→    totalPayment: string;
+  1186→  1186→  };
+  1187→  1187→  // ─── Bank Page (User) ───
+  1188→  1188→  bankPage: {
+  1189→  1189→    title: string;
+  1190→  1190→    subtitle: string;
+  1191→  1191→    addBank: string;
+  1192→  1192→    primaryLabel: string;
+  1193→  1193→    noBankAccount: string;
+  1194→  1194→    addBankCta: string;
+  1195→  1195→    editAccount: string;
+  1196→  1196→    addAccount: string;
+  1197→  1197→    updateInfo: string;
+  1198→  1198→    enterNewInfo: string;
+  1199→  1199→    bankName: string;
+  1200→  1200→    bankNamePlaceholder: string;
+  1201→  1201→    accountNo: string;
+  1202→  1202→    accountNoPlaceholder: string;
+  1203→  1203→    holderName: string;
+  1204→  1204→    holderNamePlaceholder: string;
+  1205→  1205→    deleteConfirm: string;
+  1206→  1206→    deleteWarning: string;
+  1207→  1207→    bankUpdated: string;
+  1208→  1208→    bankAdded: string;
+  1209→  1209→    bankDeleted: string;
+  1210→  1210→    deleteFailed: string;
+  1211→  1211→    allFieldsRequired: string;
+  1212→  1212→  };
+  1213→  1213→  // ─── Download Page ───
+  1214→  1214→  downloadPage: {
+  1215→  1215→    title: string;
+  1216→  1216→    subtitle: string;
+  1217→  1217→    secure: string;
+  1218→  1218→    secureDesc: string;
+  1219→  1219→    fast: string;
+  1220→  1220→    fastDesc: string;
+  1221→  1221→    realtime: string;
+  1222→  1222→    realtimeDesc: string;
+  1223→  1223→    mobileFirst: string;
+  1224→  1224→    mobileFirstDesc: string;
+  1225→  1225→    featuredTitle: string;
+  1226→  1226→    installSteps: string;
+  1227→  1227→    installStep1: string;
+  1228→  1228→    installStep2: string;
+  1229→  1229→    installStep3: string;
+  1230→  1230→    installStep4: string;
+  1231→  1231→    installStep5: string;
+  1232→  1232→    requirements: string;
+  1233→  1233→    reqAndroid: string;
+  1234→  1234→    reqRam: string;
+  1235→  1235→    reqStorage: string;
+  1236→  1236→    reqInternet: string;
+  1237→  1237→    downloadApk: string;
+  1238→  1238→    compatibleWith: string;
+  1239→  1239→  };
+  1240→  1240→  // ─── Language Switcher ───
+  1241→  1241→  langSwitcher: {
+  1242→  1242→    searchPlaceholder: string;
+  1243→  1243→    noLanguagesFound: string;
+  1244→  1244→    languagesAvailable: string;
+  1245→  1245→  };
+  1246→  1246→}
+  1247→  1247→
+  1248→  1248→/**
+  1249→  1249→ * Helper type to get nested key paths for type-safe translation access
+  1250→  1250→ */
+  1251→  1251→export type NestedKeyOf<ObjectType extends object> = {
+  1252→  1252→  [Key in keyof ObjectType & (string | number)]: ObjectType[Key] extends object
+  1253→  1253→    ? `${Key}` | `${Key}.${NestedKeyOf<ObjectType[Key]>}`
+  1254→  1254→    : `${Key}`;
+  1255→  1255→}[keyof ObjectType & (string | number)];
+  1256→  1256→
+  1257→  1257→export type TranslationKey = NestedKeyOf<TranslationStrings>;
+  1258→  1258→
