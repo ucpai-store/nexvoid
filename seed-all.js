@@ -108,14 +108,14 @@ async function main() {
   console.log('\n4. Investment packages (6 paket, min 160k)...');
   const pkgCount = await prisma.investmentPackage.count();
   
-  // Always update/insert to ensure 6 packages exist (MIN 160k)
+  // 6 packages persis sesuai request user (MIN 160k, Gold sebagai entry)
   const packages = [
-    { name: 'Paket Pemula',     amount: 160000,    profitRate: 8,  contractDays: 90, order: 1 },
-    { name: 'Paket Bronze',     amount: 500000,    profitRate: 9,  contractDays: 90, order: 2 },
-    { name: 'Paket Silver',     amount: 1600000,   profitRate: 10, contractDays: 90, order: 3 },
-    { name: 'Paket Gold',       amount: 5000000,   profitRate: 12, contractDays: 90, order: 4 },
-    { name: 'Paket Platinum',   amount: 16000000,  profitRate: 15, contractDays: 90, order: 5 },
-    { name: 'Paket Diamond',    amount: 50000000,  profitRate: 18, contractDays: 90, order: 6 },
+    { name: 'Paket Gold',      amount: 160000,    profitRate: 2,   contractDays: 90, order: 1 },
+    { name: 'Paket Platinum',  amount: 320000,    profitRate: 2.5, contractDays: 90, order: 2 },
+    { name: 'Paket Diamond',   amount: 640000,    profitRate: 3,   contractDays: 90, order: 3 },
+    { name: 'Paket VIP',       amount: 1920000,   profitRate: 3.5, contractDays: 90, order: 4 },
+    { name: 'Paket Elite',     amount: 5760000,   profitRate: 4,   contractDays: 90, order: 5 },
+    { name: 'Paket Ultimate',  amount: 17280000,  profitRate: 5,   contractDays: 90, order: 6 },
   ];
   
   for (const pkg of packages) {
@@ -138,60 +138,62 @@ async function main() {
   // ==========================================================================
   console.log('\n5. Products (produk investasi)...');
   
+  // 6 products dengan nama sama dengan packages (bukan Bot Trading)
+  // Profit harian = price × (profitRate / 100), total profit = profit harian × duration
   const products = [
     {
-      name: 'Bot Trading Pemula',
+      name: 'Paket Gold',
       price: 160000,
-      duration: 60,
+      duration: 90,
       estimatedProfit: 288000,
-      quota: 100,
-      description: 'Bot trading otomatis untuk pemula. Profit estimasi Rp 288.000 dalam 60 hari (ROI 80%).',
-      profitRate: 1.33,
+      quota: 1000,
+      description: 'Paket Gold - Rp 160.000. Profit 2%/hari = Rp 3.200/hari selama 90 hari. Total profit Rp 288.000.',
+      profitRate: 2,
     },
     {
-      name: 'Bot Trading Bronze',
-      price: 500000,
-      duration: 60,
-      estimatedProfit: 1000000,
-      quota: 100,
-      description: 'Bot trading dengan algoritma enhanced. Profit estimasi Rp 1.000.000 dalam 60 hari (ROI 100%).',
-      profitRate: 1.67,
-    },
-    {
-      name: 'Bot Trading Silver',
-      price: 1600000,
+      name: 'Paket Platinum',
+      price: 320000,
       duration: 90,
-      estimatedProfit: 4000000,
-      quota: 100,
-      description: 'Bot trading profesional dengan AI prediction. Profit estimasi Rp 4.000.000 dalam 90 hari (ROI 150%).',
-      profitRate: 1.67,
+      estimatedProfit: 720000,
+      quota: 1000,
+      description: 'Paket Platinum - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari selama 90 hari. Total profit Rp 720.000.',
+      profitRate: 2.5,
     },
     {
-      name: 'Bot Trading Gold',
-      price: 5000000,
+      name: 'Paket Diamond',
+      price: 640000,
       duration: 90,
-      estimatedProfit: 15000000,
-      quota: 50,
-      description: 'Bot trading premium dengan multi-strategy. Profit estimasi Rp 15.000.000 dalam 90 hari (ROI 200%).',
-      profitRate: 2.22,
+      estimatedProfit: 1728000,
+      quota: 1000,
+      description: 'Paket Diamond - Rp 640.000. Profit 3%/hari = Rp 19.200/hari selama 90 hari. Total profit Rp 1.728.000.',
+      profitRate: 3,
     },
     {
-      name: 'Bot Trading Platinum',
-      price: 16000000,
-      duration: 120,
-      estimatedProfit: 56000000,
-      quota: 30,
-      description: 'Bot trading VIP dengan akses market global. Profit estimasi Rp 56.000.000 dalam 120 hari (ROI 250%).',
-      profitRate: 2.08,
+      name: 'Paket VIP',
+      price: 1920000,
+      duration: 90,
+      estimatedProfit: 6048000,
+      quota: 500,
+      description: 'Paket VIP - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari selama 90 hari. Total profit Rp 6.048.000.',
+      profitRate: 3.5,
     },
     {
-      name: 'Bot Trading Diamond',
-      price: 50000000,
-      duration: 120,
-      estimatedProfit: 200000000,
-      quota: 10,
-      description: 'Bot trading eksklusif dengan algoritma proprietary. Profit estimasi Rp 200.000.000 dalam 120 hari (ROI 300%).',
-      profitRate: 2.50,
+      name: 'Paket Elite',
+      price: 5760000,
+      duration: 90,
+      estimatedProfit: 20736000,
+      quota: 200,
+      description: 'Paket Elite - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari selama 90 hari. Total profit Rp 20.736.000.',
+      profitRate: 4,
+    },
+    {
+      name: 'Paket Ultimate',
+      price: 17280000,
+      duration: 90,
+      estimatedProfit: 77760000,
+      quota: 100,
+      description: 'Paket Ultimate - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari selama 90 hari. Total profit Rp 77.760.000.',
+      profitRate: 5,
     },
   ];
   
