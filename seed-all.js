@@ -171,14 +171,22 @@ async function main() {
 
   // Hitung estimatedProfit otomatis: price × profitRate% × CONTRACT_DAYS
   // Modal TIDAK dikembalikan — estimatedProfit = total profit selama kontrak
+  //
+  // QUOTA: Tinggi (9999) supaya "Kuota Terisi" bisa menampilkan ribuan.
+  // quotaUsed di-set ke baseline realistis (variasi 35-75% terisi) supaya
+  // kelihatan ramai sejak awal. Cron service akan auto-increment quotaUsed
+  // tiap ~15 menit dan auto-reset ke ~5-12% saat penuh (batch baru).
   const fmt = (n) => n.toLocaleString('id-ID');
+  const QUOTA_HIGH = 9999; // kuota besar supaya bisa tampil ribuan
+  const randBaseline = () => Math.floor(QUOTA_HIGH * (0.35 + Math.random() * 0.40)); // 35-75%
   const products = [
     {
       name: 'Gold Premium Aset 1',
       price: 160000,
       duration: CONTRACT_DAYS,
       estimatedProfit: Math.round(160000 * 0.02 * CONTRACT_DAYS),
-      quota: 1000,
+      quota: QUOTA_HIGH,
+      quotaUsed: randBaseline(),
       description: `Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 576.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 2,
     },
@@ -187,7 +195,8 @@ async function main() {
       price: 320000,
       duration: CONTRACT_DAYS,
       estimatedProfit: Math.round(320000 * 0.025 * CONTRACT_DAYS),
-      quota: 1000,
+      quota: QUOTA_HIGH,
+      quotaUsed: randBaseline(),
       description: `Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 1.440.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 2.5,
     },
@@ -196,7 +205,8 @@ async function main() {
       price: 640000,
       duration: CONTRACT_DAYS,
       estimatedProfit: Math.round(640000 * 0.03 * CONTRACT_DAYS),
-      quota: 1000,
+      quota: QUOTA_HIGH,
+      quotaUsed: randBaseline(),
       description: `Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 3.456.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 3,
     },
@@ -205,7 +215,8 @@ async function main() {
       price: 1920000,
       duration: CONTRACT_DAYS,
       estimatedProfit: Math.round(1920000 * 0.035 * CONTRACT_DAYS),
-      quota: 500,
+      quota: QUOTA_HIGH,
+      quotaUsed: randBaseline(),
       description: `Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 12.096.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 3.5,
     },
@@ -214,7 +225,8 @@ async function main() {
       price: 5760000,
       duration: CONTRACT_DAYS,
       estimatedProfit: Math.round(5760000 * 0.04 * CONTRACT_DAYS),
-      quota: 200,
+      quota: QUOTA_HIGH,
+      quotaUsed: randBaseline(),
       description: `Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 41.472.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 4,
     },
@@ -223,7 +235,8 @@ async function main() {
       price: 17280000,
       duration: CONTRACT_DAYS,
       estimatedProfit: Math.round(17280000 * 0.05 * CONTRACT_DAYS),
-      quota: 100,
+      quota: QUOTA_HIGH,
+      quotaUsed: randBaseline(),
       description: `Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 155.520.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.`,
       profitRate: 5,
     },
@@ -253,14 +266,15 @@ async function main() {
   for (const prod of products) {
     const existing = await prisma.product.findFirst({ where: { name: prod.name } });
     if (existing) {
+      // Update termasuk quota (9999) + reset quotaUsed ke baseline realistis
       await prisma.product.update({
         where: { id: existing.id },
         data: { ...prod, isActive: true, isStopped: false }
       });
-      console.log(`   ✏️  Update: ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari)`);
+      console.log(`   ✏️  Update: ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari) | Kuota: ${prod.quotaUsed}/${prod.quota}`);
     } else {
       await prisma.product.create({ data: prod });
-      console.log(`   ✅ Buat: ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari)`);
+      console.log(`   ✅ Buat: ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari) | Kuota: ${prod.quotaUsed}/${prod.quota}`);
     }
   }
   console.log(`   📦 Total: ${products.length} products`);
@@ -377,7 +391,7 @@ async function main() {
   console.log(`\n🛒 Products (6) — Kontrak ${CONTRACT_DAYS} hari • Modal TIDAK dikembalikan:`);
   const allProds = await prisma.product.findMany({ orderBy: { price: 'asc' } });
   for (const p of allProds) {
-    console.log(`   - ${p.name}: Rp ${fmt(p.price)} → profit Rp ${fmt(p.estimatedProfit)} (${p.duration} hari)`);
+    console.log(`   - ${p.name}: Rp ${fmt(p.price)} → profit Rp ${fmt(p.estimatedProfit)} (${p.duration} hari) | Kuota: ${p.quotaUsed}/${p.quota}`);
   }
 
   console.log('\nℹ️  Catatan:');
