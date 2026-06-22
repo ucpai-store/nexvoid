@@ -51,3 +51,43 @@ Stage Summary:
 - No DB schema changes needed (qrImage field already existed)
 - Files changed: AdminPaymentPage.tsx, DepositPage.tsx, +deploy-payment-qr.sh
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-payment-qr.sh | bash
+
+---
+Task ID: 3
+Agent: main (Z.ai Code)
+Task: Simplify admin payment to QRIS + USDT only (deposit-only); remove bank/ewallet/crypto from admin
+
+Work Log:
+- Read worklog: previous Task 2 had already added QR upload to USDT+QRIS in admin
+- User clarified: admin payment should ONLY be QRIS and USDT — nothing else. Payment is for DEPOSIT only. Withdraw uses user's own bank accounts.
+- Explored AdminPaymentPage.tsx (868 lines): had 5 types (qris/bank/ewallet/usdt/crypto) in typeConfig
+- Explored DepositPage.tsx: already only had QRIS+USDT tabs, but USDT tab included crypto fallback
+- Explored API routes: POST/PUT allowed all 5 types; public GET allowed qris/usdt/crypto
+- Verified WithdrawPage.tsx: uses hardcoded bank/ewallet scroll + user enters own account (does NOT use admin PaymentMethod) ✓ correct
+- AdminPaymentPage.tsx changes:
+  - typeConfig: removed bank/ewallet/crypto, only qris+usdt remain
+  - groupedMethods: now filters to only allowedTypes (qris+usdt), legacy types hidden
+  - Added deposit-only info banner (explains withdraw uses user bank accounts)
+  - Added hidden legacy methods notice (yellow warning if old bank/ewallet/crypto exist in DB)
+  - Fixed bg-cardmerald typo → bg-emerald
+  - Improved mobile: smaller header text (text-xl on mobile), compact "Tambah" button label
+- API POST /api/admin/payment-methods: validation now only ['qris','usdt']
+- API PUT /api/admin/payment-methods/[id]: validation now only ['qris','usdt']
+- Public GET /api/payment-methods: where.type = { in: ['qris','usdt'] } by default, filters out legacy
+- DepositPage.tsx: removed `|| (activeTab === 'usdt' && pm.type === 'crypto')` from filter, now strict `pm.type === activeTab`
+- Created server.sh (was missing — dev script references bash server.sh)
+- Verified dev server: HTTP 200 on main page, payment API returns only qris+usdt types (PASS)
+- Committed + pushed to GitHub origin/main (2 commits: code changes + deploy script)
+- Created deploy-payment-simplify.sh for VPS deployment
+
+Stage Summary:
+- Admin > Payment: ONLY QRIS and USDT (2 type buttons, 2 category groups)
+- USDT form: Wallet Address (accountNo) + QR Image upload + Holder Name
+- QRIS form: QR Image upload + Name
+- Legacy bank/ewallet/crypto methods: hidden from users + admin list (notice shown if exist)
+- API validation enforces qris+usdt only on create/update
+- Public API only exposes qris+usdt
+- Deposit page: USDT tab shows only usdt-type methods (no crypto)
+- Withdraw: unchanged — uses user's own BankAccount records (separate system)
+- Files changed: AdminPaymentPage.tsx, DepositPage.tsx, 3 API route files, +server.sh, +deploy-payment-simplify.sh
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-payment-simplify.sh | bash
