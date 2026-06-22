@@ -121,3 +121,34 @@ Stage Summary:
 - New cleanup API: DELETE /api/admin/payment-methods/cleanup-legacy
 - Files changed: AdminPaymentPage.tsx, +cleanup-legacy/route.ts, deploy-payment-simplify.sh
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-payment-simplify.sh | bash
+
+---
+Task ID: 5
+Agent: main (Z.ai Code)
+Task: Fix failed deploy — admin payment page still shows bank/ewallet on production
+
+Work Log:
+- User sent screenshot showing VPS terminal with deploy failure
+- VLM analysis revealed: deploy script failed with "cd: /var/www/nexvo: No such file or directory"
+- Root cause: deploy-payment-simplify.sh used wrong project path (/var/www/nexvo)
+- Checked other working deploy scripts: deploy-payment-qr.sh, deploy-languages.sh, deploy-withdraw.sh all use PROJECT_DIR="/home/nexvo"
+- Rewrote deploy-payment-simplify.sh:
+  - Fixed PROJECT_DIR to /home/nexvo (correct path)
+  - Matched working structure from deploy-payment-qr.sh:
+    * npm install / bun install
+    * npm run build
+    * cp .next/static + public to .next/standalone
+    * pm2 restart nexvo-web --update-env
+  - Added curl availability check (user's 2nd attempt failed: "Command 'curl' not found")
+  - Added payment API verification step (checks only qris+usdt returned)
+  - Better Indonesian post-deploy instructions
+  - Added troubleshooting: "Kalau masih kelihatan bank/ewallet: Hard refresh browser (Ctrl+Shift+R)"
+- Committed + pushed to GitHub origin/main
+
+Stage Summary:
+- Fixed deploy script path: /var/www/nexvo → /home/nexvo
+- User needs to RE-RUN the deploy command on VPS:
+  curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-payment-simplify.sh | bash
+- After deploy: admin Payment page auto-purges bank/ewallet/crypto from DB, only QRIS+USDT remain
+- If curl not found on VPS: apt-get install -y curl first
+- Files changed: deploy-payment-simplify.sh (rewritten)
