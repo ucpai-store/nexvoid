@@ -382,14 +382,19 @@ export default function AdminPaymentPage() {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-foreground text-sm font-medium truncate">{pm.name}</p>
                           {!pm.isActive && (
                             <Badge className="bg-red-500/10 text-red-400 text-[9px] border-border">Nonaktif</Badge>
                           )}
+                          {pm.qrImage && (
+                            <Badge className="bg-primary/10 text-primary text-[9px] border-primary/20 flex items-center gap-1">
+                              <QrCode className="w-2.5 h-2.5" />QR
+                            </Badge>
+                          )}
                         </div>
                         {pm.accountNo && (
-                          <p className="text-muted-foreground text-xs font-mono">{pm.accountNo}</p>
+                          <p className="text-muted-foreground text-xs font-mono truncate">{pm.accountNo}</p>
                         )}
                         {pm.holderName && (
                           <p className="text-muted-foreground text-[10px]">{pm.holderName}</p>
@@ -669,10 +674,17 @@ export default function AdminPaymentPage() {
                     )}
                   </div>
 
-                  {/* QR Image (for QRIS) */}
-                  {form.type === 'qris' && (
+                  {/* QR Image (for QRIS & USDT) */}
+                  {(form.type === 'qris' || form.type === 'usdt') && (
                     <div className="space-y-2">
-                      <Label className="text-foreground text-sm font-medium">Gambar QR Code</Label>
+                      <Label className="text-foreground text-sm font-medium">
+                        {form.type === 'usdt' ? 'QR Code USDT (Opsional)' : 'Gambar QR Code'}
+                      </Label>
+                      {form.type === 'usdt' && (
+                        <p className="text-muted-foreground text-[11px] -mt-1">
+                          Upload QR code alamat USDT agar user bisa langsung scan. Wallet address tetap wajib diisi di atas.
+                        </p>
+                      )}
                       <input
                         ref={qrInputRef}
                         type="file"
@@ -688,7 +700,7 @@ export default function AdminPaymentPage() {
                       {form.qrImage ? (
                         <div className="space-y-2">
                           <div className="rounded-xl bg-foreground/5 p-3 flex justify-center max-w-xs mx-auto">
-                            <img src={getFileUrl(form.qrImage)} alt="QR Code" className="max-w-full max-h-48 object-contain" />
+                            <img src={getFileUrl(form.qrImage)} alt={form.type === 'usdt' ? 'QR USDT' : 'QR Code'} className="max-w-full max-h-48 object-contain" />
                           </div>
                           <div className="flex items-center gap-2 justify-center">
                             <Button
@@ -728,7 +740,9 @@ export default function AdminPaymentPage() {
                             ) : (
                               <>
                                 <QrCode className="w-8 h-8 text-primary mx-auto mb-2" />
-                                <p className="text-foreground font-medium text-sm">Upload Gambar QR Code</p>
+                                <p className="text-foreground font-medium text-sm">
+                                  {form.type === 'usdt' ? 'Upload QR Code USDT' : 'Upload Gambar QR Code'}
+                                </p>
                                 <p className="text-muted-foreground text-xs">Klik untuk memilih file</p>
                               </>
                             )}

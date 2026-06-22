@@ -820,6 +820,26 @@ export default function DepositPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {/* USDT QR Code (if admin uploaded one) */}
+                      {selectedPayment.qrImage && !qrImageError[selectedPayment.id] && (
+                        <div className="flex justify-center">
+                          <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="p-3 rounded-3xl bg-white glow-gold-strong"
+                          >
+                            <img
+                              src={getFileUrl(selectedPayment.qrImage)}
+                              alt="USDT QR"
+                              className="w-48 h-48 object-contain rounded-xl"
+                              onError={() => setQrImageError(prev => ({ ...prev, [selectedPayment.id]: true }))}
+                            />
+                          </motion.div>
+                        </div>
+                      )}
+                      {selectedPayment.qrImage && !qrImageError[selectedPayment.id] && (
+                        <p className="text-muted-foreground text-xs text-center">Scan QR di atas atau copy alamat wallet USDT di bawah</p>
+                      )}
                       {selectedPayment.accountNo ? (
                         <div className="flex items-center justify-between gap-2 p-3 rounded-xl glass">
                           <div className="min-w-0 flex-1">
