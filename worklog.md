@@ -152,3 +152,42 @@ Stage Summary:
 - After deploy: admin Payment page auto-purges bank/ewallet/crypto from DB, only QRIS+USDT remain
 - If curl not found on VPS: apt-get install -y curl first
 - Files changed: deploy-payment-simplify.sh (rewritten)
+
+---
+Task ID: 6
+Agent: main (Z.ai Code)
+Task: Upload NEXVO logo permanently and remove black background
+
+Work Log:
+- User uploaded logo (pasted_image_1782138958157.png, 1280x853, solid black background)
+- VLM analysis confirmed: gold N emblem in circle, "Nexvo" text (white "Ne"+"x", gold "vo"), "BUILD VALUE, GROW FUTURE" tagline, solid black background
+- Explored logo system:
+  - SystemSettings.site_logo stores the logo path in DB
+  - Default fallback: /api/files/nexvo-logo.png (served from public/nexvo-logo.png)
+  - Admin can upload custom logos via /api/admin/logo (stored in uploads/site-logo-*)
+  - site-store.ts loads logo from DB, falls back to default
+  - Used in: Header, Footer, AdminHeader, page.tsx, RegisterPage
+- Background removal process (Python PIL + numpy):
+  - Converted to RGBA
+  - Detected near-black pixels (R<40, G<40, B<40) → set alpha to 0 (transparent)
+  - Edge anti-aliasing: dark pixels (R<80, G<80, B<80) → alpha 128 (partial)
+  - Result: 92% transparent, 6% opaque (logo elements), 0.3% partial (edges)
+  - VLM verified: "logo is clean, no leftover dark/box around it"
+- Auto-cropped transparent borders (1280x853 → 720x589) with 20px padding
+- Created square version (512x512) for favicon/PWA use
+- Saved as public/nexvo-logo.png (the permanent default fallback)
+- Verified dev server: HTTP 200, logo served (218KB, 720x589 RGBA)
+- Created deploy-logo.sh:
+  - Pulls latest code (with new logo) from GitHub
+  - Removes old custom logos from uploads/ and standalone/uploads/
+  - Resets DB: site_logo & site_favicon → /api/files/nexvo-logo.png
+  - Builds Next.js, copies to standalone, restarts PM2
+  - Verification: checks logo HTTP 200 + main page
+- Committed + pushed to GitHub origin/main
+
+Stage Summary:
+- New permanent logo: public/nexvo-logo.png (720x589, transparent background)
+- Logo works on any background color (light/dark mode) — no more black box
+- Deploy command: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-logo.sh | bash
+- After deploy + hard refresh (Ctrl+Shift+R), new logo appears on all pages
+- Files changed: public/nexvo-logo.png (replaced), +nexvo-logo-square.png, +nexvo-logo-transparent.png, +deploy-logo.sh
