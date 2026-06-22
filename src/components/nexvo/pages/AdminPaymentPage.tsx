@@ -33,12 +33,11 @@ interface PaymentMethod {
   updatedAt: string;
 }
 
+// Only QRIS and USDT are supported for deposit payments.
+// Withdraw uses the user's own bank accounts (BankAccount model), not admin methods.
 const typeConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   qris: { label: 'QRIS', icon: QrCode, color: '#E31E24' },
-  bank: { label: 'Transfer Bank', icon: Wallet, color: '#0066AF' },
-  ewallet: { label: 'E-Wallet', icon: Wallet, color: '#7B61FF' },
   usdt: { label: 'USDT (BEP20)', icon: Wallet, color: '#26A17B' },
-  crypto: { label: 'Crypto', icon: Wallet, color: '#F7931A' },
 };
 
 const emptyForm: Omit<PaymentMethod, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -285,19 +284,15 @@ export default function AdminPaymentPage() {
     setShowForm(true);
   };
 
-  // Group methods by type
-  const groupedMethods = Object.keys(typeConfig).map((key) => ({
+  // Only show QRIS and USDT methods (deposit-only). Other legacy types are hidden.
+  const allowedTypes = Object.keys(typeConfig); // ['qris', 'usdt']
+  const visibleMethods = paymentMethods.filter((pm) => allowedTypes.includes(pm.type));
+  const groupedMethods = allowedTypes.map((key) => ({
     key,
-    methods: paymentMethods.filter((pm) => pm.type === key),
-  })).filter(group => group.methods.length > 0);
-  
-  // Catch any methods that don't match a known type
-  const uncategorizedMethods = paymentMethods.filter(
-    (pm) => !Object.keys(typeConfig).includes(pm.type)
-  );
-  if (uncategorizedMethods.length > 0) {
-    groupedMethods.push({ key: 'other', methods: uncategorizedMethods });
-  }
+    methods: visibleMethods.filter((pm) => pm.type === key),
+  }));
+  // Legacy/hidden methods note (bank/ewallet/crypto are no longer manageable)
+  const hiddenMethods = paymentMethods.filter((pm) => !allowedTypes.includes(pm.type));
 
   if (loading) {
     return (
@@ -317,23 +312,41 @@ export default function AdminPaymentPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between mb-6"
+        className="flex items-center justify-between mb-4 sm:mb-6 gap-3"
       >
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">Pengaturan Pembayaran</h1>
-          <p className="text-muted-foreground text-sm">Manage payment methods and settings</p>
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gold-gradient">Pengaturan Pembayaran</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm">Deposit payment methods (QRIS & USDT)</p>
         </div>
         <Button
           onClick={openNewForm}
-          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
+          className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold shrink-0 text-sm h-10 px-3 sm:px-4"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Tambah Metode
+          <Plus className="w-4 h-4 mr-1.5 sm:mr-2" />
+          <span className="hidden sm:inline">Tambah Metode</span>
+          <span className="sm:hidden">Tambah</span>
         </Button>
       </motion.div>
 
+      {/* Deposit-only notice */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6 border border-primary/15 flex items-start gap-3"
+      >
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-foreground text-sm font-semibold">Pembayaran Deposit — QRIS & USDT saja</p>
+          <p className="text-muted-foreground text-xs mt-0.5 leading-relaxed">
+            Metode di sini hanya untuk <span className="text-primary font-medium">Deposit</span>. Penarikan (Withdraw) menggunakan rekening bank pengguna sendiri, tidak perlu diatur di sini.
+          </p>
+        </div>
+      </motion.div>
+
       {/* Payment Methods by Category */}
-      <div className="max-w-4xl space-y-6">
+      <div className="max-w-4xl space-y-4 sm:space-y-6">
         {groupedMethods.map((category) => {
           const config = typeConfig[category.key] || { label: 'Lainnya', icon: Wallet, color: '#888888' };
           const Icon = config.icon;
@@ -441,6 +454,36 @@ export default function AdminPaymentPage() {
           );
         })}
 
+        {/* Hidden legacy methods (bank/ewallet/crypto) — deposit only uses QRIS + USDT now */}
+        {hiddenMethods.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-2xl p-3 sm:p-4 border border-yellow-400/15"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-yellow-400/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-foreground text-sm font-semibold">
+                  {hiddenMethods.length} metode lama disembunyikan
+                </p>
+                <p className="text-muted-foreground text-xs mt-0.5 leading-relaxed">
+                  Metode bank/e-wallet/crypto lama tidak ditampilkan ke pengguna. Hanya QRIS & USDT yang aktif untuk deposit.
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {hiddenMethods.map((pm) => (
+                    <Badge key={pm.id} className="bg-yellow-400/10 text-yellow-400 text-[9px] border-yellow-400/20">
+                      {pm.name} ({pm.type})
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Auto Payment Toggle */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -463,7 +506,7 @@ export default function AdminPaymentPage() {
             />
           </div>
           {autoPayment && (
-            <div className="mt-4 p-3 rounded-xl bg-cardmerald-500/10 border border-emerald-500/20">
+            <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div>

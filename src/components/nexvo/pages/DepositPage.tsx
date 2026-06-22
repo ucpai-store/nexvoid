@@ -236,7 +236,9 @@ export default function DepositPage() {
   }, [prefillAmount]);
 
   useEffect(() => {
-    const filtered = paymentMethods.filter((pm) => pm.type === activeTab || (activeTab === 'usdt' && pm.type === 'crypto'));
+    // Only show methods matching the active tab (qris or usdt).
+    // Legacy crypto/bank/ewallet types are no longer exposed by the API.
+    const filtered = paymentMethods.filter((pm) => pm.type === activeTab);
     if (filtered.length > 0 && (!selectedPayment || !filtered.find(f => f.id === selectedPayment.id))) {
       setSelectedPayment(filtered[0]);
     } else if (filtered.length === 0) {
@@ -246,7 +248,7 @@ export default function DepositPage() {
     setQrImageError({});
   }, [activeTab, paymentMethods]);
 
-  const filteredMethods = paymentMethods.filter((pm) => pm.type === activeTab || (activeTab === 'usdt' && pm.type === 'crypto'));
+  const filteredMethods = paymentMethods.filter((pm) => pm.type === activeTab);
 
   const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -685,7 +687,7 @@ export default function DepositPage() {
                     <div className="flex gap-2 p-1 glass rounded-2xl">
                       {categoryTabKeys.map((tab) => {
                         const Icon = tab.icon;
-                        const count = paymentMethods.filter((pm) => pm.type === tab.key || (tab.key === 'usdt' && pm.type === 'crypto')).length;
+                        const count = paymentMethods.filter((pm) => pm.type === tab.key).length;
                         const isActive = activeTab === tab.key;
                         return (
                           <button key={tab.key} type="button" onClick={() => { setActiveTab(tab.key); setHasConfirmedPayment(false); }}

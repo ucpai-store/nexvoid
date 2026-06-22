@@ -33,10 +33,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // qris, usdt
 
-    // Allow qris, usdt, and crypto types
-    const where: { isActive: boolean; type?: string } = { isActive: true };
-    if (type && ['qris', 'usdt', 'crypto'].includes(type)) {
+    // Only QRIS and USDT are exposed for deposit payments.
+    // bank/ewallet/crypto legacy types are hidden from users.
+    const where: { isActive: boolean; type?: string | { in: string[] } } = { isActive: true };
+    if (type && ['qris', 'usdt'].includes(type)) {
       where.type = type;
+    } else {
+      // Default: only return qris + usdt (filter out legacy types)
+      where.type = { in: ['qris', 'usdt'] };
     }
 
     const paymentMethods = await db.paymentMethod.findMany({

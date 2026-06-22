@@ -34,8 +34,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Tipe dan nama metode pembayaran wajib diisi' }, { status: 400 });
     }
 
-    if (!['bank', 'ewallet', 'qris', 'usdt', 'crypto'].includes(type)) {
-      return NextResponse.json({ success: false, error: 'Tipe metode pembayaran tidak valid (bank/ewallet/qris/usdt)' }, { status: 400 });
+    // Only QRIS and USDT are supported for deposit payments.
+    // Withdraw uses the user's own bank accounts (BankAccount model).
+    if (!['qris', 'usdt'].includes(type)) {
+      return NextResponse.json({ success: false, error: 'Tipe metode pembayaran tidak valid (hanya qris/usdt)' }, { status: 400 });
     }
 
     const paymentMethod = await db.paymentMethod.create({

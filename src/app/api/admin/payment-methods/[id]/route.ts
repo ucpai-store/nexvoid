@@ -21,8 +21,9 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Metode pembayaran tidak ditemukan' }, { status: 404 });
     }
 
-    if (type && !['bank', 'ewallet', 'qris', 'usdt', 'crypto'].includes(type)) {
-      return NextResponse.json({ success: false, error: 'Tipe metode pembayaran tidak valid (bank/ewallet/qris/usdt)' }, { status: 400 });
+    // Only QRIS and USDT are supported for deposit payments.
+    if (type && !['qris', 'usdt'].includes(type)) {
+      return NextResponse.json({ success: false, error: 'Tipe metode pembayaran tidak valid (hanya qris/usdt)' }, { status: 400 });
     }
 
     const data: {
