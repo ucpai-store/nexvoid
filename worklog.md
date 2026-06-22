@@ -26,3 +26,28 @@ Stage Summary:
 - 3-tier translation fallback ensures no missing keys ever show raw key string
 - Files changed: lang-store.ts, i18n.ts, LanguageSwitcher.tsx, globals.css
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-languages.sh | bash
+
+---
+Task ID: 2
+Agent: main (Z.ai Code)
+Task: Admin payment feature — USDT supports QR image upload + wallet address; QRIS covers all payments
+
+Work Log:
+- Explored AdminPaymentPage.tsx (853 lines): found QR upload section was gated on form.type === 'qris' only, so USDT had no QR field
+- Explored DepositPage.tsx USDT section: only showed wallet address (accountNo), no qrImage rendering
+- Verified API routes already support qrImage field for all types (qris/usdt/bank/ewallet/crypto) — no API changes needed
+- AdminPaymentPage.tsx: changed QR condition from 'qris' only to 'qris || usdt', added dynamic labels ('QR Code USDT (Opsional)' for usdt), helper text, dynamic upload button text
+- DepositPage.tsx: added USDT QR display ABOVE wallet address in the USDT tab — shows admin-uploaded QR with fallback to wallet-address-only if no QR
+- AdminPaymentPage.tsx list: added 'QR' badge next to method name for any method with qrImage configured (so admin sees which have QR)
+- Verified dev server: HTTP 200, no compilation errors in modified files (only pre-existing sandbox Prisma DB error)
+- Committed + pushed to GitHub origin/main (2 commits: feature + deploy script)
+- Created deploy-payment-qr.sh for VPS deployment
+
+Stage Summary:
+- Admin > Payment > USDT: now has Wallet Address (wajib) + QR Code upload (opsional)
+- Admin > Payment > QRIS: unchanged (single QRIS for all payments)
+- Deposit page USDT tab: displays QR (if uploaded) + wallet address + copy button
+- Badge 'QR' in admin list shows which methods have QR configured
+- No DB schema changes needed (qrImage field already existed)
+- Files changed: AdminPaymentPage.tsx, DepositPage.tsx, +deploy-payment-qr.sh
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-payment-qr.sh | bash
