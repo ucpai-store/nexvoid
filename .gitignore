@@ -75,3 +75,6 @@ ecosystem.config.js
 nexvo-guide-ebook.pdf
 tool-results/
 upload/
+# Keep the Next.js API route for file uploads (not the uploads/ content dir)
+!src/app/api/upload/
+!src/app/api/upload/**
