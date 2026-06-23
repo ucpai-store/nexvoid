@@ -57,6 +57,7 @@ deploy*.js
 # Keep specific deploy scripts that users run via curl from GitHub
 !deploy-upload-fix-v2.sh
 !deploy-manual-approval.sh
+!deploy-wd-system.sh
 DEPLOY*.sh
 DEPLOY*.md
 FIX*.sh

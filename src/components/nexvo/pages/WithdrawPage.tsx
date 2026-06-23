@@ -66,6 +66,7 @@ const EWALLET_OPTIONS: PaymentOption[] = [
 
 interface Withdrawal {
   id: string;
+  withdrawalId: string;
   amount: number;
   fee: number;
   netAmount: number;
@@ -265,6 +266,16 @@ export default function WithdrawPage() {
   const [lastWithdrawAmount, setLastWithdrawAmount] = useState(0);
   const [lastWithdrawNet, setLastWithdrawNet] = useState(0);
   const [lastWithdrawMethod, setLastWithdrawMethod] = useState('');
+  const [lastWithdrawId, setLastWithdrawId] = useState('');
+  // Meta from API: min/max withdrawal + pending withdrawal check
+  const [meta, setMeta] = useState<{
+    lastPackageAmount?: number;
+    hasPendingWithdrawal?: boolean;
+    pendingWithdrawalId?: string | null;
+    minWithdraw?: number;
+    maxWithdraw?: number;
+    feePercent?: number;
+  }>({});
 
   // Form state
   const [selectedCategory, setSelectedCategory] = useState<PaymentCategory>('bank');
@@ -285,7 +296,10 @@ export default function WithdrawPage() {
       const withdrawData = await withdrawRes.json();
       const settingsData = await settingsRes.json();
 
-      if (withdrawData.success) setWithdrawals(withdrawData.data || []);
+      if (withdrawData.success) {
+        setWithdrawals(withdrawData.data || []);
+        if (withdrawData.meta) setMeta(withdrawData.meta);
+      }
       if (settingsData.success) setSettings(settingsData.data || {});
     } catch {
       setError(t('common.error'));
@@ -307,8 +321,15 @@ export default function WithdrawPage() {
   }, [selectedCategory]);
 
   const numAmount = parseInt(amount.replace(/[^0-9]/g, '')) || 0;
-  const feeRate = parseFloat(settings.withdraw_fee || '10') / 100;
-  const minWithdraw = Math.max(parseInt(settings.min_withdraw || '100000'), 100000);
+  // Withdrawal rules (from API meta):
+  //   - Min: 100,000 (forced)
+  //   - Max: last purchased package/product amount
+  //   - Fee: 10% (forced, ignores setting)
+  //   - Blocked if user has pending withdrawal (must wait for admin approval)
+  const minWithdraw = meta.minWithdraw || 100000;
+  const maxWithdraw = meta.maxWithdraw || 0;
+  const feeRate = (meta.feePercent || 10) / 100;
+  const hasPendingWithdrawal = meta.hasPendingWithdrawal || false;
   const fee = Math.round(numAmount * feeRate);
   const netAmount = numAmount - fee;
   const mainBalance = user?.mainBalance || 0;
@@ -343,7 +364,12 @@ export default function WithdrawPage() {
   };
 
   const isFormValid = (): boolean => {
+    // Block if user has pending withdrawal (must wait for admin approval)
+    if (hasPendingWithdrawal) return false;
+    // Block if no package purchased (maxWithdraw = 0)
+    if (maxWithdraw <= 0) return false;
     if (!numAmount || numAmount < minWithdraw) return false;
+    if (numAmount > maxWithdraw) return false;
     if (numAmount > mainBalance) return false;
     switch (selectedCategory) {
       case 'bank': return !!selectedBank && !!accountNo && !!holderName;
@@ -354,7 +380,11 @@ export default function WithdrawPage() {
   };
 
   const setPercentAmount = (percent: number) => {
-    const val = Math.floor((mainBalance * percent) / 100);
+    let val = Math.floor((mainBalance * percent) / 100);
+    // Cap at maxWithdraw (last package amount)
+    if (maxWithdraw > 0 && val > maxWithdraw) val = maxWithdraw;
+    // Ensure at least minWithdraw
+    if (val < minWithdraw) val = minWithdraw;
     setAmount(val.toString());
   };
 
@@ -406,8 +436,9 @@ export default function WithdrawPage() {
         setLastWithdrawAmount(numAmount);
         setLastWithdrawNet(netAmount);
         setLastWithdrawMethod(paymentMethod || 'USDT');
+        setLastWithdrawId(data.data?.withdrawalId || '');
         setShowSuccessModal(true);
-        toast({ title: 'Success', description: t('withdraw.withdrawSuccess') });
+        toast({ title: 'Success', description: data.message || t('withdraw.withdrawSuccess') });
         setAmount('');
         setAccountNo('');
         setHolderName('');
@@ -487,23 +518,33 @@ export default function WithdrawPage() {
                 <motion.div
                   initial={{ scale: 0 }} animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: 'spring', damping: 12, stiffness: 200 }}
-                  className="w-20 h-20 rounded-full bg-blue-400/15 flex items-center justify-center mx-auto mb-4 relative"
+                  className="w-20 h-20 rounded-full bg-yellow-400/15 flex items-center justify-center mx-auto mb-4 relative"
                 >
-                  <div className="absolute inset-0 rounded-full bg-blue-400/10 animate-ping" />
-                  <ArrowUpCircle className="w-11 h-11 text-blue-400 relative z-10" />
+                  <div className="absolute inset-0 rounded-full bg-yellow-400/10 animate-ping" />
+                  <Clock className="w-11 h-11 text-yellow-400 relative z-10" />
                 </motion.div>
 
-                <h2 className="text-foreground text-xl font-bold mb-1">Withdrawal Berhasil!</h2>
-                <p className="text-muted-foreground text-sm mb-5">Permintaan withdrawal Anda sedang diproses. Dana akan masuk ke rekening Anda dalam 1×24 jam.</p>
+                <h2 className="text-foreground text-xl font-bold mb-1">Withdrawal Diterima!</h2>
+                <p className="text-muted-foreground text-sm mb-5">Permintaan withdrawal Anda sedang <span className="text-yellow-400 font-semibold">menunggu persetujuan admin</span>. Dana akan masuk ke rekening Anda setelah admin menyetujui. Anda tidak bisa membuat withdrawal baru sampai withdrawal ini diproses.</p>
 
                 <div className="glass rounded-2xl p-4 mb-5 space-y-3 border border-primary/10">
                   <div>
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Withdrawal ID</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-gold-gradient text-2xl font-bold font-mono tracking-wider">{lastWithdrawId}</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-white/5 pt-3">
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Metode</p>
                     <p className="text-foreground text-sm font-semibold">{lastWithdrawMethod}</p>
                   </div>
                   <div className="border-t border-white/5 pt-3">
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Jumlah Withdraw</p>
                     <p className="text-foreground text-xl font-bold">{formatRupiah(lastWithdrawAmount)}</p>
+                  </div>
+                  <div className="border-t border-white/5 pt-3">
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Fee (10%)</p>
+                    <p className="text-yellow-400 text-sm font-bold">{formatRupiah(lastWithdrawAmount - lastWithdrawNet)}</p>
                   </div>
                   <div className="border-t border-white/5 pt-3">
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Diterima</p>
@@ -552,7 +593,11 @@ export default function WithdrawPage() {
               <span className="text-muted-foreground text-xs sm:text-sm font-medium">Saldo Tersedia</span>
             </div>
             <p className="text-3xl sm:text-4xl font-bold text-gold-gradient">{formatRupiah(mainBalance)}</p>
-            <p className="text-muted-foreground text-[10px] sm:text-xs mt-1">Min withdraw: {formatRupiah(minWithdraw)}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+              <p className="text-muted-foreground text-[10px] sm:text-xs">Min: <span className="text-foreground font-medium">{formatRupiah(minWithdraw)}</span></p>
+              <p className="text-muted-foreground text-[10px] sm:text-xs">Max: <span className="text-foreground font-medium">{maxWithdraw > 0 ? formatRupiah(maxWithdraw) : '—'}</span></p>
+              <p className="text-muted-foreground text-[10px] sm:text-xs">Fee: <span className="text-yellow-400 font-medium">10%</span></p>
+            </div>
           </div>
           <div className="hidden sm:flex flex-col items-center gap-1 px-4 py-3 rounded-2xl glass border border-primary/10">
             <Shield className="w-5 h-5 text-primary" />
@@ -580,6 +625,44 @@ export default function WithdrawPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ─── Pending Withdrawal Warning (block new WD) ─── */}
+      {hasPendingWithdrawal && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-2xl p-4 flex items-center gap-3 border border-yellow-400/30 bg-yellow-400/5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-yellow-400/15 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-yellow-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-foreground text-sm font-semibold">Withdrawal Pending</p>
+            <p className="text-muted-foreground text-xs">
+              Anda masih memiliki withdrawal <span className="text-yellow-400 font-mono font-bold">{meta.pendingWithdrawalId}</span> yang sedang menunggu persetujuan admin. Tunggu hingga withdrawal tersebut diproses sebelum membuat withdrawal baru.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ─── No Package Warning (maxWithdraw = 0) ─── */}
+      {!hasPendingWithdrawal && maxWithdraw <= 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-2xl p-4 flex items-center gap-3 border border-red-400/30 bg-red-400/5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-red-400/15 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-red-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-foreground text-sm font-semibold">Belum Ada Pembelian Paket/Produk</p>
+            <p className="text-muted-foreground text-xs">
+              Maksimal withdrawal ditentukan oleh paket/produk terakhir yang Anda beli. Silakan beli paket/produk terlebih dahulu sebelum melakukan withdrawal.
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* ─── Premium Withdraw Form ─── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -768,7 +851,9 @@ export default function WithdrawPage() {
             {/* Preset nominal — sesuai paket investasi */}
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {presetAmounts.map((preset) => {
-                const disabled = mainBalance < preset.value;
+                // Disable preset if: insufficient balance, exceeds maxWithdraw, or user has pending WD
+                const exceedsMax = maxWithdraw > 0 && preset.value > maxWithdraw;
+                const disabled = mainBalance < preset.value || exceedsMax || hasPendingWithdrawal || maxWithdraw <= 0;
                 const isSelected = amount === preset.value.toString();
                 return (
                   <motion.button
@@ -874,6 +959,9 @@ export default function WithdrawPage() {
                     <PayIcon className="w-5 h-5 text-blue-400" />
                   </div>
                   <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-gold-gradient text-[10px] font-bold font-mono tracking-wider">{wd.withdrawalId || 'WD-?'}</span>
+                    </div>
                     <p className="text-foreground text-sm font-semibold">{wd.bankName}</p>
                     <p className="text-muted-foreground text-xs">{wd.accountNo?.slice(-8) || '****'}</p>
                     <p className="text-muted-foreground text-[10px]">{formatDate(wd.createdAt)}</p>

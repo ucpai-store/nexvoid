@@ -100,22 +100,23 @@ model Deposit {
 }
 
 model Withdrawal {
-  id          String   @id @default(cuid())
-  userId      String
-  bankId      String   @default("")
-  bankName    String
-  accountNo   String
-  holderName  String
-  paymentType String   @default("bank")
-  amount      Float
-  fee         Float
-  netAmount   Float
-  status      String   @default("pending")
-  note        String   @default("")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  withdrawalId  String   @unique
+  userId        String
+  bankId        String   @default("")
+  bankName      String
+  accountNo     String
+  holderName    String
+  paymentType   String   @default("bank")
+  amount        Float
+  fee           Float
+  netAmount     Float
+  status        String   @default("pending")
+  note          String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Purchase {

@@ -34,6 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 /* ───────── Types ───────── */
 interface Withdrawal {
   id: string;
+  withdrawalId: string;
   userId: string;
   bankName: string;
   accountNo: string;
@@ -197,6 +198,7 @@ export default function AdminWithdrawalsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-primary/10 hover:bg-transparent">
+                    <TableHead className="text-muted-foreground text-xs">ID Withdrawal</TableHead>
                     <TableHead className="text-muted-foreground text-xs">User</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Metode</TableHead>
                     <TableHead className="text-muted-foreground text-xs">No. Akun</TableHead>
@@ -213,6 +215,9 @@ export default function AdminWithdrawalsPage() {
                     const sc = statusConfig[wd.status] || statusConfig.pending;
                     return (
                       <TableRow key={wd.id} className="border-primary/5 hover:bg-white/[0.02]">
+                        <TableCell>
+                          <span className="text-gold-gradient text-xs font-bold font-mono tracking-wider">{wd.withdrawalId || 'WD-?'}</span>
+                        </TableCell>
                         <TableCell>
                           <p className="text-foreground text-sm font-medium">{wd.user?.name || 'Unknown'}</p>
                           <p className="text-muted-foreground text-xs">{wd.user?.userId}</p>
@@ -275,6 +280,7 @@ export default function AdminWithdrawalsPage() {
                   <div key={wd.id} className="glass rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div>
+                        <p className="text-gold-gradient text-xs font-bold font-mono tracking-wider mb-0.5">{wd.withdrawalId || 'WD-?'}</p>
                         <p className="text-foreground text-sm font-medium">{wd.user?.name}</p>
                         <p className="text-muted-foreground text-xs">{wd.user?.userId}</p>
                       </div>
@@ -347,9 +353,11 @@ export default function AdminWithdrawalsPage() {
               if (!wd) return null;
               return (
                 <div className="mt-3 p-3 rounded-xl bg-cardmerald-500/10 border border-emerald-500/20 space-y-1 text-sm">
+                  <p className="text-gold-gradient font-bold font-mono tracking-wider">{wd.withdrawalId || 'WD-?'}</p>
                   <p className="text-foreground font-medium">{wd.user?.name || 'Unknown'}</p>
                   <p className="text-muted-foreground">{wd.bankName} • {wd.accountNo}</p>
-                  <p className="text-emerald-400 font-semibold">{formatRupiah(wd.netAmount)}</p>
+                  <p className="text-muted-foreground">Jumlah: {formatRupiah(wd.amount)} (Fee: {formatRupiah(wd.fee)})</p>
+                  <p className="text-emerald-400 font-semibold">Netto diterima: {formatRupiah(wd.netAmount)}</p>
                 </div>
               );
             })()}

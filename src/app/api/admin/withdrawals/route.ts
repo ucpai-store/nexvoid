@@ -87,7 +87,7 @@ export async function PUT(request: NextRequest) {
         where: { id },
         data: {
           status,
-          note: note || '',
+          note: note || (status === 'approved' ? 'Disetujui oleh admin' : 'Ditolak oleh admin'),
         },
       });
 
@@ -117,15 +117,15 @@ export async function PUT(request: NextRequest) {
       sendPushNotification(
         withdrawal.userId, "user",
         "✅ Withdrawal Disetujui",
-        `Withdrawal Rp ${Math.floor(withdrawal.amount).toLocaleString("id-ID")} telah disetujui`,
-        { type: "withdrawal_approved", withdrawalId: withdrawal.id }
+        `Withdrawal ${withdrawal.withdrawalId} - Rp ${Math.floor(withdrawal.amount).toLocaleString("id-ID")} telah disetujui. Saldo ${Math.floor(withdrawal.netAmount).toLocaleString("id-ID")} sudah dikirim.`,
+        { type: "withdrawal_approved", withdrawalId: withdrawal.withdrawalId }
       ).catch(() => {});
     } else {
       sendPushNotification(
         withdrawal.userId, "user",
         "❌ Withdrawal Ditolak",
-        `Withdrawal Rp ${Math.floor(withdrawal.amount).toLocaleString("id-ID")} ditolak. Saldo dikembalikan. ${note || ""}`,
-        { type: "withdrawal_rejected", withdrawalId: withdrawal.id }
+        `Withdrawal ${withdrawal.withdrawalId} - Rp ${Math.floor(withdrawal.amount).toLocaleString("id-ID")} ditolak. Saldo dikembalikan. ${note || ""}`,
+        { type: "withdrawal_rejected", withdrawalId: withdrawal.withdrawalId }
       ).catch(() => {});
     }
 
