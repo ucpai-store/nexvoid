@@ -279,3 +279,64 @@ Stage Summary:
 - Admin logout + unauthenticated admin access redirect to /id/admin
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-deposit-admin.sh | bash
 - Files changed: +src/app/api/deposit/upload/route.ts, M src/app/api/deposit/route.ts, M src/app/api/admin/deposits/route.ts, M src/components/nexvo/pages/DepositPage.tsx, M src/components/nexvo/pages/AdminDepositsPage.tsx, M src/components/nexvo/pages/LoginPage.tsx, M src/components/nexvo/AppShell.tsx, M src/components/nexvo/AdminHeader.tsx, +src/app/id/admin/layout.tsx, +src/app/id/admin/page.tsx, +deploy-deposit-admin.sh
+
+---
+Task ID: 9
+Agent: main (Z.ai Code)
+Task: Fix broken uploads (QRIS/USDT QR image) + redesign admin login page (premium, neat)
+
+Work Log:
+- User reported: "eror mau uplod gk bisa terus tampilan login admin jelek kasi desain yang baguss rapi"
+- Root cause of upload failure:
+  - .gitignore line 77 had `upload/` pattern → matched `src/app/api/upload/` directory
+  - The /api/upload route was therefore gitignored and deleted locally (git status: D)
+  - 5 pages used /api/upload: AdminPaymentPage (QR), AdminProductsPage, ProfilePage, AdminBannersPage, SettingsPage
+  - All their uploads silently failed (404)
+- Fix 1 — .gitignore: Added negation `!src/app/api/upload/` and `!src/app/api/upload/**` after `upload/` line
+- Fix 1b — Recreated /api/upload/route.ts (unified):
+  - Accepts EITHER user token (getUserFromRequest) OR admin token (getAdminFromRequest)
+  - Validates size (10MB) + type (JPG/PNG/GIF/WebP/SVG)
+  - Saves to uploads/ + public/ + standalone dirs (survives rebuilds)
+  - Returns { success, data: { url, filePath, filename, originalName, size } }
+  - Logs admin upload actions via logAdminAction
+  - Verified: git check-ignore now shows the negation rule (route is tracked)
+- Fix 2 — Redesigned /id/admin login page (premium glassmorphism):
+  - Canvas-based animated gold particle field (28 particles)
+  - Gradient glow backgrounds + subtle hex grid + scan line animation
+  - Gold border glow around card, top/bottom accent lines
+  - Shield icon in rounded gold-tinted box with blur glow
+  - "Admin Control" gradient gold title + "NEXVO Control Center" subtitle
+  - Form: Username + Password fields with focus glow, eye toggle (improved contrast slate-400)
+  - Submit button: gold gradient + shine sweep on hover + scale animation
+  - Verifying state: spinner + fingerprint icon
+  - Security badge: "Koneksi aman · 256-bit SSL" (subtle, integrated)
+  - "Kembali ke Beranda" link (improved contrast slate-400)
+  - Fully responsive: max-w-[420px], px-6 sm:px-8, h-11 sm:h-12 inputs
+  - Replaced non-standard h-13/h-18 classes with arbitrary values h-[3.25rem]
+- VLM evaluation:
+  - v1: 7/10 (spacing inconsistent, gold overuse, clutter)
+  - v2 (after redesign): mobile 7/10, desktop 8/10 — "premium, professional, neat"
+  - Final refinements: eye icon contrast slate-400 + size 18px, back link contrast slate-400 + 13px
+- Browser verification (agent-browser):
+  - /id/admin renders new premium design ✅
+  - Admin login (admin/Admin@2024) → redirects to /#admin-dashboard ✅
+  - Navigated to admin payment page → QRIS/USDT sections render ✅
+  - Simulated QR upload via fetch (admin token from localStorage) → HTTP 200, returns URL ✅
+  - Uploaded file accessible (HTTP 200, 84 bytes) ✅
+  - No console errors (only expected client-side DB warning) ✅
+  - No page errors ✅
+- API verification (curl):
+  - /api/upload with admin token → 200 + URL ✅
+  - /api/upload with user token → 200 + URL ✅
+  - /api/upload without token → 401 (correct) ✅
+- Cleaned up 22 old test upload artifacts (public/upload-*.png) from repo
+- Created deploy-upload-admin.sh: pulls, builds, copies static+uploads, restarts PM2, verifies
+- Committed + pushed to GitHub origin/main
+
+Stage Summary:
+- Upload FIXED: /api/upload route restored (was gitignored+deleted) → QRIS/USDT QR image upload works
+- Also fixes: product images, banners, profile avatars, settings images (all used /api/upload)
+- Admin login /id/admin REDESIGNED: premium dark glassmorphism, gold accents, animated particles
+- VLM-rated 7-8/10 (premium, professional, neat)
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-upload-admin.sh | bash
+- Files: M .gitignore, +src/app/api/upload/route.ts, M src/app/id/admin/page.tsx, +deploy-upload-admin.sh, D 22 test artifacts
