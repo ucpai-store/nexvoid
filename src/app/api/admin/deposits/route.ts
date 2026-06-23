@@ -78,26 +78,42 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Deposit tidak ditemukan' }, { status: 404 });
     }
 
-    // Deposits are auto-approved, so admin can:
-    //  - reject an already-approved deposit (reverses the credit, for fraud handling)
-    //  - re-approve / no-op on approved
-    // Only block re-processing of already-rejected deposits.
+    // Manual approval flow:
+    //  - Admin approves a 'pending' deposit → credit balance to user
+    //  - Admin rejects a 'pending' deposit → no balance change (was never credited)
+    //  - Admin rejects an 'approved' deposit → reverse the credit (fraud handling)
+    // Block re-processing of already-processed deposits (rejected or approved twice)
     if (deposit.status === 'rejected') {
-      return NextResponse.json({ success: false, error: 'Deposit sudah diproses' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Deposit sudah ditolak, tidak bisa diproses lagi' }, { status: 400 });
     }
+    if (deposit.status === 'approved' && status === 'approved') {
+      return NextResponse.json({ success: false, error: 'Deposit sudah disetujui' }, { status: 400 });
+    }
+
+    const netAmount = deposit.netAmount || (deposit.amount - (deposit.fee || 0));
 
     const updatedDeposit = await db.$transaction(async (tx) => {
       const updated = await tx.deposit.update({
         where: { id },
         data: {
           status,
-          note: note || '',
+          note: note || (status === 'approved' ? 'Disetujui oleh admin' : 'Ditolak oleh admin'),
         },
       });
 
-      // If rejecting an auto-approved deposit, reverse the credit
+      // Approving a pending deposit → credit balance to user
+      if (status === 'approved' && deposit.status === 'pending') {
+        await tx.user.update({
+          where: { id: deposit.userId },
+          data: {
+            depositBalance: { increment: netAmount },
+            totalDeposit: { increment: netAmount },
+          },
+        });
+      }
+
+      // Rejecting an already-approved deposit → reverse the credit (fraud handling)
       if (status === 'rejected' && deposit.status === 'approved') {
-        const netAmount = deposit.netAmount || (deposit.amount - (deposit.fee || 0));
         await tx.user.update({
           where: { id: deposit.userId },
           data: {

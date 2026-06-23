@@ -50,44 +50,32 @@ export async function POST(request: NextRequest) {
 
     const depositId = await getUniqueDepositId();
 
-    // Deposit auto-approved: NO admin fee, NO admin approval needed.
-    // Full amount is credited to user balance immediately.
+    // Deposit requires MANUAL ADMIN APPROVAL.
+    // Balance will be credited ONLY when admin approves the deposit.
+    // No admin fee on deposit (admin fee only applies on withdrawal).
     const fee = 0;
     const netAmount = amount;
 
-    // Create deposit record AND credit balance immediately (auto-approve)
-    const deposit = await db.$transaction(async (tx) => {
-      const newDeposit = await tx.deposit.create({
-        data: {
-          depositId,
-          userId: user.id,
-          amount,
-          fee,
-          netAmount,
-          proofImage: proofImage || '',
-          paymentMethodId: paymentMethodId || null,
-          paymentType: paymentType || '',
-          paymentName: paymentName || '',
-          paymentAccount: paymentAccount || '',
-          status: 'approved',
-          note: 'Auto-approved',
-        },
-      });
-
-      // Credit full amount to user's depositBalance + totalDeposit
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          depositBalance: { increment: netAmount },
-          totalDeposit: { increment: netAmount },
-        },
-      });
-
-      return newDeposit;
+    // Create deposit record with status 'pending' (awaiting admin approval)
+    const deposit = await db.deposit.create({
+      data: {
+        depositId,
+        userId: user.id,
+        amount,
+        fee,
+        netAmount,
+        proofImage: proofImage || '',
+        paymentMethodId: paymentMethodId || null,
+        paymentType: paymentType || '',
+        paymentName: paymentName || '',
+        paymentAccount: paymentAccount || '',
+        status: 'pending',
+        note: 'Menunggu persetujuan admin',
+      },
     });
 
-    // Notify WhatsApp bot (deposit auto-approved)
-    await notifyBot('deposit_approved', {
+    // Notify WhatsApp bot (deposit submitted, awaiting approval)
+    await notifyBot('deposit_pending', {
       depositId: deposit.depositId,
       userId: user.id,
       userName: user.name || user.userId,
@@ -96,15 +84,19 @@ export async function POST(request: NextRequest) {
       fee,
       netAmount,
       paymentMethod: paymentName || paymentType || 'N/A',
-      status: 'approved',
+      status: 'pending',
     }).catch(() => {});
-    // Push notification to admins (informational, no action needed)
-    sendPushToAdmins("💸 Deposit Otomatis", `${user.name || user.userId} deposit Rp ${Math.floor(netAmount).toLocaleString("id-ID")} (auto-approved)`, { type: "deposit", depositId: deposit.depositId, userId: user.id }).catch(() => {});
+    // Push notification to admins (action required: approve/reject)
+    sendPushToAdmins(
+      "🆕 Deposit Menunggu Approval",
+      `${user.name || user.userId} deposit Rp ${Math.floor(netAmount).toLocaleString("id-ID")} - perlu persetujuan`,
+      { type: "deposit", depositId: deposit.depositId, userId: user.id, requiresAction: true }
+    ).catch(() => {});
 
     return NextResponse.json({
       success: true,
       data: deposit,
-      message: `Deposit ${depositId} berhasil! Saldo Rp ${Math.floor(netAmount).toLocaleString('id-ID')} telah masuk ke akun Anda.`,
+      message: `Deposit ${depositId} berhasil dikirim! Saldo Rp ${Math.floor(netAmount).toLocaleString('id-ID')} akan masuk setelah admin menyetujui deposit Anda.`,
     });
   } catch (error) {
     console.error('Create deposit error:', error);

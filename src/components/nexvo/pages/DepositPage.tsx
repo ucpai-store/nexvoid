@@ -220,7 +220,8 @@ export default function DepositPage() {
       if (waData.success) setWhatsappAdmins(waData.data || []);
       const settingsData = await settingsRes.json();
       if (settingsData.success && settingsData.data) {
-        // Deposit is now FREE (auto-approved, no admin fee). Admin fee only applies on withdrawal.
+        // Deposit has NO admin fee (admin fee only applies on withdrawal).
+        // Deposit requires manual admin approval before balance is credited.
         setAdminFee(0);
       }
     } catch {
@@ -462,14 +463,14 @@ export default function DepositPage() {
                 <motion.div
                   initial={{ scale: 0 }} animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: 'spring', damping: 12, stiffness: 200 }}
-                  className="w-20 h-20 rounded-full bg-emerald-400/15 flex items-center justify-center mx-auto mb-4 relative"
+                  className="w-20 h-20 rounded-full bg-yellow-400/15 flex items-center justify-center mx-auto mb-4 relative"
                 >
-                  <div className="absolute inset-0 rounded-full bg-emerald-400/10 animate-ping" />
-                  <CheckCircle2 className="w-11 h-11 text-emerald-400 relative z-10" />
+                  <div className="absolute inset-0 rounded-full bg-yellow-400/10 animate-ping" />
+                  <Clock className="w-11 h-11 text-yellow-400 relative z-10" />
                 </motion.div>
 
-                <h2 className="text-foreground text-xl font-bold mb-1">Deposit Berhasil!</h2>
-                <p className="text-muted-foreground text-sm mb-5">Saldo Anda telah masuk otomatis tanpa potongan admin. Admin fee hanya berlaku saat withdrawal.</p>
+                <h2 className="text-foreground text-xl font-bold mb-1">Deposit Diterima!</h2>
+                <p className="text-muted-foreground text-sm mb-5">Deposit Anda sedang <span className="text-yellow-400 font-semibold">menunggu persetujuan admin</span>. Saldo akan masuk otomatis ke akun Anda setelah admin menyetujui deposit ini. Tanpa potongan admin fee.</p>
 
                 <div className="glass rounded-2xl p-4 mb-5 space-y-3 border border-primary/10">
                   <div>
@@ -483,14 +484,12 @@ export default function DepositPage() {
                     <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Jumlah Deposit</p>
                     <p className="text-foreground text-xl font-bold">{formatRupiah(lastDepositAmount)}</p>
                   </div>
-                  {lastDepositFee > 0 && <div className="border-t border-white/5 pt-3">
-                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Admin Fee</p>
-                    <p className="text-yellow-400 text-lg font-bold">{formatRupiah(lastDepositFee)}</p>
-                  </div>}
                   <div className="border-t border-white/5 pt-3">
-                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Saldo Yang Masuk</p>
-                    <p className="text-emerald-400 text-2xl font-bold">{formatRupiah(lastDepositNet)}</p>
-                    {lastDepositFee > 0 ? <p className="text-yellow-400/70 text-[10px] mt-1">⚠️ Admin fee: {formatRupiah(lastDepositFee)}</p> : <p className="text-emerald-400/70 text-[10px] mt-1">✓ Tanpa potongan admin fee</p>}
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Status</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-yellow-400 text-lg font-bold">Menunggu Persetujuan Admin</span>
+                    </div>
+                    <p className="text-emerald-400/70 text-[10px] mt-1">✓ Tanpa potongan admin fee</p>
                   </div>
                 </div>
 
