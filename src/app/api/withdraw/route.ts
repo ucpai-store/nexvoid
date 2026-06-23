@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
-import { getAllSettings, isWithinWorkingHours } from '@/lib/settings';
+import { getAllSettings, isWithinWorkingHours, isWeekendWIB } from '@/lib/settings';
 import { notifyBot } from '@/lib/bot-notification';
 import { sendPushToAdmins } from '@/lib/push-notification';
 
@@ -51,9 +51,17 @@ export async function POST(request: NextRequest) {
 
     const settings = await getAllSettings();
 
-    // Check working hours
+    // ─── WEEKEND BLOCK: No withdrawal activities on Saturday & Sunday ───
+    if (isWeekendWIB()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Withdrawal diblokir pada hari Sabtu & Minggu. Semua aktivitas (deposit, withdrawal, profit) libur di akhir pekan. Silakan kembali pada hari kerja (Senin-Jumat).'
+      }, { status: 400 });
+    }
+
+    // Check working hours (weekday hours: Mon-Fri, 09:00-16:00 WIB)
     if (!isWithinWorkingHours(settings)) {
-      return NextResponse.json({ success: false, error: 'Withdrawals can only be made during working hours (Mon-Fri, 09:00-16:00 WIB)' }, { status: 400 });
+      return NextResponse.json({ success: false, error: `Withdrawals can only be made during working hours (Mon-Fri, 09:00-16:00 WIB)` }, { status: 400 });
     }
 
     // ─── RULE 1: Minimum withdrawal = 100,000 ───────────────────────

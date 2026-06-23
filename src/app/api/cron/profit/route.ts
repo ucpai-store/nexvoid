@@ -482,6 +482,29 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // ─── WEEKEND BLOCK: No profit distribution on Saturday & Sunday ───
+    const wibNow = getWibNow();
+    const dayOfWeek = wibNow.getDay(); // 0=Sunday, 6=Saturday
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+      console.log(`[Cron API] ⏸️ Profit cron skipped — today is ${dayName} (weekend libur). All activities off.`);
+      return NextResponse.json({
+        success: true,
+        data: {
+          processed: 0,
+          totalProfit: 0,
+          totalMatching: 0,
+          totalReferral: 0,
+          errors: 0,
+          errorDetails: [],
+          skipped: true,
+          skipReason: `Weekend (${dayName}) — semua aktivitas libur`,
+          durationMs: 0,
+          wibTime: wibNow.toISOString(),
+        },
+      });
+    }
+
     console.log('[Cron API] 🌅 Manual trigger: Daily investment profit + matching bonus');
     const startTime = Date.now();
     const result = await processDailyInvestmentProfits();
@@ -492,7 +515,7 @@ export async function POST(request: NextRequest) {
       data: {
         ...result,
         durationMs,
-        wibTime: getWibNow().toISOString(),
+        wibTime: wibNow.toISOString(),
       },
     });
   } catch (error: unknown) {
@@ -516,6 +539,29 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // ─── WEEKEND BLOCK: No profit distribution on Saturday & Sunday ───
+    const wibNow = getWibNow();
+    const dayOfWeek = wibNow.getDay(); // 0=Sunday, 6=Saturday
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+      console.log(`[Cron API] ⏸️ GET profit cron skipped — today is ${dayName} (weekend libur). All activities off.`);
+      return NextResponse.json({
+        success: true,
+        data: {
+          processed: 0,
+          totalProfit: 0,
+          totalMatching: 0,
+          totalReferral: 0,
+          errors: 0,
+          errorDetails: [],
+          skipped: true,
+          skipReason: `Weekend (${dayName}) — semua aktivitas libur`,
+          durationMs: 0,
+          wibTime: wibNow.toISOString(),
+        },
+      });
+    }
+
     console.log('[Cron API] 🌅 GET trigger: Daily investment profit + matching bonus');
     const startTime = Date.now();
     const result = await processDailyInvestmentProfits();
@@ -526,7 +572,7 @@ export async function GET(request: NextRequest) {
       data: {
         ...result,
         durationMs,
-        wibTime: getWibNow().toISOString(),
+        wibTime: wibNow.toISOString(),
       },
     });
   } catch (error: unknown) {

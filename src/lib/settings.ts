@@ -88,6 +88,27 @@ export function isWithinWorkingHours(settings: Record<string, string>): boolean 
 }
 
 /**
+ * Check if today is a weekend (Saturday or Sunday) in WIB timezone.
+ * ALL activities (deposit, withdrawal, profit) are OFF on weekends.
+ * Saturday (day=6) and Sunday (day=0) are considered weekends.
+ */
+export function isWeekendWIB(): boolean {
+  const wibNow = getWibNow();
+  const day = wibNow.getDay(); // 0=Sunday, 6=Saturday
+  return day === 0 || day === 6;
+}
+
+/**
+ * Get the name of today's day in Indonesian (WIB timezone).
+ * Useful for display: "Sabtu", "Minggu", "Senin", etc.
+ */
+export function getTodayDayNameWIB(): string {
+  const wibNow = getWibNow();
+  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  return days[wibNow.getDay()];
+}
+
+/**
  * Get working hours info for display purposes.
  * Returns current WIB time, whether it's working hours, and a message.
  */

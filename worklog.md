@@ -523,3 +523,59 @@ Stage Summary:
 - Files: M prisma/schema.prisma, M src/app/api/withdraw/route.ts,
   M src/app/api/admin/withdrawals/route.ts, M src/components/nexvo/pages/WithdrawPage.tsx,
   M src/components/nexvo/pages/AdminWithdrawalsPage.tsx, +deploy-wd-system.sh, M .gitignore
+
+---
+Task ID: weekend-libur
+Agent: main
+Task: Disable ALL activities (WD, deposit, profit) on Saturday & Sunday (weekend libur). No activities at all on weekends.
+
+Work Log:
+- Read existing code: src/lib/settings.ts (isWithinWorkingHours already blocks weekends for WD), src/app/api/deposit/route.ts (no weekend check), src/app/api/withdraw/route.ts (has isWithinWorkingHours), src/app/api/cron/profit/route.ts (no weekend check), mini-services/cron-service/index.ts (no weekend check in processDailyInvestmentProfits), src/app/api/user/profit-status/route.ts
+- Added 2 new helper functions to src/lib/settings.ts:
+  * isWeekendWIB(): returns true if today is Saturday (6) or Sunday (0) in WIB
+  * getTodayDayNameWIB(): returns Indonesian day name (Minggu/Senin/.../Sabtu)
+- src/app/api/deposit/route.ts: added weekend block at top of POST (after auth checks, before body parse). Returns 400 with Indonesian message: "Deposit diblokir pada hari Sabtu & Minggu..."
+- src/app/api/withdraw/route.ts: added explicit isWeekendWIB() check BEFORE the isWithinWorkingHours() check (clearer error message for weekends vs. weekday hours)
+- src/app/api/cron/profit/route.ts: added weekend block in both POST and GET handlers. Returns success with skipped=true and skipReason when weekend (so cron doesn't error out, just skips)
+- mini-services/cron-service/index.ts: added weekend guard inside processDailyInvestmentProfits() (returns empty result on Sat/Sun). Also updated the scheduler checkAndRunCrons() to log skip message on weekends instead of running profit
+- src/app/api/user/profit-status/route.ts: 
+  * Added isWeekend field to response
+  * If weekend: nextProfitTime = next Monday 00:00 WIB (not tomorrow)
+  * Updated schedule.dailyProfit text: "Senin-Jumat jam 00:00 WIB (libur Sabtu & Minggu)"
+- Created new reusable component: src/components/nexvo/shared/WeekendNoticeBanner.tsx
+  * Client-side WIB time computation (UTC+7, works regardless of browser timezone)
+  * Shows amber/orange banner with CalendarX2 icon when today is Sat/Sun
+  * Re-checks every 60 seconds (handles day rollover)
+  * Animated with Framer Motion (AnimatePresence)
+  * Props: activity (string) for custom message (Deposit/Withdrawal/Profit harian)
+- Added WeekendNoticeBanner to 3 pages:
+  * DepositPage.tsx (activity="Deposit")
+  * WithdrawPage.tsx (activity="Withdrawal")
+  * ProfitPage.tsx (activity="Profit harian")
+- Verified with agent-browser:
+  * Home page loads ✓
+  * User login (628123456789/Test@1234) ✓
+  * Deposit page (#deposit) loads, no errors ✓
+  * Withdraw page (#withdraw) loads, no errors ✓
+  * Profit page (#profit) loads, no errors ✓
+  * No console errors (only expected DB warning on client)
+- Verified profit-status API returns isWeekend: false (today is Tuesday), nextProfitTime = tomorrow 00:00 WIB, schedule.dailyProfit = "Senin-Jumat jam 00:00 WIB (libur Sabtu & Minggu)" ✓
+- TypeScript: no new errors introduced by my changes (pre-existing errors in other files unchanged)
+
+Stage Summary:
+- Weekend libur feature implemented end-to-end:
+  * Backend: deposit API, withdraw API, profit cron API, cron-service all block/skip on Sat/Sun (WIB)
+  * Frontend: WeekendNoticeBanner on Deposit/Withdraw/Profit pages (auto-shows on weekends)
+  * profit-status API: returns isWeekend flag + correct next-profit-on-Monday calculation
+- Files modified:
+  * M src/lib/settings.ts (+isWeekendWIB, +getTodayDayNameWIB)
+  * M src/app/api/deposit/route.ts (+weekend block)
+  * M src/app/api/withdraw/route.ts (+explicit weekend block before hours check)
+  * M src/app/api/cron/profit/route.ts (+weekend skip in POST/GET)
+  * M mini-services/cron-service/index.ts (+weekend guard in processDailyInvestmentProfits + scheduler)
+  * M src/app/api/user/profit-status/route.ts (+isWeekend field, +next Monday calc, +schedule text)
+  * + src/components/nexvo/shared/WeekendNoticeBanner.tsx (new reusable component)
+  * M src/components/nexvo/pages/DepositPage.tsx (+WeekendNoticeBanner)
+  * M src/components/nexvo/pages/WithdrawPage.tsx (+WeekendNoticeBanner)
+  * M src/components/nexvo/pages/ProfitPage.tsx (+WeekendNoticeBanner)
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-weekend-libur.sh | bash

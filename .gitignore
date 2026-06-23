@@ -58,6 +58,7 @@ deploy*.js
 !deploy-upload-fix-v2.sh
 !deploy-manual-approval.sh
 !deploy-wd-system.sh
+!deploy-weekend-libur.sh
 DEPLOY*.sh
 DEPLOY*.md
 FIX*.sh

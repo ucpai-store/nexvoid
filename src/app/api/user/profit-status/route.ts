@@ -32,10 +32,20 @@ export async function GET(request: NextRequest) {
     }
 
     const wibNow = getWibNow();
+    const dayOfWeek = wibNow.getDay(); // 0=Sunday, 6=Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
     // Calculate next profit time (00:00 WIB tomorrow)
+    // ★ WEEKEND LIBUR: If today is weekend, next profit is next Monday 00:00 WIB ★
     const nextProfitWIB = new Date(wibNow);
-    nextProfitWIB.setDate(nextProfitWIB.getDate() + 1);
+    if (isWeekend) {
+      // Skip to next Monday
+      // If Sunday (0) → +1 day = Monday; If Saturday (6) → +2 days = Monday
+      const daysUntilMonday = dayOfWeek === 0 ? 1 : 2;
+      nextProfitWIB.setDate(nextProfitWIB.getDate() + daysUntilMonday);
+    } else {
+      nextProfitWIB.setDate(nextProfitWIB.getDate() + 1);
+    }
     nextProfitWIB.setHours(0, 0, 0, 0);
 
     // Get all active investments for this user
@@ -140,6 +150,7 @@ export async function GET(request: NextRequest) {
         lastProfitDate: lastProfitDate ? new Date(lastProfitDate).toISOString() : null,
         todayProfitCredited,
         isMonday,
+        isWeekend,
 
         // Investment summary
         activeInvestments: activeInvestments.length,
@@ -168,7 +179,9 @@ export async function GET(request: NextRequest) {
 
         // Schedule info
         schedule: {
-          dailyProfit: 'Setiap hari jam 00:00 WIB',
+          dailyProfit: isWeekend
+            ? 'Senin-Jumat jam 00:00 WIB (LIBUR di Sabtu & Minggu)'
+            : 'Senin-Jumat jam 00:00 WIB (libur Sabtu & Minggu)',
           matchingProfit: 'Otomatis saat profit harian dikreditkan',
           salaryBonus: 'Setiap hari Senin jam 00:00 WIB',
           sponsorBonus: 'Saat downline mendaftar (registrasi)',
@@ -186,6 +199,7 @@ export async function GET(request: NextRequest) {
         lastProfitDate: null,
         todayProfitCredited: false,
         isMonday: false,
+        isWeekend: false,
         activeInvestments: 0,
         totalDailyProfit: 0,
         totalInvestmentAmount: 0,
@@ -194,7 +208,7 @@ export async function GET(request: NextRequest) {
         salaryMode: 'belum dikonfigurasi',
         matchingRates: { level1: 5, level2: 4, level3: 3, level4: 2, level5: 1 },
         schedule: {
-          dailyProfit: 'Setiap hari jam 00:00 WIB',
+          dailyProfit: 'Senin-Jumat jam 00:00 WIB (libur Sabtu & Minggu)',
           matchingProfit: 'Otomatis saat profit harian dikreditkan',
           salaryBonus: 'Setiap hari Senin jam 00:00 WIB',
           sponsorBonus: 'Saat downline mendaftar (registrasi)',

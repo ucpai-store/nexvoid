@@ -428,6 +428,15 @@ async function processDailyInvestmentProfits(): Promise<{
 }> {
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0 };
 
+  // ─── WEEKEND LIBUR: No profit distribution on Saturday & Sunday ───
+  const wibNowCheck = getWibNow();
+  const dayOfWeekCheck = wibNowCheck.getDay(); // 0=Sunday, 6=Saturday
+  if (dayOfWeekCheck === 0 || dayOfWeekCheck === 6) {
+    const dayName = dayOfWeekCheck === 0 ? 'Minggu' : 'Sabtu';
+    console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    return result;
+  }
+
   const todayWIB = getTodayWibDateString();
 
   const investments = await db.investment.findMany({
@@ -755,12 +764,18 @@ function checkAndRunCrons() {
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
   // Daily profit + matching bonus: Every day at 00:00 WIB
+  // ★ WEEKEND LIBUR: No profit distribution on Saturday (6) & Sunday (0) ★
   if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr) {
     lastProfitRunDate = dateStr;
-    console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()}...`);
-    processDailyInvestmentProfits().then((result) => {
-      console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
-    }).catch(console.error);
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+      console.log(`\n[CRON] ⏸️ Profit cron SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    } else {
+      console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()}...`);
+      processDailyInvestmentProfits().then((result) => {
+        console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
+      }).catch(console.error);
+    }
   }
 
   // Weekly salary: Every Monday at 00:00 WIB
