@@ -78,7 +78,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Deposit tidak ditemukan' }, { status: 404 });
     }
 
-    if (deposit.status !== 'pending') {
+    // Deposits are auto-approved, so admin can:
+    //  - reject an already-approved deposit (reverses the credit, for fraud handling)
+    //  - re-approve / no-op on approved
+    // Only block re-processing of already-rejected deposits.
+    if (deposit.status === 'rejected') {
       return NextResponse.json({ success: false, error: 'Deposit sudah diproses' }, { status: 400 });
     }
 
@@ -91,14 +95,14 @@ export async function PUT(request: NextRequest) {
         },
       });
 
-      // If approved, add netAmount to user's depositBalance and totalDeposit
-      if (status === 'approved') {
+      // If rejecting an auto-approved deposit, reverse the credit
+      if (status === 'rejected' && deposit.status === 'approved') {
         const netAmount = deposit.netAmount || (deposit.amount - (deposit.fee || 0));
         await tx.user.update({
           where: { id: deposit.userId },
           data: {
-            depositBalance: { increment: netAmount },
-            totalDeposit: { increment: netAmount },
+            depositBalance: { decrement: netAmount },
+            totalDeposit: { decrement: netAmount },
           },
         });
       }

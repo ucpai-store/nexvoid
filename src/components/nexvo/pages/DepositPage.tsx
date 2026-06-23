@@ -220,7 +220,8 @@ export default function DepositPage() {
       if (waData.success) setWhatsappAdmins(waData.data || []);
       const settingsData = await settingsRes.json();
       if (settingsData.success && settingsData.data) {
-        setAdminFee(parseFloat(settingsData.data.deposit_fee) || 0);
+        // Deposit is now FREE (auto-approved, no admin fee). Admin fee only applies on withdrawal.
+        setAdminFee(0);
       }
     } catch {
       setError(t('common.error'));
@@ -280,7 +281,7 @@ export default function DepositPage() {
     try {
       const formData = new FormData();
       formData.append('file', proofFile);
-      const res = await fetch('/api/upload', {
+      const res = await fetch('/api/deposit/upload', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -290,9 +291,11 @@ export default function DepositPage() {
         setProofImageUrl(data.data.url);
         return data.data.url;
       }
-      return '';
-    } catch {
-      return '';
+      throw new Error(data.error || 'Gagal upload bukti transfer');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal upload bukti transfer';
+      toast({ title: 'Upload Gagal', description: msg, variant: 'destructive' });
+      throw err;
     } finally {
       setUploadingProof(false);
     }
@@ -317,7 +320,12 @@ export default function DepositPage() {
     try {
       let proofUrl = '';
       if (proofFile) {
-        proofUrl = await uploadProof();
+        try {
+          proofUrl = await uploadProof();
+        } catch {
+          setSubmitting(false);
+          return;
+        }
       }
 
       const res = await fetch('/api/deposit', {
@@ -441,7 +449,7 @@ export default function DepositPage() {
                 </motion.div>
 
                 <h2 className="text-foreground text-xl font-bold mb-1">Deposit Berhasil!</h2>
-                <p className="text-muted-foreground text-sm mb-5">Deposit Anda sedang menunggu approval admin. Saldo akan masuk setelah dikonfirmasi.</p>
+                <p className="text-muted-foreground text-sm mb-5">Saldo Anda telah masuk otomatis tanpa potongan admin. Admin fee hanya berlaku saat withdrawal.</p>
 
                 <div className="glass rounded-2xl p-4 mb-5 space-y-3 border border-primary/10">
                   <div>

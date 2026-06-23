@@ -204,7 +204,8 @@ export default function AdminHeader() {
 
   const handleLogout = () => {
     adminLogout();
-    navigate('admin-login');
+    // Redirect to the standalone admin login page (separate from user app)
+    window.location.href = '/id/admin';
   };
 
   const isActive = (page: Page) => currentPage === page;

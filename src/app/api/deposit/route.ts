@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
-import { getSetting } from '@/lib/settings';
 import { notifyBot } from '@/lib/bot-notification';
 import { sendPushToAdmins } from '@/lib/push-notification';
 
@@ -51,35 +50,44 @@ export async function POST(request: NextRequest) {
 
     const depositId = await getUniqueDepositId();
 
-    // Read deposit admin fee from settings (in Rupiah, flat amount)
-    const depositFeeStr = await getSetting('deposit_fee');
-    const fee = parseFloat(depositFeeStr) || 0;
-    const netAmount = amount - fee;
+    // Deposit auto-approved: NO admin fee, NO admin approval needed.
+    // Full amount is credited to user balance immediately.
+    const fee = 0;
+    const netAmount = amount;
 
-    if (netAmount <= 0) {
-      return NextResponse.json({ success: false, error: 'Deposit amount too small after fee deduction' }, { status: 400 });
-    }
+    // Create deposit record AND credit balance immediately (auto-approve)
+    const deposit = await db.$transaction(async (tx) => {
+      const newDeposit = await tx.deposit.create({
+        data: {
+          depositId,
+          userId: user.id,
+          amount,
+          fee,
+          netAmount,
+          proofImage: proofImage || '',
+          paymentMethodId: paymentMethodId || null,
+          paymentType: paymentType || '',
+          paymentName: paymentName || '',
+          paymentAccount: paymentAccount || '',
+          status: 'approved',
+          note: 'Auto-approved',
+        },
+      });
 
-    // Deposit needs admin approval (pending status)
-    const deposit = await db.deposit.create({
-      data: {
-        depositId,
-        userId: user.id,
-        amount,
-        fee,
-        netAmount,
-        proofImage: proofImage || '',
-        paymentMethodId: paymentMethodId || null,
-        paymentType: paymentType || '',
-        paymentName: paymentName || '',
-        paymentAccount: paymentAccount || '',
-        status: 'pending',
-        note: '',
-      },
+      // Credit full amount to user's depositBalance + totalDeposit
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          depositBalance: { increment: netAmount },
+          totalDeposit: { increment: netAmount },
+        },
+      });
+
+      return newDeposit;
     });
 
-    // Notify WhatsApp bot
-    await notifyBot('deposit_pending', {
+    // Notify WhatsApp bot (deposit auto-approved)
+    await notifyBot('deposit_approved', {
       depositId: deposit.depositId,
       userId: user.id,
       userName: user.name || user.userId,
@@ -88,15 +96,15 @@ export async function POST(request: NextRequest) {
       fee,
       netAmount,
       paymentMethod: paymentName || paymentType || 'N/A',
-      status: 'pending',
+      status: 'approved',
     }).catch(() => {});
-    // Push notification to admins about new deposit
-    sendPushToAdmins("💸 Deposit Baru", `${user.name || user.userId} request deposit Rp ${Math.floor(netAmount).toLocaleString("id-ID")}`, { type: "deposit", depositId: deposit.depositId, userId: user.id }).catch(() => {});
+    // Push notification to admins (informational, no action needed)
+    sendPushToAdmins("💸 Deposit Otomatis", `${user.name || user.userId} deposit Rp ${Math.floor(netAmount).toLocaleString("id-ID")} (auto-approved)`, { type: "deposit", depositId: deposit.depositId, userId: user.id }).catch(() => {});
 
     return NextResponse.json({
       success: true,
       data: deposit,
-      message: `Deposit ${depositId} submitted successfully! Waiting for admin approval. Deposit ID: ${depositId}. Amount Rp ${Math.floor(netAmount).toLocaleString('id-ID')} will be credited after approval.`,
+      message: `Deposit ${depositId} berhasil! Saldo Rp ${Math.floor(netAmount).toLocaleString('id-ID')} telah masuk ke akun Anda.`,
     });
   } catch (error) {
     console.error('Create deposit error:', error);

@@ -226,3 +226,56 @@ Stage Summary:
 - USDT: admin can upload QR code image + wallet address + icon ✓
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-upload-fix.sh | bash
 - Files changed: +src/app/api/upload/route.ts, +deploy-upload-fix.sh
+
+---
+Task ID: 8
+Agent: main (Z.ai Code)
+Task: Fix deposit proof upload visibility, auto-approve deposits (no admin), admin fee on withdraw only, separate admin login at /id/admin
+
+Work Log:
+- User requested: (1) deposit proof must show in admin, (2) deposit no admin needed — balance auto-credits, (3) admin fee only on withdraw, (4) remove admin login from user login page, (5) separate admin login route e.g. nexvo/id/admin
+- Investigated current flow:
+  - /api/upload route was DELETED locally (git status: D) and gitignored (`.gitignore` has `upload/` matching `src/app/api/upload/`). Also it required admin auth, but DepositPage used USER token → proof uploads silently failed (401/404).
+  - Deposit API created deposits with status='pending' + deposit_fee (Rp500) → needed admin approval.
+  - Withdraw API already applies withdraw_fee (%) — admin fee on withdraw already works.
+  - LoginPage had an "Admin Panel" button at the bottom navigating to #admin-login.
+  - Admin login lived inside the SPA (AdminLoginPage rendered by AppShell).
+- Fix 1 (proof upload): Created /api/deposit/upload/route.ts — accepts USER token (getUserFromRequest), saves to uploads/ + public/ + standalone dirs, returns /api/files/{filename} URL. NOT gitignored (deposit/ dir).
+- Fix 1b: Updated DepositPage uploadProof to call /api/deposit/upload, added error toast on failure + abort submit if upload fails.
+- Fix 2 (auto-approve): Modified /api/deposit/route.ts POST — fee=0, netAmount=amount, status='approved', credits depositBalance+totalDeposit immediately inside a transaction. Removed getSetting(deposit_fee) import. Updated success message + success modal text ("Saldo masuk otomatis tanpa potongan admin").
+- Fix 2b: Updated /api/admin/deposits PUT — admin can now reject an auto-approved deposit (reverses balance credit) for fraud handling. Approve button removed from UI (deposits never pending anymore); reject button shown for approved deposits.
+- Fix 2c: AdminDepositsPage UI — desktop + mobile action cells now show "Tolak & Tarik Saldo (Fraud)" reject button for approved deposits.
+- Fix 2d: DepositPage frontend — force adminFee=0 (ignores deposit_fee setting) so preview shows "Gratis".
+- Fix 3: Withdraw admin fee already in place (withdraw_fee %), no change needed.
+- Fix 4: Removed the "Admin Panel" button + Shield import from LoginPage.tsx.
+- Fix 5: Created standalone admin login route /id/admin:
+  - src/app/id/admin/layout.tsx — metadata (noindex, title "Admin Login — NEXVO")
+  - src/app/id/admin/page.tsx — standalone client component: username/password form, calls /api/auth/admin-login, stores nexvo_admin_token + nexvo_admin in localStorage (same keys as auth-store), redirects to /#admin-dashboard. Dark gold theme, mobile responsive, security notice, cooldown logic.
+  - Updated AppShell: unauthenticated admin pages now redirect to /id/admin via AdminLoginRedirect component (uses useEffect + window.location.href). Removed inline AdminLoginPage rendering.
+  - Updated AdminHeader logout: window.location.href = '/id/admin' (full redirect to standalone page).
+- Browser verification (agent-browser):
+  - /id/admin renders admin login form ✅
+  - Admin login (admin/Admin@2024) → redirects to /#admin-dashboard, dashboard renders ✅
+  - User login page (/) — NO admin button anymore ✅
+  - User login (628123456789/Test@1234) → home page ✅
+- API verification (curl):
+  - Proof upload with user token → success, returns URL ✅
+  - Deposit POST → status='approved', fee=0, netAmount=100000 ✅
+  - Balance before: 0 → after deposit: 100000 (auto-credited immediately) ✅
+  - Admin deposits API → returns deposit WITH proofImage URL + user info ✅
+  - Proof image accessible (HTTP 200) ✅
+  - Admin deposits page UI shows deposit DP-PQYEFG with "Lihat" (proof) + "Tolak & Tarik Saldo (Fraud)" buttons ✅
+  - Proof dialog "Bukti Transfer" opens ✅
+- No console errors (only expected client-side DB warnings).
+- Created deploy-deposit-admin.sh: pulls code, builds, copies static+uploads to standalone, restarts PM2, verifies /id/admin + /api/deposit/upload + / all respond.
+- Committed + pushed to GitHub origin/main.
+
+Stage Summary:
+- Deposit proof upload now works (user-auth /api/deposit/upload, not gitignored)
+- Deposits auto-approved: balance credited immediately, NO admin fee, NO admin approval
+- Admin fee ONLY on withdrawal (withdraw_fee %, unchanged)
+- Admin login button removed from user LoginPage
+- Separate admin login at /id/admin (standalone Next.js route, not in user SPA)
+- Admin logout + unauthenticated admin access redirect to /id/admin
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-deposit-admin.sh | bash
+- Files changed: +src/app/api/deposit/upload/route.ts, M src/app/api/deposit/route.ts, M src/app/api/admin/deposits/route.ts, M src/components/nexvo/pages/DepositPage.tsx, M src/components/nexvo/pages/AdminDepositsPage.tsx, M src/components/nexvo/pages/LoginPage.tsx, M src/components/nexvo/AppShell.tsx, M src/components/nexvo/AdminHeader.tsx, +src/app/id/admin/layout.tsx, +src/app/id/admin/page.tsx, +deploy-deposit-admin.sh

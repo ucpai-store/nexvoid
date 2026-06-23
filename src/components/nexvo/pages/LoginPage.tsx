@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Shield, Eye, EyeOff, Phone, Mail, Lock, ChevronRight,
+  Eye, EyeOff, Phone, Mail, Lock, ChevronRight,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -306,13 +306,6 @@ export default function LoginPage() {
                 {t('auth.registerNow')}
               </button>
             </p>
-            <button
-              onClick={() => navigate('admin-login')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-primary/50 hover:text-primary hover:bg-primary/5 transition-all text-xs font-medium"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              {t('auth.adminPanel')}
-            </button>
           </div>
         </div>
 

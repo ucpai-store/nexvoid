@@ -272,6 +272,20 @@ export default function AdminDepositsPage() {
                               </button>
                             </div>
                           )}
+                          {deposit.status === 'approved' && (
+                            <button
+                              onClick={() => setRejectDialog(deposit.id)}
+                              disabled={processing[deposit.id]}
+                              className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                              title="Tolak & Tarik Saldo (Fraud)"
+                            >
+                              {processing[deposit.id] ? (
+                                <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-red-400" />
+                              )}
+                            </button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -328,6 +342,16 @@ export default function AdminDepositsPage() {
                             <XCircle className="w-4 h-4 text-red-400" />
                           </button>
                         </div>
+                      )}
+                      {deposit.status === 'approved' && (
+                        <button
+                          onClick={() => setRejectDialog(deposit.id)}
+                          disabled={processing[deposit.id]}
+                          className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 disabled:opacity-50"
+                          title="Tolak & Tarik Saldo (Fraud)"
+                        >
+                          <XCircle className="w-4 h-4 text-red-400" />
+                        </button>
                       )}
                     </div>
                   </div>

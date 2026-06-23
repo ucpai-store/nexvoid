@@ -1,6 +1,7 @@
 'use client';
 
-import { Shield, TrendingUp } from 'lucide-react';
+import { useEffect } from 'react';
+import { Shield, TrendingUp, Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -119,6 +120,21 @@ function renderPage(pageKey: string): React.ReactNode {
   return <PlaceholderPage title="404" icon={Shield} />;
 }
 
+/* ───────── Redirect to standalone admin login (/id/admin) ───────── */
+function AdminLoginRedirect() {
+  useEffect(() => {
+    window.location.href = '/id/admin';
+  }, []);
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
+        <p className="text-muted-foreground text-sm">Mengalihkan ke halaman login admin...</p>
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Page Router ───────── */
 export default function AppShell() {
   const { currentPage } = useAppStore();
@@ -141,22 +157,10 @@ export default function AppShell() {
       );
     }
 
-    // If on admin-login AND no token → show login page
-    if (currentPage === 'admin-login' && !adminToken) {
-      return (
-        <div className="min-h-screen bg-background">
-          <AdminLoginPage />
-        </div>
-      );
-    }
-
-    // If on any other admin page AND no token → redirect to admin login
-    if (currentPage !== 'admin-login' && !adminToken) {
-      return (
-        <div className="min-h-screen bg-background">
-          <AdminLoginPage />
-        </div>
-      );
+    // No token on any admin page (including legacy #admin-login)
+    // → redirect to the standalone /id/admin login page
+    if (!adminToken) {
+      return <AdminLoginRedirect />;
     }
 
     // Authenticated admin pages
