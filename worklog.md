@@ -410,3 +410,52 @@ Stage Summary:
 - This deploy will: fix Nginx limits, pull the now-tracked route, rebuild fresh, restart PM2, test upload
 - After deploy, user MUST hard refresh browser (Ctrl+Shift+R) to load new frontend code
 - Files: M .gitignore, +src/app/api/deposit/upload/route.ts, M src/app/api/upload/route.ts, M src/components/nexvo/pages/DepositPage.tsx, +deploy-upload-fix-v2.sh
+
+---
+Task ID: 12
+Agent: main (Z.ai Code)
+Task: Revert deposit to manual admin approval ("saldo tunggu persetujuan admin baru masuk")
+
+Work Log:
+- User changed requirement: deposit MUST require admin approval, NOT auto-approve
+- Reverted /api/deposit/route.ts:
+  - status: 'approved' → 'pending'
+  - Removed auto-credit of depositBalance + totalDeposit
+  - Note: 'Auto-approved' → 'Menunggu persetujuan admin'
+  - Bot notification: deposit_approved → deposit_pending
+  - Push to admins: '💸 Deposit Otomatis' → '🆕 Deposit Menunggu Approval'
+  - Message: 'Saldo telah masuk' → 'Saldo akan masuk setelah admin menyetujui'
+- Updated /api/admin/deposits/route.ts PUT:
+  - Approve pending deposit → credit depositBalance + totalDeposit (NEW)
+  - Reject pending deposit → no balance change
+  - Reject approved deposit → reverse credit (fraud handling, kept)
+  - Block re-approve of already-approved deposit
+  - Block re-process of rejected deposit
+- AdminDepositsPage.tsx: already had Approve (✓) + Reject (✗) buttons for pending deposits (no change needed)
+- Updated DepositPage.tsx success modal:
+  - Icon: green CheckCircle2 → yellow Clock
+  - Title: 'Deposit Berhasil!' → 'Deposit Diterima!'
+  - Message: 'Saldo masuk otomatis tanpa potongan admin' → 'Deposit sedang menunggu persetujuan admin. Saldo akan masuk setelah admin menyetujui.'
+  - Replaced 'Saldo Yang Masuk' section with 'Status: Menunggu Persetujuan Admin'
+- Created deploy-manual-approval.sh (tests deposit status = pending after submit)
+- Added negation to .gitignore for deploy-manual-approval.sh
+- Committed + pushed (1da8e51)
+- Browser verification:
+  - User deposit → status=pending ✅
+  - Admin deposits page → shows "Pending 1" tab, DP-T57PEY with "Setujui" + "Tolak" buttons ✅
+  - Admin click "Setujui" → deposit becomes "Disetujui", Pending 0 / Disetujui 5 ✅
+  - User deposit list → DP-T57PEY status=approved, note="Disetujui oleh admin" ✅
+  - Balance credited only after admin approval ✅
+- API test:
+  - Deposit POST → status=pending, note="Menunggu persetujuan admin" ✅
+  - Admin PUT approve → status=approved, note="Disetujui oleh admin" ✅
+
+Stage Summary:
+- Deposit flow REVERTED to manual admin approval (per user's new request)
+- User deposit → status PENDING, saldo BELUM masuk
+- Admin cek bukti di /#admin-dashboard → Deposits → klik ✓ Setujui
+- Setelah admin approve → saldo masuk ke user (depositBalance + totalDeposit)
+- Admin fee tetap 0 di deposit (hanya di withdrawal)
+- Admin masih bisa reject approved deposit untuk fraud handling (tarik saldo balik)
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-manual-approval.sh | bash
+- Files: M src/app/api/deposit/route.ts, M src/app/api/admin/deposits/route.ts, M src/components/nexvo/pages/DepositPage.tsx, +deploy-manual-approval.sh, M .gitignore
