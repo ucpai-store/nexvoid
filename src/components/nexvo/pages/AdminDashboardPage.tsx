@@ -6,7 +6,7 @@ import {
   Users, ArrowDownCircle, ArrowUpCircle, ShoppingBag,
   Wallet, TrendingUp, Clock, CheckCircle2,
   XCircle, Loader2, ChevronRight, Activity,
-  Shield, BarChart3
+  Shield, BarChart3, Zap, AlertTriangle, Calendar
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -46,6 +46,11 @@ export default function AdminDashboardPage() {
   const [pendingWithdrawals, setPendingWithdrawals] = useState<PendingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<Record<string, boolean>>({});
+  const [profitDiag, setProfitDiag] = useState<{
+    wibTime?: string; wibDateStr?: string; dayName?: string; isWeekend?: boolean;
+    totalActiveInvestments?: number; alreadyCreditedToday?: number; needsCrediting?: number;
+  } | null>(null);
+  const [profitTriggering, setProfitTriggering] = useState(false);
   const { adminToken, admin, adminLogout } = useAuthStore();
   const { navigate } = useAppStore();
   const { toast } = useToast();
@@ -94,8 +99,12 @@ export default function AdminDashboardPage() {
         if (r.status === 401) { adminLogout(); navigate('admin-login'); return null; }
         return r.json();
       }),
+      adminFetch('/api/admin/profit-trigger', adminToken).then(async (r) => {
+        if (r.status === 401) return null;
+        return r.json();
+      }).catch(() => null),
     ])
-      .then(([statsRes, depositsRes, withdrawalsRes]) => {
+      .then(([statsRes, depositsRes, withdrawalsRes, profitRes]) => {
         if (!statsRes) return; // 401 handled
         if (statsRes.success) setStats(statsRes.data);
         if (depositsRes?.success) {
@@ -124,6 +133,9 @@ export default function AdminDashboardPage() {
             }));
           setPendingWithdrawals(pending);
         }
+        if (profitRes?.success && profitRes.diagnostic) {
+          setProfitDiag(profitRes.data);
+        }
       })
       .catch(() => {
         toast({ title: 'Failed to load data dashboard', variant: 'destructive' });
@@ -131,6 +143,33 @@ export default function AdminDashboardPage() {
       .finally(() => setLoading(false));
    
   }, [adminToken]);
+
+  const handleTriggerProfit = async (force: boolean) => {
+    if (!adminToken) return;
+    setProfitTriggering(true);
+    try {
+      const url = force ? '/api/admin/profit-trigger?force=true' : '/api/admin/profit-trigger';
+      const r = await adminFetch(url, adminToken, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'trigger' }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        toast({
+          title: '✅ Profit Triggered',
+          description: data.message || `Processed: ${data.data?.processed || 0}, Profit: Rp ${Math.floor(data.data?.totalProfit || 0).toLocaleString('id-ID')}`,
+        });
+        fetchData(); // refresh diagnostic
+      } else {
+        toast({ title: 'Failed', description: data.error || 'Trigger failed', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Network error', variant: 'destructive' });
+    } finally {
+      setProfitTriggering(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -421,6 +460,79 @@ export default function AdminDashboardPage() {
 
       {/* Quick Actions */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="mt-6">
+        <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
+          <Zap className="w-4 h-4 text-amber-400" />
+          Kontrol Profit Harian
+        </h3>
+        <div className="glass rounded-2xl p-4 sm:p-5 space-y-4">
+          {/* Diagnostic info */}
+          {profitDiag ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="text-center">
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">WIB Time</p>
+                <p className="text-foreground text-sm font-bold">{profitDiag.wibDateStr || '-'}</p>
+                <p className="text-muted-foreground text-[10px]">{profitDiag.dayName}{profitDiag.isWeekend ? ' (Libur)' : ''}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Investasi Aktif</p>
+                <p className="text-foreground text-lg font-bold">{profitDiag.totalActiveInvestments ?? 0}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Sudah Dikredit</p>
+                <p className="text-emerald-400 text-lg font-bold">{profitDiag.alreadyCreditedToday ?? 0}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Perlu Kredit</p>
+                <p className={`text-lg font-bold ${(profitDiag.needsCrediting ?? 0) > 0 ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                  {profitDiag.needsCrediting ?? 0}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground text-sm py-2">
+              <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+              Memuat diagnostic...
+            </div>
+          )}
+
+          {/* Weekend warning */}
+          {profitDiag?.isWeekend && (
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-400/10 border border-amber-400/20">
+              <Calendar className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-amber-300 text-xs">
+                Hari ini <span className="font-bold">{profitDiag.dayName}</span> — weekend libur. Profit tidak otomatis dikredit. Gunakan tombol <span className="font-bold">Force Trigger</span> untuk paksa kredit.
+              </p>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button
+              onClick={() => handleTriggerProfit(false)}
+              disabled={profitTriggering || profitDiag?.isWeekend || (profitDiag?.needsCrediting ?? 0) === 0}
+              className="h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 disabled:opacity-40"
+            >
+              {profitTriggering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
+              Trigger Profit Normal
+            </Button>
+            <Button
+              onClick={() => handleTriggerProfit(true)}
+              disabled={profitTriggering}
+              variant="outline"
+              className="h-12 border-amber-400/40 text-amber-400 hover:bg-amber-400/10 font-semibold rounded-xl"
+            >
+              {profitTriggering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
+              Force Trigger (Lewati Cek)
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-[10px] leading-relaxed">
+            <span className="font-semibold text-foreground">Trigger Normal:</span> kredits profit ke investasi yang belum dikredit hari ini (skip weekend & yang sudah dikredit).<br/>
+            <span className="font-semibold text-foreground">Force Trigger:</span> paksa kredit ke SEMUA investasi aktif, lewati cek weekend & lastProfitDate (untuk emergency/debug).
+          </p>
+        </div>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="mt-6">
         <h3 className="text-foreground font-semibold mb-3">Aksi Cepat</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[

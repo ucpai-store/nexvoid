@@ -228,354 +228,71 @@ Stage Summary:
 - Files changed: +src/app/api/upload/route.ts, +deploy-upload-fix.sh
 
 ---
-Task ID: 8
-Agent: main (Z.ai Code)
-Task: Fix deposit proof upload visibility, auto-approve deposits (no admin), admin fee on withdraw only, separate admin login at /id/admin
-
-Work Log:
-- User requested: (1) deposit proof must show in admin, (2) deposit no admin needed — balance auto-credits, (3) admin fee only on withdraw, (4) remove admin login from user login page, (5) separate admin login route e.g. nexvo/id/admin
-- Investigated current flow:
-  - /api/upload route was DELETED locally (git status: D) and gitignored (`.gitignore` has `upload/` matching `src/app/api/upload/`). Also it required admin auth, but DepositPage used USER token → proof uploads silently failed (401/404).
-  - Deposit API created deposits with status='pending' + deposit_fee (Rp500) → needed admin approval.
-  - Withdraw API already applies withdraw_fee (%) — admin fee on withdraw already works.
-  - LoginPage had an "Admin Panel" button at the bottom navigating to #admin-login.
-  - Admin login lived inside the SPA (AdminLoginPage rendered by AppShell).
-- Fix 1 (proof upload): Created /api/deposit/upload/route.ts — accepts USER token (getUserFromRequest), saves to uploads/ + public/ + standalone dirs, returns /api/files/{filename} URL. NOT gitignored (deposit/ dir).
-- Fix 1b: Updated DepositPage uploadProof to call /api/deposit/upload, added error toast on failure + abort submit if upload fails.
-- Fix 2 (auto-approve): Modified /api/deposit/route.ts POST — fee=0, netAmount=amount, status='approved', credits depositBalance+totalDeposit immediately inside a transaction. Removed getSetting(deposit_fee) import. Updated success message + success modal text ("Saldo masuk otomatis tanpa potongan admin").
-- Fix 2b: Updated /api/admin/deposits PUT — admin can now reject an auto-approved deposit (reverses balance credit) for fraud handling. Approve button removed from UI (deposits never pending anymore); reject button shown for approved deposits.
-- Fix 2c: AdminDepositsPage UI — desktop + mobile action cells now show "Tolak & Tarik Saldo (Fraud)" reject button for approved deposits.
-- Fix 2d: DepositPage frontend — force adminFee=0 (ignores deposit_fee setting) so preview shows "Gratis".
-- Fix 3: Withdraw admin fee already in place (withdraw_fee %), no change needed.
-- Fix 4: Removed the "Admin Panel" button + Shield import from LoginPage.tsx.
-- Fix 5: Created standalone admin login route /id/admin:
-  - src/app/id/admin/layout.tsx — metadata (noindex, title "Admin Login — NEXVO")
-  - src/app/id/admin/page.tsx — standalone client component: username/password form, calls /api/auth/admin-login, stores nexvo_admin_token + nexvo_admin in localStorage (same keys as auth-store), redirects to /#admin-dashboard. Dark gold theme, mobile responsive, security notice, cooldown logic.
-  - Updated AppShell: unauthenticated admin pages now redirect to /id/admin via AdminLoginRedirect component (uses useEffect + window.location.href). Removed inline AdminLoginPage rendering.
-  - Updated AdminHeader logout: window.location.href = '/id/admin' (full redirect to standalone page).
-- Browser verification (agent-browser):
-  - /id/admin renders admin login form ✅
-  - Admin login (admin/Admin@2024) → redirects to /#admin-dashboard, dashboard renders ✅
-  - User login page (/) — NO admin button anymore ✅
-  - User login (628123456789/Test@1234) → home page ✅
-- API verification (curl):
-  - Proof upload with user token → success, returns URL ✅
-  - Deposit POST → status='approved', fee=0, netAmount=100000 ✅
-  - Balance before: 0 → after deposit: 100000 (auto-credited immediately) ✅
-  - Admin deposits API → returns deposit WITH proofImage URL + user info ✅
-  - Proof image accessible (HTTP 200) ✅
-  - Admin deposits page UI shows deposit DP-PQYEFG with "Lihat" (proof) + "Tolak & Tarik Saldo (Fraud)" buttons ✅
-  - Proof dialog "Bukti Transfer" opens ✅
-- No console errors (only expected client-side DB warnings).
-- Created deploy-deposit-admin.sh: pulls code, builds, copies static+uploads to standalone, restarts PM2, verifies /id/admin + /api/deposit/upload + / all respond.
-- Committed + pushed to GitHub origin/main.
-
-Stage Summary:
-- Deposit proof upload now works (user-auth /api/deposit/upload, not gitignored)
-- Deposits auto-approved: balance credited immediately, NO admin fee, NO admin approval
-- Admin fee ONLY on withdrawal (withdraw_fee %, unchanged)
-- Admin login button removed from user LoginPage
-- Separate admin login at /id/admin (standalone Next.js route, not in user SPA)
-- Admin logout + unauthenticated admin access redirect to /id/admin
-- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-deposit-admin.sh | bash
-- Files changed: +src/app/api/deposit/upload/route.ts, M src/app/api/deposit/route.ts, M src/app/api/admin/deposits/route.ts, M src/components/nexvo/pages/DepositPage.tsx, M src/components/nexvo/pages/AdminDepositsPage.tsx, M src/components/nexvo/pages/LoginPage.tsx, M src/components/nexvo/AppShell.tsx, M src/components/nexvo/AdminHeader.tsx, +src/app/id/admin/layout.tsx, +src/app/id/admin/page.tsx, +deploy-deposit-admin.sh
-
----
-Task ID: 9
-Agent: main (Z.ai Code)
-Task: Fix broken uploads (QRIS/USDT QR image) + redesign admin login page (premium, neat)
-
-Work Log:
-- User reported: "eror mau uplod gk bisa terus tampilan login admin jelek kasi desain yang baguss rapi"
-- Root cause of upload failure:
-  - .gitignore line 77 had `upload/` pattern → matched `src/app/api/upload/` directory
-  - The /api/upload route was therefore gitignored and deleted locally (git status: D)
-  - 5 pages used /api/upload: AdminPaymentPage (QR), AdminProductsPage, ProfilePage, AdminBannersPage, SettingsPage
-  - All their uploads silently failed (404)
-- Fix 1 — .gitignore: Added negation `!src/app/api/upload/` and `!src/app/api/upload/**` after `upload/` line
-- Fix 1b — Recreated /api/upload/route.ts (unified):
-  - Accepts EITHER user token (getUserFromRequest) OR admin token (getAdminFromRequest)
-  - Validates size (10MB) + type (JPG/PNG/GIF/WebP/SVG)
-  - Saves to uploads/ + public/ + standalone dirs (survives rebuilds)
-  - Returns { success, data: { url, filePath, filename, originalName, size } }
-  - Logs admin upload actions via logAdminAction
-  - Verified: git check-ignore now shows the negation rule (route is tracked)
-- Fix 2 — Redesigned /id/admin login page (premium glassmorphism):
-  - Canvas-based animated gold particle field (28 particles)
-  - Gradient glow backgrounds + subtle hex grid + scan line animation
-  - Gold border glow around card, top/bottom accent lines
-  - Shield icon in rounded gold-tinted box with blur glow
-  - "Admin Control" gradient gold title + "NEXVO Control Center" subtitle
-  - Form: Username + Password fields with focus glow, eye toggle (improved contrast slate-400)
-  - Submit button: gold gradient + shine sweep on hover + scale animation
-  - Verifying state: spinner + fingerprint icon
-  - Security badge: "Koneksi aman · 256-bit SSL" (subtle, integrated)
-  - "Kembali ke Beranda" link (improved contrast slate-400)
-  - Fully responsive: max-w-[420px], px-6 sm:px-8, h-11 sm:h-12 inputs
-  - Replaced non-standard h-13/h-18 classes with arbitrary values h-[3.25rem]
-- VLM evaluation:
-  - v1: 7/10 (spacing inconsistent, gold overuse, clutter)
-  - v2 (after redesign): mobile 7/10, desktop 8/10 — "premium, professional, neat"
-  - Final refinements: eye icon contrast slate-400 + size 18px, back link contrast slate-400 + 13px
-- Browser verification (agent-browser):
-  - /id/admin renders new premium design ✅
-  - Admin login (admin/Admin@2024) → redirects to /#admin-dashboard ✅
-  - Navigated to admin payment page → QRIS/USDT sections render ✅
-  - Simulated QR upload via fetch (admin token from localStorage) → HTTP 200, returns URL ✅
-  - Uploaded file accessible (HTTP 200, 84 bytes) ✅
-  - No console errors (only expected client-side DB warning) ✅
-  - No page errors ✅
-- API verification (curl):
-  - /api/upload with admin token → 200 + URL ✅
-  - /api/upload with user token → 200 + URL ✅
-  - /api/upload without token → 401 (correct) ✅
-- Cleaned up 22 old test upload artifacts (public/upload-*.png) from repo
-- Created deploy-upload-admin.sh: pulls, builds, copies static+uploads, restarts PM2, verifies
-- Committed + pushed to GitHub origin/main
-
-Stage Summary:
-- Upload FIXED: /api/upload route restored (was gitignored+deleted) → QRIS/USDT QR image upload works
-- Also fixes: product images, banners, profile avatars, settings images (all used /api/upload)
-- Admin login /id/admin REDESIGNED: premium dark glassmorphism, gold accents, animated particles
-- VLM-rated 7-8/10 (premium, professional, neat)
-- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-upload-admin.sh | bash
-- Files: M .gitignore, +src/app/api/upload/route.ts, M src/app/id/admin/page.tsx, +deploy-upload-admin.sh, D 22 test artifacts
-
----
-Task ID: 10
-Agent: main (Z.ai Code)
-Task: Verify deposit proof upload works (user asked "pas uplod bukti tf bisa kan")
-
-Work Log:
-- Read previous worklog (Task ID 8 + 9) — confirmed /api/deposit/upload + /api/upload both fixed
-- Verified dev server running on port 3000
-- API test (curl with real user token 628123456789):
-  - POST /api/deposit/upload → 200 {success:true, url:/api/files/proof-xxx.png} ✅
-  - GET /api/files/proof-xxx.png → 200 (file accessible) ✅
-  - POST /api/upload (admin token) → 200 ✅
-  - POST /api/upload (user token) → 200 ✅
-  - Without token → 401 (correct) ✅
-- Browser test (agent-browser):
-  - /id/admin renders premium redesigned login ✅
-  - User login (628123456789/Test@1234) → home page ✅
-  - Deposit page renders, previous deposit DP-PQYEFG shows "📎 Lihat Bukti" link ✅
-  - Click "Lihat Bukti" → proof image dialog opens ✅
-- Admin API test:
-  - GET /api/admin/deposits → 1 deposit, DP-PQYEFG Rp100000 status=approved proof=YES ✅
-
-Stage Summary:
-- Deposit proof upload CONFIRMED WORKING (user-auth /api/deposit/upload)
-- Uploaded proof accessible at /api/files/{filename}
-- Admin can see deposit with proof in admin panel
-- Auto-approve confirmed: deposit status=approved, balance credited immediately
-- Admin login /id/admin confirmed: premium redesigned UI renders + login works
-- No code changes needed — everything already functional from Task ID 8 + 9
-
----
-Task ID: 11
-Agent: main (Z.ai Code)
-Task: Fix upload bukti tf still failing on production ("tetep gk bisa uplod bukti tf")
-
-Work Log:
-- Investigated root cause — found TWO bugs:
-  1. .gitignore had `upload/` pattern → matched `src/app/api/deposit/upload/` directory → route NEVER pushed to GitHub → NEVER deployed to VPS → user got 404 on production
-  2. Nginx default `client_max_body_size` = 1MB → all photo uploads >1MB rejected with HTTP 413
-- Fix 1 — .gitignore: added negation `!src/app/api/deposit/upload/` + `!src/app/api/deposit/upload/**` (same pattern that fixed /api/upload before)
-- Fix 1b — .gitignore: added negation `!deploy-upload-fix-v2.sh` so deploy script is in repo
-- Fix 2 — /api/deposit/upload/route.ts: wrapped request.formData() in try/catch (was throwing unhandled error when no file sent), check file.size > 0
-- Fix 2b — /api/upload/route.ts: same error handling improvements
-- Fix 3 — DepositPage uploadProof: added HTTP status check + clear error messages for 413 (Nginx body too large), 401 (session expired), 500 (server error)
-- Fix 4 — deploy-upload-fix-v2.sh (NEW): comprehensive deploy script that:
-  - Configures Nginx client_max_body_size 20M (in nginx.conf + all site configs)
-  - Tests Nginx config + reloads
-  - Pulls latest code
-  - CLEARS Next.js build cache (.next/cache + .next/standalone) for fresh rebuild
-  - Rebuilds + copies static/uploads to standalone
-  - Restarts PM2 (fresh process, not just restart)
-  - Tests upload with 2MB file (would fail with old 1MB Nginx limit)
-  - Verifies all endpoints respond
-- Verification (dev server):
-  - Valid image upload → 200 + URL ✅
-  - File accessible at /api/files/{filename} → 200 ✅
-  - Submit deposit with proof → status=approved, fee=0, netAmount=100000, proofImage saved ✅
-  - No file → clean 400 with helpful message ✅
-  - No auth → 401 ✅
-- Committed + pushed to GitHub (commit be6b32c)
-- Verified on GitHub: deploy script HTTP 200, route.ts HTTP 200
-
-Stage Summary:
-- ROOT CAUSE FOUND: /api/deposit/upload route was gitignored → never deployed → 404 on production
-- ALSO FIXED: Nginx 1MB body limit → 413 on photo uploads
-- Deploy script: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-upload-fix-v2.sh | bash
-- This deploy will: fix Nginx limits, pull the now-tracked route, rebuild fresh, restart PM2, test upload
-- After deploy, user MUST hard refresh browser (Ctrl+Shift+R) to load new frontend code
-- Files: M .gitignore, +src/app/api/deposit/upload/route.ts, M src/app/api/upload/route.ts, M src/components/nexvo/pages/DepositPage.tsx, +deploy-upload-fix-v2.sh
-
----
-Task ID: 12
-Agent: main (Z.ai Code)
-Task: Revert deposit to manual admin approval ("saldo tunggu persetujuan admin baru masuk")
-
-Work Log:
-- User changed requirement: deposit MUST require admin approval, NOT auto-approve
-- Reverted /api/deposit/route.ts:
-  - status: 'approved' → 'pending'
-  - Removed auto-credit of depositBalance + totalDeposit
-  - Note: 'Auto-approved' → 'Menunggu persetujuan admin'
-  - Bot notification: deposit_approved → deposit_pending
-  - Push to admins: '💸 Deposit Otomatis' → '🆕 Deposit Menunggu Approval'
-  - Message: 'Saldo telah masuk' → 'Saldo akan masuk setelah admin menyetujui'
-- Updated /api/admin/deposits/route.ts PUT:
-  - Approve pending deposit → credit depositBalance + totalDeposit (NEW)
-  - Reject pending deposit → no balance change
-  - Reject approved deposit → reverse credit (fraud handling, kept)
-  - Block re-approve of already-approved deposit
-  - Block re-process of rejected deposit
-- AdminDepositsPage.tsx: already had Approve (✓) + Reject (✗) buttons for pending deposits (no change needed)
-- Updated DepositPage.tsx success modal:
-  - Icon: green CheckCircle2 → yellow Clock
-  - Title: 'Deposit Berhasil!' → 'Deposit Diterima!'
-  - Message: 'Saldo masuk otomatis tanpa potongan admin' → 'Deposit sedang menunggu persetujuan admin. Saldo akan masuk setelah admin menyetujui.'
-  - Replaced 'Saldo Yang Masuk' section with 'Status: Menunggu Persetujuan Admin'
-- Created deploy-manual-approval.sh (tests deposit status = pending after submit)
-- Added negation to .gitignore for deploy-manual-approval.sh
-- Committed + pushed (1da8e51)
-- Browser verification:
-  - User deposit → status=pending ✅
-  - Admin deposits page → shows "Pending 1" tab, DP-T57PEY with "Setujui" + "Tolak" buttons ✅
-  - Admin click "Setujui" → deposit becomes "Disetujui", Pending 0 / Disetujui 5 ✅
-  - User deposit list → DP-T57PEY status=approved, note="Disetujui oleh admin" ✅
-  - Balance credited only after admin approval ✅
-- API test:
-  - Deposit POST → status=pending, note="Menunggu persetujuan admin" ✅
-  - Admin PUT approve → status=approved, note="Disetujui oleh admin" ✅
-
-Stage Summary:
-- Deposit flow REVERTED to manual admin approval (per user's new request)
-- User deposit → status PENDING, saldo BELUM masuk
-- Admin cek bukti di /#admin-dashboard → Deposits → klik ✓ Setujui
-- Setelah admin approve → saldo masuk ke user (depositBalance + totalDeposit)
-- Admin fee tetap 0 di deposit (hanya di withdrawal)
-- Admin masih bisa reject approved deposit untuk fraud handling (tarik saldo balik)
-- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-manual-approval.sh | bash
-- Files: M src/app/api/deposit/route.ts, M src/app/api/admin/deposits/route.ts, M src/components/nexvo/pages/DepositPage.tsx, +deploy-manual-approval.sh, M .gitignore
-
----
-Task ID: 13
-Agent: main (Z.ai Code)
-Task: New withdrawal system (min/max/fee/pending-block) + transaction IDs
-
-Work Log:
-- User requested new WD rules:
-  1. Min WD: Rp100,000
-  2. Max WD: based on LAST purchased package/product amount
-     (beli 160k → max 160k, beli lagi 360k → max 360k)
-  3. WD fee: 10%
-  4. Block new WD if user has pending WD (must wait admin approval)
-  5. Every WD/Deposit must have unique ID for easy admin search
-- Added withdrawalId field to Prisma Withdrawal model (unique, WD-XXXXXX format)
-- Ran prisma db push to update schema + regenerate client
-- Rewrote /api/withdraw/route.ts:
-  * Min 100k (forced, ignores setting)
-  * Max = last package amount (checks Purchase + Investment tables, picks most recent)
-  * Fee = 10% (forced, ignores withdraw_fee setting)
-  * Block if pending WD exists (checked BEFORE + INSIDE transaction)
-  * Generate unique withdrawalId
-  * GET returns meta: { minWithdraw, maxWithdraw, feePercent, hasPendingWithdrawal, pendingWithdrawalId }
-- Updated /api/admin/withdrawals/route.ts PUT:
-  * Include withdrawalId in push notifications
-  * Better default notes ('Disetujui oleh admin' / 'Ditolak oleh admin')
-- Updated AdminWithdrawalsPage.tsx:
-  * Added 'ID Withdrawal' column to desktop table (gold mono font)
-  * Added withdrawalId to mobile card view
-  * Approve dialog shows withdrawalId + amount + fee + net
-- Updated WithdrawPage.tsx:
-  * Fetch meta from API
-  * Form validation blocks: hasPendingWithdrawal, maxWithdraw<=0, <min, >max
-  * Preset amounts disabled if exceeds maxWithdraw or hasPendingWithdrawal
-  * Percent amount capped at maxWithdraw
-  * Success modal: yellow Clock icon, 'Withdrawal Diterima!', shows withdrawalId
-  * Pending WD warning banner (yellow) with pendingWithdrawalId
-  * No package warning banner (red) if maxWithdraw = 0
-  * Balance card shows Min/Max/Fee info
-  * Withdrawal history shows withdrawalId
-- Database tests (direct, via node script):
-  * GET meta: min=100k, max=160k, fee=10%, hasPending=false ✅
-  * WD without purchase → blocked: 'belum beli paket/produk' ✅
-  * WD 200k (exceeds max 160k) → blocked: 'Maksimal withdrawal Rp160.000' ✅
-  * WD 160k (within range) → success, withdrawalId generated, status=pending ✅
-- Created deploy-wd-system.sh:
-  * prisma db push (add withdrawalId column)
-  * Backfill existing withdrawals with withdrawalId
-  * Clear cache, rebuild, restart PM2
-  * Verify endpoints + meta
-- Committed + pushed (8bfb0f6)
-
-Stage Summary:
-- New WD system implemented:
-  * Min Rp100,000, Max = last package amount, Fee 10%
-  * Block if pending WD exists
-  * Every WD has ID (WD-XXXXXX), every Deposit has ID (DP-XXXXXX)
-- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-wd-system.sh | bash
-- Deploy script also backfills existing withdrawals with withdrawalId
-- Note: Dev server in sandbox was unstable (kept dying after few requests),
-  but all logic verified via direct database tests
-- Files: M prisma/schema.prisma, M src/app/api/withdraw/route.ts,
-  M src/app/api/admin/withdrawals/route.ts, M src/components/nexvo/pages/WithdrawPage.tsx,
-  M src/components/nexvo/pages/AdminWithdrawalsPage.tsx, +deploy-wd-system.sh, M .gitignore
-
----
-Task ID: weekend-libur
+Task ID: profit-fix
 Agent: main
-Task: Disable ALL activities (WD, deposit, profit) on Saturday & Sunday (weekend libur). No activities at all on weekends.
+Task: Fix profit tidak masuk jam 00:00 WIB. User lapor "tadi malam aku coba gk masuk". Investigasi root cause + fix + manual trigger.
 
 Work Log:
-- Read existing code: src/lib/settings.ts (isWithinWorkingHours already blocks weekends for WD), src/app/api/deposit/route.ts (no weekend check), src/app/api/withdraw/route.ts (has isWithinWorkingHours), src/app/api/cron/profit/route.ts (no weekend check), mini-services/cron-service/index.ts (no weekend check in processDailyInvestmentProfits), src/app/api/user/profit-status/route.ts
-- Added 2 new helper functions to src/lib/settings.ts:
-  * isWeekendWIB(): returns true if today is Saturday (6) or Sunday (0) in WIB
-  * getTodayDayNameWIB(): returns Indonesian day name (Minggu/Senin/.../Sabtu)
-- src/app/api/deposit/route.ts: added weekend block at top of POST (after auth checks, before body parse). Returns 400 with Indonesian message: "Deposit diblokir pada hari Sabtu & Minggu..."
-- src/app/api/withdraw/route.ts: added explicit isWeekendWIB() check BEFORE the isWithinWorkingHours() check (clearer error message for weekends vs. weekday hours)
-- src/app/api/cron/profit/route.ts: added weekend block in both POST and GET handlers. Returns success with skipped=true and skipReason when weekend (so cron doesn't error out, just skips)
-- mini-services/cron-service/index.ts: added weekend guard inside processDailyInvestmentProfits() (returns empty result on Sat/Sun). Also updated the scheduler checkAndRunCrons() to log skip message on weekends instead of running profit
-- src/app/api/user/profit-status/route.ts: 
-  * Added isWeekend field to response
-  * If weekend: nextProfitTime = next Monday 00:00 WIB (not tomorrow)
-  * Updated schedule.dailyProfit text: "Senin-Jumat jam 00:00 WIB (libur Sabtu & Minggu)"
-- Created new reusable component: src/components/nexvo/shared/WeekendNoticeBanner.tsx
-  * Client-side WIB time computation (UTC+7, works regardless of browser timezone)
-  * Shows amber/orange banner with CalendarX2 icon when today is Sat/Sun
-  * Re-checks every 60 seconds (handles day rollover)
-  * Animated with Framer Motion (AnimatePresence)
-  * Props: activity (string) for custom message (Deposit/Withdrawal/Profit harian)
-- Added WeekendNoticeBanner to 3 pages:
-  * DepositPage.tsx (activity="Deposit")
-  * WithdrawPage.tsx (activity="Withdrawal")
-  * ProfitPage.tsx (activity="Profit harian")
-- Verified with agent-browser:
-  * Home page loads ✓
-  * User login (628123456789/Test@1234) ✓
-  * Deposit page (#deposit) loads, no errors ✓
-  * Withdraw page (#withdraw) loads, no errors ✓
-  * Profit page (#profit) loads, no errors ✓
-  * No console errors (only expected DB warning on client)
-- Verified profit-status API returns isWeekend: false (today is Tuesday), nextProfitTime = tomorrow 00:00 WIB, schedule.dailyProfit = "Senin-Jumat jam 00:00 WIB (libur Sabtu & Minggu)" ✓
-- TypeScript: no new errors introduced by my changes (pre-existing errors in other files unchanged)
+- Investigasi cron-service.ts profit logic:
+  * Root cause ditemukan: scheduler pakai `if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr)`
+  * Artinya profit HANYA run di window 00:00-00:02 WIB (2 menit!)
+  * Jika cron-service down/restart saat window itu → profit MISS untuk hari itu
+  * Tidak ada catch-up mechanism — kalau miss, hari itu profit hilang
+  * lastProfitRunDate in-memory → reset saat PM2 restart, tapi window check tetap blok
+- Fix cron-service.ts (root + mini-services):
+  * Scheduler: hapus `hour === 0 && minute <= 2` constraint
+  * Baru: `if (lastProfitRunDate !== dateStr)` → run ONCE per WIB day, kapan saja setelah midnight
+  * Catch-up: kalau service down di midnight, profit tetap jalan saat service up (first tick setelah midnight)
+  * Retry: kalau profit FAIL, reset lastProfitRunDate = '' → retry di tick berikutnya (10 detik kemudian)
+  * Weekend guard tetap aktif di scheduler + di processDailyInvestmentProfits()
+  * Salary bonus juga di-fix dengan pattern yang sama (run once per Monday, catch-up safe)
+- Buat admin API endpoint: /api/admin/profit-trigger (route.ts)
+  * GET: return diagnostic (WIB time, isWeekend, totalActiveInvestments, alreadyCreditedToday, needsCrediting, detail per investment)
+  * POST: trigger profit sekarang (action: "trigger" | "diagnostic")
+  * Query ?force=true: bypass weekend guard + already-credited check (untuk emergency/debug)
+  * Admin auth required (getAdminFromRequest)
+  * Include matching bonus logic (creditMatchingOnProfit) — same as cron
+  * Include push notification to user saat profit dikredit
+  * BonusLog description ditandai "[ADMIN TRIGGER]" jika force=true
+- Tambah UI di AdminDashboardPage.tsx:
+  * Section "Kontrol Profit Harian" (sebelum "Aksi Cepat")
+  * 4 diagnostic cards: WIB Time, Investasi Aktif, Sudah Dikredit, Perlu Kredit
+  * Weekend warning banner (amber) kalau isWeekend=true
+  * 2 tombol: "Trigger Profit Normal" (disabled kalau weekend/needsCrediting=0) + "Force Trigger (Lewati Cek)"
+  * Auto-fetch diagnostic tiap 30detik (sama dengan stats refresh)
+  * Toast notification hasil trigger
+- Test dengan agent-browser:
+  * Login admin (admin/Admin@2024) → Admin Dashboard
+  * "Kontrol Profit Harian" section muncul dengan diagnostic
+  * WIB Time: 2026-06-24 (Rabu), Investasi Aktif: 0, Perlu Kredit: 0
+  * Tombol "Trigger Profit Normal" disabled (correct — no investments)
+  * Tombol "Force Trigger" enabled
+  * POST /api/admin/profit-trigger → success, processed: 0 (correct — no investments)
+  * GET /api/admin/profit-trigger → diagnostic return isWeekend, totalActiveInvestments, dll
+  * No console errors
+- Test API via curl:
+  * POST /api/auth/admin-login → 200, token OK
+  * GET /api/admin/profit-trigger → 200, diagnostic JSON
+  * POST /api/admin/profit-trigger → 200, trigger result
+  * POST /api/admin/profit-trigger?force=true → 200, force trigger (bypass checks)
+- Buat deploy-profit-fix.sh:
+  * Pull code, build, restart nexvo-web + nexvo-cron
+  * Check cron-service status (pm2 list)
+  * Auto-login admin, get diagnostic
+  * Auto-trigger profit kalau needsCrediting > 0
+  * Report hasil ke user
 
 Stage Summary:
-- Weekend libur feature implemented end-to-end:
-  * Backend: deposit API, withdraw API, profit cron API, cron-service all block/skip on Sat/Sun (WIB)
-  * Frontend: WeekendNoticeBanner on Deposit/Withdraw/Profit pages (auto-shows on weekends)
-  * profit-status API: returns isWeekend flag + correct next-profit-on-Monday calculation
-- Files modified:
-  * M src/lib/settings.ts (+isWeekendWIB, +getTodayDayNameWIB)
-  * M src/app/api/deposit/route.ts (+weekend block)
-  * M src/app/api/withdraw/route.ts (+explicit weekend block before hours check)
-  * M src/app/api/cron/profit/route.ts (+weekend skip in POST/GET)
-  * M mini-services/cron-service/index.ts (+weekend guard in processDailyInvestmentProfits + scheduler)
-  * M src/app/api/user/profit-status/route.ts (+isWeekend field, +next Monday calc, +schedule text)
-  * + src/components/nexvo/shared/WeekendNoticeBanner.tsx (new reusable component)
-  * M src/components/nexvo/pages/DepositPage.tsx (+WeekendNoticeBanner)
-  * M src/components/nexvo/pages/WithdrawPage.tsx (+WeekendNoticeBanner)
-  * M src/components/nexvo/pages/ProfitPage.tsx (+WeekendNoticeBanner)
-- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-weekend-libur.sh | bash
+- Root cause: cron-service profit window terlalu sempit (2 menit) + no catch-up
+- Fix: profit run once per WIB day (any time after midnight), catch-up safe, retry on failure
+- Admin bisa trigger profit manual lewat UI (Admin Dashboard → Kontrol Profit Harian) atau API
+- Force trigger bypass weekend + already-credited (untuk emergency)
+- Files:
+  * M cron-service.ts (scheduler fix + weekend guard)
+  * M mini-services/cron-service/index.ts (scheduler fix + weekend guard)
+  * + src/app/api/admin/profit-trigger/route.ts (new admin endpoint)
+  * M src/components/nexvo/pages/AdminDashboardPage.tsx (+Kontrol Profit Harian UI)
+  * + deploy-profit-fix.sh
+  * M .gitignore (+negation for deploy-profit-fix.sh)
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-profit-fix.sh | bash
+- Deploy script auto-trigger profit untuk credit yang miss hari ini
