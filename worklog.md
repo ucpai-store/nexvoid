@@ -370,3 +370,43 @@ Stage Summary:
 - Auto-approve confirmed: deposit status=approved, balance credited immediately
 - Admin login /id/admin confirmed: premium redesigned UI renders + login works
 - No code changes needed — everything already functional from Task ID 8 + 9
+
+---
+Task ID: 11
+Agent: main (Z.ai Code)
+Task: Fix upload bukti tf still failing on production ("tetep gk bisa uplod bukti tf")
+
+Work Log:
+- Investigated root cause — found TWO bugs:
+  1. .gitignore had `upload/` pattern → matched `src/app/api/deposit/upload/` directory → route NEVER pushed to GitHub → NEVER deployed to VPS → user got 404 on production
+  2. Nginx default `client_max_body_size` = 1MB → all photo uploads >1MB rejected with HTTP 413
+- Fix 1 — .gitignore: added negation `!src/app/api/deposit/upload/` + `!src/app/api/deposit/upload/**` (same pattern that fixed /api/upload before)
+- Fix 1b — .gitignore: added negation `!deploy-upload-fix-v2.sh` so deploy script is in repo
+- Fix 2 — /api/deposit/upload/route.ts: wrapped request.formData() in try/catch (was throwing unhandled error when no file sent), check file.size > 0
+- Fix 2b — /api/upload/route.ts: same error handling improvements
+- Fix 3 — DepositPage uploadProof: added HTTP status check + clear error messages for 413 (Nginx body too large), 401 (session expired), 500 (server error)
+- Fix 4 — deploy-upload-fix-v2.sh (NEW): comprehensive deploy script that:
+  - Configures Nginx client_max_body_size 20M (in nginx.conf + all site configs)
+  - Tests Nginx config + reloads
+  - Pulls latest code
+  - CLEARS Next.js build cache (.next/cache + .next/standalone) for fresh rebuild
+  - Rebuilds + copies static/uploads to standalone
+  - Restarts PM2 (fresh process, not just restart)
+  - Tests upload with 2MB file (would fail with old 1MB Nginx limit)
+  - Verifies all endpoints respond
+- Verification (dev server):
+  - Valid image upload → 200 + URL ✅
+  - File accessible at /api/files/{filename} → 200 ✅
+  - Submit deposit with proof → status=approved, fee=0, netAmount=100000, proofImage saved ✅
+  - No file → clean 400 with helpful message ✅
+  - No auth → 401 ✅
+- Committed + pushed to GitHub (commit be6b32c)
+- Verified on GitHub: deploy script HTTP 200, route.ts HTTP 200
+
+Stage Summary:
+- ROOT CAUSE FOUND: /api/deposit/upload route was gitignored → never deployed → 404 on production
+- ALSO FIXED: Nginx 1MB body limit → 413 on photo uploads
+- Deploy script: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-upload-fix-v2.sh | bash
+- This deploy will: fix Nginx limits, pull the now-tracked route, rebuild fresh, restart PM2, test upload
+- After deploy, user MUST hard refresh browser (Ctrl+Shift+R) to load new frontend code
+- Files: M .gitignore, +src/app/api/deposit/upload/route.ts, M src/app/api/upload/route.ts, M src/components/nexvo/pages/DepositPage.tsx, +deploy-upload-fix-v2.sh
