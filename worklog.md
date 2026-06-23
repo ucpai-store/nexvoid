@@ -340,3 +340,33 @@ Stage Summary:
 - VLM-rated 7-8/10 (premium, professional, neat)
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-upload-admin.sh | bash
 - Files: M .gitignore, +src/app/api/upload/route.ts, M src/app/id/admin/page.tsx, +deploy-upload-admin.sh, D 22 test artifacts
+
+---
+Task ID: 10
+Agent: main (Z.ai Code)
+Task: Verify deposit proof upload works (user asked "pas uplod bukti tf bisa kan")
+
+Work Log:
+- Read previous worklog (Task ID 8 + 9) — confirmed /api/deposit/upload + /api/upload both fixed
+- Verified dev server running on port 3000
+- API test (curl with real user token 628123456789):
+  - POST /api/deposit/upload → 200 {success:true, url:/api/files/proof-xxx.png} ✅
+  - GET /api/files/proof-xxx.png → 200 (file accessible) ✅
+  - POST /api/upload (admin token) → 200 ✅
+  - POST /api/upload (user token) → 200 ✅
+  - Without token → 401 (correct) ✅
+- Browser test (agent-browser):
+  - /id/admin renders premium redesigned login ✅
+  - User login (628123456789/Test@1234) → home page ✅
+  - Deposit page renders, previous deposit DP-PQYEFG shows "📎 Lihat Bukti" link ✅
+  - Click "Lihat Bukti" → proof image dialog opens ✅
+- Admin API test:
+  - GET /api/admin/deposits → 1 deposit, DP-PQYEFG Rp100000 status=approved proof=YES ✅
+
+Stage Summary:
+- Deposit proof upload CONFIRMED WORKING (user-auth /api/deposit/upload)
+- Uploaded proof accessible at /api/files/{filename}
+- Admin can see deposit with proof in admin panel
+- Auto-approve confirmed: deposit status=approved, balance credited immediately
+- Admin login /id/admin confirmed: premium redesigned UI renders + login works
+- No code changes needed — everything already functional from Task ID 8 + 9
