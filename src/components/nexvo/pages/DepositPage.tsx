@@ -286,8 +286,28 @@ export default function DepositPage() {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+
+      // Handle non-OK HTTP responses (413 = Nginx body too large, 401 = token expired, etc.)
+      if (!res.ok) {
+        let errorMsg = `Upload gagal (HTTP ${res.status})`;
+        try {
+          const data = await res.json();
+          if (data?.error) errorMsg = data.error;
+        } catch {
+          // Response is not JSON (likely Nginx 413 HTML page)
+          if (res.status === 413) {
+            errorMsg = 'File terlalu besar (maks 5MB). Kompres gambar lalu coba lagi.';
+          } else if (res.status === 401) {
+            errorMsg = 'Sesi berakhir, silakan login ulang lalu coba upload lagi.';
+          } else if (res.status === 500) {
+            errorMsg = 'Server error saat upload. Coba lagi atau hubungi admin.';
+          }
+        }
+        throw new Error(errorMsg);
+      }
+
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.data?.url) {
         setProofImageUrl(data.data.url);
         return data.data.url;
       }

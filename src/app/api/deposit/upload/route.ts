@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest, getAdminFromRequest, logAdminAction } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 // Multiple directories to ensure file persists across rebuilds
 function getAllUploadDirs(): string[] {
@@ -20,23 +20,13 @@ function getAllUploadDirs(): string[] {
   return dirs;
 }
 
-function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return request.headers.get('x-real-ip') || '';
-}
-
 export async function POST(request: NextRequest) {
   try {
-    // Accept EITHER a valid user token OR a valid admin token
     const user = await getUserFromRequest(request);
-    const admin = user ? null : await getAdminFromRequest(request);
-
-    if (!user && !admin) {
+    if (!user) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
-
-    if (user && user.isSuspended) {
+    if (user.isSuspended) {
       return NextResponse.json({ success: false, error: 'Account suspended' }, { status: 403 });
     }
 
@@ -53,30 +43,30 @@ export async function POST(request: NextRequest) {
 
     if (!file || file.size === 0) {
       return NextResponse.json(
-        { success: false, error: 'File tidak ditemukan. Pilih file gambar terlebih dahulu.' },
+        { success: false, error: 'File bukti transfer tidak ditemukan. Pilih file gambar terlebih dahulu.' },
         { status: 400 }
       );
     }
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ success: false, error: 'File terlalu besar (maks 10MB)' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'File terlalu besar (maks 8MB)' }, { status: 400 });
     }
 
     // Validate file type (by MIME and extension fallback)
     const ext = (file.name.split('.').pop() || '').toLowerCase();
-    const validExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+    const validExt = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
     if (!ALLOWED_TYPES.includes(file.type) && !validExt) {
-      return NextResponse.json({ success: false, error: 'Tipe file tidak diizinkan (hanya JPG, PNG, GIF, WebP, SVG)' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Tipe file tidak diizinkan (hanya JPG, PNG, GIF, WebP)' }, { status: 400 });
     }
 
     // Generate unique filename
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
-    const safeExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)
+    const safeExt = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)
       ? ext
       : (file.type.split('/')[1] || 'jpg');
-    const filename = `upload-${timestamp}-${random}.${safeExt}`;
+    const filename = `proof-${timestamp}-${random}.${safeExt}`;
 
     // Convert File to Buffer
     const bytes = await file.arrayBuffer();
@@ -95,23 +85,17 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // Log admin upload action
-    if (admin) {
-      await logAdminAction(admin.id, 'UPLOAD_FILE', `Uploaded ${filename} (${file.name}, ${file.size} bytes)`, getClientIp(request)).catch(() => {});
-    }
-
     return NextResponse.json({
       success: true,
       data: {
         url: `/api/files/${filename}`,
-        filePath: `/api/files/${filename}`,
         filename,
         originalName: file.name,
         size: file.size,
       },
     });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Deposit proof upload error:', error);
     return NextResponse.json({ success: false, error: 'Gagal upload file. Silakan coba lagi.' }, { status: 500 });
   }
 }

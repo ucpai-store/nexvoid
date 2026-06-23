@@ -54,6 +54,8 @@ public_html
 deploy*.sh
 deploy*.mjs
 deploy*.js
+# Keep specific deploy scripts that users run via curl from GitHub
+!deploy-upload-fix-v2.sh
 DEPLOY*.sh
 DEPLOY*.md
 FIX*.sh
@@ -75,6 +77,8 @@ ecosystem.config.js
 nexvo-guide-ebook.pdf
 tool-results/
 upload/
-# Keep the Next.js API route for file uploads (not the uploads/ content dir)
+# Keep the Next.js API routes for file uploads (not the uploads/ content dir)
 !src/app/api/upload/
 !src/app/api/upload/**
+!src/app/api/deposit/upload/
+!src/app/api/deposit/upload/**
