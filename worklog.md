@@ -2479,3 +2479,63 @@ Stage Summary:
 - ✅ Admin trigger: /api/admin/profit-trigger juga fix (no weekend guard + uses stored dailyProfit).
 - ✅ Salary (separate system): 1%/minggu selamanya, syarat 10 referral + investasi aktif (unchanged, verified previous session).
 - READY FOR VPS DEPLOY.
+
+---
+Task ID: DEPLOY-SCRIPT-CURL
+Agent: main (Z.ai Code)
+Task: User minta deploy script yang bisa di-curl pipe ke bash (contoh: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash). "cek semua sistem sekali ku deploy wajib beres total".
+
+Work Log:
+- Buat 3 deploy scripts di /home/z/my-project/:
+  • deploy.sh — full deploy (pull+build+db push+pm2 start+verify+self-heal), 463 lines
+  • deploy-check.sh — alias ke `deploy.sh --check` (verify-only, no deploy)
+  • deploy-ui-update.sh — alias ke `deploy.sh --skip-build` (hot update, no rebuild)
+- Fitur deploy.sh:
+  1. Pre-flight: cek git/bun/node/pm2 (auto-install pm2 kalau missing)
+  2. Stop old: pm2 delete + lsof port kill (clear rogue processes)
+  3. Pull: git fetch + reset --hard origin/main
+  4. Install: bun install (root + wa-bot)
+  5. Build: bun run build (skip with --skip-build or --dev)
+  6. DB: auto-fix .env DATABASE_URL absolute path + bun run db:push
+  7. Start Next.js: pm2 start "bun run start" (prod) or "npx next dev" (dev)
+  8. Start cron-service: pm2 start "bun run index.ts" --cwd mini-services/cron-service
+  8b. Start wa-bot: pm2 start "npx tsx index.ts" --cwd mini-services/wa-bot (optional)
+  9. PM2 save + startup config
+  10. Verify ALL (with self-heal):
+      - Port checks (3000, 3032) dengan retry 8×
+      - HTTP health (app=200, cron=status:running)
+      - Profit trigger test (idempotent, safe)
+      - Salary trigger test (idempotent, safe)
+      - DB integrity check (count users/products/investments + salaryConfig)
+      - Salary config sanity (rate=1, maxWeeks=0, minDirectRefs=10, isActive=true)
+      - Self-heal: auto-restart cron if profit trigger fails; auto-fix salary config if wrong
+  - Final report: PM2 status + green box "ALL SYSTEMS 100% OK" or red box with fail count
+- Test syntax: bash -n deploy.sh ✓ (clean)
+- Install pm2 di sandbox untuk testing: npm install -g pm2 (v7.0.1)
+- Test --check mode: ALL PASS (port 3000+3032 listening, HTTP OK, profit/salary trigger OK, DB OK, salary config 1%/week FOREVER ✓)
+- Fix ANSI color box rendering (echo -e on all box lines)
+- Test FULL deploy --skip-build --dev:
+  • nexvo-app: PID 9354, online, :3000 ✓
+  • nexvo-cron: PID 8884, online, :3032 ✓
+  • nexvo-wa-bot: PID 8917, online ✓
+  • profit trigger: processed=0, profit=0, errors=0 (idempotent ✓)
+  • salary trigger: OK ✓
+  • DB: 12 users, 6 products, 11 investments, salaryConfig(rate=1,maxWeeks=0,minDirectRefs=10,isActive=true) ✓
+  • "ALL SYSTEMS 100% OK" ✓
+- Browser verify: http://localhost:3000/ loads NEXVO homepage (HTTP 200) ✓
+- Commit + push ke GitHub (origin/main):
+  • commit 59e6f4e: deploy scripts + profit daily fix
+  • commit c07edcd: deploy-check.sh (force-add, was gitignored)
+- Force-add deploy-check.sh karena .gitignore ada pattern `deploy*.sh` (dengan exceptions). deploy.sh, deploy-check.sh, deploy-ui-update.sh sekarang semua di remote.
+
+Stage Summary:
+- ✅ Deploy script siap pakai via curl pipe to bash dari GitHub raw URL.
+- ✅ Script bersifat idempotent (safe re-run), self-healing (auto-restart + auto-fix config), comprehensive verify (10 checks).
+- ✅ Setelah deploy, ALL systems wajib 100% OK: app + cron + wa-bot online, profit/salary trigger jalan, DB integrity OK, salary config benar.
+- ✅ 3 varian script: deploy.sh (full), deploy-check.sh (verify only), deploy-ui-update.sh (hot update no build).
+- Perintah deploy untuk VPS:
+    curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy.sh | bash
+  Atau hot UI update (no rebuild):
+    curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+  Atau verify-only:
+    curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-check.sh | bash
