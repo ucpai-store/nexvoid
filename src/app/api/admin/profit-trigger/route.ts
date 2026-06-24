@@ -21,6 +21,23 @@ function formatRupiahSimple(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
 }
 
+/**
+ * Count WEEKDAYS (Mon-Fri) between two dates (exclusive start, inclusive end).
+ * Sat/Sun are LIBUR — not counted in catchup.
+ */
+function countWeekdaysBetween(startWib: Date, endWib: Date): number {
+  let count = 0;
+  const current = new Date(startWib.getFullYear(), startWib.getMonth(), startWib.getDate());
+  current.setDate(current.getDate() + 1);
+  const end = new Date(endWib.getFullYear(), endWib.getMonth(), endWib.getDate());
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count++;
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
 // ──────────── Matching Bonus (Event-Driven) ────────────
 
 const DEFAULT_MATCHING_RATES: Record<number, number> = {
@@ -113,9 +130,17 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
 }> {
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0, errorDetails: [] as string[], skipped: 0 };
 
-  // ★ NO WEEKEND SKIP — profit runs EVERY DAY including Saturday & Sunday ★
+  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) — semua aktivitas mati ★
+  // Can be bypassed with force=true for admin manual trigger
   const wibNow = getWibNow();
+  const dayOfWeek = wibNow.getDay();
   const todayWIB = getWibDateString(new Date());
+
+  if (!options?.force && (dayOfWeek === 0 || dayOfWeek === 6)) {
+    const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+    console.log(`[Admin Profit Trigger] ⏸️ SKIPPED — today is ${dayName} (weekend libur). Use force=true to override.`);
+    return { ...result, errorDetails: [`Weekend (${dayName}) — skipped. Use ?force=true to override.`] };
+  }
 
   const investments = await db.investment.findMany({
     where: { status: 'active' },
@@ -178,18 +203,19 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
         continue;
       }
 
-      // ★ AUTO-CATCHUP: credit all missed days at once (capped by remainingCap) ★
+      // ★ AUTO-CATCHUP: credit all missed WEEKDAYS at once (capped by remainingCap) ★
+      // Weekend (Sat/Sun) = LIBUR, tidak dihitung dalam catchup
       let missedDays = 1;
       if (inv.lastProfitDate) {
         const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
         if (lastProfitWIB !== todayWIB || options?.force) {
           const lastDate = new Date(inv.lastProfitDate);
           const lastWib = new Date(lastDate.getTime() + lastDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
-          const lastDay = new Date(lastWib.getFullYear(), lastWib.getMonth(), lastWib.getDate());
-          const todayWib = new Date(wibNow.getFullYear(), wibNow.getMonth(), wibNow.getDate());
-          const diffMs = todayWib.getTime() - lastDay.getTime();
-          const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-          missedDays = Math.max(1, diffDays);
+          missedDays = countWeekdaysBetween(lastWib, wibNow);
+          if (missedDays <= 0) {
+            result.skipped++;
+            continue; // already credited all weekdays up to today
+          }
         } else {
           result.skipped++;
           continue; // Already credited today

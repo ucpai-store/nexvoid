@@ -53,6 +53,24 @@ function formatRupiahSimple(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
 }
 
+/**
+ * Count WEEKDAYS (Mon-Fri) between two dates (exclusive start, inclusive end).
+ * Used for auto-catchup: if cron was down across a weekend, we only credit
+ * the missed weekdays (Sat/Sun are LIBUR — no profit, no catchup for them).
+ */
+function countWeekdaysBetween(startWib: Date, endWib: Date): number {
+  let count = 0;
+  const current = new Date(startWib.getFullYear(), startWib.getMonth(), startWib.getDate());
+  current.setDate(current.getDate() + 1); // start from day AFTER last profit
+  const end = new Date(endWib.getFullYear(), endWib.getMonth(), endWib.getDate());
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count++; // not Sunday(0) or Saturday(6)
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
 // ──────────── Matching Config Helper ────────────
 
 async function getMatchingRates(): Promise<Record<number, number>> {
@@ -367,8 +385,15 @@ async function processDailyInvestmentProfits(): Promise<{
 }> {
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0 };
 
-  // ★ NO WEEKEND SKIP — profit runs EVERY DAY including Saturday & Sunday ★
+  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) — semua aktivitas mati ★
   const wibNow = getWibNow();
+  const dayOfWeek = wibNow.getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+    console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    return result;
+  }
+
   const now = wibNow;
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -421,17 +446,14 @@ async function processDailyInvestmentProfits(): Promise<{
         continue;
       }
 
-      // ★ AUTO-CATCHUP: if cron was down for N days, credit all missed days at once ★
-      // Calculate missed days from lastProfitDate to today (WIB)
-      let missedDays = 1; // default today
+      // ★ AUTO-CATCHUP: if cron was down for N WEEKDAYS, credit all missed weekdays at once ★
+      // Weekend (Sat/Sun) = LIBUR, tidak dihitung dalam catchup
+      let missedDays = 1; // default today (already a weekday since we skipped weekend above)
       if (inv.lastProfitDate) {
         const lastDate = new Date(inv.lastProfitDate);
         const lastWib = new Date(lastDate.getTime() + lastDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
-        const lastDay = new Date(lastWib.getFullYear(), lastWib.getMonth(), lastWib.getDate());
-        const todayWib = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const diffMs = todayWib.getTime() - lastDay.getTime();
-        const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-        missedDays = Math.max(1, diffDays);
+        missedDays = countWeekdaysBetween(lastWib, now);
+        if (missedDays <= 0) continue; // already credited all weekdays up to today
       }
 
       // Total profit to credit = dailyProfit × missedDays, but capped by remainingCap
@@ -449,11 +471,8 @@ async function processDailyInvestmentProfits(): Promise<{
         if (currentInv?.lastProfitDate) {
           const lastDate = new Date(currentInv.lastProfitDate);
           const lastWib = new Date(lastDate.getTime() + lastDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
-          const lastDay = new Date(lastWib.getFullYear(), lastWib.getMonth(), lastWib.getDate());
-          const todayWib = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const diffMs = todayWib.getTime() - lastDay.getTime();
-          const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-          if (diffDays <= 0) return; // Already credited today — skip
+          const recheckMissed = countWeekdaysBetween(lastWib, now);
+          if (recheckMissed <= 0) return; // Already credited all weekdays — skip
         }
 
         // Re-check hard cap inside transaction
@@ -633,13 +652,19 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // ★ Daily profit + matching bonus: Every day at 00:00 WIB (INCLUDING WEEKENDS) ★
+  // ★ Daily profit + matching bonus: Every day at 00:00 WIB ★
+  // ★ WEEKEND LIBUR: Skip on Saturday (6) & Sunday (0) — semua aktivitas mati ★
   if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr) {
     lastProfitRunDate = dateStr;
-    console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()} (every day, including weekends)...`);
-    processDailyInvestmentProfits().then((result) => {
-      console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
-    }).catch(console.error);
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+      console.log(`\n[CRON] ⏸️ Profit cron SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    } else {
+      console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()} (weekday only, with auto-catchup + hard cap)...`);
+      processDailyInvestmentProfits().then((result) => {
+        console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
+      }).catch(console.error);
+    }
   }
 
   // Weekly salary: Every Monday at 00:00 WIB (check minute 0 with 2-min window)
@@ -749,7 +774,7 @@ const server = Bun.serve({
 console.log(`[Cron Service] 🚀 Running on port ${PORT}`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
-console.log(`  - Daily Profit + Matching: 00:00 WIB every day (INCLUDING Sat/Sun, with auto-catchup + hard cap)`);
+console.log(`  - Daily Profit + Matching: 00:00 WIB WEEKDAYS ONLY (Sat/Sun = LIBUR, with auto-catchup + hard cap)`);
 console.log(`  - Weekly Salary: 00:00 WIB every Monday`);
 console.log(`  - Quota Bump: every 15 minutes (auto-increment Kuota Terisi, reset when full)`);
 console.log(`  - Matching: Event-driven (credited automatically with daily profit)`);
