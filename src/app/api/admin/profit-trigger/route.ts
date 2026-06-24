@@ -113,12 +113,9 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
 }> {
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0, errorDetails: [] as string[], skipped: 0 };
 
+  // ★ NO WEEKEND SKIP — profit runs EVERY DAY including Saturday & Sunday ★
   const wibNow = getWibNow();
-  const dayOfWeek = wibNow.getDay();
   const todayWIB = getWibDateString(new Date());
-
-  // ★ Profit dikredit TIAP HARI (termasuk Sabtu & Minggu) — 160k × 2% = 3.200/hari × 180 hari = 576.000 total.
-  // Tidak ada weekend guard lagi. force=true hanya untuk bypass "already credited today" check.
 
   const investments = await db.investment.findMany({
     where: { status: 'active' },
@@ -161,15 +158,51 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
         }
       }
 
-      // ★ Use stored dailyProfit (preferred) — untuk Product purchases yang link ke _internal_default package (profitRate=0).
-      // Fallback ke package.profitRate hanya kalau stored dailyProfit = 0 (legacy InvestmentPackage purchases).
-      const dailyProfit = inv.dailyProfit > 0
-        ? inv.dailyProfit
-        : Math.floor(inv.amount * (inv.package.profitRate / 100));
+      // ★ HARD CAP: total profit cannot exceed dailyProfit × contractDays
+      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
       if (dailyProfit <= 0) {
         result.skipped++;
         continue;
       }
+      const contractDays = inv.package.contractDays || 180;
+      const hardCap = dailyProfit * contractDays;
+      const remainingCap = Math.max(0, hardCap - inv.totalProfitEarned);
+
+      if (remainingCap <= 0) {
+        // Already hit hard cap → mark as completed
+        await db.investment.update({
+          where: { id: inv.id },
+          data: { status: 'completed' },
+        });
+        result.skipped++;
+        continue;
+      }
+
+      // ★ AUTO-CATCHUP: credit all missed days at once (capped by remainingCap) ★
+      let missedDays = 1;
+      if (inv.lastProfitDate) {
+        const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
+        if (lastProfitWIB !== todayWIB || options?.force) {
+          const lastDate = new Date(inv.lastProfitDate);
+          const lastWib = new Date(lastDate.getTime() + lastDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
+          const lastDay = new Date(lastWib.getFullYear(), lastWib.getMonth(), lastWib.getDate());
+          const todayWib = new Date(wibNow.getFullYear(), wibNow.getMonth(), wibNow.getDate());
+          const diffMs = todayWib.getTime() - lastDay.getTime();
+          const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+          missedDays = Math.max(1, diffDays);
+        } else {
+          result.skipped++;
+          continue; // Already credited today
+        }
+      }
+
+      let creditAmount = dailyProfit * missedDays;
+      let willComplete = false;
+      if (creditAmount >= remainingCap) {
+        creditAmount = remainingCap;
+        willComplete = true;
+      }
+      const daysCredited = Math.ceil(creditAmount / dailyProfit);
 
       await db.$transaction(async (tx) => {
         // Re-check inside transaction
@@ -184,41 +217,44 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
         await tx.user.update({
           where: { id: inv.userId },
           data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
+            mainBalance: { increment: creditAmount },
+            totalProfit: { increment: creditAmount },
           },
         });
 
         await tx.investment.update({
           where: { id: inv.id },
           data: {
-            totalProfitEarned: { increment: dailyProfit },
+            totalProfitEarned: { increment: creditAmount },
             dailyProfit: dailyProfit,
             lastProfitDate: new Date(),
+            ...(willComplete ? { status: 'completed' as const, endDate: new Date() } : {}),
           },
         });
 
+        const catchupNote = missedDays > 1 ? ` [CATCHUP ${daysCredited} hari]` : '';
+        const capNote = willComplete ? ` [HARD CAP ${formatRupiahSimple(hardCap)} → SELESAI]` : '';
         await tx.bonusLog.create({
           data: {
             userId: inv.userId,
             fromUserId: inv.userId,
             type: 'profit',
             level: 0,
-            amount: dailyProfit,
+            amount: creditAmount,
             description: options?.force
-              ? `[ADMIN TRIGGER] Profit harian ${inv.package.name} — ${formatRupiahSimple(inv.amount)} × ${inv.package.profitRate}% = ${formatRupiahSimple(dailyProfit)}`
-              : `Profit harian ${inv.package.name} — ${formatRupiahSimple(inv.amount)} × ${inv.package.profitRate}% = ${formatRupiahSimple(dailyProfit)}`,
+              ? `[ADMIN TRIGGER] Profit harian ${inv.package.name} — ${formatRupiahSimple(creditAmount)}${catchupNote}${capNote}`
+              : `Profit harian ${inv.package.name} — ${formatRupiahSimple(creditAmount)}${catchupNote}${capNote}`,
           },
         });
 
-        const matchAmount = await creditMatchingOnProfit(tx, inv.userId, dailyProfit);
+        const matchAmount = await creditMatchingOnProfit(tx, inv.userId, creditAmount);
         result.totalMatching += matchAmount;
       });
 
       result.processed++;
-      result.totalProfit += dailyProfit;
+      result.totalProfit += creditAmount;
 
-      sendPushNotification(inv.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(dailyProfit).toLocaleString("id-ID")} hari ini`, { type: "daily_profit", amount: dailyProfit }).catch(() => {});
+      sendPushNotification(inv.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(creditAmount).toLocaleString("id-ID")} ${missedDays > 1 ? `(catchup ${daysCredited} hari)` : 'hari ini'}`, { type: "daily_profit", amount: creditAmount }).catch(() => {});
     } catch (error: unknown) {
       result.errors++;
       const message = error instanceof Error ? error.message : String(error);
