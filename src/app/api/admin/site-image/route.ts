@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, unlink } from 'fs/promises';
+import { writeFile, unlink, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { getAdminFromRequest, logAdminAction } from '@/lib/auth';
 import { db } from '@/lib/db';
 
-const PUBLIC_DIR = '/home/z/my-project/public';
-const STANDALONE_PUBLIC_DIR = '/home/z/my-project/.next/standalone/public';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+// FIX: use process.cwd() so this works on BOTH dev sandbox (/home/z/my-project)
+// and production VPS (/home/nexvo/nexvo). Hardcoded paths broke image serving on VPS.
+function getPublicDirs(): string[] {
+  const dirs = [path.join(process.cwd(), 'public')];
+  const standalonePublic = path.join(process.cwd(), '.next', 'standalone', 'public');
+  if (existsSync(path.dirname(standalonePublic))) dirs.push(standalonePublic);
+  return dirs;
+}
+
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
 
 // Valid setting keys that can store image paths
@@ -58,20 +66,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure public directory exists
-    if (!existsSync(PUBLIC_DIR)) {
-      const { mkdir } = await import('fs/promises');
-      await mkdir(PUBLIC_DIR, { recursive: true });
+    const dirs = getPublicDirs();
+
+    // Ensure public directories exist
+    for (const dir of dirs) {
+      if (!existsSync(dir)) {
+        await mkdir(dir, { recursive: true }).catch(() => {});
+      }
     }
 
     // Delete old image for this setting
     const oldSetting = await db.systemSettings.findUnique({
       where: { key: settingKey },
     });
-    if (oldSetting?.value && oldSetting.value.startsWith('/site-')) {
+    if (oldSetting?.value) {
       const oldFilename = oldSetting.value.split('/').pop();
-      if (oldFilename) {
-        for (const dir of [PUBLIC_DIR, STANDALONE_PUBLIC_DIR]) {
+      if (oldFilename && oldFilename.startsWith('site-')) {
+        for (const dir of dirs) {
           const oldFilePath = path.join(dir, oldFilename);
           if (existsSync(oldFilePath)) {
             try { await unlink(oldFilePath); } catch { /* non-critical */ }
@@ -83,24 +94,26 @@ export async function POST(request: NextRequest) {
     // Generate unique filename
     const ext = path.extname(file.name) || '.png';
     const filename = `site-${settingKey}-${Date.now()}${ext}`;
-    const publicPath = `/${filename}`;
     const imageUrl = `/api/files/${filename}`;
 
     // Write file to public directories
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    for (const dir of [PUBLIC_DIR, STANDALONE_PUBLIC_DIR]) {
-      if (existsSync(dir)) {
+    for (const dir of dirs) {
+      try {
+        await mkdir(dir, { recursive: true });
         await writeFile(path.join(dir, filename), buffer);
+      } catch {
+        // ignore dir write errors (e.g. standalone dir may not exist)
       }
     }
 
-    // Store the public path in SystemSettings
+    // Store the served URL in SystemSettings (so /api/files/[...path] can serve it)
     await db.systemSettings.upsert({
       where: { key: settingKey },
-      update: { value: publicPath },
-      create: { key: settingKey, value: publicPath },
+      update: { value: imageUrl },
+      create: { key: settingKey, value: imageUrl },
     });
 
     // Log admin action

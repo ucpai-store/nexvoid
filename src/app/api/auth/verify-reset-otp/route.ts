@@ -41,21 +41,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate reset token (JWT, 15 min expiry)
+    // Generate reset token (JWT, 15 min expiry) — stateless, no DB column needed
     const resetToken = jwt.sign(
       { userId: user.id, type: 'password-reset' },
       JWT_SECRET,
       { expiresIn: '15m' }
     );
 
-    // Store reset token and expiry in user record
-    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    // Clear the OTP so it cannot be reused. The reset token itself is a signed JWT
+    // (verified statelessly in /api/auth/reset-password), so we do NOT store it in DB.
     await db.user.update({
       where: { id: user.id },
       data: {
-        resetToken,
-        resetTokenExpiry,
-        emailOtpCode: null, // Clear OTP
+        emailOtpCode: null,
         emailOtpExpiry: null,
       },
     });

@@ -510,7 +510,10 @@ async function processDailyInvestmentProfitsCore(): Promise<{
 
   const todayWIB = getTodayWibDateString();
   const wibNow = getWibNow();
-  const todayDow = getWibDayOfWeekFromDate(wibNow); // 0=Sun, 6=Sat
+  // FIX: wibNow is ALREADY WIB-shifted, so .getDay() returns the correct WIB day-of-week.
+  // Do NOT pass wibNow into getWibDayOfWeekFromDate() — that double-shifts (+7h again)
+  // and on UTC servers causes Friday 17:00-23:59 WIB to be misread as Saturday (weekend).
+  const todayDow = wibNow.getDay(); // 0=Sun, 6=Sat
   const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
   const investments = await db.investment.findMany({

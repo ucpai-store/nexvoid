@@ -175,11 +175,14 @@ async function main() {
   console.log(`  Force (bypass weekend): ${FORCE}`);
   const wibNow = getWibNow();
   const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  console.log(`  WIB Now: ${getWibDateString(wibNow)} ${String(wibNow.getHours()).padStart(2,'0')}:${String(wibNow.getMinutes()).padStart(2,'0')} (${dayNames[getWibDayOfWeekFromDate(wibNow)]})`);
+  // FIX: wibNow is already WIB-shifted; .getDay() returns the correct WIB day-of-week.
+  // (getWibDayOfWeekFromDate(wibNow) would double-shift and misread Fri evening as Sat.)
+  console.log(`  WIB Now: ${getWibDateString(wibNow)} ${String(wibNow.getHours()).padStart(2,'0')}:${String(wibNow.getMinutes()).padStart(2,'0')} (${dayNames[wibNow.getDay()]})`);
   console.log('═══════════════════════════════════════════════════════\n');
 
   const todayWIB = getTodayWibDateString();
-  const todayDow = getWibDayOfWeekFromDate(wibNow);
+  // FIX: wibNow is already WIB-shifted; use .getDay() directly to avoid double-shift bug.
+  const todayDow = wibNow.getDay();
   const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
   if (!FORCE && !isTodayWeekday) {
