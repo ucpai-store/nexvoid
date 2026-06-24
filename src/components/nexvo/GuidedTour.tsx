@@ -277,8 +277,9 @@ export default function GuidedTour() {
 
     let cancelled = false;
     const runStep = async () => {
-      // Wait for page to settle
-      await new Promise((r) => setTimeout(r, 700));
+      // Wait for page to settle + let full tooltip announce the step (~2s)
+      // so user sees the instruction before tooltip collapses for typing
+      await new Promise((r) => setTimeout(r, 2000));
       if (cancelled || typeCancelRef.current) return;
 
       // Type demo fields one by one (with visible label)
@@ -344,6 +345,9 @@ export default function GuidedTour() {
 
   const isCentered = actualPlacement === 'center';
   const progress = ((currentStep + 1) / TOUR_STEPS.length) * 100;
+  // When auto-play is actively typing form fields, collapse the tooltip to a
+  // minimal compact bar so the form being filled stays fully visible (for video).
+  const isTypingPhase = isAutoPlay && typingLabel !== null && !isPaused && !isCentered;
 
   const tooltipWidthClass = isSmallMobile
     ? 'w-[calc(100vw-24px)] max-w-[340px]'
@@ -479,11 +483,12 @@ export default function GuidedTour() {
               <div className="fixed inset-0 z-[90] bg-black/40 backdrop-blur-[2px]" />
             )}
 
-            {/* Soft spotlight glow behind target (no darkening) */}
+            {/* Soft spotlight glow behind target (no darkening).
+                Dimmed during typing phase so focus stays on the form being filled. */}
             {targetRect && !isCentered && (
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: isTypingPhase ? 0.25 : 1 }}
                 className="fixed z-[90] pointer-events-none rounded-2xl"
                 style={{
                   top: targetRect.top - 24,
@@ -496,11 +501,12 @@ export default function GuidedTour() {
               />
             )}
 
-            {/* Highlight ring around target — THICK + bright + animated pulse */}
+            {/* Highlight ring around target — THICK + bright + animated pulse.
+                Faded during typing phase so focus stays on form, not the submit button. */}
             {targetRect && !isCentered && (
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: isTypingPhase ? 0.35 : 1 }}
                 className="fixed z-[91] pointer-events-none rounded-xl"
                 style={{
                   top: targetRect.top - 5,
@@ -520,8 +526,10 @@ export default function GuidedTour() {
               </motion.div>
             )}
 
-            {/* Arrow pointing to target — BIG + bright + bobbing animation */}
-            {targetRect && !isCentered && (
+            {/* Arrow pointing to target — BIG + bright + bobbing animation.
+                Hidden during typing phase (arrow points to submit button which
+                isn't the focus while filling form fields). */}
+            {targetRect && !isCentered && !isTypingPhase && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.3 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -740,6 +748,79 @@ export default function GuidedTour() {
                 boxShadow:
                   '0 0 0 1px rgba(234,179,8,0.4), 0 8px 32px rgba(0,0,0,0.6), 0 0 40px rgba(234,179,8,0.25)',
               };
+
+              // ─── TYPING PHASE: minimal compact bar (form stays fully visible) ───
+              // When auto-play is typing form fields, collapse to a thin bar so
+              // the form being filled is 100% visible for video recording.
+              if (isTypingPhase) {
+                const compactBar = (
+                  <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                    <div className="w-6 h-6 rounded-full bg-gold-gradient flex items-center justify-center font-bold text-primary-foreground text-[10px] shrink-0 glow-gold">
+                      {currentStep + 1}
+                    </div>
+                    <Type className="w-3.5 h-3.5 text-yellow-400 animate-pulse shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground text-[11px] sm:text-xs font-bold truncate">
+                        Mengisi: {typingLabel}
+                      </p>
+                      <p className="text-yellow-400/70 text-[9px] sm:text-[10px]">
+                        Form terlihat penuh · panduan akan kembali
+                      </p>
+                    </div>
+                    <span className="flex gap-0.5 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                    <button
+                      onClick={togglePause}
+                      className="p-1.5 rounded-lg text-yellow-400 hover:bg-yellow-400/10 shrink-0"
+                      style={{ border: '1px solid rgba(234,179,8,0.4)' }}
+                      aria-label="Jeda"
+                    >
+                      <Pause className="w-3.5 h-3.5 fill-current" />
+                    </button>
+                  </div>
+                );
+
+                // MOBILE: thin bar pinned at bottom (above bottom nav)
+                if (isMobile) {
+                  return (
+                    <motion.div
+                      key={`compact-${currentStep}`}
+                      initial={{ opacity: 0, y: 40 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 40 }}
+                      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                      className="fixed left-2 right-2 z-[93] rounded-2xl overflow-hidden border-2 border-yellow-400/70"
+                      style={{
+                        ...tooltipStyle,
+                        bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
+                      }}
+                    >
+                      {compactBar}
+                    </motion.div>
+                  );
+                }
+
+                // DESKTOP: thin pill floating at top-center (form beside target fully visible)
+                return (
+                  <motion.div
+                    key={`compact-${currentStep}`}
+                    initial={{ opacity: 0, y: -20, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.9 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed left-1/2 -translate-x-1/2 z-[93] rounded-full overflow-hidden border-2 border-yellow-400/70"
+                    style={{
+                      ...tooltipStyle,
+                      top: '16px',
+                    }}
+                  >
+                    {compactBar}
+                  </motion.div>
+                );
+              }
 
               // ─── MOBILE: fixed bottom sheet (NEVER covers form/button) ───
               if (isMobile && !isCentered) {
