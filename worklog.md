@@ -1174,3 +1174,31 @@ Stage Summary:
 - No more false-positive chunk detection on `[...path]` catch-all routes
 - User must run the NEW command to recover from 502:
   curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-fix-all.sh | bash
+
+---
+Task ID: deposit-remove-whatsapp
+Agent: main
+Task: User request — remove WhatsApp chat-to-admin button from deposit flow. Replace with 'Deposit Sedang Diproses' message. User said: 'habis depo otomatis kan ada info mengambang dan ada button whatsaapp nah button whatsaapp yang untuk chat untuk minta persetujuan admin tu hapus jadi kasi deposit sedang di proses atau apa gitu intinya gk usah chat kontak admin'
+
+Work Log:
+- Searched DepositPage.tsx for WhatsApp/chat/admin references
+- Found 3 places with WhatsApp chat-to-admin buttons:
+  1. Success modal (lines 500-507): big green "Chat Admin via WhatsApp" button + subtitle "Auto-kirim Deposit ID & Jumlah ke admin"
+  2. Upload hint (line 985): "Upload bukti transfer/screenshot, atau kirim via WhatsApp setelah submit"
+  3. Deposit history (lines 1069-1074): small "Chat Admin" button on pending deposits
+- Also found handleChatAdmin function (lines 393-406) that opens wa.me link
+- Applied fixes:
+  1. Success modal: replaced WhatsApp button with "Deposit Sedang Diproses" emerald message box with Loader2 spinner. Text: "Deposit Anda sedang dalam antrian proses verifikasi oleh admin. Saldo akan masuk otomatis ke akun Anda setelah deposit disetujui. Mohon tunggu, tidak perlu menghubungi admin."
+  2. Upload hint: changed to "Upload bukti transfer/screenshot untuk mempercepat verifikasi deposit"
+  3. Deposit history: replaced "Chat Admin" button with "Sedang Diproses" badge (yellow, Clock icon)
+  4. Removed dead code: unused Phone + MessageCircle imports, handleChatAdmin function
+- Verified TypeScript: tsc --noEmit shows NO errors in DepositPage.tsx (pre-existing errors in other files only)
+- Created deploy-ui-update.sh: lightweight deploy for frontend-only changes (no profit/cron touch, crash-resistant with trap + build backup)
+- Committed (7c97c43) + pushed to GitHub main
+- Verified deploy-ui-update.sh accessible via raw URL (HTTP 200)
+
+Stage Summary:
+- All 3 WhatsApp chat-to-admin buttons removed from deposit flow
+- Replaced with clear "Sedang Diproses" messaging
+- Users no longer need to contact admin for deposit approval — admin processes in dashboard
+- Deploy command: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
