@@ -1738,3 +1738,47 @@ Stage Summary:
 - Phone display clean: form visible above, tooltip below, demo email shown,
   yellow "Demo OTP: 123456" badge visible
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tour-typing-collapse
+Agent: main
+Task: User request — 'pas tutorial pas isi data diri tu panduan ngambang tu ngehalangin kamu munculin bentar lalu hilang pas step otp baru muncul' — during register form filling, the floating tooltip obstructs the form. User wants: tooltip shows briefly (announce), then HIDES while form is filled, then reappears at OTP step.
+
+Work Log:
+- Problem: During auto-play typing on register/login/deposit/withdraw steps, the
+  full bottom-sheet tooltip (34vh ~200px) sat below the form. While it didn't
+  directly overlap fields, it was visually heavy and the user wanted it GONE
+  during typing so the form is 100% clean for video.
+- Solution: Added "typing phase" collapse behavior:
+  1. Added `isTypingPhase` computed = isAutoPlay && typingLabel !== null && !isPaused && !isCentered
+  2. Increased initial announce delay 700ms → 2000ms (full tooltip shows ~2s
+     so user reads the instruction before it collapses)
+  3. When isTypingPhase=true, render MINIMAL COMPACT BAR instead of full tooltip:
+     - Mobile: thin bar (height ~52px) pinned at bottom above bottom nav
+       Shows: step number badge + "Mengisi: [field]" + progress dots + pause btn
+     - Desktop: thin pill floating at top-center (form beside target fully visible)
+  4. When typing done (typingLabel=null), full tooltip reappears with countdown
+  5. During typing phase, also dim/hide visual aids that point to submit button:
+     - Spotlight glow: opacity 1 → 0.25 (focus on form, not target)
+     - Highlight ring: opacity 1 → 0.35 (faded, not distracting)
+     - Arrow: HIDDEN (points to submit button, irrelevant while filling fields)
+- Verification (Agent Browser + VLM, iPhone 14 viewport):
+  * Started auto-play, waited 13s to reach register-form typing phase
+  * JS eval confirmed: compactVis=true, formField="Bud" (name being typed),
+    title=none (full tooltip h3 GONE — collapsed to compact bar)
+  * VLM analysis of typing-phase screenshot:
+    - "registration form fully visible and not obstructed by a large tooltip" ✓
+    - "small minimal bar at the bottom showing typing progress (not a big tooltip)" ✓
+    - "form field being filled is visible" ✓
+    - "good for recording a video (form clearly visible)" ✓
+- TypeScript: tsc --noEmit clean
+- ESLint: bun run lint clean
+- Committed (736d9b2) + pushed to GitHub main
+
+Stage Summary:
+- Tour tooltip now COLLAPSES during form typing → form 100% visible for video
+- Flow per step: announce (2s full tooltip) → type (compact bar) → done (full tooltip + countdown) → advance
+- At OTP step: full tooltip shows with Demo OTP badge (no typing collapse needed,
+  OTP is the focus)
+- Visual aids (ring/arrow/glow) dim during typing so focus stays on form fields
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
