@@ -437,38 +437,6 @@ export default function PaketPage() {
         </p>
       </motion.div>
 
-      {/* No-duplicates rule banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl p-3 sm:p-4 border border-primary/15 flex items-start gap-3"
-      >
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <Info className="w-4 h-4 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-foreground text-xs sm:text-sm font-semibold mb-0.5">
-            1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki
-          </p>
-          <p className="text-muted-foreground text-[10px] sm:text-xs leading-relaxed">
-            Paket &amp; Produk sama. Beli 1 macam per transaksi — boleh pilih paket
-            mana saja yang <strong>belum dimiliki</strong>, tidak harus berurutan.
-            Setiap paket hanya bisa dibeli sekali. Profit masuk otomatis setiap hari
-            jam 00:00 sesuai paket aktif hari ini.
-          </p>
-          {tierInfo && (
-            <p className="text-emerald-400 text-[10px] sm:text-xs font-medium mt-1.5">
-              {tierInfo.currentTierName
-                ? <>Paket aktif Anda sekarang: <strong>{tierInfo.currentTierName}</strong></>
-                : 'Anda belum punya paket aktif.'}
-              {tierInfo.maxedOut
-                ? ' · Anda sudah memiliki semua paket.'
-                : ` · ${tierInfo.remainingCount} paket lagi bisa dibeli.`}
-            </p>
-          )}
-        </div>
-      </motion.div>
-
       {/* Package Cards Grid */}
       {packages.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
