@@ -1202,3 +1202,245 @@ Stage Summary:
 - Replaced with clear "Sedang Diproses" messaging
 - Users no longer need to contact admin for deposit approval — admin processes in dashboard
 - Deploy command: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: explore-nav-for-tour
+Agent: Explore
+Task: Explore navigation + key elements for Guided Tour feature
+
+Work Log:
+- Read worklog tail (last 50 lines) — context: prior tasks added 20-lang i18n, USDT QR uploads, removed WhatsApp chat from deposit, fixed deploy scripts
+- Read /src/stores/app-store.ts — found navigate() + Page union type + VALID_PAGES set (hash-based router)
+- Read /src/components/nexvo/AppShell.tsx — confirmed page router uses UserHeader + main + bottom spacer; admin pages use AdminHeader
+- Verified /src/components/nexvo/LandingPage.tsx is ORPHANED (grep showed zero importers) — it accepts onLogin/onRegister props but nothing renders it. Real entry for unauthenticated users is LoginPage (AppShell default)
+- Verified /src/components/nexvo/shared/Header.tsx is also ORPHANED (zero importers) — its "Masuk"/"Daftar"/"Panduan" strings are NOT visible in the live app
+- Read /src/components/nexvo/pages/LoginPage.tsx, RegisterPage.tsx, UserDashboard.tsx, PaketPage.tsx, WithdrawPage.tsx, DepositPage.tsx, UserHeader.tsx
+- Grepped entire /src/components for `data-tour` → ZERO matches. Grepped for `id=` in HomePage/UserDashboard → only HomePage section ids (hero/about/how-it-works/products/live/testimonials/guide), no per-button ids
+- Confirmed translation strings in en.ts and id.ts for auth.login, auth.registerNow, dashboard.depositBtn, nav.paket, etc.
+- Researched submit button texts: DepositPage="Deposit Rp …", WithdrawPage="Withdraw Rp …", PaketPage="Invest Sekarang" + confirm dialog "Konfirmasi Invest" or "Deposit & Invest"
+
+Stage Summary:
+
+=== NAVIGATION SYSTEM ===
+File: /src/stores/app-store.ts
+- `navigate(page: Page, data?: Record<string,unknown>)` sets currentPage + pageData, closes sidebars, sets window.location.hash = page, scrolls to top
+- Hash-based router: `initHashListener()` listens for 'hashchange' → back/forward support
+- Initial page from URL hash; defaults to 'login' if no/invalid hash
+
+ALL valid Page identifiers (37 total):
+  Auth: 'home', 'login', 'register', 'otp', 'forgot-password'
+  User: 'dashboard', 'products', 'product-detail', 'deposit', 'withdraw',
+        'bank', 'history', 'settings', 'referral', 'download', 'paket', 'assets',
+        'salary-bonus', 'matching-bonus', 'profit', 'live'
+  Admin: 'admin-login', 'admin-dashboard', 'admin-users', 'admin-products',
+         'admin-deposits', 'admin-withdrawals', 'admin-asset', 'admin-payment',
+         'admin-app', 'admin-banners', 'admin-settings', 'admin-live',
+         'admin-api-keys', 'admin-api-key', 'admin-system', 'admin-appearance',
+         'admin-packages'
+
+=== APPSHELL ===
+File: /src/components/nexvo/AppShell.tsx
+- Reads `currentPage` from store and renders matching page via PAGE_COMPONENTS map
+- Authenticated user layout: `<UserHeader /> + <main>{PageComponent}</main> + <div className="h-[80px] sm:h-20" />` (bottom spacer for mobile bottom nav)
+- Admin layout: `<AdminHeader /> + <main className="lg:ml-[260px]">{PageComponent}</main>`
+- Unauthenticated: full-screen LoginPage/RegisterPage/OTPPage (no header)
+- FLOATING PANDUAN BUTTON PLACEMENT: best position is `fixed bottom-[88px] right-4 sm:right-6 z-50` on authenticated user pages — sits ABOVE the mobile bottom nav (UserHeader's bottom bar is h-[60px] sm:h-[64px] + 8px margin = ~72px, plus the 80px spacer). On desktop it can be `fixed bottom-6 right-6`. Add it once at the AppShell level (inside the auth-user branch) so it appears on every authenticated page.
+
+=== ORPHAN FILES (do NOT use for tour) ===
+- /src/components/nexvo/LandingPage.tsx — ZERO importers (dead code, accepts onLogin/onRegister but never rendered)
+- /src/components/nexvo/shared/Header.tsx — ZERO importers (dead code, its "Masuk"/"Daftar"/"Panduan" labels are NOT in the live app)
+
+=== TOUR TARGETS — per page ===
+
+[Note: NO element has id=, data-tour=, or data-testid= attributes anywhere. Tour MUST either (a) add data-tour="xxx" attributes to targets, or (b) use text-content/role/nth-of-type selectors. Recommended approach: ADD data-tour attributes during tour build — much more robust than text matching across 20 languages.]
+
+────────────
+PAGE: 'login' (default for unauthenticated)
+File: LoginPage.tsx (319 lines)
+- Login method toggle: two buttons "Nomor HP" / "Email" (hardcoded Indonesian)
+- Phone input: `<Input type="tel">` with CountryCodeSelector + placeholder "8123456789"
+- Password input: `<Input type="password">` with placeholder `t('auth.enterPassword')` (EN "Enter your password" / ID "Masukkan password")
+- Submit button: `<Button type="submit">` text = `t('auth.login')` (EN "Login" / ID "Masuk") + ChevronRight icon
+  Suggested selector if NOT adding attrs: `form button[type="submit"]` (only one per page)
+- "Forgot Password?" link: hardcoded English "Forgot Password?" → navigate('forgot-password')
+- Register link: `t('auth.registerNow')` (EN "Register Now" / ID "Daftar Sekarang") → navigate('register')
+  Suggested selector: `button:has-text("Register")` or `button:has-text("Daftar")` (Playwright syntax)
+
+────────────
+PAGE: 'register'
+File: RegisterPage.tsx (393 lines)
+- Fields: Name (Users icon), WhatsApp + CountryCodeSelector (default +62), Email (Mail icon), Password (Lock icon + show/hide eye), Confirm Password (Lock + eye), Referral Code (optional, toggle)
+- Submit button: `<Button type="submit" disabled={loading||!canRegister}>` text = `t('auth.registerNow')` + ChevronRight icon
+  Suggested selector: `form button[type="submit"]`
+- After successful register: `navigate('otp', { email, whatsapp, fromRegister: true })` — user goes to OTP page
+  (Legacy path without verification: `navigate('dashboard')`)
+- Login link: `t('auth.signIn')` → navigate('login')
+
+────────────
+PAGE: 'otp' (after register)
+File: OTPPage.tsx (not deep-read, but flow: user enters email code → on verify → 'home' or 'dashboard')
+- Tour step here: "Check email for OTP code, enter 6 digits, click verify"
+
+────────────
+PAGE: 'home' (authenticated landing)
+File: HomePage.tsx (1878 lines) — actual landing page shown after login
+- Has section ids: #hero, #about, #how-it-works, #products, #live, #testimonials, #guide
+- Main CTA buttons all call `navigate('products')` (NOT 'paket' or 'deposit' directly):
+  • Line ~268: "Mulai Investasi" hero button → navigate('products')
+  • Line ~496: `t('landing.startInvestNow')` button → navigate('products')
+  • Line ~805: per-product CTA → navigate('product-detail', { productId })
+- For tour, "Deposit" / "Withdraw" / "Paket" entry points live in UserDashboard ('dashboard' page) or UserHeader nav, NOT on HomePage. Recommend tour navigates user to 'dashboard' before highlighting Deposit/Withdraw/Paket.
+
+────────────
+PAGE: 'dashboard' (UserDashboard)
+File: UserDashboard.tsx (723 lines) — RECOMMENDED TOUR HUB for Deposit/Withdraw/Paket
+- Quick Actions section (lines 541-557): two side-by-side buttons in `grid grid-cols-2`:
+  • Deposit button: `<Button onClick={() => navigate('deposit')}>` with `<ArrowDownCircle>` icon + text `t('dashboard.depositBtn')` (EN/ID varies — check dashboard.depositBtn in locale files)
+  • Withdraw button: `<Button onClick={() => navigate('withdraw')}>` with `<ArrowUpCircle>` icon + text `t('dashboard.withdrawBtn')`
+  Suggested selectors (if no data-tour added): the 2 buttons inside `.grid.grid-cols-2` — use `:nth-child(1)` for Deposit, `:nth-child(2)` for Withdraw
+- Quick Nav grid (lines 587-607): 5 buttons in `grid grid-cols-3 sm:grid-cols-5`:
+  • Products (ShoppingBag) → navigate('products')
+  • Assets (Package) → navigate('assets')
+  • Paket (Receipt, label `t('nav.paket')` → EN "Packages" / ID "Paket") → navigate('paket')
+  • Bank (Shield) → navigate('bank')
+  • History (Clock) → navigate('history')
+
+────────────
+PAGE: 'deposit'
+File: DepositPage.tsx (1088 lines) — 3-step form
+- Step 1: Nominal (amount input)
+- Step 2: Bayar (payment method QRIS/USDT/bank/ewallet, "Lanjut Upload Bukti" button to step 3)
+- Step 3: Bukti (upload proof image, final submit)
+- FINAL SUBMIT button (line 1004): `<Button type="submit" disabled={submitting || uploadingProof}>` text = `Deposit {formatRupiah(numAmount)}` (e.g., "Deposit Rp 100.000") with ArrowDownCircle icon
+  Suggested selector: `form button[type="submit"]`
+- On success: shows modal "Deposit Sedang Diproses" (no WhatsApp button — removed by prior task)
+- Min deposit: Rp 100.000
+
+────────────
+PAGE: 'paket'
+File: PaketPage.tsx (521 lines) — list of investment packages
+- Each package card has "Invest Sekarang" button (line 189): `<Button onClick={() => onInvest(pkg)}>` with Wallet icon + hardcoded text "Invest Sekarang"
+  Suggested selector: buttons containing text "Invest Sekarang"
+- Clicking opens a confirm Dialog:
+  • If user has enough balance (depositBalance + mainBalance ≥ pkg.amount): button text "Konfirmasi Invest" (with CheckCircle2 icon) → calls /api/investments POST
+  • If insufficient balance: button text "Deposit & Invest" (with Wallet icon) → calls `navigate('deposit', { amount, purpose: 'investment', packageId, packageName })`
+- Cancel button: "Batal"
+- Success dialog: "Lihat Aset Saya" button → navigate('assets')
+
+────────────
+PAGE: 'withdraw'
+File: WithdrawPage.tsx (1000 lines)
+- Main balance card shows current MainBalance + min/max/fee (10%)
+- Category tabs: Bank / E-Wallet / USDT (selectedCategory state)
+- Amount input + preset buttons (Rp 100k, 200k, 500k, 1M, 2M, 5M)
+- SUBMIT button (line 914): `<Button type="submit" disabled={submitting || !isFormValid()}>` text = `Withdraw {formatRupiah(numAmount)}` (e.g., "Withdraw Rp 100.000") with ArrowUpCircle icon
+  Suggested selector: `form button[type="submit"]`
+- On success: shows "Withdrawal Diterima!" modal with Withdrawal ID
+- Restrictions: weekdays only 09:00-16:00 WIB, min Rp 100k, max = last package amount, blocked if pending withdrawal exists, blocked if no package purchased
+
+=== HEADER (UserHeader.tsx — actual live header for auth users) ===
+File: /src/components/nexvo/UserHeader.tsx (456 lines)
+- Desktop top header (hidden md:block): logo + 13 nav buttons (desktopNavKeys) + ThemeToggle + NotificationBell + LanguageSwitcher + user info + Settings + Logout
+- Mobile top bar (md:hidden): logo + level badge + ThemeToggle + sidebar toggle (hamburger)
+- Mobile sidebar (slides from right): same 13 nav items + LanguageSwitcher + Settings + Logout
+- MOBILE BOTTOM NAV (fixed bottom): 5 items — Home, Assets, Products (center, elevated gold), Wallet (=deposit, Wallet icon), Profile (=settings)
+- NO ids/data-tour on any nav button
+- Nav items use `t(item.key)` so labels vary by language
+
+=== KEY BUTTON TEXT SUMMARY (for tour tooltips) ===
+| Step | Page | Button Text | i18n Key | Navigates To |
+|------|------|-------------|----------|--------------|
+| Register | login | "Register Now" / "Daftar Sekarang" | auth.registerNow | navigate('register') |
+| Submit Register | register | "Register Now" / "Daftar Sekarang" | auth.registerNow | navigate('otp') |
+| Verify OTP | otp | (verify button) | — | navigate('home' or 'dashboard') |
+| Login | login | "Login" / "Masuk" | auth.login | navigate('home') |
+| Deposit | dashboard | "Deposit" (dashboard.depositBtn) | dashboard.depositBtn | navigate('deposit') |
+| Submit Deposit | deposit | "Deposit Rp X.XXX" (hardcoded) | — | API call → modal |
+| Buy Package | paket | "Invest Sekarang" (hardcoded) | — | opens confirm dialog |
+| Confirm Buy | paket dialog | "Konfirmasi Invest" or "Deposit & Invest" | — | API call → success dialog |
+| Withdraw | dashboard | "Withdraw" (dashboard.withdrawBtn) | dashboard.withdrawBtn | navigate('withdraw') |
+| Submit Withdraw | withdraw | "Withdraw Rp X.XXX" (hardcoded) | — | API call → modal |
+
+=== RECOMMENDED TOUR ARCHITECTURE ===
+1. Add a `<GuidedTour>` component rendered inside AppShell's authenticated-user branch (after <main>) — fixed-position floating "Panduan" button bottom-right.
+2. Tour uses `navigate(page)` to switch pages between steps (waits for page mount + small delay before highlighting target).
+3. STRONGLY RECOMMENDED: Add `data-tour="..."` attributes to each target button during the tour build. Text-based selectors will break across 20 languages. Suggested attrs:
+   - data-tour="register-link" (LoginPage register link)
+   - data-tour="register-submit" (RegisterPage submit)
+   - data-tour="otp-input" / data-tour="otp-submit"
+   - data-tour="login-link" (RegisterPage back-to-login) — for tour reverse flow
+   - data-tour="login-submit" (LoginPage submit)
+   - data-tour="deposit-btn" (UserDashboard quick action)
+   - data-tour="withdraw-btn" (UserDashboard quick action)
+   - data-tour="paket-btn" (UserDashboard quick nav)
+   - data-tour="deposit-submit" (DepositPage step-3 submit)
+   - data-tour="paket-invest" (PaketPage per-card invest button)
+   - data-tour="paket-confirm" (PaketPage confirm dialog)
+   - data-tour="withdraw-submit" (WithdrawPage submit)
+4. Floating "Panduan" button placement: `fixed bottom-[88px] right-4 sm:bottom-6 sm:right-6 z-50` — clears mobile bottom nav (60-64px tall + 8px margin). Tour overlay itself uses `z-[60]` to sit above UserHeader (z-40) and bottom nav (z-40).
+5. Tour flow: login page → click "Register" → fill demo fields → submit → OTP page (skip verification, just point at input) → navigate('login') → fill demo → submit → land on home → navigate('dashboard') → highlight Deposit → navigate('deposit') → highlight submit → navigate('dashboard') → highlight Paket → navigate('paket') → highlight "Invest Sekarang" → navigate('dashboard') → highlight Withdraw → navigate('withdraw') → highlight submit → done.
+6. NONE of the existing buttons have ids — minimal-risk approach is to add data-tour attrs (one attribute per target button) rather than refactoring className/structure.
+
+=== FILES THE TOUR BUILDER WILL NEED TO TOUCH ===
+- NEW: /src/components/nexvo/GuidedTour.tsx (tour overlay + tooltip + arrow + step state)
+- NEW: /src/stores/tour-store.ts (zustand: currentStep, isActive, startTour, nextStep, prevStep, skipTour)
+- EDIT: /src/components/nexvo/AppShell.tsx (render <GuidedTour/> floating button + overlay in auth-user branch)
+- EDIT: LoginPage.tsx — add data-tour attrs to register-link + login-submit
+- EDIT: RegisterPage.tsx — add data-tour attrs to fields + register-submit + login-link
+- EDIT: OTPPage.tsx — add data-tour attrs (need to read this file first during tour build)
+- EDIT: UserDashboard.tsx — add data-tour attrs to deposit-btn, withdraw-btn, paket-btn
+- EDIT: DepositPage.tsx — add data-tour attr to final submit button
+- EDIT: PaketPage.tsx — add data-tour attrs to "Invest Sekarang" button + confirm dialog button
+- EDIT: WithdrawPage.tsx — add data-tour attr to submit button
+
+=== i18n NOTES ===
+- Default language is English (per Task 1)
+- Login submit shows "Login" (EN) / "Masuk" (ID)
+- Register submit shows "Register Now" (EN) / "Daftar Sekarang" (ID)
+- Dashboard quick action labels: `t('dashboard.depositBtn')`, `t('dashboard.withdrawBtn')` — values vary per locale (verify in locale files before building)
+- "Invest Sekarang", "Konfirmasi Invest", "Deposit & Invest", "Batal", "Lihat Aset Saya" in PaketPage are HARDCODED Indonesian (not i18n-wrapped) — these are stable regardless of language
+- "Deposit Rp X" and "Withdraw Rp X" submit button texts are HARDCODED format strings — stable across languages
+
+
+---
+Task ID: guided-tour-feature
+Agent: main
+Task: User request — add on-screen guided instructions (arrows) for registrasi → investasi → deposit → withdraw flow. User wants to record a video following the on-screen guidance. 'di web kasi petunjuk kayak araham mulai registrasi dan cara investasi depo windraw nanti aku mau record gitu buat vidio caranya namun di web nanti kasi arahan jadi aku tinggal vidio dan ikuti aja paham kann'
+
+Work Log:
+- Launched Explore subagent to map navigation system + find target elements across 10 page files
+- Findings: 37 valid page identifiers, navigate() in app-store, NO data-tour attributes existed anywhere, LandingPage/Header.tsx are orphans (LoginPage is real entry)
+- Created src/stores/tour-store.ts: Zustand store with 12 tour steps, localStorage persistence (nexvo-tour-completed flag)
+- Created src/components/nexvo/GuidedTour.tsx: Full tour overlay component
+  * Floating gold "Panduan" button (bottom-right, pulse animation, z-40)
+  * Welcome modal (auto-show after 1.2s on first login page visit, dismissible)
+  * 12-step walkthrough with tooltips + arrows
+  * Dark backdrop with clip-path cutout around highlighted target
+  * Gold highlight ring (box-shadow) + animated arrow (auto-direction: up/down/left/right)
+  * Progress bar, Next/Prev/Skip controls, step counter
+  * Auto-navigates to correct page per step via useAppStore.navigate()
+  * Auto-flips tooltip placement if viewport space insufficient
+  * Scrolls target into view, re-positions on resize/scroll
+  * Polls for target element after navigation (300ms + 800ms reposition)
+  * Premium dark+gold styling matching Nexvo theme (glass-strong, gold-gradient, glow-gold)
+- Modified AppShell.tsx: wrapper pattern — renamed inner function to AppShellInner, export wrapper that renders <AppShellInner /> + <GuidedTour /> so tour is global on all pages
+- Added data-tour attributes to 7 page files:
+  * LoginPage: data-tour="login-submit", data-tour="register-link"
+  * RegisterPage: data-tour="register-submit"
+  * OTPPage: data-tour="otp-input"
+  * UserDashboard: data-tour="deposit-btn", data-tour="withdraw-btn", data-tour="paket-btn"
+  * DepositPage: data-tour="deposit-submit"
+  * PaketPage: data-tour="paket-invest"
+  * WithdrawPage: data-tour="withdraw-submit"
+- Fixed 2 TS errors: added bottom+right to TargetRect interface
+- Verified: tsc --noEmit shows NO errors in tour-related files
+- Verified: dev server compiles and serves GET / → 200
+- Committed (1a631d0) + pushed to GitHub main
+
+Stage Summary:
+- Guided Tour feature complete: 12-step interactive walkthrough
+- User can click "Panduan" button (bottom-right) → welcome modal → step-by-step with arrows
+- Tour auto-navigates through: Login → Register → OTP → Login → Dashboard → Deposit → Dashboard → Paket → Dashboard → Withdraw → Done
+- Each step shows tooltip with title + description + arrow pointing to target button
+- Ready for video recording — user follows arrows on screen
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
