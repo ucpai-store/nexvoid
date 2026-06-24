@@ -8,11 +8,13 @@ export interface TourStep {
   selector?: string; // data-tour attribute value (omit = centered modal)
   title: string;
   description: string;
+  /** Short narration text spoken by TTS voice (Indonesian). Keep concise. */
+  narration: string;
   placement?: 'bottom' | 'top' | 'left' | 'right' | 'center';
-  waitForNavigation?: boolean; // if true, wait for page to load before showing
+  waitForNavigation?: boolean;
   /** Demo fields to auto-type in auto-play mode */
   demoFields?: { selector: string; value: string; label?: string }[];
-  /** Auto-play delay (ms) after typing/arrival before advancing. Default 3500 */
+  /** Auto-play delay (ms) after typing/arrival before advancing. Default 6000 */
   autoAdvanceDelay?: number;
   /** Page data to pass when navigating (e.g. email for OTP page) */
   pageData?: Record<string, unknown>;
@@ -26,6 +28,7 @@ interface TourState {
   hasCompleted: boolean;
   isAutoPlay: boolean;
   isPaused: boolean;
+  isVoiceEnabled: boolean;
   start: () => void;
   startAutoPlay: () => void;
   next: () => void;
@@ -36,6 +39,8 @@ interface TourState {
   togglePause: () => void;
   setAutoPlay: (v: boolean) => void;
   stopAutoPlay: () => void;
+  toggleVoice: () => void;
+  setVoiceEnabled: (v: boolean) => void;
 }
 
 const STORAGE_KEY = 'nexvo-tour-completed';
@@ -46,27 +51,33 @@ export const TOUR_STEPS: TourStep[] = [
     page: 'login',
     title: '👋 Selamat Datang di NEXVO!',
     description:
-      'Panduan ini akan menuntun Anda langkah demi langkah: REGISTRASI → LOGIN → DEPOSIT → INVESTASI → WITHDRAW. Aktifkan "Mode Demo Otomatis" agar form terisi sendiri — tinggal rekam video!',
+      'Halo! Selamat datang di NEXVO. Ikuti panduan ini untuk mendaftar akun. Klik "Mode Demo Otomatis" agar form terisi sendiri — tinggal rekam video!',
+    narration:
+      'Selamat datang di Nekvo. Ikuti panduan ini untuk mendaftar akun Anda. Pilih mode demo otomatis agar form terisi sendiri, dan Anda tinggal merekam video.',
     placement: 'center',
-    autoAdvanceDelay: 5000,
+    autoAdvanceDelay: 8000,
   },
   {
     id: 'register-link',
     page: 'login',
     selector: 'register-link',
-    title: 'Langkah 1: Daftar Akun Baru',
+    title: 'Langkah 1: Klik Daftar',
     description:
-      'Klik tombol "Daftar Sekarang" untuk membuat akun NEXVO Anda. Jika sudah punya akun, langsung login saja.',
+      'Klik tombol "Daftar Sekarang" untuk mulai membuat akun NEXVO Anda.',
+    narration:
+      'Langkah pertama. Klik tombol daftar sekarang untuk mulai membuat akun Nekvo Anda.',
     placement: 'bottom',
-    autoAdvanceDelay: 3500,
+    autoAdvanceDelay: 6000,
   },
   {
     id: 'register-form',
     page: 'register',
     selector: 'register-submit',
-    title: 'Langkah 2: Isi Data Registrasi',
+    title: 'Langkah 2: Isi Data Diri',
     description:
-      'Isi form: Nama lengkap, Nomor WhatsApp (format +62), Email aktif, Password, dan Kode Referral (jika ada). Setelah lengkap, klik tombol "Daftar Sekarang" di bawah.',
+      'Isi data diri Anda: Nama lengkap, Nomor WhatsApp, Email aktif, Password, dan ulangi password. Setelah lengkap, klik tombol "Daftar Sekarang".',
+    narration:
+      'Langkah kedua. Isi data diri Anda. Nama lengkap. Nomor WhatsApp. Email aktif. Password, dan ulangi password. Setelah lengkap, klik tombol daftar sekarang.',
     placement: 'top',
     demoFields: [
       { selector: 'input[placeholder="Masukkan nama pengguna"]', value: 'Budi Santoso', label: 'Nama' },
@@ -75,112 +86,35 @@ export const TOUR_STEPS: TourStep[] = [
       { selector: 'input[placeholder="Ketik password"]', value: 'Budi1234!', label: 'Password' },
       { selector: 'input[placeholder="Ulangi password"]', value: 'Budi1234!', label: 'Konfirmasi' },
     ],
-    autoAdvanceDelay: 2500,
+    autoAdvanceDelay: 5000,
   },
   {
     id: 'otp-verify',
     page: 'otp',
     selector: 'otp-input',
-    title: 'Langkah 3: Verifikasi OTP',
+    title: 'Langkah 3: Masukkan Kode OTP',
     description:
-      'Cek email/WhatsApp Anda untuk kode OTP. Masukkan kode 6 digit di kolom ini. Setelah verifikasi, akun Anda aktif dan bisa login. (Demo: kode otomatis diketik)',
+      'Cek email Anda untuk kode OTP. Masukkan kode 6 digit yang dikirim ke email di kolom ini. Setelah verifikasi, akun Anda aktif.',
+    narration:
+      'Langkah ketiga. Cek email Anda untuk kode O T P. Masukkan kode enam digit yang dikirim ke email, di kolom ini. Setelah verifikasi, akun Anda aktif.',
     placement: 'top',
     demoFields: [
       { selector: 'input[data-tour="otp-input"]', value: '123456', label: 'Kode OTP' },
     ],
     pageData: { email: 'budi@gmail.com', whatsapp: '8123456789', fromRegister: true },
     demoOtpHint: 'Demo OTP: 123456',
-    autoAdvanceDelay: 4500,
-  },
-  {
-    id: 'login-form',
-    page: 'login',
-    selector: 'login-submit',
-    title: 'Langkah 4: Login ke Akun',
-    description:
-      'Masukkan Email/WhatsApp + Password yang tadi dibuat, lalu klik "Masuk". Anda akan masuk ke Dashboard.',
-    placement: 'top',
-    demoFields: [
-      { selector: 'input[placeholder="your@email.com"]', value: 'budi@gmail.com', label: 'Email' },
-      { selector: 'input[placeholder="8123456789"]', value: '8123456789', label: 'WhatsApp' },
-      { selector: 'input[placeholder="Ketik password"]', value: 'Budi1234!', label: 'Password' },
-    ],
-    autoAdvanceDelay: 2500,
-  },
-  {
-    id: 'dashboard-deposit',
-    page: 'dashboard',
-    selector: 'deposit-btn',
-    title: 'Langkah 5: Deposit Saldo',
-    description:
-      'Setelah login, di Dashboard klik tombol "Deposit" untuk top-up saldo pertama Anda. Saldo ini dipakai untuk beli paket investasi.',
-    placement: 'bottom',
-    autoAdvanceDelay: 4000,
-  },
-  {
-    id: 'deposit-form',
-    page: 'deposit',
-    selector: 'deposit-submit',
-    title: 'Langkah 6: Isi Form Deposit',
-    description:
-      '1) Masukkan nominal (min Rp100.000). 2) Pilih metode: QRIS / USDT / Bank. 3) Upload bukti transfer. 4) Klik tombol "Deposit RpX". Admin akan verifikasi, saldo masuk otomatis setelah disetujui.',
-    placement: 'top',
-    demoFields: [
-      { selector: 'input[placeholder="0"]', value: '500000', label: 'Nominal' },
-    ],
-    autoAdvanceDelay: 3000,
-  },
-  {
-    id: 'dashboard-paket',
-    page: 'dashboard',
-    selector: 'paket-btn',
-    title: 'Langkah 7: Pilih Paket Investasi',
-    description:
-      'Setelah saldo masuk, kembali ke Dashboard lalu klik "Paket" untuk melihat daftar paket investasi yang tersedia.',
-    placement: 'bottom',
-    autoAdvanceDelay: 4000,
-  },
-  {
-    id: 'paket-invest',
-    page: 'paket',
-    selector: 'paket-invest',
-    title: 'Langkah 8: Beli Paket Investasi',
-    description:
-      'Pilih paket yang sesuai budget Anda, lalu klik "Invest Sekarang". Konfirmasi pembelian — saldo akan terpotong otomatis dan paket langsung AKTIF. Profit harian masuk jam 00:00 WIB setiap hari kerja.',
-    placement: 'bottom',
-    autoAdvanceDelay: 4500,
-  },
-  {
-    id: 'dashboard-withdraw',
-    page: 'dashboard',
-    selector: 'withdraw-btn',
-    title: 'Langkah 9: Tarik Profit (Withdraw)',
-    description:
-      'Untuk mencairkan profit/saldo, klik tombol "Withdraw" di Dashboard. Withdraw hanya bisa dilakukan di hari kerja (Senin-Jumat) jam 09:00-16:00 WIB.',
-    placement: 'bottom',
-    autoAdvanceDelay: 4000,
-  },
-  {
-    id: 'withdraw-form',
-    page: 'withdraw',
-    selector: 'withdraw-submit',
-    title: 'Langkah 10: Isi Form Withdraw',
-    description:
-      '1) Pilih kategori: Bank / E-Wallet / USDT. 2) Pilih rekening tujuan. 3) Masukkan nominal (max = nilai paket terakhir). 4) Klik "Withdraw RpX". Ada potongan fee 10%. Dana masuk 1×24 jam kerja.',
-    placement: 'top',
-    demoFields: [
-      { selector: 'input[placeholder="0"]', value: '100000', label: 'Nominal' },
-    ],
-    autoAdvanceDelay: 3000,
+    autoAdvanceDelay: 7000,
   },
   {
     id: 'done',
-    page: 'dashboard',
+    page: 'login',
     title: '🎉 Panduan Selesai!',
     description:
-      'Selamat! Anda sudah tahu alur lengkap NEXVO: Registrasi → Deposit → Investasi → Withdraw. Untuk memulai panduan lagi, klik tombol "Panduan" di pojok kanan bawah. Selamat berinvestasi! 🚀',
+      'Selesai! Akun Anda sudah aktif. Untuk memulai panduan lagi, klik tombol "Panduan" di pojok kanan bawah. Selamat bergabung dengan NEXVO!',
+    narration:
+      'Panduan selesai. Akun Anda sudah aktif. Untuk memulai panduan lagi, klik tombol panduan di pojok kanan bawah. Selamat bergabung dengan Nekvo.',
     placement: 'center',
-    autoAdvanceDelay: 6000,
+    autoAdvanceDelay: 8000,
   },
 ];
 
@@ -190,6 +124,7 @@ export const useTourStore = create<TourState>((set, get) => ({
   hasCompleted: false,
   isAutoPlay: false,
   isPaused: false,
+  isVoiceEnabled: true,
 
   start: () => {
     set({ isActive: true, currentStep: 0, isAutoPlay: false, isPaused: false });
@@ -232,6 +167,21 @@ export const useTourStore = create<TourState>((set, get) => ({
   },
   stopAutoPlay: () => {
     set({ isAutoPlay: false, isPaused: false });
+  },
+  toggleVoice: () => {
+    set((s) => {
+      const next = !s.isVoiceEnabled;
+      if (!next && typeof window !== 'undefined') {
+        window.speechSynthesis?.cancel();
+      }
+      return { isVoiceEnabled: next };
+    });
+  },
+  setVoiceEnabled: (v: boolean) => {
+    set({ isVoiceEnabled: v });
+    if (!v && typeof window !== 'undefined') {
+      window.speechSynthesis?.cancel();
+    }
   },
 }));
 

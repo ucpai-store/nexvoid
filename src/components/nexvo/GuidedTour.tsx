@@ -17,6 +17,8 @@ import {
   Radio,
   Type,
   Shield,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useTourStore, TOUR_STEPS } from '@/stores/tour-store';
 import { useAppStore } from '@/stores/app-store';
@@ -37,7 +39,7 @@ interface TargetRect {
 async function typeIntoInput(
   selector: string,
   value: string,
-  charDelay = 55
+  charDelay = 90
 ): Promise<void> {
   const input = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null;
   if (!input) return;
@@ -67,6 +69,7 @@ export default function GuidedTour() {
     currentStep,
     isAutoPlay,
     isPaused,
+    isVoiceEnabled,
     start,
     startAutoPlay,
     next,
@@ -74,6 +77,7 @@ export default function GuidedTour() {
     skip,
     togglePause,
     stopAutoPlay,
+    toggleVoice,
   } = useTourStore();
   const { currentPage, navigate } = useAppStore();
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
@@ -115,6 +119,60 @@ export default function GuidedTour() {
       document.body.style.transition = '';
     };
   }, [isActive, isMobile]);
+
+  // ─── TTS Voice Guidance ───
+  // Speaks the step's narration text in Indonesian using the browser's
+  // built-in SpeechSynthesis API (no backend/API key needed).
+  // Speech is cancelled when: step changes, tour ends, paused, or voice toggled off.
+  useEffect(() => {
+    if (!isActive || !step || !isVoiceEnabled) return;
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    // Cancel any ongoing speech before starting new
+    window.speechSynthesis.cancel();
+
+    // Small delay so it doesn't conflict with page navigation
+    const timer = setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(step.narration);
+      utterance.lang = 'id-ID';
+      utterance.rate = 0.92; // slightly slower than normal (don't rush)
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      // Try to find an Indonesian voice
+      const voices = window.speechSynthesis.getVoices();
+      const idVoice =
+        voices.find((v) => v.lang === 'id-ID') ||
+        voices.find((v) => v.lang.startsWith('id'));
+      if (idVoice) utterance.voice = idVoice;
+
+      window.speechSynthesis.speak(utterance);
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+      window.speechSynthesis?.cancel();
+    };
+  }, [isActive, currentStep, isVoiceEnabled, step]);
+
+  // Cancel speech when tour is paused
+  useEffect(() => {
+    if (isPaused && typeof window !== 'undefined') {
+      window.speechSynthesis?.cancel();
+    }
+  }, [isPaused]);
+
+  // Cancel speech when tour ends/skips
+  useEffect(() => {
+    if (!isActive && typeof window !== 'undefined') {
+      window.speechSynthesis?.cancel();
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.speechSynthesis?.cancel();
+      }
+    };
+  }, [isActive]);
 
   // ─── Show floating button if tour not active and user hasn't dismissed ───
   useEffect(() => {
@@ -277,9 +335,10 @@ export default function GuidedTour() {
 
     let cancelled = false;
     const runStep = async () => {
-      // Wait for page to settle + let full tooltip announce the step (~2s)
-      // so user sees the instruction before tooltip collapses for typing
-      await new Promise((r) => setTimeout(r, 2000));
+      // Wait for page to settle + let voice finish speaking the narration (~4s)
+      // so user hears the instruction before tooltip collapses for typing.
+      // Don't rush — user needs time to read + listen.
+      await new Promise((r) => setTimeout(r, 4000));
       if (cancelled || typeCancelRef.current) return;
 
       // Type demo fields one by one (with visible label)
@@ -417,15 +476,15 @@ export default function GuidedTour() {
                   Selamat Datang di NEXVO! 👋
                 </h2>
                 <p className="text-muted-foreground text-xs sm:text-sm mb-4 sm:mb-5 px-2">
-                  Baru di NEXVO? Ikuti panduan interaktif untuk tahu cara:
+                  Ikuti panduan cara mendaftar akun NEXVO (4 langkah):
                 </p>
 
-                <div className="grid grid-cols-1 gap-2 mb-5 sm:mb-6 text-left">
+                <div className="grid grid-cols-1 gap-2 mb-4 sm:mb-5 text-left">
                   {[
-                    { n: '1', t: 'Registrasi Akun', c: 'bg-yellow-400/15 text-yellow-400' },
-                    { n: '2', t: 'Deposit Saldo', c: 'bg-emerald-400/15 text-emerald-400' },
-                    { n: '3', t: 'Beli Paket Investasi', c: 'bg-cyan-400/15 text-cyan-400' },
-                    { n: '4', t: 'Withdraw Profit', c: 'bg-purple-400/15 text-purple-400' },
+                    { n: '1', t: 'Klik Daftar', c: 'bg-yellow-400/15 text-yellow-400' },
+                    { n: '2', t: 'Isi Data Diri', c: 'bg-emerald-400/15 text-emerald-400' },
+                    { n: '3', t: 'Masukkan Kode OTP', c: 'bg-cyan-400/15 text-cyan-400' },
+                    { n: '4', t: 'Selesai!', c: 'bg-purple-400/15 text-purple-400' },
                   ].map((s) => (
                     <div key={s.n} className="flex items-center gap-3 glass rounded-xl p-2.5 sm:p-3 border border-white/5">
                       <div className={`w-8 h-8 rounded-full ${s.c} flex items-center justify-center font-bold text-sm shrink-0`}>
@@ -461,8 +520,9 @@ export default function GuidedTour() {
                 >
                   Nanti saja
                 </button>
-                <p className="text-muted-foreground/60 text-[10px] mt-3 leading-relaxed">
-                  Mode Demo Otomatis: form terisi sendiri + langkah jalan otomatis. Tinggal rekam! 🎥
+                <p className="text-muted-foreground/60 text-[10px] mt-3 leading-relaxed flex items-center justify-center gap-1.5">
+                  <Volume2 className="w-3 h-3 text-yellow-400 shrink-0" />
+                  Dengan suara panduan · form terisi sendiri · tinggal rekam! 🎥
                 </p>
               </div>
             </motion.div>
@@ -649,13 +709,27 @@ export default function GuidedTour() {
                           </p>
                         )}
                       </div>
-                      <button
-                        onClick={skip}
-                        className="text-muted-foreground hover:text-foreground p-1 -mt-1 -mr-1 shrink-0"
-                        aria-label="Tutup panduan"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-0.5 shrink-0 -mt-1 -mr-1">
+                        <button
+                          onClick={toggleVoice}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            isVoiceEnabled
+                              ? 'text-yellow-400 hover:bg-yellow-400/10'
+                              : 'text-muted-foreground hover:bg-white/5'
+                          }`}
+                          aria-label={isVoiceEnabled ? 'Matikan suara' : 'Nyalakan suara'}
+                          title={isVoiceEnabled ? 'Matikan suara' : 'Nyalakan suara'}
+                        >
+                          {isVoiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={skip}
+                          className="text-muted-foreground hover:text-foreground p-1.5"
+                          aria-label="Tutup panduan"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Description */}
