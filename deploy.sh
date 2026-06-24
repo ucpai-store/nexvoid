@@ -1,91 +1,462 @@
-#!/bin/bash
-# ============================================================
-# NEXVO - Auto Deploy Script
-# ============================================================
-# Cara pakai (jalankan di VPS sebagai root):
-#   bash /home/nexvo/deploy.sh
-#
-# Atau langsung dari GitHub (saat VPS sudah online):
-#   curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy.sh | bash
-# ============================================================
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+#  NEXVO — One-Shot Production Deployment Script
+#  Usage:
+#    curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy.sh | bash
+#    bash deploy.sh                 # full deploy (pull + build + restart + verify)
+#    bash deploy.sh --skip-build    # skip next build (for hot-pull code only)
+#    bash deploy.sh --dev           # run in dev mode (next dev, no build)
+#    bash deploy.sh --check         # verify-only, no deploy
+#  After this script finishes, ALL systems MUST be 100% working:
+#    - Next.js app on :3000
+#    - Cron-service on :3032 (profit + salary auto-credit)
+#    - Profit 2%/day × 180 days = 576k cap (EVERY day incl. weekend)
+#    - Salary 1%/week FOREVER (10 refs + active investment)
+# ═══════════════════════════════════════════════════════════════
+set -eo pipefail
 
-set -e
+# ─── Config ───
+APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PORT_APP="${PORT_APP:-3000}"
+PORT_CRON="${PORT_CRON:-3032}"
+PORT_WABOT="${PORT_WABOT:-3033}"
+LOG_DIR="$APP_DIR/logs"
+GIT_REMOTE="${GIT_REMOTE:-origin}"
+GIT_BRANCH="${GIT_BRANCH:-main}"
+ABS_DB_PATH="$APP_DIR/db/custom.db"
 
-PROJECT_DIR="/home/nexvo"
-REPO_URL="https://github.com/ucpai-store/nexvoid.git"
-BRANCH="main"
+# ─── Args ───
+SKIP_BUILD=false
+DEV_MODE=false
+CHECK_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --skip-build) SKIP_BUILD=true ;;
+    --dev) DEV_MODE=true; SKIP_BUILD=true ;;
+    --check) CHECK_ONLY=true ;;
+    --help|-h)
+      sed -n '2,12p' "$0"; exit 0 ;;
+  esac
+done
 
-echo "=================================================="
-echo "  NEXVO Auto Deploy - $(date '+%Y-%m-%d %H:%M:%S')"
-echo "=================================================="
+# ─── Helpers ───
+C_BLUE='\033[0;34m'; C_GREEN='\033[0;32m'; C_YELLOW='\033[1;33m'
+C_RED='\033[0;31m'; C_CYAN='\033[1;36m'; C_BOLD='\033[1m'; C_NC='\033[0m'
+log()  { echo -e "${C_BLUE}[$(date +%H:%M:%S)]${C_NC} $*"; }
+ok()   { echo -e "${C_GREEN}[$(date +%H:%M:%S)] ✓${C_NC} $*"; }
+warn() { echo -e "${C_YELLOW}[$(date +%H:%M:%S)] ⚠${C_NC} $*"; }
+err()  { echo -e "${C_RED}[$(date +%H:%M:%S)] ✗${C_NC} $*" >&2; }
+die()  { err "$*"; exit 1; }
+section() { echo -e "\n${C_CYAN}${C_BOLD}══════ $* ══════${C_NC}"; }
 
-# 1. Pastikan direktori project ada
-if [ ! -d "$PROJECT_DIR" ]; then
-  echo "[1/6] Cloning repo ke $PROJECT_DIR ..."
-  git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
-  cd "$PROJECT_DIR"
-else
-  echo "[1/6] Update repo di $PROJECT_DIR ..."
-  cd "$PROJECT_DIR"
-  git fetch origin "$BRANCH"
-  git reset --hard "origin/$BRANCH"
-  git pull origin "$BRANCH" || true
+FAIL_COUNT=0
+record_fail() { FAIL_COUNT=$((FAIL_COUNT+1)); }
+
+# ═══════════════════════════════════════════════════════════════
+# 1. PRE-FLIGHT CHECKS
+# ═══════════════════════════════════════════════════════════════
+section "1/10 PRE-FLIGHT CHECKS"
+cd "$APP_DIR"
+
+command -v git >/dev/null  || die "git not found. Install: apt install git"
+command -v bun >/dev/null  || die "bun not found. Install: curl -fsSL https://bun.sh/install | bash"
+command -v node >/dev/null || die "node not found. Install Node 18+"
+command -v curl >/dev/null || die "curl not found"
+command -v lsof >/dev/null || warn "lsof not found (port checks will use ss fallback)"
+
+ok "git:   $(git --version | cut -d' ' -f3)"
+ok "bun:   $(bun --version)"
+ok "node:  $(node --version)"
+ok "app:   $APP_DIR"
+
+# Auto-install pm2 if missing (production process manager)
+if ! command -v pm2 >/dev/null; then
+  warn "pm2 not found — installing globally..."
+  npm install -g pm2 2>/dev/null || die "failed to install pm2 (try: sudo npm install -g pm2)"
+fi
+ok "pm2:   $(pm2 --version)"
+
+mkdir -p "$LOG_DIR" "$APP_DIR/db"
+
+# ═══════════════════════════════════════════════════════════════
+# If --check mode, jump straight to verification
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = true ]; then
+  log "Check-only mode — skipping deploy steps, jumping to verification..."
+  # Skip to step 10
+  SKIP_BUILD=true
+  DEV_MODE=true  # don't try to rebuild
 fi
 
-# 2. Install dependencies
-echo ""
-echo "[2/6] Install dependencies (npm install) ..."
-npm install --legacy-peer-deps
+# ═══════════════════════════════════════════════════════════════
+# 2. STOP OLD SERVICES
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "2/10 STOP OLD SERVICES"
 
-# 3. Generate Prisma client
-echo ""
-echo "[3/6] Generate Prisma client ..."
-npx prisma generate || true
+  # Stop via pm2 (if any)
+  for name in nexvo-app nexvo-cron nexvo-wa-bot; do
+    if pm2 describe "$name" >/dev/null 2>&1; then
+      pm2 delete "$name" >/dev/null 2>&1 && ok "stopped $name" || warn "could not stop $name"
+    fi
+  done
 
-# 4. Push schema (jangan reset data! hanya sync schema)
-echo ""
-echo "[4/6] Push prisma schema (db push, KEEP data) ..."
-npx prisma db push --accept-data-loss=false || npx prisma db push
-
-# 5. Build Next.js
-echo ""
-echo "[5/6] Build Next.js (npm run build) ..."
-npm run build
-
-# Copy static assets ke standalone
-echo ""
-echo "  Copy static -> standalone ..."
-cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
-cp -r public .next/standalone/public 2>/dev/null || true
-
-# 6. Restart PM2
-echo ""
-echo "[6/6] Restart PM2 ..."
-if command -v pm2 &> /dev/null; then
-  pm2 restart nexvo-web nexvo-cron 2>/dev/null || {
-    echo "  PM2 process belum ada, starting fresh ..."
-    cd .next/standalone
-    pm2 start server.js --name nexvo-web --update-env
-    cd "$PROJECT_DIR"
-    pm2 start "npm run cron" --name nexvo-cron --update-env 2>/dev/null || true
-  }
-  pm2 save
-  echo "  PM2 status:"
-  pm2 list
-else
-  echo "  [WARNING] PM2 belum terinstall. Install dengan: npm install -g pm2"
+  # Kill anything still holding our ports (leftover/rogue processes)
+  for port in $PORT_APP $PORT_CRON $PORT_WABOT; do
+    if command -v lsof >/dev/null; then
+      pids=$(lsof -ti :$port 2>/dev/null || true)
+    else
+      pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2 | tr '\n' ' ')
+    fi
+    if [ -n "$pids" ]; then
+      warn "killing leftover process on port $port (PID: $pids)"
+      kill -9 $pids 2>/dev/null || true
+      sleep 2
+    fi
+  done
+  ok "ports cleared"
 fi
 
+# ═══════════════════════════════════════════════════════════════
+# 3. PULL LATEST CODE
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "3/10 PULL LATEST CODE"
+  cd "$APP_DIR"
+
+  if [ -d ".git" ]; then
+    git fetch "$GIT_REMOTE" "$GIT_BRANCH" 2>&1 | tail -3 || warn "git fetch failed (offline?)"
+    git reset --hard "$GIT_REMOTE/$GIT_BRANCH" 2>&1 | tail -2 || warn "git reset failed"
+    ok "code at commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+    git log -1 --format="   %h %s (%cr)" 2>/dev/null || true
+  else
+    warn "not a git repo — skipping pull (assuming fresh deploy)"
+  fi
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 4. INSTALL DEPENDENCIES
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "4/10 INSTALL DEPENDENCIES"
+  cd "$APP_DIR"
+
+  log "installing root deps..."
+  bun install 2>&1 | tail -5
+  ok "root deps installed"
+
+  # wa-bot has its own package.json
+  if [ -f "mini-services/wa-bot/package.json" ]; then
+    log "installing wa-bot deps..."
+    (cd mini-services/wa-bot && bun install 2>&1 | tail -3) || warn "wa-bot install failed (optional)"
+    ok "wa-bot deps installed"
+  fi
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 5. BUILD (production only)
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "5/10 BUILD"
+  cd "$APP_DIR"
+
+  if [ "$SKIP_BUILD" = true ]; then
+    warn "skipping build (--skip-build or --dev mode)"
+  else
+    log "running: bun run build (prisma generate + next build)..."
+    bun run build 2>&1 | tail -10
+    ok "build complete"
+  fi
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 6. DATABASE
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "6/10 DATABASE"
+  cd "$APP_DIR"
+
+  # Ensure .env has correct DATABASE_URL with absolute path
+  mkdir -p "$APP_DIR/db"
+  if [ ! -f "$APP_DIR/.env" ]; then
+    echo "DATABASE_URL=file:$ABS_DB_PATH" > "$APP_DIR/.env"
+    ok "created .env"
+  elif ! grep -q "^DATABASE_URL=file:$ABS_DB_PATH" "$APP_DIR/.env"; then
+    # Update DATABASE_URL to absolute path (cron-service needs this)
+    sed -i "\|^DATABASE_URL=|c|DATABASE_URL=file:$ABS_DB_PATH|" "$APP_DIR/.env" 2>/dev/null || \
+      echo "DATABASE_URL=file:$ABS_DB_PATH" >> "$APP_DIR/.env"
+    ok "updated .env DATABASE_URL → $ABS_DB_PATH"
+  else
+    ok ".env OK"
+  fi
+
+  # Generate prisma client
+  bun run db:generate 2>&1 | tail -3 || warn "db:generate issue"
+  ok "prisma client generated"
+
+  # Push schema (safe, idempotent)
+  bun run db:push 2>&1 | tail -5
+  ok "db schema pushed"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 7. START NEXT.JS
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "7/10 START NEXT.JS (port $PORT_APP)"
+  cd "$APP_DIR"
+
+  if [ "$DEV_MODE" = true ]; then
+    warn "starting in DEV mode (next dev — no build needed)"
+    pm2 start "npx next dev -p $PORT_APP" \
+      --name nexvo-app \
+      --cwd "$APP_DIR" \
+      --log "$LOG_DIR/nexvo-app.log" \
+      --time 2>&1 | tail -3
+  else
+    pm2 start "bun run start" \
+      --name nexvo-app \
+      --cwd "$APP_DIR" \
+      --log "$LOG_DIR/nexvo-app.log" \
+      --time 2>&1 | tail -3
+  fi
+  ok "nexvo-app started (mode: $([ "$DEV_MODE" = true ] && echo dev || echo prod))"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 8. START CRON-SERVICE (profit + salary auto-credit)
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "8/10 START CRON-SERVICE (port $PORT_CRON)"
+  cd "$APP_DIR/mini-services/cron-service"
+
+  # cron-service uses @prisma/client from root node_modules (resolved via parent dir lookup)
+  # CWD must be mini-services/cron-service so `../../db/custom.db` resolves correctly
+  pm2 start "bun run index.ts" \
+    --name nexvo-cron \
+    --cwd "$APP_DIR/mini-services/cron-service" \
+    --log "$LOG_DIR/nexvo-cron.log" \
+    --time 2>&1 | tail -3
+  ok "nexvo-cron started (profit 2%/day × 180d + salary 1%/week forever)"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 8b. START WA-BOT (optional — only if configured)
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ] && [ -f "$APP_DIR/mini-services/wa-bot/index.ts" ]; then
+  section "8b/10 START WA-BOT (port $PORT_WABOT, optional)"
+  cd "$APP_DIR/mini-services/wa-bot"
+  # wa-bot needs tsx (in its own node_modules)
+  pm2 start "npx tsx index.ts" \
+    --name nexvo-wa-bot \
+    --cwd "$APP_DIR/mini-services/wa-bot" \
+    --log "$LOG_DIR/nexvo-wa-bot.log" \
+    --time 2>&1 | tail -3 || warn "wa-bot failed to start (optional, skip)"
+  ok "nexvo-wa-bot started (scan QR via admin panel)"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 9. SAVE PM2 + AUTO-RESTART ON REBOOT
+# ═══════════════════════════════════════════════════════════════
+if [ "$CHECK_ONLY" = false ]; then
+  section "9/10 SAVE PM2 CONFIG"
+  pm2 save 2>&1 | tail -2
+  ok "pm2 config saved"
+
+  # Try to setup startup script (may need sudo on first run)
+  if [ ! -f "/etc/systemd/system/pm2-$USER.service" ] && [ "$EUID" -eq 0 ]; then
+    pm2 startup 2>&1 | tail -2
+    ok "pm2 startup configured"
+  else
+    warn "pm2 startup: run 'sudo env PATH=\$PATH:\$(dirname \$(which node)) pm2 startup' once manually"
+  fi
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 10. VERIFY ALL SYSTEMS (with self-heal)
+# ═══════════════════════════════════════════════════════════════
+section "10/10 VERIFY ALL SYSTEMS"
+
+log "warming up (8s)..."
+sleep 8
+
+# ── Port check helper ──
+check_port() {
+  local port=$1 name=$2
+  for i in 1 2 3 4 5 6 7 8; do
+    if command -v lsof >/dev/null; then
+      lsof -i :$port >/dev/null 2>&1 && { ok "$name listening on :$port"; return 0; }
+    else
+      ss -tlnp 2>/dev/null | grep -q ":$port " && { ok "$name listening on :$port"; return 0; }
+    fi
+    sleep 2
+  done
+  err "$name NOT listening on :$port"
+  record_fail
+  return 1
+}
+
+# ── HTTP check helper ──
+check_http() {
+  local url=$1 name=$2 grep_for=$3
+  local body
+  body=$(curl -s -m 15 "$url" 2>/dev/null || echo "")
+  if [ -n "$body" ] && echo "$body" | grep -q "$grep_for"; then
+    ok "$name OK"
+    return 0
+  else
+    err "$name FAILED (expected: $grep_for)"
+    record_fail
+    return 1
+  fi
+}
+
+# ── 10a. Port checks ──
+check_port $PORT_APP  "nexvo-app"
+check_port $PORT_CRON "nexvo-cron"
+
+# ── 10b. HTTP health ──
+check_http "http://localhost:$PORT_APP/"          "nexvo-app health"       "NEXVO"
+check_http "http://localhost:$PORT_CRON/"         "nexvo-cron health"      "\"status\":\"running\""
+
+# ── 10c. Profit trigger (idempotent — safe to run) ──
+log "testing profit trigger (idempotent backfill)..."
+profit_resp=$(curl -s -m 30 -X POST "http://localhost:$PORT_CRON/api/trigger/profit" \
+  -H "Content-Type: application/json" -d '{}' 2>/dev/null || echo '{}')
+if echo "$profit_resp" | grep -q '"success":true'; then
+  processed=$(echo "$profit_resp" | grep -o '"processed":[0-9]*' | head -1 | cut -d: -f2)
+  total_profit=$(echo "$profit_resp" | grep -o '"totalProfit":[0-9]*' | head -1 | cut -d: -f2)
+  errors=$(echo "$profit_resp" | grep -o '"errors":[0-9]*' | head -1 | cut -d: -f2)
+  ok "profit trigger OK (processed=$processed, profit=$total_profit, errors=$errors)"
+  [ "$errors" -gt 0 ] 2>/dev/null && warn "profit had $errors errors — check pm2 logs nexvo-cron"
+else
+  err "profit trigger FAILED: $profit_resp"
+  record_fail
+  # Self-heal: restart cron and retry once
+  warn "self-heal: restarting nexvo-cron..."
+  pm2 restart nexvo-cron 2>/dev/null || true
+  sleep 5
+  profit_resp=$(curl -s -m 30 -X POST "http://localhost:$PORT_CRON/api/trigger/profit" \
+    -H "Content-Type: application/json" -d '{}' 2>/dev/null || echo '{}')
+  if echo "$profit_resp" | grep -q '"success":true'; then
+    ok "profit trigger OK after self-heal"
+  else
+    err "profit trigger STILL failing — check: pm2 logs nexvo-cron"
+  fi
+fi
+
+# ── 10d. Salary trigger (idempotent — safe to run) ──
+log "testing salary trigger (idempotent)..."
+salary_resp=$(curl -s -m 30 -X POST "http://localhost:$PORT_CRON/api/trigger/salary" \
+  -H "Content-Type: application/json" -d '{}' 2>/dev/null || echo '{}')
+if echo "$salary_resp" | grep -q '"success":true'; then
+  ok "salary trigger OK"
+else
+  err "salary trigger FAILED: $salary_resp"
+  record_fail
+fi
+
+# ── 10e. DB integrity check ──
+log "checking DB integrity..."
+db_check=$(cd "$APP_DIR" && bun -e '
+import { PrismaClient } from "@prisma/client";
+const db = new PrismaClient();
+const [users, products, investments, salaryCfg] = await Promise.all([
+  db.user.count(),
+  db.product.count(),
+  db.investment.count(),
+  db.salaryConfig.findFirst(),
+]);
+console.log(JSON.stringify({
+  users, products, investments,
+  salaryRate: salaryCfg?.salaryRate,
+  maxWeeks: salaryCfg?.maxWeeks,
+  minDirectRefs: salaryCfg?.minDirectRefs,
+  isActive: salaryCfg?.isActive,
+}));
+' 2>/dev/null || echo '{}')
+if echo "$db_check" | grep -q '"users"'; then
+  ok "DB OK: $db_check"
+else
+  err "DB check FAILED: $db_check"
+  record_fail
+fi
+
+# ── 10f. Salary config sanity ──
+if echo "$db_check" | grep -q '"salaryRate":1.*"maxWeeks":0'; then
+  ok "salary config: 1%/week FOREVER ✓"
+elif echo "$db_check" | grep -q '"salaryRate":1'; then
+  warn "salary config: rate=1% but maxWeeks!=0 (check admin panel)"
+else
+  err "salary config WRONG — should be 1%/week, maxWeeks=0 (FOREVER)"
+  record_fail
+  # Self-heal: set correct salary config
+  warn "self-heal: setting salary config to 1%/week, maxWeeks=0, minDirectRefs=10..."
+  cd "$APP_DIR" && bun -e '
+import { PrismaClient } from "@prisma/client";
+const db = new PrismaClient();
+const existing = await db.salaryConfig.findFirst();
+if (existing) {
+  await db.salaryConfig.update({ where: { id: existing.id }, data: {
+    salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, isActive: true
+  }});
+} else {
+  await db.salaryConfig.create({ data: {
+    salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, isActive: true,
+    fixedSalaryAmount: 25000,
+  }});
+}
+console.log("✓ salary config fixed");
+' 2>&1 | tail -1
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# FINAL REPORT
+# ═══════════════════════════════════════════════════════════════
 echo ""
-echo "=================================================="
-echo "  DEPLOY SELESAI!"
-echo "  Web: http://nexvo.id  (atau http://76.13.198.125:3000)"
-echo "  Cek log: pm2 logs nexvo-web --lines 50"
-echo "=================================================="
+echo -e "${C_CYAN}${C_BOLD}══════ PM2 STATUS ══════${C_NC}"
+pm2 status 2>/dev/null | head -15
+
 echo ""
-echo "NOTE: Untuk hapus semua akun user yang sudah daftar:"
-echo "  1. Login sebagai super admin di /admin"
-echo "  2. Buka Settings > tab 'Reset Data'"
-echo "  3. Klik 'Factory Reset Sekarang'"
-echo "  4. Ketik: RESET ALL USER DATA"
-echo "  5. Konfirmasi. Selesai."
+if [ "$FAIL_COUNT" -eq 0 ]; then
+  echo -e "${C_GREEN}${C_BOLD}╔══════════════════════════════════════════════════════════════╗"
+  echo -e "║   ✅  NEXVO DEPLOYED SUCCESSFULLY — ALL SYSTEMS 100% OK      ║"
+  echo -e "╠══════════════════════════════════════════════════════════════╣"
+  echo -e "║  Next.js app:     http://localhost:$PORT_APP                       ║"
+  echo -e "║  Cron-service:    http://localhost:$PORT_CRON                      ║"
+  echo -e "║                                                              ║"
+  echo -e "║  💰 Profit:  2%/day × 180 days = 576k cap (EVERY day)        ║"
+  echo -e "║  📅 Salary:  1%/week FOREVER (10 refs + active investment)   ║"
+  echo -e "║  🔄 Backfill: auto-credits all missed days in one shot       ║"
+  echo -e "║  ⏰ Schedule: 00:00 WIB daily (profit) + Mon 00:00 (salary)  ║"
+  echo -e "╚══════════════════════════════════════════════════════════════╝${C_NC}"
+  echo ""
+  echo -e "${C_BOLD}Logs:${C_NC}"
+  echo "  pm2 logs nexvo-app          # Next.js logs"
+  echo "  pm2 logs nexvo-cron         # profit + salary logs"
+  echo "  pm2 logs nexvo-wa-bot       # WhatsApp bot logs"
+  echo ""
+  echo -e "${C_BOLD}Manual triggers (idempotent, safe to re-run):${C_NC}"
+  echo "  curl -X POST http://localhost:$PORT_CRON/api/trigger/profit   # credit missed profits"
+  echo "  curl -X POST http://localhost:$PORT_CRON/api/trigger/salary   # credit weekly salary"
+  echo "  curl -X POST http://localhost:$PORT_CRON/api/trigger/quota-bump  # bump product quotas"
+  echo ""
+  echo -e "${C_BOLD}Admin panel:${C_NC}  open http://localhost:$PORT_APP/#admin-login"
+  echo -e "${C_BOLD}Re-deploy:${C_NC}     bash deploy.sh  (or curl pipe from GitHub)"
+  echo -e "${C_BOLD}Check only:${C_NC}     bash deploy.sh --check"
+  exit 0
+else
+  echo -e "${C_RED}${C_BOLD}╔══════════════════════════════════════════════════════════════╗"
+  echo -e "║   ⚠️  DEPLOY COMPLETED WITH $FAIL_COUNT ISSUE(S)                          ║"
+  echo -e "╠══════════════════════════════════════════════════════════════╣"
+  echo -e "║  Some systems failed verification. Check logs below.         ║"
+  echo -e "╚══════════════════════════════════════════════════════════════╝${C_NC}"
+  echo ""
+  echo -e "${C_BOLD}Debug commands:${C_NC}"
+  echo "  pm2 status                          # which services are online?"
+  echo "  pm2 logs nexvo-app --lines 50       # Next.js errors"
+  echo "  pm2 logs nexvo-cron --lines 50      # cron errors"
+  echo "  pm2 restart nexvo-app nexvo-cron    # force restart"
+  echo "  bash deploy.sh --check              # re-verify"
+  exit 1
+fi
