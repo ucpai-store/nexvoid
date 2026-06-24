@@ -1694,3 +1694,47 @@ Stage Summary:
 - All tour features reviewed: neat, no screen/image covering, phone display clean
 - Flow verified end-to-end: welcome → register-link → register-form → OTP (real!) → login → dashboard → deposit → paket → withdraw → done
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tour-otp-auto-verify
+Agent: main
+Task: User request — 'yg raki kamu tau kan panduan dan tata caranya yg bener mksd ku otp otomatis terisi paham kan jadi panduan nya rapi teks tidak boleh menutupi area tutorial saat bekerja paham kan' — OTP must auto-fill, tooltip must NEVER cover tutorial area while working.
+
+Work Log:
+- Verified OTP auto-fill works in AUTO-PLAY mode (not just manual):
+  * Started fresh dev server, opened iPhone 14 viewport in Agent Browser
+  * Clicked "Mode Demo Otomatis" button (ref e21)
+  * Monitored tour progression at 10s/14s/18s/22s intervals
+  * At 22s reached OTP step — confirmed via JS eval:
+    - url: ":3000/#otp" (correct navigation)
+    - title: "Langkah 3: Verifikasi OTP" (correct step)
+    - otpVal: "123456" ← OTP AUTO-FILLED by auto-play typeIntoInput!
+    - emailVis: true (budi@gmail.com shown via pageData)
+  * The typeIntoInput() function types '123456' char-by-char at 55ms intervals
+    using native HTMLInputElement value setter + dispatches 'input' event so
+    React state updates — OTP input shows the code as if user typed it
+- Verified NO overlap (teks tidak menutupi area tutorial):
+  * VLM analysis of OTP step screenshot (/tmp/otp-final.png):
+    "No, the bottom tooltip is positioned below the OTP input field and does
+    not cover it."
+  * VLM analysis of register step screenshot (/tmp/otp-auto-18.png):
+    "The tour tooltip/bottom sheet at the bottom does not cover any of the
+    register form input fields. The typing happens visibly in the form fields
+    above the tooltip."
+  * Body padding effect (230px) pushes centered forms up above bottom sheet
+  * Bottom sheet maxHeight 34vh, scrollable, sits in empty space below form
+- Minor polish: improved touch targets on "Lewati panduan" / "Matikan Auto"
+  / "Nyalakan Auto" buttons (added py-1.5 px-1 padding so they're not mepet
+  edge — better tap area on phone)
+- TypeScript: tsc --noEmit clean
+- Dev server: HTTP 200, OTP step renders with demo email + auto-typed code
+- Committed (c6a94a2) + pushed to GitHub main
+
+Stage Summary:
+- OTP AUTO-FILL CONFIRMED: in Mode Demo Otomatis, OTP field gets "123456"
+  typed automatically (char-by-char, visible to viewer)
+- NO OVERLAP CONFIRMED: tooltip/bottom sheet NEVER covers the tutorial
+  target area (OTP input, register form fields) — VLM verified on both steps
+- Phone display clean: form visible above, tooltip below, demo email shown,
+  yellow "Demo OTP: 123456" badge visible
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
