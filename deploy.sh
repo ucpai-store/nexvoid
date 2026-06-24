@@ -16,11 +16,23 @@
 set -eo pipefail
 
 # ─── Config ───
-APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+# Auto-detect app dir:
+#   1. If APP_DIR env var set → use it
+#   2. If $0 is a real file (running from cloned repo) → use its dir
+#   3. Else (curl pipe to bash, $0 = "bash") → use /root/nexvo (or ~/nexvo)
+if [ -n "$APP_DIR" ]; then
+  : # keep env var
+elif [ -f "$0" ] && [ "$(dirname "$0")" != "." ]; then
+  APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+else
+  # curl pipe to bash — no script file on disk
+  APP_DIR="${HOME}/nexvo"
+fi
 PORT_APP="${PORT_APP:-3000}"
 PORT_CRON="${PORT_CRON:-3032}"
 PORT_WABOT="${PORT_WABOT:-3033}"
 LOG_DIR="$APP_DIR/logs"
+GIT_REPO_URL="${GIT_REPO_URL:-https://github.com/ucpai-store/nexvoid.git}"
 GIT_REMOTE="${GIT_REMOTE:-origin}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 ABS_DB_PATH="$APP_DIR/db/custom.db"
@@ -29,13 +41,25 @@ ABS_DB_PATH="$APP_DIR/db/custom.db"
 SKIP_BUILD=false
 DEV_MODE=false
 CHECK_ONLY=false
+FRESH_CLONE=false
 for arg in "$@"; do
   case "$arg" in
     --skip-build) SKIP_BUILD=true ;;
     --dev) DEV_MODE=true; SKIP_BUILD=true ;;
     --check) CHECK_ONLY=true ;;
+    --fresh) FRESH_CLONE=true ;;
     --help|-h)
-      sed -n '2,12p' "$0"; exit 0 ;;
+      sed -n '2,14p' "$0" 2>/dev/null || cat <<'USAGE'
+NEXVO Deploy Script
+  bash deploy.sh                 # full deploy (clone+pull+build+restart+verify)
+  bash deploy.sh --skip-build    # skip next build (hot-pull code only)
+  bash deploy.sh --dev           # run in dev mode (next dev, no build)
+  bash deploy.sh --check         # verify-only, no deploy
+  bash deploy.sh --fresh         # wipe APP_DIR and re-clone from scratch
+  curl -fsSL <url>/deploy.sh | bash           # works on fresh VPS (auto-clone)
+  APP_DIR=/opt/nexvo bash deploy.sh           # custom install path
+USAGE
+      exit 0 ;;
   esac
 done
 
@@ -56,6 +80,9 @@ record_fail() { FAIL_COUNT=$((FAIL_COUNT+1)); }
 # 1. PRE-FLIGHT CHECKS
 # ═══════════════════════════════════════════════════════════════
 section "1/10 PRE-FLIGHT CHECKS"
+
+# Ensure APP_DIR exists (for fresh VPS / curl pipe to bash)
+mkdir -p "$APP_DIR"
 cd "$APP_DIR"
 
 command -v git >/dev/null  || die "git not found. Install: apt install git"
@@ -118,19 +145,57 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 3. PULL LATEST CODE
+# 3. PULL LATEST CODE (auto-clone if not a git repo yet)
 # ═══════════════════════════════════════════════════════════════
 if [ "$CHECK_ONLY" = false ]; then
   section "3/10 PULL LATEST CODE"
   cd "$APP_DIR"
 
-  if [ -d ".git" ]; then
+  # ─── Fresh clone requested: wipe and re-clone ───
+  if [ "$FRESH_CLONE" = true ] && [ -d ".git" ]; then
+    warn "--fresh: wiping $APP_DIR/.git + node_modules for clean re-clone"
+    # Preserve .env + db/ before wipe (so user data survives fresh clone)
+    cp -f .env /tmp/nexvo.env.bak 2>/dev/null || true
+    cp -rf db /tmp/nexvo-db.bak 2>/dev/null || true
+    rm -rf .git node_modules .next
+  fi
+
+  if [ ! -d ".git" ]; then
+    # ─── First-time deploy: clone the repo ───
+    if [ -n "$GIT_TOKEN" ]; then
+      # Private repo with token
+      CLONE_URL="${GIT_REPO_URL/:\/\//:\/$GIT_TOKEN@}"
+    else
+      CLONE_URL="$GIT_REPO_URL"
+    fi
+
+    # Always clone to temp then move — works whether APP_DIR is empty or has stray files (logs/, db/)
+    log "cloning $GIT_REPO_URL (branch: $GIT_BRANCH) → $APP_DIR"
+    TMP_CLONE=$(mktemp -d)
+    if git clone --depth 1 -b "$GIT_BRANCH" "$CLONE_URL" "$TMP_CLONE/repo" 2>&1 | tail -5; then
+      # Move repo contents into APP_DIR (including .git, dotfiles)
+      shopt -s dotglob nullglob
+      mv "$TMP_CLONE/repo"/* "$APP_DIR"/ 2>/dev/null || true
+      shopt -u dotglob nullglob
+      rm -rf "$TMP_CLONE"
+      ok "repo cloned into $APP_DIR"
+    else
+      rm -rf "$TMP_CLONE"
+      die "git clone failed. Check GIT_REPO_URL or GIT_TOKEN env var."
+    fi
+
+    # Restore preserved .env + db/ if --fresh was used
+    [ -f /tmp/nexvo.env.bak ] && cp -f /tmp/nexvo.env.bak .env && rm /tmp/nexvo.env.bak && ok "restored .env"
+    [ -d /tmp/nexvo-db.bak ] && cp -rf /tmp/nexvo-db.bak/* db/ 2>/dev/null && rm -rf /tmp/nexvo-db.bak && ok "restored db/"
+  else
+    # ─── Existing repo: pull latest ───
     git fetch "$GIT_REMOTE" "$GIT_BRANCH" 2>&1 | tail -3 || warn "git fetch failed (offline?)"
     git reset --hard "$GIT_REMOTE/$GIT_BRANCH" 2>&1 | tail -2 || warn "git reset failed"
+  fi
+
+  if [ -d ".git" ]; then
     ok "code at commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
     git log -1 --format="   %h %s (%cr)" 2>/dev/null || true
-  else
-    warn "not a git repo — skipping pull (assuming fresh deploy)"
   fi
 fi
 
@@ -140,6 +205,11 @@ fi
 if [ "$CHECK_ONLY" = false ]; then
   section "4/10 INSTALL DEPENDENCIES"
   cd "$APP_DIR"
+
+  # Sanity: package.json must exist after clone/pull
+  if [ ! -f "package.json" ]; then
+    die "package.json not found in $APP_DIR. Clone failed? Try: bash deploy.sh --fresh"
+  fi
 
   log "installing root deps..."
   bun install 2>&1 | tail -5
@@ -190,13 +260,23 @@ if [ "$CHECK_ONLY" = false ]; then
     ok ".env OK"
   fi
 
+  # ★ CRITICAL: explicitly export DATABASE_URL so prisma uses our path (not inherited from shell env)
+  export DATABASE_URL="file:$ABS_DB_PATH"
+
   # Generate prisma client
   bun run db:generate 2>&1 | tail -3 || warn "db:generate issue"
   ok "prisma client generated"
 
-  # Push schema (safe, idempotent)
-  bun run db:push 2>&1 | tail -5
+  # Push schema (safe, idempotent). Use env var explicitly to avoid stale .env caching.
+  DATABASE_URL="file:$ABS_DB_PATH" bun run db:push 2>&1 | tail -5
   ok "db schema pushed"
+
+  # Verify DB file actually exists
+  if [ -f "$ABS_DB_PATH" ]; then
+    ok "DB file: $ABS_DB_PATH ($(du -h "$ABS_DB_PATH" | cut -f1))"
+  else
+    warn "DB file not found at $ABS_DB_PATH — check prisma config"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -388,10 +468,7 @@ if echo "$db_check" | grep -q '"salaryRate":1.*"maxWeeks":0'; then
 elif echo "$db_check" | grep -q '"salaryRate":1'; then
   warn "salary config: rate=1% but maxWeeks!=0 (check admin panel)"
 else
-  err "salary config WRONG — should be 1%/week, maxWeeks=0 (FOREVER)"
-  record_fail
-  # Self-heal: set correct salary config
-  warn "self-heal: setting salary config to 1%/week, maxWeeks=0, minDirectRefs=10..."
+  warn "salary config missing/wrong — self-healing to 1%/week, maxWeeks=0, minDirectRefs=10..."
   cd "$APP_DIR" && bun -e '
 import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
@@ -408,6 +485,19 @@ if (existing) {
 }
 console.log("✓ salary config fixed");
 ' 2>&1 | tail -1
+  # Re-verify after self-heal
+  db_check2=$(cd "$APP_DIR" && bun -e '
+import { PrismaClient } from "@prisma/client";
+const db = new PrismaClient();
+const c = await db.salaryConfig.findFirst();
+console.log(JSON.stringify({salaryRate:c?.salaryRate, maxWeeks:c?.maxWeeks, minDirectRefs:c?.minDirectRefs, isActive:c?.isActive}));
+' 2>/dev/null || echo '{}')
+  if echo "$db_check2" | grep -q '"salaryRate":1.*"maxWeeks":0'; then
+    ok "salary config self-healed OK ✓"
+  else
+    err "salary config self-heal FAILED: $db_check2"
+    record_fail
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════
