@@ -111,8 +111,14 @@ if [ -f "$DB_FILE" ]; then
   echo "Checking investments with lastProfitDate >= $TODAY_WIB 00:00 WIB..."
   sqlite3 "$DB_FILE" "SELECT COUNT(*) as credited_count, COUNT(*) FILTER (WHERE status='active') as active_count FROM Investment WHERE date(lastProfitDate) >= date('$TODAY_WIB');" 2>/dev/null || echo "(sqlite3 not available or query failed)"
   echo ""
-  echo "Sample of recent profit bonuses (last 5):"
-  sqlite3 -header -column "$DB_FILE" "SELECT substr(userId,1,12) as user, amount, type, substr(description,1,50) as desc_short, datetime(createdAt) as time FROM BonusLog WHERE type='profit' ORDER BY createdAt DESC LIMIT 5;" 2>/dev/null || echo "(could not query bonus logs)"
+  echo "─── Profit bonuses credited today (last 10) ───"
+  sqlite3 -header -column "$DB_FILE" "SELECT substr(userId,1,12) as user, amount, substr(description,1,60) as desc_short, datetime(createdAt) as time FROM BonusLog WHERE type='profit' AND date(createdAt) >= date('$TODAY_WIB') ORDER BY createdAt DESC LIMIT 10;" 2>/dev/null || echo "(could not query bonus logs)"
+  echo ""
+  echo "─── Investments that STILL need backfill (lastProfitDate < today) ───"
+  sqlite3 -header -column "$DB_FILE" "SELECT substr(id,1,12) as inv_id, substr(userId,1,12) as user, status, date(startDate) as start, date(lastProfitDate) as last_profit FROM Investment WHERE status='active' AND (lastProfitDate IS NULL OR date(lastProfitDate) < date('$TODAY_WIB')) LIMIT 10;" 2>/dev/null || echo "(could not query)"
+  echo ""
+  echo "─── Summary: active investments vs credited today ───"
+  sqlite3 "$DB_FILE" "SELECT 'Active investments: ' || COUNT(*) FROM Investment WHERE status='active'; SELECT 'Credited today: ' || COUNT(*) FROM Investment WHERE status='active' AND date(lastProfitDate) >= date('$TODAY_WIB'); SELECT 'Need backfill: ' || COUNT(*) FROM Investment WHERE status='active' AND (lastProfitDate IS NULL OR date(lastProfitDate) < date('$TODAY_WIB'));" 2>/dev/null || echo "(query failed)"
 else
   echo "⚠️ DB file not found at $DB_FILE"
 fi

@@ -128,6 +128,45 @@ function getTodayWibDateString(): string {
   return getWibDateString(new Date());
 }
 
+/**
+ * Get day of week (0=Sunday, 6=Saturday) for a given Date in WIB timezone.
+ * Uses getWibDateString to avoid local timezone interpretation issues.
+ */
+function getWibDayOfWeekFromDate(date: Date): number {
+  const wibStr = getWibDateString(date); // "YYYY-MM-DD" in WIB
+  const [y, m, d] = wibStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/**
+ * Count weekdays (Mon-Fri) MISSED between lastCreditDateStr+1 and todayStr (exclusive today).
+ * Used for backfill: e.g., if last credit was Thursday and today is Monday,
+ * missed days = Friday (1 day, since Sat/Sun are skipped).
+ *
+ * @param lastCreditDateStr  WIB date string "YYYY-MM-DD" of last successful credit
+ * @param todayStr           WIB date string "YYYY-MM-DD" of today
+ * @returns number of weekdays missed (0 if none or if lastCredit >= today-1)
+ */
+function countWeekdaysMissed(lastCreditDateStr: string, todayStr: string): number {
+  const [ly, lm, ld] = lastCreditDateStr.split('-').map(Number);
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  // Start from day AFTER last credit (the first potentially-missed day)
+  const start = new Date(Date.UTC(ly, lm - 1, ld + 1));
+  // End at today (exclusive — today is handled separately by the normal cron logic)
+  const end = new Date(Date.UTC(ty, tm - 1, td));
+
+  let count = 0;
+  const cursor = new Date(start);
+  // Safety cap: never count more than 60 missed days (prevents runaway loop on bad data)
+  let safety = 60;
+  while (cursor < end && safety-- > 0) {
+    const dow = cursor.getUTCDay(); // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) count++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count;
+}
+
 // ──────────── Matching Config Helper ────────────
 
 async function getMatchingRates(): Promise<Record<number, number>> {
@@ -425,8 +464,10 @@ async function processDailyInvestmentProfits(): Promise<{
   totalProfit: number;
   totalMatching: number;
   errors: number;
+  backfilledDays: number;
+  backfilledInvestments: number;
 }> {
-  const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0 };
+  const emptyResult = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0, backfilledDays: 0, backfilledInvestments: 0 };
 
   // ─── WEEKEND LIBUR: No profit distribution on Saturday & Sunday ───
   const wibNowCheck = getWibNow();
@@ -434,7 +475,7 @@ async function processDailyInvestmentProfits(): Promise<{
   if (dayOfWeekCheck === 0 || dayOfWeekCheck === 6) {
     const dayName = dayOfWeekCheck === 0 ? 'Minggu' : 'Sabtu';
     console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
-    return result;
+    return emptyResult;
   }
 
   return processDailyInvestmentProfitsCore();
@@ -443,14 +484,17 @@ async function processDailyInvestmentProfits(): Promise<{
 /**
  * Force version — bypasses weekend guard. Used by manual trigger with ?force=true
  * (admin catch-up). The per-investment lastProfitDate check still prevents double-credit.
+ * Even on weekend, this will credit missed weekdays (but not the weekend itself).
  */
 async function processDailyInvestmentProfitsForce(): Promise<{
   processed: number;
   totalProfit: number;
   totalMatching: number;
   errors: number;
+  backfilledDays: number;
+  backfilledInvestments: number;
 }> {
-  console.log('[Profit Cron] ⚠️ FORCE MODE — bypassing weekend guard (manual trigger).');
+  console.log('[Profit Cron] ⚠️ FORCE MODE — bypassing weekend guard (manual trigger). Backfill will credit missed weekdays only.');
   return processDailyInvestmentProfitsCore();
 }
 
@@ -459,20 +503,26 @@ async function processDailyInvestmentProfitsCore(): Promise<{
   totalProfit: number;
   totalMatching: number;
   errors: number;
+  backfilledDays: number;
+  backfilledInvestments: number;
 }> {
-  const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0 };
+  const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0, backfilledDays: 0, backfilledInvestments: 0 };
 
   const todayWIB = getTodayWibDateString();
+  const wibNow = getWibNow();
+  const todayDow = getWibDayOfWeekFromDate(wibNow); // 0=Sun, 6=Sat
+  const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
   const investments = await db.investment.findMany({
     where: { status: 'active' },
     include: { package: true },
   });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
 
   for (const inv of investments) {
     try {
+      // ─── Skip if already credited today ───
       if (inv.lastProfitDate) {
         const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
         if (lastProfitWIB === todayWIB) {
@@ -480,13 +530,14 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         }
       }
 
+      // ─── Skip if bought today (profit starts tomorrow) ───
       const createdDate = inv.startDate ? new Date(inv.startDate) : new Date(inv.createdAt);
       const createdWIB = getWibDateString(createdDate);
       if (createdWIB === todayWIB) {
         continue;
       }
 
-      const wibNow = getWibNow();
+      // ─── Skip if contract ended ───
       if (inv.endDate) {
         const endDate = new Date(inv.endDate);
         if (wibNow >= endDate) {
@@ -499,34 +550,60 @@ async function processDailyInvestmentProfitsCore(): Promise<{
       }
 
       const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
-
       if (dailyProfit <= 0) continue;
 
+      // ─── BACKFILL LOGIC: Calculate missed weekdays ───
+      // lastCreditDate = lastProfitDate (WIB) or startDate (WIB) if null
+      let lastCreditDateStr: string;
+      if (inv.lastProfitDate) {
+        lastCreditDateStr = getWibDateString(new Date(inv.lastProfitDate));
+      } else {
+        lastCreditDateStr = createdWIB; // first profit cycle starts day after purchase
+      }
+
+      const missedDays = countWeekdaysMissed(lastCreditDateStr, todayWIB);
+      // Total days to credit = missed weekdays + today (if today is weekday)
+      // Cap at 30 days total for safety (prevents runaway credit on bad data)
+      const totalDays = Math.min(missedDays + (isTodayWeekday ? 1 : 0), 30);
+
+      if (totalDays <= 0) {
+        // Weekend with no missed days — nothing to credit
+        continue;
+      }
+
+      const totalCredit = dailyProfit * totalDays;
+      const isBackfill = missedDays > 0;
+
       await db.$transaction(async (tx) => {
+        // Re-check inside transaction to prevent race condition
         const currentInv = await tx.investment.findUnique({ where: { id: inv.id } });
         if (currentInv?.lastProfitDate) {
           const lastProfitWIB = getWibDateString(new Date(currentInv.lastProfitDate));
           if (lastProfitWIB === todayWIB) {
-            return;
+            return; // already credited by another process
           }
         }
 
         await tx.user.update({
           where: { id: inv.userId },
           data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
+            mainBalance: { increment: totalCredit },
+            totalProfit: { increment: totalCredit },
           },
         });
 
         await tx.investment.update({
           where: { id: inv.id },
           data: {
-            totalProfitEarned: { increment: dailyProfit },
+            totalProfitEarned: { increment: totalCredit },
             dailyProfit: dailyProfit,
             lastProfitDate: new Date(),
           },
         });
+
+        const desc = totalDays === 1
+          ? `Profit harian ${inv.package.name} — ${formatRupiahSimple(inv.amount)} x ${inv.package.profitRate}% = ${formatRupiahSimple(dailyProfit)}`
+          : `Profit ${totalDays} hari (${isBackfill ? `${missedDays} tertinggal + ${isTodayWeekday ? 'hari ini' : '0'}` : 'semua hari ini'}) — ${inv.package.name}: ${formatRupiahSimple(dailyProfit)} x ${totalDays} = ${formatRupiahSimple(totalCredit)}`;
 
         await tx.bonusLog.create({
           data: {
@@ -534,24 +611,31 @@ async function processDailyInvestmentProfitsCore(): Promise<{
             fromUserId: inv.userId,
             type: 'profit',
             level: 0,
-            amount: dailyProfit,
-            description: `Profit harian ${inv.package.name} — ${formatRupiahSimple(inv.amount)} x ${inv.package.profitRate}% = ${formatRupiahSimple(dailyProfit)}`,
+            amount: totalCredit,
+            description: desc,
           },
         });
 
-        const matchResult = await creditMatchingOnProfit(tx, inv.userId, dailyProfit);
+        const matchResult = await creditMatchingOnProfit(tx, inv.userId, totalCredit);
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
       });
 
       result.processed++;
-      result.totalProfit += dailyProfit;
+      result.totalProfit += totalCredit;
+      if (isBackfill) {
+        result.backfilledInvestments++;
+        result.backfilledDays += missedDays;
+        console.log(`[Profit Cron] 📦 BACKFILL: Investment ${inv.id} (user ${inv.userId}) — ${missedDays} missed weekday(s) + ${isTodayWeekday ? 'today' : 'weekend(no today)'} = ${totalDays} days × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}`);
+      }
     } catch (error: any) {
       result.errors++;
       console.error(`[Profit Cron] ❌ Investment ${inv.id}: ${error.message}`);
     }
   }
+
+  // ─── Purchase tracking (product purchases, no balance change — just stats) ───
 
   // Purchase tracking
   const purchases = await db.purchase.findMany({
@@ -596,7 +680,7 @@ async function processDailyInvestmentProfitsCore(): Promise<{
     }
   }
 
-  console.log(`[Profit Cron] Done. Processed: ${result.processed}, Total Profit: ${formatRupiahSimple(result.totalProfit)}, Total Matching: ${formatRupiahSimple(result.totalMatching)}, Errors: ${result.errors}`);
+  console.log(`[Profit Cron] Done. Processed: ${result.processed}, Total Profit: ${formatRupiahSimple(result.totalProfit)}, Backfill: ${result.backfilledInvestments} inv / ${result.backfilledDays} days, Total Matching: ${formatRupiahSimple(result.totalMatching)}, Errors: ${result.errors}`);
   return result;
 }
 
@@ -829,7 +913,7 @@ async function runProfitCronIfDue(reason: string): Promise<void> {
   console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus (${reason}) at ${wibNow.toISOString()} (WIB: ${wibNow.toLocaleString('id-ID', { timeZone: 'UTC' })})...`);
   try {
     const result = await processDailyInvestmentProfits();
-    console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
+    console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, Backfill: ${result.backfilledInvestments} inv/${result.backfilledDays} days, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
   } catch (err) {
     console.error(`[CRON] 🌅 Profit cron ERROR:`, err);
     // Reset flag so it retries on next tick
@@ -977,7 +1061,10 @@ const server = Bun.serve({
 console.log(`[Cron Service v2.0] 🚀 Running on port ${PORT}`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
-console.log(`  - Daily Profit + Matching: 00:00 WIB every day`);
+console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
+console.log(`  - Weekend Libur: Sabtu & Minggu (no profit distribution)`);
+console.log(`  - Startup Catch-up: If past 00:05 WIB and profit not credited, run immediately`);
+console.log(`  - AUTO BACKFILL: Missed weekdays auto-credited (skip Sat/Sun, cap 30 days)`);
 console.log(`  - Weekly Salary: 00:00 WIB every Monday`);
 console.log(`  - Quota Simulation: Every 2 hours at :30 (nav.live style)`);
 console.log(`  - Matching: Event-driven (credited with daily profit, based on PROFIT amount)`);
