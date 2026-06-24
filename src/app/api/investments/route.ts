@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
+import { validateSequentialPurchase, getUserTierAvailability } from '@/lib/tier-system';
 
 // GET: List user's investments
 export async function GET(request: NextRequest) {
@@ -141,6 +142,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ★ Sequential tier enforcement ★
+    // Paket & produk sama. User hanya boleh membeli 1 macam dan harus berurutan:
+    // beli VIP 1 → terkunci → wajib beli VIP 2 → dst. Tidak boleh loncat.
+    const tierCheck = await validateSequentialPurchase(user.id, packageId);
+    if (!tierCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: tierCheck.error },
+        { status: 400 }
+      );
+    }
+
     const dailyProfit = pkg.amount * (pkg.profitRate / 100);
     const startDate = new Date();
     const endDate = new Date(startDate);
@@ -183,6 +195,14 @@ export async function POST(request: NextRequest) {
         const updatedUser = await tx.user.update({
           where: { id: user.id },
           data: updateData,
+        });
+
+        // ★ Only ONE active tier per user ★
+        // When upgrading to the next tier, supersede all previously active
+        // investments so the system runs solely on the newly purchased tier.
+        await tx.investment.updateMany({
+          where: { userId: user.id, status: 'active' },
+          data: { status: 'completed' },
         });
 
         // Create investment WITHOUT immediate profit — cron will credit at 00:00 WIB

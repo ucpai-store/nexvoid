@@ -1837,3 +1837,68 @@ Stage Summary:
 - Note: TTS uses browser's built-in speechSynthesis (no backend needed).
   Real browsers have Indonesian voices; headless Chrome has 0 voices but API works.
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tier-system-unify
+Agent: main
+Task: User request — 'hapus fitur panduan ya... semua sistem wajib berjalan sesuai paket/produk yg aktif hari ini wajib masuk profit jam 00.00... paket dan produk itu sama... kalo beli vip 1 otomatis ke lock user kalo mau beli paket/produk wajib vip2/atasnya... intinya beli hanya 1 macam... harus beli paket/produk yg belom di beli' — DELETE the tutorial/guide feature entirely, and build a unified sequential tier (paket=produk) purchase system where the user buys one tier at a time, must buy in order (VIP1→VIP2→...), only 1 active tier, profit credited at 00:00 based on the active tier.
+
+Work Log:
+- DELETED tutorial feature completely:
+  * Removed src/components/nexvo/GuidedTour.tsx (~950 lines)
+  * Removed src/stores/tour-store.ts
+  * Removed <GuidedTour /> mount + import from AppShell.tsx (AppShell now just renders <AppShellInner />)
+  * Verified zero remaining references to GuidedTour/tour-store/useTourStore
+- Created src/lib/tier-system.ts (unified tier logic):
+  * loadOrderedTiers() — fetches active InvestmentPackage ordered by amount asc (VIP1 lowest → VIPn highest)
+  * getUserTierAvailability(userId) — computes per-tier state: active / available (next) / bought / locked / maxed
+  * validateSequentialPurchase(userId, packageId) — enforces: only the immediately-next unbought tier is purchasable
+  * Sequential rule: nextTier = highestBoughtIndex + 1; reject everything else
+- Updated src/app/api/investments/route.ts POST:
+  * Added validateSequentialPurchase() check before creating investment (rejects non-sequential buys with clear Indonesian message)
+  * Added `tx.investment.updateMany({where:{userId,status:'active'}, data:{status:'completed'}})` — when buying next tier, all previously-active investments are superseded so ONLY ONE active tier remains per user
+  * This satisfies "beli hanya 1 macam" + "wajib beli atasanya" + "yg belom di beli"
+- Created src/app/api/investments/tiers/route.ts (GET) — returns full TierAvailability for the authenticated user (drives the PaketPage UI states)
+- Updated src/components/nexvo/pages/PaketPage.tsx:
+  * PackageCard now accepts per-tier `state` (available/active/bought/locked) and renders:
+    - "Beli Sekarang" button (only for the next available tier)
+    - "Sedang Aktif" badge (active tier, green)
+    - "Sudah Dimiliki" (bought/superseded, blue)
+    - "Terkunci" with lock icon + reason (locked tiers, gray, disabled)
+    - State ribbons (AKTIF/TERKUNCI/SELESAI) on card corners
+  * Main component fetches /api/packages + /api/investments/tiers, merges tier state into each package
+  * Added "Aturan Beli Berurutan · 1 Paket Aktif Saja" info banner explaining the rule + showing current/next tier
+  * After successful purchase, re-fetches tiers so states update (VIP→Aktif, next→available)
+  * Profit warning text updated: "Profit .../hari masuk setiap hari jam 00:00"
+- Unified ProductsPage (paket = produk):
+  * ProductsPage.tsx rewritten to render <PaketPage /> directly (both menus now show the same VIP tier grid)
+  * ProductDetailPage.tsx rewritten to redirect to 'paket' on mount (old per-product detail flow removed)
+- Seeded 6 VIP tiers (VIP 1: 100K → VIP 6: 10JT) + a verified test user via scripts/seed-tiers-user.ts
+- Added 127.0.0.1 + localhost to next.config.ts allowedDevOrigins (was blocking dev font/chunk loads from 127.0.0.1)
+- Profit cron (/api/cron/profit) left UNCHANGED — it already credits daily profit based on active investments at 00:00 WIB. With the new only-one-active model, exactly one tier generates profit per user per day. Idempotent (lastProfitDate check). Weekend block preserved (existing behavior).
+
+Verification (Agent Browser + VLM, iPhone 14 viewport, dev server kept alive within single bash call):
+  * Tutorial removal: confirmed panduanAriaButtons=0 (GuidedTour floating button GONE), no console errors
+  * /api/packages returns 6 VIP tiers; /api/investments/tiers returns 401 when unauthenticated ✓
+  * Full sequential purchase flow tested via API:
+    - BEFORE: current=null, next=VIP 1, states=[VIP1:available, VIP2-6:locked] ✓
+    - BUY VIP 1 → success, "Profit harian Rp 10.000 akan masuk setiap hari jam 00:00 WIB" ✓
+    - TRY VIP 3 → REJECTED: "Pembelian harus berurutan. Paket yang bisa Anda beli sekarang adalah 'VIP 2'..." ✓
+    - BUY VIP 2 → success ✓
+    - AFTER: current=VIP 2, next=VIP 3, states=[VIP1:bought, VIP2:active, VIP3:available, VIP4-6:locked] ✓
+  * VLM mobile screenshot analysis (full-page):
+    - "Beli Berurutan" banner present ✓
+    - VIP tier cards show correct states (VIP 1 Sudah Dimiliki, VIP 2 Aktif, VIP 3-6 Terkunci) ✓
+    - "Mobile layout is neat... vertically stacked with clear spacing, consistent card structures, readable text hierarchy" ✓
+- TypeScript: tsc --noEmit clean on all changed files (pre-existing errors in unrelated files only)
+- ESLint: config pre-existing issue (ESLint 9 vs old format) — not related to changes
+
+Stage Summary:
+- Tutorial/guide feature COMPLETELY REMOVED (GuidedTour.tsx, tour-store.ts, AppShell mount)
+- Unified sequential tier system: paket = produk = single VIP tier list (InvestmentPackage)
+- Purchase rules enforced server-side: beli hanya 1 macam, berurutan (VIP1→VIP2→...), tidak boleh loncat, 1 paket aktif saja
+- Previous active tier auto-superseded when buying next tier (only-one-active invariant)
+- Profit masuk jam 00:00 WIB via existing cron, based on the single active tier
+- PaketPage UI shows Aktif/Beli Sekarang/Terkunci/Sudah Dimiliki states + rule banner; mobile-verified neat
+- ProductsPage renders the same VIP tier grid; ProductDetailPage redirects to paket
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash

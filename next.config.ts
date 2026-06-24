@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   allowedDevOrigins: [
     '.space-z.ai',
+    '127.0.0.1',
+    'localhost',
   ],
   async headers() {
     return [

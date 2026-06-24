@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import {
   TrendingUp, ShieldCheck, Clock, Loader2,
   AlertTriangle, RefreshCw, Wallet, CheckCircle2,
-  Coins, CalendarDays, Crown, Sparkles, AlertCircle
+  Coins, CalendarDays, Crown, Sparkles, AlertCircle,
+  Lock, Info
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAppStore } from '@/stores/app-store';
@@ -25,6 +26,8 @@ import { toast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n';
 
 /* ───────── Types ───────── */
+type TierState = 'available' | 'active' | 'bought' | 'locked';
+
 interface PackageItem {
   id: string;
   name: string;
@@ -36,6 +39,9 @@ interface PackageItem {
   totalInvestments: number;
   dailyProfit: number;
   totalProfit: number;
+  /** sequential-tier purchase state for the current user */
+  state?: TierState;
+  reason?: string;
 }
 
 /* ───────── Tier styling based on package order ───────── */
@@ -99,18 +105,44 @@ function PackageCard({
   const TierIcon = tier.icon;
   const isFeatured = tier.featured;
 
+  // Sequential-tier state for the current user
+  const state: TierState = pkg.state ?? 'available';
+  const isActive = state === 'active';
+  const isAvailable = state === 'available';
+  const isLocked = state === 'locked';
+  const isBought = state === 'bought';
+
+  const canBuy = isAvailable;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08, duration: 0.4, ease: 'easeOut' }}
-      whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-      className={`group glass-strong rounded-2xl p-4 sm:p-5 lg:p-6 flex flex-col relative overflow-hidden border-2 ${tier.border} ${tier.glow} transition-all duration-300 ${isFeatured ? 'ring-2 ring-primary/20' : ''}`}
+      whileHover={canBuy ? { scale: 1.02, transition: { duration: 0.2 } } : undefined}
+      className={`group glass-strong rounded-2xl p-4 sm:p-5 lg:p-6 flex flex-col relative overflow-hidden border-2 ${tier.border} ${canBuy ? tier.glow : ''} transition-all duration-300 ${isFeatured ? 'ring-2 ring-primary/20' : ''} ${!canBuy ? 'opacity-70' : ''}`}
     >
       {/* Featured ribbon */}
       {isFeatured && (
         <div className="absolute top-0 right-0 bg-gold-gradient text-primary-foreground text-[9px] font-bold px-3 py-1 rounded-bl-xl">
           ⭐ POPULER
+        </div>
+      )}
+
+      {/* State ribbon (Aktif / Terkunci / Selesai) */}
+      {isActive && (
+        <div className="absolute top-0 left-0 bg-emerald-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3" /> AKTIF
+        </div>
+      )}
+      {isLocked && (
+        <div className="absolute top-0 left-0 bg-slate-500/80 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
+          <Lock className="w-3 h-3" /> TERKUNCI
+        </div>
+      )}
+      {isBought && (
+        <div className="absolute top-0 left-0 bg-blue-500/80 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3" /> SELESAI
         </div>
       )}
 
@@ -145,7 +177,7 @@ function PackageCard({
         <div className="flex items-start gap-1.5 mb-4 mt-2 p-2 rounded-lg bg-amber-400/5 border border-amber-400/15">
           <AlertCircle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
           <p className="text-amber-400/80 text-[10px] leading-tight">
-            Profit {formatRupiah(pkg.dailyProfit)}/hari masuk setiap hari. Modal tidak dikembalikan.
+            Profit {formatRupiah(pkg.dailyProfit)}/hari masuk setiap hari jam 00:00. Modal tidak dikembalikan.
           </p>
         </div>
 
@@ -185,17 +217,38 @@ function PackageCard({
           <p className="text-gold-gradient text-lg sm:text-xl font-bold mt-0.5">{formatRupiah(pkg.totalProfit)}</p>
         </div>
 
-        {/* Invest button */}
-        <Button
-          onClick={() => onInvest(pkg)}
-          data-tour="paket-invest"
-          className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
-        >
-          <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4" />
-            Invest Sekarang
+        {/* Locked reason */}
+        {(isLocked || isBought) && pkg.reason && (
+          <div className="flex items-start gap-1.5 mb-3 p-2 rounded-lg bg-slate-400/5 border border-slate-400/15">
+            <Info className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+            <p className="text-slate-400 text-[10px] leading-tight">{pkg.reason}</p>
           </div>
-        </Button>
+        )}
+
+        {/* Invest button — only the next sequential tier is purchasable */}
+        {isActive ? (
+          <div className="w-full h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4" /> Sedang Aktif
+          </div>
+        ) : isBought ? (
+          <div className="w-full h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400/80 font-semibold text-sm flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4" /> Sudah Dimiliki
+          </div>
+        ) : isLocked ? (
+          <div className="w-full h-11 rounded-xl bg-slate-500/10 border border-slate-500/20 text-slate-400 font-semibold text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+            <Lock className="w-4 h-4" /> Terkunci
+          </div>
+        ) : (
+          <Button
+            onClick={() => onInvest(pkg)}
+            className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
+          >
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4" />
+              Beli Sekarang
+            </div>
+          </Button>
+        )}
       </div>
     </motion.div>
   );
@@ -212,13 +265,51 @@ export default function PaketPage() {
   const [investing, setInvesting] = useState<string | null>(null);
   const [confirmPkg, setConfirmPkg] = useState<PackageItem | null>(null);
   const [successPkg, setSuccessPkg] = useState<PackageItem | null>(null);
+  // Sequential-tier availability for the logged-in user
+  const [tierInfo, setTierInfo] = useState<{
+    currentTierName: string | null;
+    nextTierName: string | null;
+    maxedOut: boolean;
+  } | null>(null);
 
   const fetchPackages = useCallback(async () => {
     try {
       const res = await fetch('/api/packages');
       const data = await res.json();
       if (data.success) {
-        setPackages(data.data || []);
+        let list: PackageItem[] = data.data || [];
+
+        // If authenticated, merge in the user's sequential-tier purchase state.
+        if (token) {
+          try {
+            const tierRes = await fetch('/api/investments/tiers', {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const tierData = await tierRes.json();
+            if (tierData.success && tierData.data) {
+              const avail = tierData.data;
+              const stateById = new Map<string, { state: TierState; reason?: string }>(
+                (avail.tiers || []).map((t: { id: string; state: TierState; reason?: string }) => [
+                  t.id,
+                  { state: t.state, reason: t.reason },
+                ])
+              );
+              list = list.map((p) => {
+                const s = stateById.get(p.id);
+                return s ? { ...p, state: s.state, reason: s.reason } : p;
+              });
+              setTierInfo({
+                currentTierName: avail.currentTierName,
+                nextTierName: avail.nextTierName,
+                maxedOut: !!avail.maxedOut,
+              });
+            }
+          } catch {
+            // Non-fatal: fall back to all-available view
+          }
+        }
+
+        setPackages(list);
       } else {
         setError(t('common.error'));
       }
@@ -227,7 +318,7 @@ export default function PaketPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token, t]);
 
   useEffect(() => {
     fetchPackages();
@@ -267,6 +358,9 @@ export default function PaketPage() {
           setConfirmPkg(null);
           setSuccessPkg(pkg);
           toast({ title: t('common.success'), description: data.message || t('paket.investSuccess') });
+          // Refresh tier states so the newly active tier shows "Aktif" and the
+          // next tier becomes the only purchasable one.
+          fetchPackages();
         } else {
           toast({ title: 'Gagal', description: data.error || t('common.operationFailed'), variant: 'destructive' });
           setConfirmPkg(null);
@@ -349,6 +443,37 @@ export default function PaketPage() {
         <p className="text-muted-foreground text-xs sm:text-base max-w-md mx-auto">
           Investasi dengan profit harian tetap, konsisten, dan transparan
         </p>
+      </motion.div>
+
+      {/* Sequential-tier rule banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass rounded-2xl p-3 sm:p-4 border border-primary/15 flex items-start gap-3"
+      >
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Info className="w-4 h-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-foreground text-xs sm:text-sm font-semibold mb-0.5">
+            Aturan Beli Berurutan · 1 Paket Aktif Saja
+          </p>
+          <p className="text-muted-foreground text-[10px] sm:text-xs leading-relaxed">
+            Paket &amp; Produk sama. Beli mulai dari paket terendah, lalu naik berurutan
+            (VIP 1 → VIP 2 → dst). Beli 1 macam dulu — setelah aktif, baru bisa beli
+            paket di atasnya. Profit masuk otomatis setiap hari jam 00:00 sesuai paket aktif.
+          </p>
+          {tierInfo && tierInfo.currentTierName && (
+            <p className="text-emerald-400 text-[10px] sm:text-xs font-medium mt-1.5">
+              Paket aktif Anda sekarang: <strong>{tierInfo.currentTierName}</strong>
+              {tierInfo.maxedOut
+                ? ' · Anda sudah di paket tertinggi.'
+                : tierInfo.nextTierName
+                ? ` · Bisa beli berikutnya: ${tierInfo.nextTierName}`
+                : ''}
+            </p>
+          )}
+        </div>
       </motion.div>
 
       {/* Package Cards Grid */}

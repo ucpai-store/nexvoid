@@ -278,14 +278,7 @@ function AppShellInner() {
   );
 }
 
-/* ───────── Wrapper: renders page + global Guided Tour overlay ───────── */
-import GuidedTour from '@/components/nexvo/GuidedTour';
-
+/* ───────── Wrapper: renders the app shell ───────── */
 export default function AppShell() {
-  return (
-    <>
-      <AppShellInner />
-      <GuidedTour />
-    </>
-  );
+  return <AppShellInner />;
 }
