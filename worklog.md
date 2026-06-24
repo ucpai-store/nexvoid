@@ -1539,3 +1539,43 @@ Stage Summary:
 - Pause/resume kapan saja, toggle auto on/off kapan saja
 - Mobile rapi: bottom-sheet modal, compact badges, icon-only buttons on phone
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tour-visibility-fix
+Agent: main
+Task: User request — 'kok gelar gimana mo vidio cuman teks gituu wajib kelihatan jelass baguss di hp wajibb rapi' — tour terlalu gelap, cuma teks tooltip keliatan, gak bisa rekam video. Halaman harus kelihatan jelas.
+
+Work Log:
+- Root cause: backdrop bg-black/75 dengan clip-path cutout nutupin 95% layar.
+  Hanya target kecil (button) + tooltip yang keliatan. Form, page, konteks
+  semua gelap. User gak bisa rekam video karena gak keliatan apa yang dilakukan.
+- Fix di GuidedTour.tsx:
+  1. HAPUS backdrop gelap total (targetRect && !isCentered) — sekarang empty div
+     tanpa background. Page tetap fully visible.
+  2. Tambah soft spotlight glow: radial-gradient gold 18% opacity di sekitar target
+     (48px margin), tidak darkening, cuma highlight area fokus
+  3. Highlight ring DIPERKUAT:
+     - boxShadow: 5px solid gold + 7px black outline + 35px gold glow + 60px soft glow
+     - 4 corner accents animated ping (sebelumnya 1, dengan delay 200ms stagger)
+  4. Arrow DIPERBESAR:
+     - w-9 h-9 (dari w-6 h-6), strokeWidth=3
+     - Drop-shadow 10px gold + 2px black untuk visibility di background apapun
+     - Bobbing animation: y/x ±6px, 0.9s infinite loop (animasi 'tap here')
+  5. Centered steps (welcome/done): bg-black/40 + blur-[2px] (dari /75 + blur-sm)
+     — masih fokus ke modal tapi gak terlalu gelap
+  6. Welcome modal backdrop: bg-black/70 → bg-black/50
+  7. Welcome modal card: glass-strong (85% opacity dark) → solid rgba(8,12,24,0.98)
+     dengan border-2 yellow-400/70 + box-shadow glow
+  8. Tooltip: glass-strong → solid rgba(8,12,24,0.97)
+     dengan border-2 yellow-400/80 + box-shadow glow
+     supaya text tetap terbaca di video dengan background apapun
+- TypeScript compile clean (no errors in GuidedTour.tsx)
+- Dev server: HTTP 200, no runtime errors
+- Committed (1886d22) + pushed to GitHub main
+
+Stage Summary:
+- Tour sekarang HALAMAN KELIHATAN JELAS — form, tombol, page semua visible
+- Spotlight glow + thick gold ring + bobbing arrow nunjukin target
+- Tooltip & welcome modal solid dark dengan border emas — readable di video
+- Mobile tetap rapi (semua responsive, padding/border konsisten)
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
