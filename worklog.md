@@ -1144,3 +1144,33 @@ Stage Summary:
 - Site images FIXED: admin/site-image uses process.cwd() (works on VPS)
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-fix-all.sh | bash
 - This single script fixes EVERYTHING: upload + profit + PM2 zombie + Nginx + permissions + 3-layer guarantee
+
+---
+Task ID: fix-deploy-502
+Agent: main
+Task: User reported 502 Bad Gateway on nexvo.id after running deploy-fix-all.sh. Screenshot showed terminal mid-deploy with error "Found chunks with '..' in name (Turbopack bug still present!): .next/chunks/app/api/files/[...path]"
+
+Work Log:
+- Analyzed screenshot via VLM: showed my deploy-fix-all.sh script CRASHED at step 5/11 with false-positive chunk detection, then exit 1
+- Root cause: my chunk verification regex `find .next/static/chunks -name "*..*"` matched the legitimate Next.js catch-all route directory `[...path]` (src/app/api/files/[...path]/route.ts) which contains `..` in its name
+- This is NOT the Turbopack bug — `[...path]` is a valid Next.js catch-all route convention
+- The `exit 1` killed the script at step 5, but PM2 was already killed at step 1 → web stayed DOWN → 502 Bad Gateway
+- Fixed deploy-fix-all.sh v2:
+  * Chunk check now uses `-type f -name "*.js"` (files only, not directories)
+  * Regex `\.\.[/\\%]|%2[fF]|%5[cC]` matches REAL path traversal (literal ../ ..\ or URL-encoded ..%2F ..%5C) but NOT `[...path]` catch-all routes
+  * Made chunk check NON-FATAL (warn + continue, never exit 1)
+  * Removed `set -e` — errors handled explicitly
+  * Added `trap ensure_pm2_running EXIT` — guarantees PM2 starts even if build/verify fails
+  * Build backup/restore: backs up .next before rebuild, restores previous build if new one fails
+  * All curl checks use --max-time 10 (no hang)
+  * Recovery mode: if build fails, starts PM2 with previous build
+- Verified regex locally: correctly catches `..%5Cpage.js` and `..%2Fpage.js` but does NOT match `[...path]/page.js`
+- Verified bash syntax: `bash -n deploy-fix-all.sh` → SYNTAX OK
+- Committed (02dcb20) + pushed to GitHub main
+- Verified raw URL accessible (HTTP 200)
+
+Stage Summary:
+- deploy-fix-all.sh v2 is crash-resistant: even if build fails, PM2 starts with previous build
+- No more false-positive chunk detection on `[...path]` catch-all routes
+- User must run the NEW command to recover from 502:
+  curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-fix-all.sh | bash
