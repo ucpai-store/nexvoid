@@ -6,7 +6,7 @@ import {
   ArrowDownCircle, CheckCircle2,
   Clock, XCircle, Loader2, AlertTriangle, RefreshCw,
   QrCode, Copy, Check,
-  ShoppingBag, Wallet, ArrowLeft, MessageCircle, Phone,
+  ShoppingBag, Wallet, ArrowLeft,
   Upload, ImagePlus, X, Sparkles, TrendingUp, Shield, Zap
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
@@ -390,20 +390,8 @@ export default function DepositPage() {
     }
   };
 
-  const handleChatAdmin = (depositId?: string, depositAmount?: number, paymentName?: string) => {
-    if (!primaryAdminPhone) {
-      toast({ title: 'Error', description: 'Admin WhatsApp number not available.', variant: 'destructive' });
-      return;
-    }
-    const id = depositId || lastDepositId || '';
-    const amt = depositAmount || lastDepositAmount || 0;
-    const pay = paymentName || lastDepositPayment || '-';
-    const msg = encodeURIComponent(
-      `Request Deposit Add\n\nDeposit ID: ${id}\nAmount: ${formatRupiah(amt)}\nPayment: ${pay}\n\nPlease process my deposit. Thank you.`
-    );
-    const phone = primaryAdminPhone.replace(/[^0-9]/g, '');
-    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-  };
+  // NOTE: WhatsApp "Chat Admin" buttons removed by user request (2024-06-24).
+  // Deposits are processed by admin in the dashboard — users no longer need to contact admin.
 
   const formatAmountDisplay = (val: string) => {
     const num = val.replace(/[^0-9]/g, '');
@@ -497,14 +485,15 @@ export default function DepositPage() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={() => handleChatAdmin()}
-                  className="w-full h-14 bg-[#25D366] text-white font-bold rounded-2xl hover:bg-[#20BD5A] transition-all text-base mb-2 shadow-lg shadow-[#25D366]/20"
-                >
-                  <Phone className="w-5 h-5 mr-2" />
-                  Chat Admin via WhatsApp
-                </Button>
-                <p className="text-muted-foreground text-[10px] mb-3">Auto-kirim Deposit ID & Jumlah ke admin</p>
+                <div className="glass rounded-2xl p-4 mb-5 space-y-3 border border-emerald-400/20 bg-emerald-400/5">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                    <span className="text-emerald-400 text-sm font-semibold">Deposit Sedang Diproses</span>
+                  </div>
+                  <p className="text-muted-foreground text-[11px] text-center leading-relaxed">
+                    Deposit Anda sedang dalam antrian proses verifikasi oleh admin. Saldo akan masuk otomatis ke akun Anda setelah deposit disetujui. Mohon tunggu, tidak perlu menghubungi admin.
+                  </p>
+                </div>
 
                 <button onClick={() => setShowSuccessModal(false)} className="text-muted-foreground text-sm hover:text-foreground transition-colors">
                   Tutup
@@ -982,7 +971,7 @@ export default function DepositPage() {
 
                   {!proofPreview && (
                     <p className="text-muted-foreground text-xs text-center">
-                      Upload bukti transfer/screenshot, atau kirim via WhatsApp setelah submit
+                      Upload bukti transfer/screenshot untuk mempercepat verifikasi deposit
                     </p>
                   )}
                 </div>
@@ -1067,10 +1056,9 @@ export default function DepositPage() {
                   )}
                   {deposit.fee > 0 && <p className="text-muted-foreground text-[10px] mt-0.5">Fee: {formatRupiah(deposit.fee)} • Net: {formatRupiah(deposit.netAmount)}</p>}
                   {deposit.status === 'pending' && (
-                    <button onClick={() => handleChatAdmin(deposit.depositId, deposit.amount, deposit.paymentName)}
-                      className="inline-flex items-center gap-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] text-[11px] font-semibold px-3 py-1.5 rounded-lg mt-1.5 transition-all">
-                      <Phone className="w-3.5 h-3.5" />Chat Admin
-                    </button>
+                    <span className="inline-flex items-center gap-1.5 bg-yellow-400/10 text-yellow-400 text-[11px] font-semibold px-3 py-1.5 rounded-lg mt-1.5">
+                      <Clock className="w-3.5 h-3.5" /> Sedang Diproses
+                    </span>
                   )}
                   {deposit.proofImage && (
                     <a href={getFileUrl(deposit.proofImage)} target="_blank" rel="noopener noreferrer" className="text-primary text-[10px] hover:underline mt-1 inline-block">
