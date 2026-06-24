@@ -1979,3 +1979,45 @@ Stage Summary:
 - Profit at 00:00 WIB via cron-service (port 3032, running) — credits daily profit based on the single active tier
 - PaketPage UI updated: removed "Terkunci" state entirely, new banner "1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki", shows remaining count of purchasable tiers
 - Mobile-verified neat by VLM (iPhone 14 viewport)
+
+---
+Task ID: deploy-tier-no-duplicates
+Agent: main
+Task: User request — 'mana perintah deploy nya aku deploy gimana dong oh ya hapus fitur tutuprial nya jangan lupa' — confirm tutorial is gone, push all changes to GitHub, and provide the deploy command.
+
+Work Log:
+- Verified tutorial feature is truly GONE from source code:
+  * src/components/nexvo/GuidedTour.tsx — NOT FOUND (already deleted previously)
+  * src/stores/tour-store.ts — NOT FOUND (already deleted previously)
+  * grep for "Mulai Panduan|startTour|GuidedTour|tour-store|useTourStore" in src/ → 0 matches
+- Fresh Agent Browser verification (iPhone 14, after close+reopen to clear chunk cache):
+  * Opened http://localhost:3000/ → login page rendered cleanly
+  * Snapshot buttons: Language, Nomor HP, Email, +62, Login, Forgot Password, Register Now, Install, CS, Next.js Dev Tools
+  * NO "Mulai Panduan" / "Tutorial" / "Tour" / "Guide" button present
+  * VLM confirmed: "Tidak ada tombol 'Mulai Panduan', 'Tutorial', 'Tour', atau 'Guide' di halaman ini"
+- Git status check:
+  * Commit 117c32c (tier-system no-duplicates + PaketPage UI + comments) was already in local main but NOT pushed
+  * Removed 11 verify-*.png screenshots that were accidentally committed to repo
+  * Added "verify-*.png" to .gitignore
+  * Updated deploy-ui-update.sh "Changes live" section to reflect new tier system:
+    - Fitur panduan/tutorial DIHAPUS sepenuhnya
+    - Sistem tier (paket=produk) — aturan no-duplicates
+    - Boleh beli tier mana saja yg belum dimiliki (TIDAK harus berurutan)
+    - Setiap tier hanya bisa dibeli SEKALI
+    - 1 paket aktif saja
+    - Profit masuk otomatis jam 00:00 WIB
+    - Banner PaketPage: '1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki'
+    - Hapus status 'Terkunci'
+- Pushed all commits to GitHub origin/main:
+  * 3edeb07 deploy: update pesan deploy untuk tier no-duplicates + hapus tutorial
+  * 7f1be33 chore: hapus verify screenshots dari repo + gitignore
+  * 117c32c (tier-system no-duplicates core change)
+- Verified GitHub raw URL accessible: https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh → HTTP 200
+
+Stage Summary:
+- Tutorial/panduan feature CONFIRMED fully removed (no traces in code, no button in running app, VLM-verified)
+- All tier-system no-duplicates changes pushed to GitHub main branch (3 commits)
+- Deploy script (deploy-ui-update.sh) updated with accurate "Changes live" message
+- Deploy command for user:
+    curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+- This lightweight deploy script: pulls code, bun install, prisma generate, builds with --webpack, restarts PM2 nexvo-web only (does NOT touch cron/profit system)
