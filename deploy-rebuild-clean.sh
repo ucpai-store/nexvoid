@@ -92,16 +92,56 @@ if [ "$BAD_CHUNKS" -gt 0 ]; then
 fi
 echo ""
 
-# ─── Step 7: Start PM2 nexvo-web (fresh, with new build) ───
-echo "▼ [7/9] Starting PM2 nexvo-web with new build..."
-pm2 restart nexvo-web --update-env 2>/dev/null || pm2 start "bun run start" --name nexvo-web 2>/dev/null || pm2 start nexvo-web 2>/dev/null
-sleep 3
-echo "✅ nexvo-web restarted with new build"
+# ─── Step 7: Start PM2 nexvo-web in PRODUCTION mode (next start, NOT dev) ───
+echo "▼ [7/9] Starting PM2 nexvo-web in PRODUCTION mode..."
+# DELETE old process (might be running 'bash server.sh' = dev mode) and recreate with 'next start'
+pm2 delete nexvo-web 2>/dev/null && echo "   Deleted old nexvo-web process (was possibly dev mode)" || echo "   No old nexvo-web to delete (fresh start)"
+# Start in production mode — serves built .next folder, CSS from /_next/static/css/
+cd "$PROJECT_DIR"
+pm2 start "bun run start" --name nexvo-web --cwd "$PROJECT_DIR" 2>/dev/null || pm2 start "npx next start" --name nexvo-web --cwd "$PROJECT_DIR" 2>/dev/null
+sleep 4
+# Verify it's running
+PM2_STATUS=$(pm2 jlist 2>/dev/null | python3 -c "import sys,json; data=json.load(sys.stdin); web=[p for p in data if p['name']=='nexvo-web']; print(web[0]['pm2_env']['status'] if web else 'not-found')" 2>/dev/null || echo "unknown")
+if [ "$PM2_STATUS" = "online" ]; then
+  echo "✅ nexvo-web running in PRODUCTION mode (next start)"
+  # Show what command it's actually running
+  pm2 describe nexvo-web 2>/dev/null | grep -E "script path|exec mode|status" | head -3
+else
+  echo "⚠️ nexvo-web status: $PM2_STATUS — trying fallback..."
+  pm2 start "bash server.sh" --name nexvo-web --cwd "$PROJECT_DIR" 2>/dev/null
+  sleep 3
+fi
+pm2 save 2>/dev/null || true
 echo ""
 
 # ─── Step 8: Reload Nginx (clear cached chunk references) ───
 echo "▼ [8/9] Reloading Nginx (clear cached chunk refs)..."
 nginx -t 2>/dev/null && nginx -s reload 2>/dev/null && echo "✅ Nginx reloaded" || echo "⚠️ Nginx reload skipped (not running or no perms)"
+echo ""
+
+# ─── Step 8.5: Verify CSS and chunks are served ───
+echo "▼ [8.5] Verifying static assets are served..."
+sleep 2
+# Find CSS file
+CSS_FILE=$(ls "$PROJECT_DIR/.next/static/css/"*.css 2>/dev/null | head -1 | xargs basename)
+if [ -n "$CSS_FILE" ]; then
+  CSS_HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/_next/static/css/$CSS_FILE" 2>/dev/null)
+  echo "   CSS: /_next/static/css/$CSS_FILE → HTTP $CSS_HTTP"
+  if [ "$CSS_HTTP" != "200" ]; then
+    echo "   ❌ CSS not serving! App will show unstyled (sr-only content visible)"
+  fi
+else
+  echo "   ⚠️ No CSS file found in .next/static/css/"
+fi
+# Test one JS chunk
+CHUNK_FILE=$(ls "$PROJECT_DIR/.next/static/chunks/"*.js 2>/dev/null | head -1 | xargs basename)
+if [ -n "$CHUNK_FILE" ]; then
+  CHUNK_HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/_next/static/chunks/$CHUNK_FILE" 2>/dev/null)
+  echo "   Chunk: /_next/static/chunks/$CHUNK_FILE → HTTP $CHUNK_HTTP"
+fi
+# Test main page
+PAGE_HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000" 2>/dev/null)
+echo "   Page: / → HTTP $PAGE_HTTP"
 echo ""
 
 # ─── Step 9: Trigger profit cron (backfill missed days) ───
@@ -156,12 +196,18 @@ echo "════════════════════════�
 echo "  ✅ Clean Rebuild Deploy Complete"
 echo "═══════════════════════════════════════════════════════"
 echo ""
-echo "🔴 PENTING — BROWSER CACHE FIX:"
-echo "   Di browser, tekan Ctrl+Shift+R (hard refresh) atau Ctrl+F5"
-echo "   Kalau masih error, buka DevTools (F12) → Network tab →"
-echo "   centang 'Disable cache' → reload page."
+echo "🔴 PENTING — BROWSER CACHE FIX (WAJIB):"
+echo "   1. Tekan Ctrl+Shift+R (hard refresh) atau Ctrl+F5"
+echo "   2. Kalau masih sama, buka DevTools (F12) → Application tab →"
+echo "      Storage → 'Clear site data' → reload"
+echo "   3. Atau buka di INCOGNITO/Private window (paling aman untuk test)"
 echo ""
-echo "   Atau buka di Incognito/Private window untuk test."
+echo "   Kenapa? Browser cache CSS/JS lama. Harus di-force load yang baru."
 echo ""
 echo "Profit cron sudah di-trigger dengan backfill —"
 echo "profit yang tertinggal kemarin malam akan otomatis masuk."
+echo ""
+echo "━━━ Verifikasi ━━━"
+echo "   - Buka nexvo.id di INCOGNITO window"
+echo "   - Harusnya muncul Login page NEXVO (bukan teks SEO Inggris)"
+echo "   - Kalau masih teks SEO = CSS belum load, jalankan lagi script ini"
