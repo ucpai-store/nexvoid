@@ -409,9 +409,12 @@ async function processDailyInvestmentProfits(): Promise<{
         }
       }
 
-      // Credit daily profit - ALWAYS recalculate from package profitRate for accuracy
-      // Formula: dailyProfit = investmentAmount × (profitRate / 100)
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
+      // Credit daily profit — use the stored `dailyProfit` value on the Investment.
+      // This value was set at purchase time based on the Product's profitRate.
+      // Fallback: recalculate from package.profitRate if stored value is 0 (legacy investments).
+      const dailyProfit = inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * (inv.package.profitRate / 100));
 
       await db.$transaction(async (tx) => {
         // ★ RE-CHECK inside transaction to prevent double credit (race condition) ★

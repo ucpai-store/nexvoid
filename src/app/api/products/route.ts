@@ -297,35 +297,42 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Find or create matching InvestmentPackage
-      let investmentPackage = await tx.investmentPackage.findFirst({
-        where: { amount: product.price, isActive: true },
-      });
+      // ★ Use Product's own profitRate & duration directly — do NOT auto-create InvestmentPackage.
+      // This keeps InvestmentPackage table clean (VIP tiers only) while Product purchases
+      // still create Investment records that the cron can credit daily.
+      // Cron reads `inv.dailyProfit` (stored) so it doesn't depend on the linked package.
+      const dailyProfit = Math.floor(product.price * ((product.profitRate || 0) / 100));
+      const contractDays = product.duration || 90;
+      const startDate = new Date();
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + contractDays);
 
-      if (!investmentPackage) {
-        investmentPackage = await tx.investmentPackage.create({
+      // Find an existing InvestmentPackage to link (any active one as fallback for FK),
+      // but DO NOT create a new one — we don't want Product purchases polluting the
+      // InvestmentPackage table (which is for VIP tiers shown on the Paket page).
+      let packageIdForInvestment = await tx.investmentPackage.findFirst({
+        where: { isActive: true },
+        select: { id: true },
+      });
+      if (!packageIdForInvestment) {
+        // Edge case: no InvestmentPackage exists yet — create a single hidden default
+        packageIdForInvestment = await tx.investmentPackage.create({
           data: {
-            name: product.name,
-            amount: product.price,
-            profitRate: product.profitRate || 5,
-            contractDays: product.duration || 90,
-            isActive: true,
-            order: 0,
+            name: '_internal_default',
+            amount: 0,
+            profitRate: 0,
+            contractDays: 0,
+            isActive: false, // hidden from Paket page (which filters isActive=true)
+            order: -1,
           },
         });
       }
-
-      // Create ONE investment (qty=1) — NO immediate profit credit
-      const dailyProfit = Math.floor(product.price * (investmentPackage.profitRate / 100));
-      const startDate = new Date();
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + investmentPackage.contractDays);
 
       // Create investment WITHOUT profit — profit will come at 00:00 WIB
       await tx.investment.create({
         data: {
           userId: user.id,
-          packageId: investmentPackage.id,
+          packageId: packageIdForInvestment.id,
           purchaseId: newPurchase.id, // Link to purchase to avoid double-counting in assets/transactions
           amount: product.price,
           dailyProfit,
