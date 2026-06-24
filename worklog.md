@@ -1782,3 +1782,58 @@ Stage Summary:
   OTP is the focus)
 - Visual aids (ring/arrow/glow) dim during typing so focus stays on form fields
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tour-4step-voice
+Agent: main
+Task: User request — '1:ucapan selamat datang 2:klik daftar/register 3:isi data diri 4:masukan kode otp... teks panduan muncul sekilas... di hp kok tetep gk rapi rapikan ya... kasi suara yg kasi panduan terus jangan cepet cepet pas in' — reduce to 4 steps, tooltip shows briefly, add voice guidance, slow down pacing, fix mobile neatness.
+
+Work Log:
+- Rewrote tour-store.ts:
+  * Reduced TOUR_STEPS from 12 → 5 (welcome, register-link, register-form, otp-verify, done)
+  * Removed: login-form, dashboard-deposit, deposit-form, dashboard-paket, paket-invest, dashboard-withdraw, withdraw-form
+  * Added `narration` field to TourStep interface (short text for TTS voice)
+  * Added isVoiceEnabled state + toggleVoice + setVoiceEnabled actions
+  * Spelled "NEXVO" as "Nekvo" in narration for correct TTS pronunciation
+  * Slower pacing: autoAdvanceDelay increased (welcome 5s→8s, register-link 3.5s→6s, register-form 2.5s→5s, otp 4.5s→7s, done 6s→8s)
+  * Done step navigates to 'login' page (not dashboard)
+- Updated GuidedTour.tsx:
+  * Added TTS voice guidance using window.speechSynthesis (Web Speech API):
+    - Speaks step.narration in Indonesian (lang='id-ID') on each step change
+    - Rate 0.92 (slightly slower than normal — don't rush)
+    - Finds Indonesian voice from getVoices() (id-ID or lang starts with 'id')
+    - 400ms delay before speaking (let page navigation settle)
+    - Cancels speech on: step change, pause, skip, voice toggle off, unmount
+  * Added voice toggle button (Volume2/VolumeX icon) in tooltip header
+    next to close button — yellow when enabled, gray when disabled
+  * Slowed down auto-play:
+    - Announce delay: 2000ms → 4000ms (let voice finish before typing starts)
+    - Typing speed: charDelay 55ms → 90ms per char (slower, more visible)
+  * Updated welcome modal:
+    - 4 new steps: Klik Daftar, Isi Data Diri, Masukkan Kode OTP, Selesai
+    - Added Volume2 icon + "Dengan suara panduan" mention at bottom
+  * Added isVoiceEnabled + toggleVoice to store destructuring
+- Verification (Agent Browser + VLM, iPhone 14 viewport):
+  * Full flow tested: welcome (4s) → step1 register-link (12s) → step2 register-form
+    typing compact (22s) → step3 OTP auto-filled 123456 (37s) → done
+  * speechSynthesis API confirmed working (manual speak test: speaking=true)
+  * Voice toggle button visible in tooltip header (aria-label="Matikan suara")
+  * VLM mobile neatness verified on ALL 4 steps:
+    - Welcome: "bottom-sheet, neat and readable, no major layout issues" ✓
+    - Step 1: "tooltip neat at bottom, does not cover login form, Daftar button visible" ✓
+    - Step 2: "form fully visible, all fields visible" + compact bar ✓
+    - Step 3: "OTP input 123456 visible, tooltip neat, Demo OTP badge present" ✓
+- TypeScript: tsc --noEmit clean
+- ESLint: bun run lint clean
+- Committed (9089380) + pushed to GitHub main
+
+Stage Summary:
+- Tour reduced to 4 steps: Welcome → Klik Daftar → Isi Data Diri → Masukkan OTP → Selesai
+- Voice guidance: Indonesian TTS speaks each step's narration automatically
+  (toggle on/off with Volume button in tooltip header)
+- Slower pacing: 4s announce (voice finishes), 90ms/char typing, 5-8s per step
+- Tooltip shows briefly (sekilas) then collapses to compact bar during typing
+- Mobile verified neat on all 4 steps by VLM
+- Note: TTS uses browser's built-in speechSynthesis (no backend needed).
+  Real browsers have Indonesian voices; headless Chrome has 0 voices but API works.
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
