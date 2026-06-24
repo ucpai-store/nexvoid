@@ -14,6 +14,10 @@ export interface TourStep {
   demoFields?: { selector: string; value: string; label?: string }[];
   /** Auto-play delay (ms) after typing/arrival before advancing. Default 3500 */
   autoAdvanceDelay?: number;
+  /** Page data to pass when navigating (e.g. email for OTP page) */
+  pageData?: Record<string, unknown>;
+  /** Optional demo OTP hint shown in tooltip (for the OTP step) */
+  demoOtpHint?: string;
 }
 
 interface TourState {
@@ -79,8 +83,13 @@ export const TOUR_STEPS: TourStep[] = [
     selector: 'otp-input',
     title: 'Langkah 3: Verifikasi OTP',
     description:
-      'Cek email/WhatsApp Anda untuk kode OTP. Masukkan kode 6 digit di kolom ini. Setelah verifikasi, akun Anda aktif dan bisa login.',
-    placement: 'bottom',
+      'Cek email/WhatsApp Anda untuk kode OTP. Masukkan kode 6 digit di kolom ini. Setelah verifikasi, akun Anda aktif dan bisa login. (Demo: kode otomatis diketik)',
+    placement: 'top',
+    demoFields: [
+      { selector: 'input[data-tour="otp-input"]', value: '123456', label: 'Kode OTP' },
+    ],
+    pageData: { email: 'budi@gmail.com', whatsapp: '8123456789', fromRegister: true },
+    demoOtpHint: 'Demo OTP: 123456',
     autoAdvanceDelay: 4500,
   },
   {

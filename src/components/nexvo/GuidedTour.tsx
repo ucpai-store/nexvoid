@@ -16,6 +16,7 @@ import {
   Pause,
   Radio,
   Type,
+  Shield,
 } from 'lucide-react';
 import { useTourStore, TOUR_STEPS } from '@/stores/tour-store';
 import { useAppStore } from '@/stores/app-store';
@@ -100,6 +101,21 @@ export default function GuidedTour() {
   const isMobile = viewport.w > 0 && viewport.w < 640;
   const isSmallMobile = viewport.w > 0 && viewport.w < 380;
 
+  // ─── When tour is active on MOBILE, push page content UP so the bottom
+  //     sheet never covers centered forms (login/register/OTP pages use
+  //     min-h-screen flex items-center → no scroll room → sheet would overlap).
+  //     We add bottom padding to <body> so flex-centered content shifts up. ───
+  useEffect(() => {
+    if (!isActive || !isMobile) return;
+    const prev = document.body.style.paddingBottom;
+    document.body.style.paddingBottom = 'calc(230px + env(safe-area-inset-bottom, 0px))';
+    document.body.style.transition = 'padding-bottom 0.3s ease';
+    return () => {
+      document.body.style.paddingBottom = prev;
+      document.body.style.transition = '';
+    };
+  }, [isActive, isMobile]);
+
   // ─── Show floating button if tour not active and user hasn't dismissed ───
   useEffect(() => {
     try {
@@ -135,7 +151,12 @@ export default function GuidedTour() {
   useEffect(() => {
     if (!isActive || !step) return;
     if (step.page && step.page !== currentPage) {
-      navigate(step.page as never);
+      // Pass pageData if the step defines it (e.g. OTP page needs email)
+      if (step.pageData && Object.keys(step.pageData).length > 0) {
+        navigate(step.page as never, step.pageData);
+      } else {
+        navigate(step.page as never);
+      }
     }
   }, [isActive, currentStep, step, currentPage, navigate]);
 
@@ -170,9 +191,9 @@ export default function GuidedTour() {
       setActualPlacement('bottom'); // arrow points down from target
       setTooltipPos({ top: 0, left: 0 }); // not used on mobile (fixed bottom sheet)
 
-      // Scroll target into upper 55% of viewport so it's visible above the bottom sheet
-      // Bottom sheet is ~200px tall + 80px bottom nav = ~280px from bottom
-      const sheetHeight = 220;
+      // Body padding (230px) already pushes centered content up so the sheet
+      // sits in empty space below. This scroll is a fallback for long pages.
+      const sheetHeight = 230;
       const visibleArea = vh - sheetHeight - 80; // 80 = bottom nav
       if (rect.top < 70 || rect.bottom > visibleArea) {
         const targetCenter = rect.top + rect.height / 2 + window.scrollY;
@@ -630,7 +651,17 @@ export default function GuidedTour() {
                     </div>
 
                     {/* Description */}
-                    <p className="text-muted-foreground text-[12.5px] sm:text-sm leading-relaxed mb-3 sm:mb-4">{step.description}</p>
+                    <p className="text-muted-foreground text-[12.5px] sm:text-sm leading-relaxed mb-2 sm:mb-3">{step.description}</p>
+
+                    {/* Demo OTP hint badge (only for OTP step) */}
+                    {step.demoOtpHint && (
+                      <div className="flex items-center gap-2 mb-3 sm:mb-4 px-3 py-2 rounded-xl bg-yellow-400/10 border border-yellow-400/30">
+                        <Shield className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                        <span className="text-yellow-400 text-[11px] sm:text-xs font-bold tracking-wide">{step.demoOtpHint}</span>
+                      </div>
+                    )}
+
+                    {!step.demoOtpHint && <div className="mb-3 sm:mb-4" />}
 
                     {/* Controls */}
                     <div className="flex items-center gap-2">
@@ -719,11 +750,12 @@ export default function GuidedTour() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 60 }}
                     transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                    className="fixed left-0 right-0 z-[93] rounded-t-2xl overflow-hidden border-2 border-yellow-400/80 border-b-0"
+                    className="fixed left-0 right-0 z-[93] rounded-t-2xl overflow-y-auto overflow-x-hidden border-2 border-yellow-400/80 border-b-0"
                     style={{
                       ...tooltipStyle,
                       bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
-                      maxHeight: '38vh',
+                      maxHeight: '34vh',
+                      WebkitOverflowScrolling: 'touch',
                     }}
                   >
                     {tooltipInner}
