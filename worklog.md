@@ -2570,3 +2570,29 @@ Stage Summary:
 - Salary: 1%/week PERMANENT (maxWeeks=0 = no limit), min 10 refs + active investment
 - Salary triggers every Monday 00:00 WIB
 - Both files pushed to GitHub origin/main
+
+---
+Task ID: weekend-libur-restore
+Agent: main (Z.ai Code)
+Task: User request — Sabtu & Minggu LIBUR (semua aktivitas mati), tapi hard cap + auto-catchup + salary permanen tetap
+
+Work Log:
+- User said: "hari sabtu dan minggu libur, semu aktivitas libur ya"
+- Restored weekend skip in cron-service processDailyInvestmentProfits() (Sabtu=6/Minggu=0 → return early)
+- Restored weekend skip in cron scheduler (00:00 WIB check → if weekend, log SKIP)
+- Added countWeekdaysBetween() helper: count only Mon-Fri between two dates
+- Updated auto-catchup to use countWeekdaysBetween() instead of raw calendar days
+  • Cron down Jumat→Senin = missedDays=1 (Sabtu/Minggu tidak dihitung)
+  • Cron down 2 weeks = missedDays=10 (10 hari kerja, bukan 14 hari kalender)
+- Updated transaction re-check to also use countWeekdaysBetween() (race condition guard)
+- Applied same changes to profit-trigger/route.ts (admin manual trigger)
+- Weekend guard can be bypassed with ?force=true for admin emergencies
+- Verified cron-service starts cleanly, API route returns 401 (compiles OK)
+- Committed + pushed (commit 5b1032f)
+
+Stage Summary:
+- Senin-Jumat 00:00 WIB: profit jalan normal + auto-catchup (weekday-only counting)
+- Sabtu & Minggu: LIBUR TOTAL (no profit, no matching, no salary)
+- Hard cap 576k: tetap aktif (dailyProfit × contractDays)
+- Salary: tetap PERMANEN (maxWeeks=0), tetap Senin 00:00 WIB
+- Admin manual trigger: bisa override weekend dengan ?force=true
