@@ -140,6 +140,11 @@ export default function GuidedTour() {
   }, [isActive, currentStep, step, currentPage, navigate]);
 
   // ─── Find target element + position tooltip (mobile-aware) ───
+  // MOBILE strategy: tooltip = FIXED bottom sheet (never covers form/button).
+  //   Target is scrolled into upper 55% of viewport so it's always visible above sheet.
+  //   Arrow points from target down toward the bottom sheet.
+  // DESKTOP strategy: tooltip floats near target with smart auto-flip,
+  //   never overlapping the target rect.
   const findAndPosition = useCallback(() => {
     if (!isActive || !step) return;
     if (step.placement === 'center' || !step.selector) {
@@ -160,50 +165,67 @@ export default function GuidedTour() {
     const vh = window.innerHeight;
     const mobile = vw < 640;
 
-    const tooltipWidth = mobile ? Math.min(vw - 24, 340) : 360;
-    const tooltipHeight = mobile ? 240 : 260;
-    const margin = mobile ? 12 : 16;
+    // ─── MOBILE: bottom sheet — no floating tooltip positioning needed ───
+    if (mobile) {
+      setActualPlacement('bottom'); // arrow points down from target
+      setTooltipPos({ top: 0, left: 0 }); // not used on mobile (fixed bottom sheet)
+
+      // Scroll target into upper 55% of viewport so it's visible above the bottom sheet
+      // Bottom sheet is ~200px tall + 80px bottom nav = ~280px from bottom
+      const sheetHeight = 220;
+      const visibleArea = vh - sheetHeight - 80; // 80 = bottom nav
+      if (rect.top < 70 || rect.bottom > visibleArea) {
+        const targetCenter = rect.top + rect.height / 2 + window.scrollY;
+        const desiredScroll = targetCenter - (70 + visibleArea) / 2;
+        window.scrollTo({ top: Math.max(0, desiredScroll), behavior: 'smooth' });
+      }
+      return;
+    }
+
+    // ─── DESKTOP: floating tooltip with smart positioning ───
+    const tooltipWidth = 360;
+    const tooltipHeight = 260;
+    const margin = 16;
+    const buffer = 12; // extra gap so tooltip never touches target
 
     let placement = step.placement || 'bottom';
 
-    if (mobile && (placement === 'left' || placement === 'right')) {
-      placement = 'bottom';
+    // Auto-flip if not enough space (ensure tooltip NEVER overlaps target)
+    if (placement === 'bottom' && rect.bottom + tooltipHeight + margin > vh - 20) {
+      placement = rect.top - tooltipHeight - margin > 20 ? 'top' : 'right';
     }
-    if (placement === 'bottom' && rect.bottom + tooltipHeight + margin > vh - 80) {
-      placement = rect.top - tooltipHeight - margin > 60 ? 'top' : 'bottom';
+    if (placement === 'top' && rect.top - tooltipHeight - margin < 20) {
+      placement = rect.bottom + tooltipHeight + margin < vh - 20 ? 'bottom' : 'right';
     }
-    if (placement === 'top' && rect.top - tooltipHeight - margin < 70) {
-      placement = rect.bottom + tooltipHeight + margin < vh - 80 ? 'bottom' : 'top';
+    if (placement === 'right' && rect.right + tooltipWidth + margin > vw - 20) {
+      placement = rect.left - tooltipWidth - margin > 20 ? 'left' : 'bottom';
     }
-    if (!mobile) {
-      if (placement === 'right' && rect.right + tooltipWidth + margin > vw) {
-        placement = rect.left - tooltipWidth - margin > 0 ? 'left' : 'bottom';
-      }
-      if (placement === 'left' && rect.left - tooltipWidth - margin < 0) {
-        placement = rect.right + tooltipWidth + margin < vw ? 'right' : 'bottom';
-      }
+    if (placement === 'left' && rect.left - tooltipWidth - margin < 20) {
+      placement = rect.right + tooltipWidth + margin < vw - 20 ? 'right' : 'bottom';
     }
     setActualPlacement(placement);
 
     let top = 0;
     let left = 0;
     if (placement === 'bottom') {
-      top = rect.bottom + margin;
+      top = rect.bottom + margin + buffer;
       left = rect.left + rect.width / 2 - tooltipWidth / 2;
     } else if (placement === 'top') {
-      top = rect.top - tooltipHeight - margin;
+      top = rect.top - tooltipHeight - margin - buffer;
       left = rect.left + rect.width / 2 - tooltipWidth / 2;
     } else if (placement === 'right') {
       top = rect.top + rect.height / 2 - tooltipHeight / 2;
-      left = rect.right + margin;
+      left = rect.right + margin + buffer;
     } else if (placement === 'left') {
       top = rect.top + rect.height / 2 - tooltipHeight / 2;
-      left = rect.left - tooltipWidth - margin;
+      left = rect.left - tooltipWidth - margin - buffer;
     }
+    // Clamp to viewport (leave room for margins)
     left = Math.max(margin, Math.min(left, vw - tooltipWidth - margin));
-    top = Math.max(margin + 60, Math.min(top, vh - tooltipHeight - margin - 80));
+    top = Math.max(margin + 20, Math.min(top, vh - tooltipHeight - margin - 20));
     setTooltipPos({ top, left });
 
+    // Scroll target into view if needed (desktop)
     if (rect.top < 90 || rect.bottom > vh - 100) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -522,17 +544,23 @@ export default function GuidedTour() {
               </motion.div>
             )}
 
-            {/* Auto-play typing indicator (floating badge near top) */}
+            {/* Auto-play typing indicator — DESKTOP ONLY (floating top).
+                On mobile it's integrated into the bottom sheet header. */}
             <AnimatePresence>
-              {isAutoPlay && typingLabel && (
+              {isAutoPlay && typingLabel && !isMobile && (
                 <motion.div
                   initial={{ opacity: 0, y: -20, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                  className="fixed top-3 left-1/2 -translate-x-1/2 z-[95] glass-strong border border-yellow-400/50 rounded-full px-3 py-1.5 flex items-center gap-2 glow-gold"
+                  className="fixed top-6 left-1/2 -translate-x-1/2 z-[95] rounded-full px-4 py-2 flex items-center gap-2"
+                  style={{
+                    background: 'rgba(8, 12, 24, 0.97)',
+                    border: '1.5px solid rgba(234,179,8,0.6)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(234,179,8,0.2)',
+                  }}
                 >
-                  <Type className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
-                  <span className="text-yellow-400 text-[11px] font-bold">Mengetik: {typingLabel}…</span>
+                  <Type className="w-4 h-4 text-yellow-400 animate-pulse" />
+                  <span className="text-yellow-400 text-xs font-bold">Mengetik: {typingLabel}…</span>
                   <span className="flex gap-0.5">
                     <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -542,138 +570,189 @@ export default function GuidedTour() {
               )}
             </AnimatePresence>
 
-            {/* Tooltip — solid dark background for max readability on video */}
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className={`fixed z-[93] ${tooltipWidthClass} rounded-2xl overflow-hidden border-2 border-yellow-400/80`}
-              style={
-                {
-                  background: 'rgba(8, 12, 24, 0.97)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  boxShadow:
-                    '0 0 0 1px rgba(234,179,8,0.4), 0 8px 32px rgba(0,0,0,0.6), 0 0 40px rgba(234,179,8,0.25)',
-                  ...(isCentered
-                    ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
-                    : { top: tooltipPos.top, left: tooltipPos.left }),
-                }
-              }
-            >
-              {/* Progress bar */}
-              <div className="h-1 bg-yellow-400/20 relative">
-                <motion.div
-                  className="h-full bg-gold-gradient"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-
-              <div className="p-4 sm:p-5">
-                {/* Header */}
-                <div className="flex items-start gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gold-gradient flex items-center justify-center font-bold text-primary-foreground text-xs sm:text-sm shrink-0 glow-gold">
-                    {currentStep + 1}
+            {/* ─── Tooltip content (shared between mobile bottom-sheet & desktop floating) ─── */}
+            {(() => {
+              const tooltipInner = (
+                <>
+                  {/* Progress bar */}
+                  <div className="h-1 bg-yellow-400/20 relative">
+                    <motion.div
+                      className="h-full bg-gold-gradient"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="text-foreground font-bold text-sm sm:text-base leading-tight">{step.title}</h3>
+
+                  <div className="p-3.5 sm:p-5">
+                    {/* Header */}
+                    <div className="flex items-start gap-2.5 sm:gap-3 mb-2 sm:mb-3">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gold-gradient flex items-center justify-center font-bold text-primary-foreground text-xs sm:text-sm shrink-0 glow-gold">
+                        {currentStep + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="text-foreground font-bold text-sm sm:text-base leading-tight">{step.title}</h3>
+                          {isAutoPlay && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[9px] font-bold uppercase tracking-wide">
+                              <Radio className="w-2.5 h-2.5 fill-current animate-pulse" />
+                              AUTO
+                            </span>
+                          )}
+                        </div>
+                        {/* Typing indicator — MOBILE: inline in header (not floating) */}
+                        {isAutoPlay && typingLabel && isMobile ? (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Type className="w-3 h-3 text-yellow-400 animate-pulse" />
+                            <span className="text-yellow-400 text-[10px] font-bold">Mengetik: {typingLabel}…</span>
+                            <span className="flex gap-0.5">
+                              <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-yellow-400/80 text-[10px] mt-0.5">
+                            Langkah {currentStep + 1} dari {TOUR_STEPS.length}
+                            {isAutoPlay && !isPaused && autoCountdown > 0 && (
+                              <span className="ml-1.5 text-emerald-400">• lanjut dalam {autoCountdown}s</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={skip}
+                        className="text-muted-foreground hover:text-foreground p-1 -mt-1 -mr-1 shrink-0"
+                        aria-label="Tutup panduan"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-muted-foreground text-[12.5px] sm:text-sm leading-relaxed mb-3 sm:mb-4">{step.description}</p>
+
+                    {/* Controls */}
+                    <div className="flex items-center gap-2">
+                      {currentStep > 0 && (
+                        <button
+                          onClick={handleManualPrev}
+                          className="px-3 h-9 sm:h-10 rounded-xl text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span className="hidden sm:inline">Kembali</span>
+                        </button>
+                      )}
+
+                      {/* Pause/Resume button — only in auto-play */}
                       {isAutoPlay && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[9px] font-bold uppercase tracking-wide">
-                          <Radio className="w-2.5 h-2.5 fill-current animate-pulse" />
-                          AUTO
-                        </span>
+                        <button
+                          onClick={togglePause}
+                          className="px-3 h-9 sm:h-10 rounded-xl text-yellow-400 text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0 hover:bg-yellow-400/10"
+                          style={{ border: '1px solid rgba(234,179,8,0.4)' }}
+                          aria-label={isPaused ? 'Lanjutkan' : 'Jeda'}
+                        >
+                          {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
+                          <span className="hidden sm:inline">{isPaused ? 'Lanjut' : 'Jeda'}</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={handleManualNext}
+                        className="flex-1 h-9 sm:h-10 bg-gold-gradient text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1 text-xs sm:text-sm"
+                      >
+                        {currentStep === TOUR_STEPS.length - 1 ? 'Selesai' : 'Lanjut'}
+                        {currentStep < TOUR_STEPS.length - 1 && <ChevronRight className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {/* Bottom row: skip + auto-play toggle */}
+                    <div className="flex items-center justify-between mt-2.5 gap-2">
+                      <button
+                        onClick={skip}
+                        className="text-muted-foreground/60 hover:text-muted-foreground text-[11px]"
+                      >
+                        Lewati panduan
+                      </button>
+                      {isAutoPlay ? (
+                        <button
+                          onClick={() => {
+                            typeCancelRef.current = true;
+                            if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+                            stopAutoPlay();
+                          }}
+                          className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline"
+                        >
+                          Matikan Auto
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            useTourStore.getState().setAutoPlay(true);
+                          }}
+                          className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline flex items-center gap-1"
+                        >
+                          <Radio className="w-3 h-3" />
+                          Nyalakan Auto
+                        </button>
                       )}
                     </div>
-                    <p className="text-yellow-400/80 text-[10px] mt-0.5">
-                      Langkah {currentStep + 1} dari {TOUR_STEPS.length}
-                      {isAutoPlay && !isPaused && autoCountdown > 0 && (
-                        <span className="ml-1.5 text-emerald-400">• lanjut dalam {autoCountdown}s</span>
-                      )}
-                    </p>
                   </div>
-                  <button
-                    onClick={skip}
-                    className="text-muted-foreground hover:text-foreground p-1 -mt-1 -mr-1 shrink-0"
-                    aria-label="Tutup panduan"
+                </>
+              );
+
+              const tooltipStyle = {
+                background: 'rgba(8, 12, 24, 0.97)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                boxShadow:
+                  '0 0 0 1px rgba(234,179,8,0.4), 0 8px 32px rgba(0,0,0,0.6), 0 0 40px rgba(234,179,8,0.25)',
+              };
+
+              // ─── MOBILE: fixed bottom sheet (NEVER covers form/button) ───
+              if (isMobile && !isCentered) {
+                return (
+                  <motion.div
+                    key={currentStep}
+                    initial={{ opacity: 0, y: 60 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 60 }}
+                    transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                    className="fixed left-0 right-0 z-[93] rounded-t-2xl overflow-hidden border-2 border-yellow-400/80 border-b-0"
+                    style={{
+                      ...tooltipStyle,
+                      bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
+                      maxHeight: '38vh',
+                    }}
                   >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+                    {tooltipInner}
+                  </motion.div>
+                );
+              }
 
-                {/* Description */}
-                <p className="text-muted-foreground text-[13px] sm:text-sm leading-relaxed mb-3 sm:mb-4">{step.description}</p>
-
-                {/* Controls */}
-                <div className="flex items-center gap-2">
-                  {currentStep > 0 && (
-                    <button
-                      onClick={handleManualPrev}
-                      className="px-3 h-10 glass border border-border rounded-xl text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      <span className="hidden sm:inline">Kembali</span>
-                    </button>
-                  )}
-
-                  {/* Pause/Resume button — only in auto-play */}
-                  {isAutoPlay && (
-                    <button
-                      onClick={togglePause}
-                      className="px-3 h-10 glass border border-yellow-400/40 text-yellow-400 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0 hover:bg-yellow-400/10"
-                      aria-label={isPaused ? 'Lanjutkan' : 'Jeda'}
-                    >
-                      {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
-                      <span className="hidden sm:inline">{isPaused ? 'Lanjut' : 'Jeda'}</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleManualNext}
-                    className="flex-1 h-10 bg-gold-gradient text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1 text-xs sm:text-sm"
-                  >
-                    {currentStep === TOUR_STEPS.length - 1 ? 'Selesai' : 'Lanjut'}
-                    {currentStep < TOUR_STEPS.length - 1 && <ChevronRight className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                {/* Bottom row: skip + auto-play toggle */}
-                <div className="flex items-center justify-between mt-2.5 gap-2">
-                  <button
-                    onClick={skip}
-                    className="text-muted-foreground/60 hover:text-muted-foreground text-[11px]"
-                  >
-                    Lewati panduan
-                  </button>
-                  {isAutoPlay ? (
-                    <button
-                      onClick={() => {
-                        typeCancelRef.current = true;
-                        if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-                        stopAutoPlay();
-                      }}
-                      className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline"
-                    >
-                      Matikan Auto
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        useTourStore.getState().setAutoPlay(true);
-                      }}
-                      className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline flex items-center gap-1"
-                    >
-                      <Radio className="w-3 h-3" />
-                      Nyalakan Auto
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
+              // ─── CENTERED (welcome/done) or DESKTOP floating ───
+              return (
+                <motion.div
+                  key={currentStep}
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className={`fixed z-[93] ${tooltipWidthClass} rounded-2xl overflow-hidden border-2 border-yellow-400/80`}
+                  style={
+                    {
+                      ...tooltipStyle,
+                      ...(isCentered
+                        ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+                        : { top: tooltipPos.top, left: tooltipPos.left }),
+                    }
+                  }
+                >
+                  {tooltipInner}
+                </motion.div>
+              );
+            })()}
           </>
         )}
       </AnimatePresence>
