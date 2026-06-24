@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
+  Info,
   TrendingUp, ShieldCheck, Clock, Loader2,
   AlertTriangle, RefreshCw, Wallet, CheckCircle2,
-  Coins, CalendarDays, Crown, Sparkles, AlertCircle,
-  Lock, Info
+  Coins, CalendarDays, Crown, Sparkles, AlertCircle
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAppStore } from '@/stores/app-store';
@@ -26,7 +26,7 @@ import { toast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n';
 
 /* ───────── Types ───────── */
-type TierState = 'available' | 'active' | 'bought' | 'locked';
+type TierState = 'available' | 'active' | 'bought';
 
 interface PackageItem {
   id: string;
@@ -39,7 +39,7 @@ interface PackageItem {
   totalInvestments: number;
   dailyProfit: number;
   totalProfit: number;
-  /** sequential-tier purchase state for the current user */
+  /** no-duplicates purchase state for the current user */
   state?: TierState;
   reason?: string;
 }
@@ -105,11 +105,10 @@ function PackageCard({
   const TierIcon = tier.icon;
   const isFeatured = tier.featured;
 
-  // Sequential-tier state for the current user
+  // No-duplicates state for the current user
   const state: TierState = pkg.state ?? 'available';
   const isActive = state === 'active';
   const isAvailable = state === 'available';
-  const isLocked = state === 'locked';
   const isBought = state === 'bought';
 
   const canBuy = isAvailable;
@@ -129,15 +128,10 @@ function PackageCard({
         </div>
       )}
 
-      {/* State ribbon (Aktif / Terkunci / Selesai) */}
+      {/* State ribbon (Aktif / Selesai) */}
       {isActive && (
         <div className="absolute top-0 left-0 bg-emerald-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
           <CheckCircle2 className="w-3 h-3" /> AKTIF
-        </div>
-      )}
-      {isLocked && (
-        <div className="absolute top-0 left-0 bg-slate-500/80 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
-          <Lock className="w-3 h-3" /> TERKUNCI
         </div>
       )}
       {isBought && (
@@ -217,15 +211,15 @@ function PackageCard({
           <p className="text-gold-gradient text-lg sm:text-xl font-bold mt-0.5">{formatRupiah(pkg.totalProfit)}</p>
         </div>
 
-        {/* Locked reason */}
-        {(isLocked || isBought) && pkg.reason && (
+        {/* Bought/active reason */}
+        {(isActive || isBought) && pkg.reason && (
           <div className="flex items-start gap-1.5 mb-3 p-2 rounded-lg bg-slate-400/5 border border-slate-400/15">
             <Info className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
             <p className="text-slate-400 text-[10px] leading-tight">{pkg.reason}</p>
           </div>
         )}
 
-        {/* Invest button — only the next sequential tier is purchasable */}
+        {/* Invest button — any unbought tier is purchasable */}
         {isActive ? (
           <div className="w-full h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Sedang Aktif
@@ -233,10 +227,6 @@ function PackageCard({
         ) : isBought ? (
           <div className="w-full h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400/80 font-semibold text-sm flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Sudah Dimiliki
-          </div>
-        ) : isLocked ? (
-          <div className="w-full h-11 rounded-xl bg-slate-500/10 border border-slate-500/20 text-slate-400 font-semibold text-sm flex items-center justify-center gap-2 cursor-not-allowed">
-            <Lock className="w-4 h-4" /> Terkunci
           </div>
         ) : (
           <Button
@@ -265,10 +255,11 @@ export default function PaketPage() {
   const [investing, setInvesting] = useState<string | null>(null);
   const [confirmPkg, setConfirmPkg] = useState<PackageItem | null>(null);
   const [successPkg, setSuccessPkg] = useState<PackageItem | null>(null);
-  // Sequential-tier availability for the logged-in user
+  // No-duplicates tier availability for the logged-in user
   const [tierInfo, setTierInfo] = useState<{
     currentTierName: string | null;
-    nextTierName: string | null;
+    remainingCount: number;
+    boughtCount: number;
     maxedOut: boolean;
   } | null>(null);
 
@@ -300,7 +291,8 @@ export default function PaketPage() {
               });
               setTierInfo({
                 currentTierName: avail.currentTierName,
-                nextTierName: avail.nextTierName,
+                remainingCount: avail.remainingCount ?? 0,
+                boughtCount: avail.boughtCount ?? 0,
                 maxedOut: !!avail.maxedOut,
               });
             }
@@ -358,8 +350,8 @@ export default function PaketPage() {
           setConfirmPkg(null);
           setSuccessPkg(pkg);
           toast({ title: t('common.success'), description: data.message || t('paket.investSuccess') });
-          // Refresh tier states so the newly active tier shows "Aktif" and the
-          // next tier becomes the only purchasable one.
+          // Refresh tier states so the newly active tier shows "Aktif" and
+          // remaining unbought tiers stay purchasable.
           fetchPackages();
         } else {
           toast({ title: 'Gagal', description: data.error || t('common.operationFailed'), variant: 'destructive' });
@@ -445,7 +437,7 @@ export default function PaketPage() {
         </p>
       </motion.div>
 
-      {/* Sequential-tier rule banner */}
+      {/* No-duplicates rule banner */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -456,21 +448,22 @@ export default function PaketPage() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-foreground text-xs sm:text-sm font-semibold mb-0.5">
-            Aturan Beli Berurutan · 1 Paket Aktif Saja
+            1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki
           </p>
           <p className="text-muted-foreground text-[10px] sm:text-xs leading-relaxed">
-            Paket &amp; Produk sama. Beli mulai dari paket terendah, lalu naik berurutan
-            (VIP 1 → VIP 2 → dst). Beli 1 macam dulu — setelah aktif, baru bisa beli
-            paket di atasnya. Profit masuk otomatis setiap hari jam 00:00 sesuai paket aktif.
+            Paket &amp; Produk sama. Beli 1 macam per transaksi — boleh pilih paket
+            mana saja yang <strong>belum dimiliki</strong>, tidak harus berurutan.
+            Setiap paket hanya bisa dibeli sekali. Profit masuk otomatis setiap hari
+            jam 00:00 sesuai paket aktif hari ini.
           </p>
-          {tierInfo && tierInfo.currentTierName && (
+          {tierInfo && (
             <p className="text-emerald-400 text-[10px] sm:text-xs font-medium mt-1.5">
-              Paket aktif Anda sekarang: <strong>{tierInfo.currentTierName}</strong>
+              {tierInfo.currentTierName
+                ? <>Paket aktif Anda sekarang: <strong>{tierInfo.currentTierName}</strong></>
+                : 'Anda belum punya paket aktif.'}
               {tierInfo.maxedOut
-                ? ' · Anda sudah di paket tertinggi.'
-                : tierInfo.nextTierName
-                ? ` · Bisa beli berikutnya: ${tierInfo.nextTierName}`
-                : ''}
+                ? ' · Anda sudah memiliki semua paket.'
+                : ` · ${tierInfo.remainingCount} paket lagi bisa dibeli.`}
             </p>
           )}
         </div>

@@ -1,13 +1,14 @@
 /**
- * Tier System — Unified Package/Product sequential purchasing.
+ * Tier System — Unified Package/Product purchasing (no-duplicates rule).
  *
  * Business rules (per product owner):
  *  - "Paket" dan "Produk" itu sama → both map to the same VIP tier list
  *    (sourced from InvestmentPackage, ordered by `amount` ascending).
  *  - Beli hanya 1 macam: a user may hold ONLY ONE active tier at a time.
- *  - Beli berurutan: must buy the next tier ABOVE the current one.
- *    If you own VIP 1 you are locked to it; to get another you must buy VIP 2,
- *    then VIP 3, etc. You cannot skip a tier.
+ *  - Pembelian TIDAK harus berurutan. User boleh beli tier mana saja yang
+ *    BELUM pernah dibeli, dalam urutan apapun (VIP 1, lalu VIP 5, misalnya).
+ *  - Setiap tier hanya bisa dibeli SEKALI. Tier yang sudah dibeli tidak bisa
+ *    dibeli lagi — user wajib pilih tier lain yang belum dimiliki.
  *  - Sistem berjalan sesuai paket/produk aktif hari ini → daily profit at 00:00
  *    WIB is credited by the cron based on the single active investment.
  */
@@ -15,11 +16,9 @@
 import { db } from '@/lib/db';
 
 export type TierState =
-  | 'available' // next tier the user is allowed to buy right now
-  | 'active' // user's currently active tier
-  | 'bought' // already owned but superseded (below current)
-  | 'locked' // above the next available — must buy lower tiers first
-  | 'maxed'; // user already owns the highest tier (only set on next-tier sentinel)
+  | 'available' // tier the user has NOT bought yet — purchasable now
+  | 'active' // user's currently active tier (most recently purchased)
+  | 'bought'; // already owned but superseded by a later purchase
 
 export interface TierInfo {
   id: string;
@@ -39,15 +38,16 @@ export interface TierInfo {
 
 export interface TierAvailability {
   tiers: TierInfo[];
-  /** id of the tier the user is allowed to buy next (null if maxed/none) */
-  nextTierId: string | null;
-  nextTierName: string | null;
+  /** number of tiers still purchasable (not yet bought) */
+  remainingCount: number;
+  /** true when user has bought every tier */
+  maxedOut: boolean;
   /** id of the user's currently active tier (null if none) */
   currentTierId: string | null;
   currentTierName: string | null;
   hasActive: boolean;
-  /** true when user already owns the highest tier */
-  maxedOut: boolean;
+  /** count of tiers the user has ever bought */
+  boughtCount: number;
 }
 
 /**
@@ -73,44 +73,36 @@ export async function loadOrderedTiers() {
 
 /**
  * Compute the user's tier availability:
- *  - which tier is active
- *  - which tier is the next purchasable one
- *  - which tiers are locked / already bought
+ *  - which tier is currently active
+ *  - which tiers are already bought (cannot buy again)
+ *  - which tiers are still available to buy (any order)
  *
- * Sequential rule: the only purchasable tier is the one immediately above
- * the user's highest-ever bought tier. If the user has bought nothing yet,
- * the lowest tier (index 0) is available.
+ * No-duplicates rule: any tier the user has NEVER bought is "available".
+ * Already-bought tiers are either "active" (the latest purchase) or
+ * "bought" (superseded by a later purchase).
  */
 export async function getUserTierAvailability(
   userId: string
 ): Promise<TierAvailability> {
   const tiers = await loadOrderedTiers();
 
-  // Every tier the user has ever bought (active or completed/superseded).
+  // Every tier the user has ever bought (active or completed/superseded),
+  // ordered by creation time so we can identify the most recent purchase.
   const userInvestments = await db.investment.findMany({
     where: { userId },
-    select: { packageId: true, status: true },
+    select: { packageId: true, status: true, createdAt: true },
+    orderBy: { createdAt: 'asc' },
   });
 
   const boughtTierIds = new Set(userInvestments.map((i) => i.packageId));
   const activeInvestment = userInvestments.find((i) => i.status === 'active');
 
-  // Highest tier index the user has ever bought.
-  let highestBoughtIndex = -1;
-  for (const tier of tiers) {
-    if (boughtTierIds.has(tier.id) && tier.tierIndex > highestBoughtIndex) {
-      highestBoughtIndex = tier.tierIndex;
-    }
-  }
-
-  // Next purchasable tier = immediately above highest bought (or 0 if none).
-  const nextTierIndex = highestBoughtIndex + 1;
-  const nextTier = nextTierIndex < tiers.length ? tiers[nextTierIndex] : null;
-  const maxedOut = nextTierIndex >= tiers.length && tiers.length > 0;
-
   const currentTier = activeInvestment
     ? tiers.find((t) => t.id === activeInvestment.packageId) || null
     : null;
+
+  const remainingCount = tiers.filter((t) => !boughtTierIds.has(t.id)).length;
+  const maxedOut = tiers.length > 0 && remainingCount === 0;
 
   const result: TierAvailability = {
     tiers: tiers.map((tier) => {
@@ -122,64 +114,72 @@ export async function getUserTierAvailability(
         reason = 'Paket aktif Anda hari ini';
       } else if (boughtTierIds.has(tier.id)) {
         state = 'bought';
-        reason = 'Sudah pernah dibeli';
-      } else if (nextTier && tier.id === nextTier.id) {
+        reason = 'Sudah pernah dibeli — pilih paket lain yang belum dimiliki';
+      } else {
         state = 'available';
         reason = currentTier
-          ? `Naik ke level berikutnya dari ${currentTier.name}`
-          : 'Paket pertama — silakan beli';
-      } else {
-        state = 'locked';
-        reason = currentTier
-          ? `Selesaikan ${currentTier.name} dulu, lalu naik berurutan`
-          : 'Beli mulai dari paket terendah';
+          ? `Beli paket lain yang belum dimiliki`
+          : 'Belum dimiliki — silakan beli';
       }
 
       return { ...tier, state, reason };
     }),
-    nextTierId: nextTier?.id ?? null,
-    nextTierName: nextTier?.name ?? null,
+    remainingCount,
+    maxedOut,
     currentTierId: currentTier?.id ?? null,
     currentTierName: currentTier?.name ?? null,
     hasActive: !!activeInvestment,
-    maxedOut,
+    boughtCount: boughtTierIds.size,
   };
 
   return result;
 }
 
 /**
- * Validate that a purchase request targets the next allowed tier.
+ * Validate that a purchase request targets a tier the user has NOT bought yet.
+ * Order does NOT matter — any unbought tier is allowed.
  * Returns { ok: true } or { ok: false, error }.
  */
-export async function validateSequentialPurchase(
+export async function validateTierPurchase(
   userId: string,
   packageId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const availability = await getUserTierAvailability(userId);
 
+  const tier = availability.tiers.find((t) => t.id === packageId);
+  if (!tier) {
+    return {
+      ok: false,
+      error: 'Paket tidak ditemukan atau tidak aktif.',
+    };
+  }
+
+  if (tier.state === 'active') {
+    return {
+      ok: false,
+      error: `Paket "${tier.name}" sedang aktif. Tidak bisa dibeli lagi — silakan pilih paket lain yang belum dimiliki.`,
+    };
+  }
+
+  if (tier.state === 'bought') {
+    return {
+      ok: false,
+      error: `Paket "${tier.name}" sudah pernah dibeli. Wajib pilih paket lain yang belum dimiliki.`,
+    };
+  }
+
   if (availability.maxedOut) {
     return {
       ok: false,
-      error:
-        'Anda sudah memiliki paket tertinggi. Tidak ada paket berikutnya untuk dibeli.',
-    };
-  }
-
-  if (!availability.nextTierId) {
-    return {
-      ok: false,
-      error: 'Tidak ada paket yang tersedia untuk dibeli saat ini.',
-    };
-  }
-
-  if (packageId !== availability.nextTierId) {
-    const nextName = availability.nextTierName || 'paket berikutnya';
-    return {
-      ok: false,
-      error: `Pembelian harus berurutan. Paket yang bisa Anda beli sekarang adalah "${nextName}". Selesaikan dulu paket di bawahnya sebelum naik ke level lebih tinggi.`,
+      error: 'Anda sudah memiliki semua paket. Tidak ada paket baru untuk dibeli.',
     };
   }
 
   return { ok: true };
 }
+
+/**
+ * Backward-compatible alias. Older code imported `validateSequentialPurchase`;
+ * the rule is no longer sequential but the function still validates a purchase.
+ */
+export const validateSequentialPurchase = validateTierPurchase;

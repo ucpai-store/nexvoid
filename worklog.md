@@ -1902,3 +1902,80 @@ Stage Summary:
 - PaketPage UI shows Aktif/Beli Sekarang/Terkunci/Sudah Dimiliki states + rule banner; mobile-verified neat
 - ProductsPage renders the same VIP tier grid; ProductDetailPage redirects to paket
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tier-system-no-duplicates
+Agent: main
+Task: User clarification — 'pembelian gk harus urut intinya produk kalo udah di beli kalo mo beli lagi wajib produk yg lainya paham kan' — CHANGE the previous sequential purchase rule. Purchases do NOT need to be in order. The only rule: a product/tier that has already been bought cannot be bought again — must pick a different (unbought) tier. Any unbought tier is purchasable in any order.
+
+Work Log:
+- Read previous worklog (tier-system-unify) to understand the existing sequential implementation
+- Inspected current files: src/lib/tier-system.ts, src/app/api/investments/route.ts, src/app/api/investments/tiers/route.ts, src/components/nexvo/pages/PaketPage.tsx
+- Rewrote src/lib/tier-system.ts with the NEW no-duplicates rule:
+  * Removed 'locked' and 'maxed' states from TierState (now only: available | active | bought)
+  * Removed nextTierId / nextTierName / highestBoughtIndex / sequential logic
+  * Added remainingCount, boughtCount to TierAvailability
+  * getUserTierAvailability(): any tier NOT in boughtTierIds → 'available' (any order)
+  * Added validateTierPurchase() — rejects only if tier.state is 'active' or 'bought'
+  * Kept backward-compatible alias: validateSequentialPurchase = validateTierPurchase
+  * Updated header docs: "Pembelian TIDAK harus berurutan. Setiap tier hanya bisa dibeli SEKALI."
+- Updated src/app/api/investments/route.ts POST:
+  * Renamed enforcement comment to "No-duplicates tier enforcement"
+  * Comment now: "Pembelian TIDAK harus berurutan — user boleh beli tier mana saja yang BELUM pernah dibeli"
+  * Kept the "supersede previously active investments" logic (only 1 active tier at a time)
+- Updated src/app/api/investments/tiers/route.ts header comment to match new rule
+- Updated src/components/nexvo/pages/PaketPage.tsx:
+  * Removed 'locked' from TierState; removed Lock import from lucide-react
+  * Removed all isLocked / TERKUNCI ribbon + button rendering
+  * Reordered lucide-react imports (Info first) to work around a Turbopack module-factory cache bug
+  * Updated tierInfo state: removed nextTierName, added remainingCount + boughtCount
+  * Rewrote rule banner:
+    - Title: "1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki"
+    - Body: "Beli 1 macam per transaksi — boleh pilih paket mana saja yang belum dimiliki, tidak harus berurutan. Setiap paket hanya bisa dibeli sekali. Profit masuk otomatis setiap hari jam 00:00 sesuai paket aktif hari ini."
+    - Status line: shows current active tier + "{N} paket lagi bisa dibeli" or "sudah memiliki semua paket"
+  * Updated post-purchase refresh comment
+- Updated stale comments in ProductsPage.tsx and ProductDetailPage.tsx (removed "berurutan" wording)
+- Restarted cron-service (mini-services/cron-service/index.ts on port 3032) — it was dead. Confirmed running and will trigger daily profit at 00:00 WIB based on the single active investment.
+
+Verification (API + Agent Browser + VLM, iPhone 14 viewport):
+  * API /api/investments/tiers (test user TIERT570438 who already owns VIP 1 + VIP 2 + VIP 6):
+    - VIP 1: state=bought, reason="Sudah pernah dibeli — pilih paket lain yang belum dimiliki" ✓
+    - VIP 2: state=bought ✓
+    - VIP 3: state=available ✓
+    - VIP 4: state=available ✓
+    - VIP 5: state=available ✓
+    - VIP 6: state=active, reason="Paket aktif Anda hari ini" ✓
+    - currentTierName=VIP 6, remainingCount=3, boughtCount=3, maxedOut=false ✓
+  * Purchase validation tests via /api/investments POST:
+    - Re-buy VIP 1 (bought) → REJECTED: "Paket 'VIP 1' sudah pernah dibeli. Wajib pilih paket lain yang belum dimiliki." ✓
+    - Re-buy VIP 2 (active) → REJECTED: "Paket 'VIP 2' sedang aktif. Tidak bisa dibeli lagi — silakan pilih paket lain yang belum dimiliki." ✓
+    - Buy VIP 6 while skipping VIP 3/4/5 → SUCCEEDED (proves no order required) ✓ — this was the test user's actual VIP 6 purchase
+  * Agent Browser (iPhone 14) on /#paket (logged in as test user):
+    - Page renders with NO runtime errors (after clearing .next cache + service worker + reordering lucide imports to dodge a Turbopack module-factory bug)
+    - Banner text visible: "1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki"
+    - Rule body visible: "belum dimiliki, tidak harus berurutan. Setiap paket hanya bisa dibeli sekali. Profit masuk otomatis setiap hari jam 00:00 sesuai paket aktif hari ini."
+    - Active tier line: "Paket aktif Anda sekarang: VIP 6"
+    - VIP 1: "Sudah Dimiliki" + reason text ✓
+    - VIP 2: "Sudah Dimiliki" + reason text ✓
+    - VIP 3: "Beli Sekarang" button (available) ✓
+    - VIP 4: "Beli Sekarang" button (available) ✓
+    - VIP 5: "Beli Sekarang" button (available) ✓
+    - VIP 6: "Sedang Aktif" ✓
+  * VLM screenshot analysis confirmed:
+    - "VIP 2: Sudah Dimiliki (blue button)"
+    - "VIP 3, VIP 4, VIP 5: Beli Sekarang (yellow button)"
+    - "VIP 6: Sedang Aktif (green button)"
+    - "Layout is neat and mobile-friendly with no overlap"
+  * Dev log clean — only pre-existing warnings (Cache-Control, client-side DB notice, cross-origin font from preview env)
+  * cron-service running on port 3032, schedule confirmed: "Daily Profit + Matching: 00:00 WIB every day"
+- TypeScript: tsc --noEmit clean on all changed files (no new errors; pre-existing errors only in unrelated files like cron-service.ts, wa-bot, admin routes)
+- Turbopack dev cache bug workaround: after editing the lucide-react import block (removing Lock), Turbopack served a stale chunk referencing a missing module factory for info.js. Fixed by (1) full .next cache wipe, (2) closing agent-browser to clear its chunk cache, (3) unregistering service worker + clearing caches, (4) reordering the lucide-react import statement (Info first). Page now loads cleanly.
+
+Stage Summary:
+- Purchase rule CHANGED from sequential to no-duplicates per user's clarification
+- "pembelian gk harus urut" → any unbought tier is purchasable in any order (VIP 1 → VIP 6 allowed, VIP 3 → VIP 1 allowed, etc.)
+- "kalo udah di beli kalo mo beli lagi wajib produk yg lainya" → already-bought tiers are rejected with a clear Indonesian error message; UI shows them as "Sudah Dimiliki" (disabled)
+- Only ONE active tier per user preserved (buying a new tier supersedes the previous active one) — satisfies "1 paket aktif saja" + "sistem berjalan sesuai paket aktif hari ini"
+- Profit at 00:00 WIB via cron-service (port 3032, running) — credits daily profit based on the single active tier
+- PaketPage UI updated: removed "Terkunci" state entirely, new banner "1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki", shows remaining count of purchasable tiers
+- Mobile-verified neat by VLM (iPhone 14 viewport)

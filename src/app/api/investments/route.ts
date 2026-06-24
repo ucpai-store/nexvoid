@@ -142,9 +142,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ★ Sequential tier enforcement ★
-    // Paket & produk sama. User hanya boleh membeli 1 macam dan harus berurutan:
-    // beli VIP 1 → terkunci → wajib beli VIP 2 → dst. Tidak boleh loncat.
+    // ★ No-duplicates tier enforcement ★
+    // Paket & produk sama. User hanya boleh membeli 1 macam per transaksi.
+    // Pembelian TIDAK harus berurutan — user boleh beli tier mana saja yang
+    // BELUM pernah dibeli. Tier yang sudah dibeli tidak bisa dibeli lagi.
     const tierCheck = await validateSequentialPurchase(user.id, packageId);
     if (!tierCheck.ok) {
       return NextResponse.json(
@@ -198,8 +199,9 @@ export async function POST(request: NextRequest) {
         });
 
         // ★ Only ONE active tier per user ★
-        // When upgrading to the next tier, supersede all previously active
-        // investments so the system runs solely on the newly purchased tier.
+        // When buying a new tier, supersede all previously active investments
+        // so the system runs solely on the newly purchased tier. Sistem wajib
+        // berjalan sesuai paket/produk yg aktif hari ini (latest purchase).
         await tx.investment.updateMany({
           where: { userId: user.id, status: 'active' },
           data: { status: 'completed' },

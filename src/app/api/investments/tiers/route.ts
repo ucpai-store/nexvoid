@@ -6,13 +6,13 @@ import { getUserTierAvailability } from '@/lib/tier-system';
  * GET /api/investments/tiers
  * Returns the unified VIP tier list (paket = produk) with each tier's
  * purchase state for the authenticated user:
- *   - active   → user's currently active tier
- *   - available → the next tier the user is allowed to buy (berurutan)
- *   - bought   → already owned but superseded
- *   - locked   → above the next available; must buy lower tiers first
+ *   - active    → user's currently active tier (most recent purchase)
+ *   - available → tier the user has NOT bought yet — purchasable in any order
+ *   - bought    → already owned but superseded (cannot buy again)
  *
- * This drives the "beli hanya 1 macam, wajib berurutan" UI on both the
- * Paket page and the Produk page.
+ * Rule: pembelian TIDAK harus berurutan. Setiap tier hanya bisa dibeli sekali.
+ * This drives the "beli hanya 1 macam, tidak boleh beli yg sudah dimiliki" UI
+ * on both the Paket page and the Produk page.
  */
 export async function GET(request: NextRequest) {
   try {

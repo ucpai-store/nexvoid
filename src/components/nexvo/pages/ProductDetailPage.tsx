@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button';
  *
  * Karena paket dan produk kini disatukan, halaman detail produk lama tidak
  * lagi dipakai. Pengguna diarahkan ke halaman Paket (daftar VIP tier) di mana
- * pembelian berurutan diberlakukan. Profit masuk otomatis jam 00:00 sesuai
- * paket aktif.
+ * berlaku aturan 1 paket aktif saja & tidak boleh beli yg sudah dimiliki.
+ * Profit masuk otomatis jam 00:00 sesuai paket aktif.
  */
 export default function ProductDetailPage() {
   const { navigate } = useAppStore();
