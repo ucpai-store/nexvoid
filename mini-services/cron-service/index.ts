@@ -2,9 +2,13 @@
  * NEXVO Cron Service
  *
  * Runs scheduled tasks automatically:
- * - Daily Investment Profit: Every day at 00:00 WIB
+ * - Daily Investment Profit: Every weekday (Mon-Fri) at 00:00 WIB
+ *   + BACKFILL: any missed weekdays since lastProfitDate are credited in one shot
+ *   + SKIP Saturday & Sunday (libur — no profit on weekends)
  *   + Immediately credits matching profit to upline (event-driven)
  * - Weekly Salary Bonus: Every Monday at 00:00 WIB
+ *   + 1% per week, FOREVER (maxWeeks <= 0 = unlimited)
+ *   + Requires: invite >= 10 people AND user has at least 1 active investment
  *
  * Uses Prisma directly to access the database.
  * Port: 3032
@@ -254,6 +258,10 @@ async function processAllSalaryBonuses(): Promise<{
     return result;
   }
 
+  // ★ maxWeeks <= 0 = UNLIMITED (selamanya) ★
+  const unlimited = !config.maxWeeks || config.maxWeeks <= 0;
+  console.log(`[Salary Cron] Mode: salaryRate=${config.salaryRate}%/week, maxWeeks=${unlimited ? 'UNLIMITED (selamanya)' : config.maxWeeks}, minDirectRefs=${config.minDirectRefs}, requireOwnActiveInvestment=true`);
+
   const { weekNumber, year } = getWeekInfo(getWibNow());
 
   const users = await db.user.findMany({
@@ -265,18 +273,21 @@ async function processAllSalaryBonuses(): Promise<{
 
   for (const user of users) {
     try {
+      // ★ CHECK 1: Wajib invite minimal minDirectRefs orang (default 10) ★
       const refCount = await getDirectRefCount(user.id);
       if (refCount < config.minDirectRefs) {
         result.skipped++;
         continue;
       }
 
+      // ★ CHECK 2: maxWeeks cap (skip if unlimited) ★
       const weeksReceived = await db.salaryBonus.count({ where: { userId: user.id, status: 'paid' } });
-      if (weeksReceived >= config.maxWeeks) {
+      if (!unlimited && weeksReceived >= config.maxWeeks) {
         result.completed++;
         continue;
       }
 
+      // ★ CHECK 3: unique per week ★
       const existing = await db.salaryBonus.findUnique({
         where: { userId_weekNumber_year: { userId: user.id, weekNumber, year } },
       });
@@ -285,6 +296,16 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
+      // ★ CHECK 4 (NEW): Wajib memiliki investasi aktif sendiri ★
+      const ownActiveInvestments = await db.investment.count({
+        where: { userId: user.id, status: 'active' },
+      });
+      if (ownActiveInvestments === 0) {
+        result.skipped++;
+        continue;
+      }
+
+      // ★ CHECK 5: effective refs (referrals with active investments) ★
       const effectiveRefs = config.requireActiveDeposit
         ? await getActiveDepositRefCount(user.id)
         : refCount;
@@ -303,6 +324,9 @@ async function processAllSalaryBonuses(): Promise<{
       }
 
       const currentWeekOfTotal = weeksReceived + 1;
+      const weekLabel = unlimited
+        ? `Minggu ke-${currentWeekOfTotal} (selamanya)`
+        : `${currentWeekOfTotal}/${config.maxWeeks}`;
 
       await db.$transaction(async (tx) => {
         await tx.user.update({
@@ -336,7 +360,7 @@ async function processAllSalaryBonuses(): Promise<{
             type: 'salary',
             level: 0,
             amount: salaryAmount,
-            description: `Gaji mingguan otomatis Minggu ${weekNumber}/${year} (${currentWeekOfTotal}/${config.maxWeeks}) - ${effectiveRefs} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
+            description: `Gaji mingguan otomatis Minggu ${weekNumber}/${year} (${weekLabel}) - ${effectiveRefs} referral aktif, ${ownActiveInvestments} investasi aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
           },
         });
       });
@@ -344,7 +368,7 @@ async function processAllSalaryBonuses(): Promise<{
       result.eligible++;
       result.totalAmount += salaryAmount;
       result.processed++;
-      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} (Week ${currentWeekOfTotal}/${config.maxWeeks})`);
+      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} (${weekLabel})`);
     } catch (error: any) {
       result.errors++;
       console.error(`[Salary Cron] ❌ ${user.userId}: ${error.message}`);
@@ -365,17 +389,10 @@ async function processDailyInvestmentProfits(): Promise<{
 }> {
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0 };
 
-  // ─── WEEKEND LIBUR: No profit distribution on Saturday & Sunday ───
   const wibNow = getWibNow();
-  const dayOfWeek = wibNow.getDay(); // 0=Sunday, 6=Saturday
-  if (dayOfWeek === 0 || dayOfWeek === 6) {
-    const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-    console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
-    return result;
-  }
-
   const now = wibNow;
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayName = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][now.getDay()];
 
   // Get all active investments
   const investments = await db.investment.findMany({
@@ -383,109 +400,145 @@ async function processDailyInvestmentProfits(): Promise<{
     include: { package: true },
   });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments...`);
+  console.log(`[Profit Cron] WIB now: ${wibNow.toISOString()} (${dayName})`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (with BACKFILL of missed weekdays, skip Sat/Sun)...`);
 
   for (const inv of investments) {
     try {
-      // Check if already credited today
-      if (inv.lastProfitDate) {
-        const lastDate = new Date(inv.lastProfitDate);
-        if (lastDate.getFullYear() === today.getFullYear() &&
-            lastDate.getMonth() === today.getMonth() &&
-            lastDate.getDate() === today.getDate()) {
-          continue; // Already credited today
-        }
-      }
+      // ─── Determine the start of crediting window ───
+      // - If lastProfitDate exists: start from the day AFTER lastProfitDate
+      // - Else (first time): start from startDate (the day investment began)
+      const lastCredited = inv.lastProfitDate
+        ? new Date(inv.lastProfitDate)
+        : new Date(inv.startDate);
+      const lastCreditedDay = new Date(lastCredited.getFullYear(), lastCredited.getMonth(), lastCredited.getDate());
 
-      // Check if investment has ended
+      // ─── Determine the end of crediting window ───
+      // - If endDate exists and now >= endDate: cap at endDate and mark investment completed
+      // - Else: end at today
+      let endDay = today;
+      let shouldComplete = false;
       if (inv.endDate) {
         const endDate = new Date(inv.endDate);
+        const endDateDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
         if (now >= endDate) {
-          await db.investment.update({
-            where: { id: inv.id },
-            data: { status: 'completed' },
-          });
-          continue;
+          endDay = endDateDay;
+          shouldComplete = true;
         }
       }
 
-      // Credit daily profit — use the stored `dailyProfit` value on the Investment.
-      // This value was set at purchase time based on the Product's profitRate.
-      // Fallback: recalculate from package.profitRate if stored value is 0 (legacy investments).
+      // ─── Count MISSED WEEKDAYS (Mon-Fri) from (lastCreditedDay + 1 day) to endDay (inclusive) ───
+      // Skip Sat (6) and Sun (0) — libur, no profit on weekends.
+      const missedDates: Date[] = [];
+      const cursor = new Date(lastCreditedDay);
+      cursor.setDate(cursor.getDate() + 1); // start from day AFTER last credited
+      while (cursor.getTime() <= endDay.getTime()) {
+        const dow = cursor.getDay();
+        if (dow !== 0 && dow !== 6) {
+          // Weekday (Mon-Fri) — eligible for profit
+          missedDates.push(new Date(cursor));
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      if (missedDates.length === 0 && !shouldComplete) {
+        // Nothing to credit and not completed — skip silently
+        continue;
+      }
+
+      // ─── Calculate daily profit (stored value preferred, fallback to package.profitRate) ───
       const dailyProfit = inv.dailyProfit > 0
         ? inv.dailyProfit
         : Math.floor(inv.amount * (inv.package.profitRate / 100));
 
+      const totalCredit = dailyProfit * missedDates.length;
+
       await db.$transaction(async (tx) => {
         // ★ RE-CHECK inside transaction to prevent double credit (race condition) ★
         const currentInv = await tx.investment.findUnique({ where: { id: inv.id } });
-        if (currentInv?.lastProfitDate) {
-          const lastDate = new Date(currentInv.lastProfitDate);
-          if (lastDate.getFullYear() === today.getFullYear() &&
-              lastDate.getMonth() === today.getMonth() &&
-              lastDate.getDate() === today.getDate()) {
-            return; // Already credited today — skip
+        if (!currentInv || currentInv.status !== 'active') return;
+        // If another run already moved lastProfitDate past our snapshot, abort
+        if (currentInv.lastProfitDate) {
+          const curLast = new Date(currentInv.lastProfitDate);
+          if (curLast.getTime() > lastCredited.getTime()) {
+            return;
           }
         }
 
-        // 1. Credit daily profit to user's mainBalance
-        await tx.user.update({
-          where: { id: inv.userId },
-          data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
-          },
-        });
-
-        // 2. Update investment record (also fix stored dailyProfit if incorrect)
-        await tx.investment.update({
-          where: { id: inv.id },
-          data: {
-            totalProfitEarned: { increment: dailyProfit },
-            dailyProfit: dailyProfit, // Fix stored value if it was wrong
-            lastProfitDate: now,
-          },
-        });
-
-        // 3. Create profit log
-        const purchase = await tx.purchase.findFirst({
-          where: { userId: inv.userId, status: 'active' },
-          orderBy: { createdAt: 'desc' },
-        });
-
-        if (purchase) {
-          await tx.profitLog.create({
+        if (totalCredit > 0) {
+          // 1. Credit total backfill profit to user's mainBalance
+          await tx.user.update({
+            where: { id: inv.userId },
             data: {
-              purchaseId: purchase.id,
-              userId: inv.userId,
-              amount: dailyProfit,
+              mainBalance: { increment: totalCredit },
+              totalProfit: { increment: totalCredit },
             },
           });
-        }
 
-        // 4. Create bonus log for daily profit
-        await tx.bonusLog.create({
-          data: {
-            userId: inv.userId,
-            fromUserId: inv.userId,
-            type: 'reward',
-            level: 0,
-            amount: dailyProfit,
-            description: `Profit harian investasi ${formatRupiahSimple(inv.amount)} — ${formatRupiahSimple(dailyProfit)}`,
-          },
-        });
+          // 2. Update investment record (also fix stored dailyProfit if incorrect)
+          await tx.investment.update({
+            where: { id: inv.id },
+            data: {
+              totalProfitEarned: { increment: totalCredit },
+              dailyProfit: dailyProfit,
+              lastProfitDate: now,
+              ...(shouldComplete ? { status: 'completed' as const } : {}),
+            },
+          });
 
-        // 5. ★ EVENT-DRIVEN MATCHING BONUS ★
-        // Credit matching bonus to all upline members immediately
-        const matchResult = await creditMatchingOnProfit(tx, inv.userId, dailyProfit);
+          // 3. Create profit log (one aggregated entry)
+          const purchase = await tx.purchase.findFirst({
+            where: { userId: inv.userId, status: 'active' },
+            orderBy: { createdAt: 'desc' },
+          });
 
-        if (matchResult.totalMatchCredited > 0) {
-          result.totalMatching += matchResult.totalMatchCredited;
+          if (purchase) {
+            await tx.profitLog.create({
+              data: {
+                purchaseId: purchase.id,
+                userId: inv.userId,
+                amount: totalCredit,
+              },
+            });
+          }
+
+          // 4. Create bonus log for daily profit (with backfill date range description)
+          const dateRangeStr = missedDates.length === 1
+            ? `tanggal ${missedDates[0].toISOString().slice(0, 10)}`
+            : `backfill ${missedDates.length} hari kerja (${missedDates[0].toISOString().slice(0, 10)} s/d ${missedDates[missedDates.length - 1].toISOString().slice(0, 10)})`;
+          await tx.bonusLog.create({
+            data: {
+              userId: inv.userId,
+              fromUserId: inv.userId,
+              type: 'reward',
+              level: 0,
+              amount: totalCredit,
+              description: `Profit harian investasi ${formatRupiahSimple(inv.amount)} — ${formatRupiahSimple(totalCredit)} (${dateRangeStr})${shouldComplete ? ' [investasi selesai]' : ''}`,
+            },
+          });
+
+          // 5. ★ EVENT-DRIVEN MATCHING BONUS — credited on total backfill amount ★
+          const matchResult = await creditMatchingOnProfit(tx, inv.userId, totalCredit);
+
+          if (matchResult.totalMatchCredited > 0) {
+            result.totalMatching += matchResult.totalMatchCredited;
+          }
+        } else if (shouldComplete) {
+          // No profit to credit (already up to date), but mark investment as completed
+          await tx.investment.update({
+            where: { id: inv.id },
+            data: { status: 'completed' },
+          });
         }
       });
 
-      result.processed++;
-      result.totalProfit += dailyProfit;
+      if (totalCredit > 0) {
+        result.processed++;
+        result.totalProfit += totalCredit;
+        console.log(`[Profit Cron] ✅ Investment ${inv.id} (user ${inv.userId}): credited ${missedDates.length} weekday(s) × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}${shouldComplete ? ' [investasi selesai]' : ''}`);
+      } else if (shouldComplete) {
+        console.log(`[Profit Cron] ✓ Investment ${inv.id} (user ${inv.userId}): marked completed (no missed profit)`);
+      }
     } catch (error: any) {
       result.errors++;
       console.error(`[Profit Cron] ❌ Investment ${inv.id}: ${error.message}`);
@@ -587,15 +640,16 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // Daily profit + matching bonus: Every day at 00:00 WIB (check minute 0 with 2-min window)
-  // ★ WEEKEND LIBUR: No profit distribution on Saturday (6) & Sunday (0) ★
+  // Daily profit + matching bonus: Every weekday (Mon-Fri) at 00:00 WIB
+  // ★ WEEKEND LIBUR: cron scheduler SKIPS Saturday (6) & Sunday (0) ★
+  // (Manual trigger via /api/trigger/profit can still run on weekends to backfill missed weekdays)
   if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr) {
     lastProfitRunDate = dateStr;
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-      console.log(`\n[CRON] ⏸️ Profit cron SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+      console.log(`\n[CRON] ⏸️ Auto profit cron SKIPPED — today is ${dayName} (weekend libur). Manual trigger still works for backfill.`);
     } else {
-      console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()}...`);
+      console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus (with BACKFILL) at ${wibNow.toISOString()}...`);
       processDailyInvestmentProfits().then((result) => {
         console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
       }).catch(console.error);
@@ -709,8 +763,8 @@ const server = Bun.serve({
 console.log(`[Cron Service] 🚀 Running on port ${PORT}`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
-console.log(`  - Daily Profit + Matching: 00:00 WIB every day`);
-console.log(`  - Weekly Salary: 00:00 WIB every Monday`);
+console.log(`  - Daily Profit + Matching (with BACKFILL): 00:00 WIB every Mon-Fri (skip Sat/Sun libur)`);
+console.log(`  - Weekly Salary: 00:00 WIB every Monday (1%/week, unlimited weeks, require 10 refs + own active investment)`);
 console.log(`  - Quota Bump: every 15 minutes (auto-increment Kuota Terisi, reset when full)`);
 console.log(`  - Matching: Event-driven (credited automatically with daily profit)`);
 console.log(`  - Level 6+ matching: AUTO DISCONNECT (no bonus)`);

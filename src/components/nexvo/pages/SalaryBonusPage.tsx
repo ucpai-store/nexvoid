@@ -173,6 +173,10 @@ export default function SalaryBonusPage() {
   const groupOmzet = eligibility?.groupOmzet ?? 0;
   const userHasActiveDeposit = eligibility?.userHasActiveDeposit ?? false;
   const allRefsActive = eligibility?.allRefsActive ?? false;
+  // ★ maxWeeks <= 0 = UNLIMITED (selamanya) ★
+  const unlimited = !maxWeeks || maxWeeks <= 0;
+  const maxWeeksLabel = unlimited ? 'selamanya' : `${maxWeeks} minggu`;
+  const weeksRemainingLabel = unlimited ? 'selamanya' : `${weeksRemaining} minggu`;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
@@ -182,7 +186,7 @@ export default function SalaryBonusPage() {
           <Banknote className="w-6 h-6 text-primary" />
           Bonus Gaji Mingguan
         </h1>
-        <p className="text-muted-foreground text-sm">Dapatkan {salaryRate}% dari omzet grup setiap minggu selama {maxWeeks} minggu</p>
+        <p className="text-muted-foreground text-sm">Dapatkan {salaryRate}% dari omzet grup setiap minggu selama {maxWeeksLabel}</p>
       </div>
 
       {/* Completed Banner */}
@@ -197,7 +201,7 @@ export default function SalaryBonusPage() {
           </div>
           <h2 className="text-foreground text-lg font-bold mb-1">Program Gaji Selesai! 🎉</h2>
           <p className="text-muted-foreground text-sm">
-            Anda telah menerima gaji mingguan selama {maxWeeks} minggu. Total: {formatRupiah(data?.totalSalaryEarned || 0)}
+            Anda telah menerima gaji mingguan selama {maxWeeksLabel}. Total: {formatRupiah(data?.totalSalaryEarned || 0)}
           </p>
         </motion.div>
       )}
@@ -239,20 +243,20 @@ export default function SalaryBonusPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-foreground text-sm font-medium">Progress Mingguan</span>
                 <span className="text-muted-foreground text-xs font-bold">
-                  {weeksReceived} / {maxWeeks} Minggu
+                  {weeksReceived} {unlimited ? 'minggu diterima (selamanya)' : `/ ${maxWeeks} Minggu`}
                 </span>
               </div>
               <div className="w-full h-3 rounded-full bg-foreground/5 overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${(weeksReceived / maxWeeks) * 100}%` }}
+                  animate={{ width: unlimited ? '100%' : `${(weeksReceived / maxWeeks) * 100}%` }}
                   transition={{ duration: 1, ease: 'easeOut' }}
                   className="h-full rounded-full bg-gold-gradient"
                 />
               </div>
               <div className="flex justify-between mt-1.5">
-                <span className="text-muted-foreground text-[10px]">Sisa: {weeksRemaining} minggu</span>
-                <span className="text-muted-foreground text-[10px]">{Math.round((weeksReceived / maxWeeks) * 100)}%</span>
+                <span className="text-muted-foreground text-[10px]">Sisa: {weeksRemainingLabel}</span>
+                <span className="text-muted-foreground text-[10px]">{unlimited ? '∞' : `${Math.round((weeksReceived / maxWeeks) * 100)}%`}</span>
               </div>
             </div>
 
@@ -438,7 +442,7 @@ export default function SalaryBonusPage() {
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
               <Clock className="w-5 h-5 text-primary" />
             </div>
-            <p className="text-foreground text-lg font-bold">{weeksReceived} <span className="text-muted-foreground text-sm font-normal">/ {maxWeeks}</span></p>
+            <p className="text-foreground text-lg font-bold">{weeksReceived} <span className="text-muted-foreground text-sm font-normal">{unlimited ? '(selamanya)' : `/ ${maxWeeks}`}</span></p>
             <p className="text-muted-foreground text-xs">Minggu Diterima</p>
           </motion.div>
 
@@ -492,7 +496,7 @@ export default function SalaryBonusPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-foreground text-sm font-medium">
-                      Minggu {bonus.weekOfTotal}/{maxWeeks}
+                      Minggu {bonus.weekOfTotal}{unlimited ? ' (selamanya)' : `/${maxWeeks}`}
                     </p>
                     <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
                       Lunas
@@ -548,7 +552,7 @@ export default function SalaryBonusPage() {
           </div>
           <div className="flex items-start gap-2">
             <span className="text-primary font-bold">4.</span>
-            <span>Gaji berlangsung selama <strong className="text-foreground">{maxWeeks} minggu</strong> sejak syarat terpenuhi</span>
+            <span>Gaji berlangsung <strong className="text-foreground">{unlimited ? 'selamanya' : `selama ${maxWeeks} minggu`}</strong> sejak syarat terpenuhi</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-primary font-bold">5.</span>
@@ -560,3 +564,4 @@ export default function SalaryBonusPage() {
   );
 }
 
+// touch Wed Jun 24 17:59:10 UTC 2026

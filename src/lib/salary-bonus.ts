@@ -273,7 +273,9 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
 
     // Check how many weeks of salary already received
     const weeksReceived = await getSalaryWeeksReceived(userId);
-    if (weeksReceived >= maxWeeks) {
+    // ★ maxWeeks <= 0 = UNLIMITED (selamanya) — skip the cap check ★
+    const unlimited = !maxWeeks || maxWeeks <= 0;
+    if (!unlimited && weeksReceived >= maxWeeks) {
       return {
         success: false,
         message: `Anda sudah menerima gaji mingguan selama ${maxWeeks} minggu. Program gaji telah selesai.`,
@@ -305,6 +307,7 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
     }
 
     const currentWeekOfTotal = weeksReceived + 1;
+    const weekLabel = unlimited ? `Minggu ke-${currentWeekOfTotal} (selamanya)` : `${currentWeekOfTotal}/${maxWeeks}`;
 
     // Update user's mainBalance
     await tx.user.update({
@@ -340,17 +343,17 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
         type: 'salary',
         level: 0,
         amount: salaryAmount,
-        description: `Gaji mingguan Minggu ${weekNumber}/${year} (${currentWeekOfTotal}/${maxWeeks}) - ${refCheck.active}/${refCheck.total} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${salaryRate}%`,
+        description: `Gaji mingguan Minggu ${weekNumber}/${year} (${weekLabel}) - ${refCheck.active}/${refCheck.total} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${salaryRate}%`,
       },
     });
 
     return {
       success: true,
-      message: `Gaji mingguan ${formatRupiahSimple(salaryAmount)} berhasil dikreditkan (Minggu ${currentWeekOfTotal}/${maxWeeks})`,
+      message: `Gaji mingguan ${formatRupiahSimple(salaryAmount)} berhasil dikreditkan (${weekLabel})`,
       amount: salaryAmount,
       weekOfTotal: currentWeekOfTotal,
       maxWeeks,
-      weeksRemaining: maxWeeks - currentWeekOfTotal,
+      weeksRemaining: unlimited ? -1 : Math.max(0, maxWeeks - currentWeekOfTotal),
     };
   });
 }
@@ -472,6 +475,8 @@ export async function getUserSalaryEligibility(userId: string): Promise<{
   const maxWeeks = config?.maxWeeks ?? 12;
   const requireActiveDeposit = config?.requireActiveDeposit ?? true;
   const minDirectRefs = config?.minDirectRefs ?? 10;
+  // ★ maxWeeks <= 0 = UNLIMITED (selamanya) ★
+  const unlimited = !maxWeeks || maxWeeks <= 0;
 
   // Check if user themselves has an active deposit
   const userOwnActiveDeposit = requireActiveDeposit
@@ -486,7 +491,7 @@ export async function getUserSalaryEligibility(userId: string): Promise<{
 
   // Weeks received
   const weeksReceived = await getSalaryWeeksReceived(userId);
-  const weeksRemaining = Math.max(0, maxWeeks - weeksReceived);
+  const weeksRemaining = unlimited ? -1 : Math.max(0, maxWeeks - weeksReceived);
 
   // Estimated salary (2.5% of group omzet, auto-detected)
   const estimatedSalary = Math.floor(groupOmzet * (salaryRate / 100));
@@ -496,8 +501,8 @@ export async function getUserSalaryEligibility(userId: string): Promise<{
     (requireActiveDeposit ? refCheck.active >= minDirectRefs : refCheck.total >= minDirectRefs);
 
   // Check eligibility - MUST meet minDirectRefs requirement
-  const isEligible = isActive && userOwnActiveDeposit && meetsMinDirectRefs && refCheck.total >= minDirectRefs && weeksReceived < maxWeeks && estimatedSalary > 0;
-  const isCompleted = weeksReceived >= maxWeeks;
+  const isEligible = isActive && userOwnActiveDeposit && meetsMinDirectRefs && refCheck.total >= minDirectRefs && (unlimited || weeksReceived < maxWeeks) && estimatedSalary > 0;
+  const isCompleted = !unlimited && weeksReceived >= maxWeeks;
 
   const refProgress = refCheck.total > 0 ? Math.min((refCheck.active / refCheck.total) * 100, 100) : 0;
 
