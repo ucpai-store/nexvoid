@@ -59,8 +59,11 @@ bunx prisma generate 2>/dev/null || npx prisma generate 2>/dev/null
 echo "✅ Prisma client ready"
 echo ""
 
-# ─── Step 6: Build Next.js (FRESH, no cache) ───
-echo "▼ [6/9] Building Next.js (fresh build, this takes 1-2 min)..."
+# ─── Step 6: Build Next.js with WEBPACK (NOT turbopack) ───
+# Turbopack generates chunk names with '..' which web servers reject (path traversal protection)
+# Webpack generates safe chunk names like '1345.3ae473c12736829a.js'
+echo "▼ [6/9] Building Next.js with webpack (fresh build, this takes 2-3 min)..."
+echo "   (Using --webpack flag to avoid Turbopack chunk name bug)"
 bun run build 2>&1 | tail -15
 BUILD_EXIT=${PIPESTATUS[0]}
 if [ "$BUILD_EXIT" != "0" ]; then
@@ -71,13 +74,21 @@ fi
 echo "✅ Build complete"
 echo ""
 
-# ─── Verify chunks exist ───
-echo "▼ [6.5] Verifying chunk files exist in .next/static/chunks/..."
+# ─── Verify chunks exist AND have safe names (no '..') ───
+echo "▼ [6.5] Verifying chunk files..."
 CHUNK_COUNT=$(find "$PROJECT_DIR/.next/static/chunks" -name "*.js" 2>/dev/null | wc -l)
+BAD_CHUNKS=$(find "$PROJECT_DIR/.next/static/chunks" -name "*.js" 2>/dev/null | grep -c '\.\.')
 echo "   Found $CHUNK_COUNT chunk files in .next/static/chunks/"
+echo "   Chunks with '..' in name (PROBLEMATIC): $BAD_CHUNKS"
 if [ "$CHUNK_COUNT" -lt 10 ]; then
   echo "❌ WARNING: Very few chunk files found! Build may be incomplete."
   ls -la "$PROJECT_DIR/.next/static/chunks/" 2>/dev/null | head -10
+fi
+if [ "$BAD_CHUNKS" -gt 0 ]; then
+  echo "❌ WARNING: Found $BAD_CHUNKS chunks with '..' in name — these will 404!"
+  echo "   Problematic files:"
+  find "$PROJECT_DIR/.next/static/chunks" -name "*.js" 2>/dev/null | grep '\.\.' | head -5
+  echo "   This means build did not use webpack. Check package.json build script."
 fi
 echo ""
 
