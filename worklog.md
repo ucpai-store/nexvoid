@@ -2388,3 +2388,29 @@ Stage Summary:
 - ✅ Frontend: src/components/nexvo/pages/SalaryBonusPage.tsx (selamanya labels).
 - Mobile-verified neat via Agent Browser (iPhone 14 viewport).
 - Test data retained: user TIERT570438 owns Aset 1 (active), has 10 referrals REFTEST0001-0010 (each with 100K investment), mainBalance=4,864,400, totalProfit=24,400.
+
+---
+Task ID: DEPLOY-RESTART
+Agent: main (Z.ai Code)
+Task: User minta perintah deploy. Investigasi: Next.js jalan tapi cron-service (port 3032) MATI — penyebab profit gak masuk mainBalance.
+
+Work Log:
+- Cek state: Next.js dev server jalan (PID 25680, port 3000, system-started), tapi mini-service cron-service MATI (port 3032 gak listening).
+- Baca cron-service/index.ts: port 3032, jadwal profit harian 00:00 WIB (skip Sabtu/Minggu) + backfill + salary mingguan 1% selamanya + quota bump 15 menit.
+- Coba start dengan `nohup ... &` dan `setsid ... &` → process ke-kill tiap bash tool call selesai (process group SIGHUP).
+- Solusi: double-fork daemonisasi `( setsid bun run index.ts >> cron.log 2>&1 & )` → process orphaned ke PID 1 (PPID=1), survive shell exit.
+- Cron-service sekarang persistent: PID 5769, PPID=1, port 3032 listening 15+ detik stabil.
+- Verifikasi gateway (Caddy port 81): `POST /api/trigger/profit?XTransformPort=3032` → cron-service ✓
+- Tes profit trigger: run-1 = `processed:10, totalProfit:20000, totalMatching:1000, errors:0` (profit MASUK mainBalance ✓). run-2 = `processed:0` (idempotent ✓, gak double-credit).
+- Health check: `GET /?XTransformPort=3032` → `{service:"NEXVO Cron Service", status:"running", wibTime:...}` ✓
+
+Stage Summary:
+- ✅ Root cause ditemukan: cron-service mati = profit gak di-credit ke mainBalance. BUKAN bug kode — service-nya gak running.
+- ✅ Cron-service di-restart dengan double-fork daemon (persistent, survive shell exit, PPID=1).
+- ✅ Profit auto-credit jam 00:00 WIB tiap hari kerja (skip Sabtu/Minggu) + backfill missed weekdays AKAN jalan lagi.
+- ✅ Salary mingguan 1% selamanya (senin 00:00 WIB, syarat 10 referral + investasi aktif) AKAN jalan lagi.
+- ✅ Gateway routing XTransformPort=3032 terverifikasi jalan untuk UI manual trigger.
+- Perintah deploy (untuk referensi user):
+  1. Main app: `bun run dev` (port 3000, auto-start sistem)
+  2. Cron-service: `cd mini-services/cron-service && ( setsid bun run index.ts >> cron.log 2>&1 & )` (port 3032, wajib manual start)
+  3. WA-bot (opsional): `cd mini-services/wa-bot && bun run dev` (butuh scan QR)
