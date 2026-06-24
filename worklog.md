@@ -2021,3 +2021,26 @@ Stage Summary:
 - Deploy command for user:
     curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
 - This lightweight deploy script: pulls code, bun install, prisma generate, builds with --webpack, restarts PM2 nexvo-web only (does NOT touch cron/profit system)
+
+---
+Task ID: hapus-banner-pemberitahuan
+Agent: main
+Task: User request — 'yang pemberitahuan 1 paket aktif tidak boleh beli paket sam yg pemberitahuan itu hapuss yaaa yg bener di produk mana kok ilang' — DELETE the "1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki" notification banner from PaketPage. Also clarify the Produk page is working (shows the same VIP tier list).
+
+Work Log:
+- Located the banner in src/components/nexvo/pages/PaketPage.tsx (lines 440-470) — the "No-duplicates rule banner" motion.div with Info icon + title + body + tierInfo status line
+- DELETED the entire banner block (32 lines removed) — the hero "Pilih Paket Investasi" now goes straight to the VIP tier cards grid
+- Verified Produk page (#products) IS working: ProductsPage renders <PaketPage />, so both menus show the identical VIP tier grid
+- Verified with Agent Browser (iPhone 14, logged in as test user):
+  * #paket page: banner GONE, VIP cards visible (VIP 1/2: Sudah Dimiliki, VIP 3/4/5: Beli Sekarang, VIP 6: Sedang Aktif)
+  * #products page: same VIP grid renders correctly (since ProductsPage wraps PaketPage)
+  * Only remaining text is per-card reason labels ("Sudah pernah dibeli — pilih paket lain yang belum dimiliki") — those are helpful per-card info, NOT a banner
+  * Dev log clean (only pre-existing client-side DB warning)
+- Committed b4ba247 + pushed to GitHub origin/main
+
+Stage Summary:
+- Banner "1 Paket Aktif Saja · Tidak Boleh Beli Yg Sudah Dimiliki" DELETED from PaketPage
+- Aturan no-duplicates tetap berlaku (server-side validation di /api/investments POST), cuma banner UI yg dihapus
+- Halaman Paket & Produk sama-sama menampilkan VIP tier grid (Produk wraps PaketPage)
+- Deploy command:
+    curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
