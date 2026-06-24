@@ -914,6 +914,7 @@ export default function WithdrawPage() {
           <Button
             type="submit"
             disabled={submitting || !isFormValid()}
+            data-tour="withdraw-submit"
             className="w-full h-14 bg-gold-gradient text-primary-foreground font-semibold rounded-2xl hover:opacity-90 transition-all glow-gold-strong text-base disabled:opacity-50"
           >
             {submitting ? (

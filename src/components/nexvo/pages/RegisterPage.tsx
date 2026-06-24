@@ -354,6 +354,7 @@ export default function RegisterPage() {
             <Button
               type="submit"
               disabled={loading || !canRegister}
+              data-tour="register-submit"
               className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm disabled:opacity-50"
             >
               {loading ? (

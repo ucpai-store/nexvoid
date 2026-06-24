@@ -273,6 +273,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
+              data-tour="login-submit"
               className="w-full h-12 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
             >
               {loading ? (
@@ -301,6 +302,7 @@ export default function LoginPage() {
               {t('auth.noAccount')}{' '}
               <button
                 onClick={() => navigate('register')}
+                data-tour="register-link"
                 className="text-primary font-medium hover:underline"
               >
                 {t('auth.registerNow')}

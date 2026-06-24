@@ -542,6 +542,7 @@ export default function UserDashboard() {
       <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
         <Button
           onClick={() => navigate('deposit')}
+          data-tour="deposit-btn"
           className="h-14 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold-strong text-sm"
         >
           <ArrowDownCircle className="w-5 h-5 mr-2" />
@@ -549,6 +550,7 @@ export default function UserDashboard() {
         </Button>
         <Button
           onClick={() => navigate('withdraw')}
+          data-tour="withdraw-btn"
           className="h-14 bg-card-gradient border border-primary/20 text-foreground font-semibold rounded-xl hover:bg-foreground/5 hover:border-primary/40 transition-all text-sm"
         >
           <ArrowUpCircle className="w-5 h-5 mr-2 text-primary" />
@@ -596,6 +598,7 @@ export default function UserDashboard() {
           <button
             key={item.page}
             onClick={() => navigate(item.page)}
+            data-tour={item.page === 'paket' ? 'paket-btn' : undefined}
             className="glass rounded-2xl p-3 sm:p-4 flex flex-col items-center gap-1.5 sm:gap-2 hover:glow-gold transition-all group"
           >
             <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center group-hover:scale-110 transition-transform">

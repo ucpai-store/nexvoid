@@ -264,6 +264,7 @@ export default function OTPPage() {
                       type="text"
                       placeholder="6-digit OTP code"
                       value={emailOtp}
+                      data-tour="otp-input"
                       onChange={(e) => setEmailOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                       maxLength={6}
                       className="flex-1 h-11 sm:h-12 bg-input/50 border-border/50 rounded-xl text-foreground text-center text-lg font-mono tracking-widest placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-[#D4AF37]/20"

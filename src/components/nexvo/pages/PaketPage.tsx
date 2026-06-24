@@ -188,6 +188,7 @@ function PackageCard({
         {/* Invest button */}
         <Button
           onClick={() => onInvest(pkg)}
+          data-tour="paket-invest"
           className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
         >
           <div className="flex items-center gap-2">

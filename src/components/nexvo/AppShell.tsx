@@ -136,7 +136,7 @@ function AdminLoginRedirect() {
 }
 
 /* ───────── Page Router ───────── */
-export default function AppShell() {
+function AppShellInner() {
   const { currentPage } = useAppStore();
   const { token, adminToken } = useAuthStore();
 
@@ -275,5 +275,17 @@ export default function AppShell() {
     <div className="min-h-screen bg-background">
       <LoginPage />
     </div>
+  );
+}
+
+/* ───────── Wrapper: renders page + global Guided Tour overlay ───────── */
+import GuidedTour from '@/components/nexvo/GuidedTour';
+
+export default function AppShell() {
+  return (
+    <>
+      <AppShellInner />
+      <GuidedTour />
+    </>
   );
 }
