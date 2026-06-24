@@ -699,10 +699,10 @@ export default function GuidedTour() {
                     </div>
 
                     {/* Bottom row: skip + auto-play toggle */}
-                    <div className="flex items-center justify-between mt-2.5 gap-2">
+                    <div className="flex items-center justify-between mt-2.5 gap-2 px-0.5">
                       <button
                         onClick={skip}
-                        className="text-muted-foreground/60 hover:text-muted-foreground text-[11px]"
+                        className="text-muted-foreground/60 hover:text-muted-foreground text-[11px] py-1.5 px-1"
                       >
                         Lewati panduan
                       </button>
@@ -713,7 +713,7 @@ export default function GuidedTour() {
                             if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
                             stopAutoPlay();
                           }}
-                          className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline"
+                          className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline py-1.5 px-1"
                         >
                           Matikan Auto
                         </button>
@@ -722,7 +722,7 @@ export default function GuidedTour() {
                           onClick={() => {
                             useTourStore.getState().setAutoPlay(true);
                           }}
-                          className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline flex items-center gap-1"
+                          className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline flex items-center gap-1 py-1.5 px-1"
                         >
                           <Radio className="w-3 h-3" />
                           Nyalakan Auto
