@@ -13,6 +13,9 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowLeft,
+  Pause,
+  Radio,
+  Type,
 } from 'lucide-react';
 import { useTourStore, TOUR_STEPS } from '@/stores/tour-store';
 import { useAppStore } from '@/stores/app-store';
@@ -26,8 +29,51 @@ interface TargetRect {
   right: number;
 }
 
+/* ───────── Typewriter helper ─────────
+   Fills a controlled React input by using the native value setter
+   (bypasses React's internal control) then dispatches an 'input' event
+   so React's onChange fires and state updates. */
+async function typeIntoInput(
+  selector: string,
+  value: string,
+  charDelay = 55
+): Promise<void> {
+  const input = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null;
+  if (!input) return;
+
+  // Find the native value setter on the prototype (works for input + textarea)
+  const proto = input instanceof HTMLTextAreaElement
+    ? window.HTMLTextAreaElement.prototype
+    : window.HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+  if (!setter) return;
+
+  input.focus();
+  for (let i = 0; i < value.length; i++) {
+    setter.call(input, value.substring(0, i + 1));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    // Slight randomization for realistic feel
+    await new Promise((r) => setTimeout(r, charDelay + Math.random() * 25));
+  }
+  // Trigger blur so any validation/formatting runs
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  input.blur();
+}
+
 export default function GuidedTour() {
-  const { isActive, currentStep, start, next, prev, skip } = useTourStore();
+  const {
+    isActive,
+    currentStep,
+    isAutoPlay,
+    isPaused,
+    start,
+    startAutoPlay,
+    next,
+    prev,
+    skip,
+    togglePause,
+    stopAutoPlay,
+  } = useTourStore();
   const { currentPage, navigate } = useAppStore();
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -35,7 +81,11 @@ export default function GuidedTour() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [hasCompletedBefore, setHasCompletedBefore] = useState(false);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  const [typingLabel, setTypingLabel] = useState<string | null>(null);
+  const [autoCountdown, setAutoCountdown] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typeCancelRef = useRef<boolean>(false);
 
   const step = TOUR_STEPS[currentStep];
 
@@ -57,10 +107,14 @@ export default function GuidedTour() {
     } catch {}
   }, []);
 
-  // ─── Welcome modal ───
-  const handleStartTour = () => {
+  // ─── Welcome modal handlers ───
+  const handleStartManual = () => {
     setShowWelcome(false);
     start();
+  };
+  const handleStartAutoPlay = () => {
+    setShowWelcome(false);
+    startAutoPlay();
   };
 
   // Auto-show welcome on first visit (only on login page, once)
@@ -106,25 +160,19 @@ export default function GuidedTour() {
     const vh = window.innerHeight;
     const mobile = vw < 640;
 
-    // Responsive tooltip dimensions
     const tooltipWidth = mobile ? Math.min(vw - 24, 340) : 360;
-    const tooltipHeight = mobile ? 220 : 240;
+    const tooltipHeight = mobile ? 240 : 260;
     const margin = mobile ? 12 : 16;
 
     let placement = step.placement || 'bottom';
 
-    // On mobile, NEVER use left/right (not enough horizontal space) — always top/bottom
     if (mobile && (placement === 'left' || placement === 'right')) {
       placement = 'bottom';
     }
-
-    // Auto-flip if not enough space
     if (placement === 'bottom' && rect.bottom + tooltipHeight + margin > vh - 80) {
-      // Don't go under bottom nav
-      placement = rect.top - tooltipHeight - margin > 60 ? 'top' : 'bottom'; // stay bottom if no room top either
+      placement = rect.top - tooltipHeight - margin > 60 ? 'top' : 'bottom';
     }
     if (placement === 'top' && rect.top - tooltipHeight - margin < 70) {
-      // Don't go under top header
       placement = rect.bottom + tooltipHeight + margin < vh - 80 ? 'bottom' : 'top';
     }
     if (!mobile) {
@@ -137,7 +185,6 @@ export default function GuidedTour() {
     }
     setActualPlacement(placement);
 
-    // Compute tooltip position
     let top = 0;
     let left = 0;
     if (placement === 'bottom') {
@@ -153,18 +200,16 @@ export default function GuidedTour() {
       top = rect.top + rect.height / 2 - tooltipHeight / 2;
       left = rect.left - tooltipWidth - margin;
     }
-    // Clamp to viewport (account for margins)
     left = Math.max(margin, Math.min(left, vw - tooltipWidth - margin));
-    top = Math.max(margin + 60, Math.min(top, vh - tooltipHeight - margin - 80)); // 60 = top header, 80 = bottom nav
+    top = Math.max(margin + 60, Math.min(top, vh - tooltipHeight - margin - 80));
     setTooltipPos({ top, left });
 
-    // Scroll target into view if needed
     if (rect.top < 90 || rect.bottom > vh - 100) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [isActive, step]);
 
-  // Poll for target element after navigation (page might still be rendering)
+  // Poll for target element after navigation
   useEffect(() => {
     if (!isActive) return;
     findAndPosition();
@@ -181,10 +226,82 @@ export default function GuidedTour() {
     };
   }, [isActive, currentStep, currentPage, findAndPosition]);
 
+  // ─── AUTO-PLAY ENGINE ───
+  // When auto-play is on AND not paused: type demo fields then auto-advance
+  useEffect(() => {
+    if (!isActive || !isAutoPlay || isPaused || !step) return;
+    typeCancelRef.current = false;
+
+    let cancelled = false;
+    const runStep = async () => {
+      // Wait for page to settle
+      await new Promise((r) => setTimeout(r, 700));
+      if (cancelled || typeCancelRef.current) return;
+
+      // Type demo fields one by one (with visible label)
+      if (step.demoFields && step.demoFields.length > 0) {
+        for (const field of step.demoFields) {
+          if (cancelled || typeCancelRef.current) return;
+          setTypingLabel(field.label || 'Mengisi...');
+          await typeIntoInput(field.selector, field.value);
+          await new Promise((r) => setTimeout(r, 350));
+        }
+        setTypingLabel(null);
+        if (cancelled || typeCancelRef.current) return;
+      }
+
+      // Countdown then advance
+      const delay = step.autoAdvanceDelay ?? 3500;
+      const tickMs = 500;
+      let remaining = delay;
+      setAutoCountdown(Math.ceil(remaining / 1000));
+      const countdownTimer = setInterval(() => {
+        if (cancelled || typeCancelRef.current) {
+          clearInterval(countdownTimer);
+          return;
+        }
+        remaining -= tickMs;
+        setAutoCountdown(Math.max(0, Math.ceil(remaining / 1000)));
+        if (remaining <= 0) {
+          clearInterval(countdownTimer);
+          if (!cancelled && !typeCancelRef.current) {
+            next();
+          }
+        }
+      }, tickMs);
+      // Store for cleanup
+      autoAdvanceRef.current = countdownTimer as unknown as ReturnType<typeof setTimeout>;
+    };
+
+    runStep();
+
+    return () => {
+      cancelled = true;
+      if (autoAdvanceRef.current) {
+        clearTimeout(autoAdvanceRef.current);
+        clearInterval(autoAdvanceRef.current as unknown as ReturnType<typeof setInterval>);
+      }
+      setTypingLabel(null);
+      setAutoCountdown(0);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, isAutoPlay, isPaused, currentStep]);
+
+  // Cancel auto-play typing if user manually navigates
+  const handleManualNext = () => {
+    typeCancelRef.current = true;
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    next();
+  };
+  const handleManualPrev = () => {
+    typeCancelRef.current = true;
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    prev();
+  };
+
   const isCentered = actualPlacement === 'center';
   const progress = ((currentStep + 1) / TOUR_STEPS.length) * 100;
 
-  // Tooltip width class — responsive
   const tooltipWidthClass = isSmallMobile
     ? 'w-[calc(100vw-24px)] max-w-[340px]'
     : 'w-[88vw] max-w-[360px]';
@@ -207,7 +324,6 @@ export default function GuidedTour() {
           >
             <HelpCircle className="w-5 h-5 shrink-0" />
             <span className="text-xs sm:text-sm">Panduan</span>
-            {/* Pulse ring */}
             <span className="absolute inset-0 rounded-2xl bg-yellow-400/30 animate-ping -z-10" />
           </motion.button>
         )}
@@ -268,23 +384,32 @@ export default function GuidedTour() {
                   ))}
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2">
+                {/* Two start buttons — Auto-play (recommended for video) and Manual */}
+                <div className="flex flex-col gap-2 mb-3">
                   <button
-                    onClick={handleStartTour}
-                    className="flex-1 h-12 bg-gold-gradient text-primary-foreground font-bold rounded-2xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 glow-gold text-sm"
+                    onClick={handleStartAutoPlay}
+                    className="w-full h-12 bg-gold-gradient text-primary-foreground font-bold rounded-2xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 glow-gold text-sm"
+                  >
+                    <Radio className="w-4 h-4 fill-current animate-pulse" />
+                    Mode Demo Otomatis (untuk rekam video)
+                  </button>
+                  <button
+                    onClick={handleStartManual}
+                    className="w-full h-12 glass border border-primary/40 text-primary hover:bg-primary/10 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
                   >
                     <Play className="w-4 h-4 fill-current" />
-                    Mulai Panduan
-                  </button>
-                  <button
-                    onClick={() => setShowWelcome(false)}
-                    className="sm:px-5 h-12 glass border border-border rounded-2xl text-muted-foreground hover:text-foreground text-sm font-medium"
-                  >
-                    Nanti Saja
+                    Mode Manual (klik sendiri)
                   </button>
                 </div>
+
+                <button
+                  onClick={() => setShowWelcome(false)}
+                  className="text-muted-foreground/70 hover:text-muted-foreground text-xs underline"
+                >
+                  Nanti saja
+                </button>
                 <p className="text-muted-foreground/60 text-[10px] mt-3 leading-relaxed">
-                  Klik tombol &quot;Panduan&quot; di pojok kanan bawah kapan saja untuk mulai ulang
+                  Mode Demo Otomatis: form terisi sendiri + langkah jalan otomatis. Tinggal rekam! 🎥
                 </p>
               </div>
             </motion.div>
@@ -302,12 +427,9 @@ export default function GuidedTour() {
                 className="fixed inset-0 z-[90] pointer-events-none"
                 style={{
                   backgroundColor: 'rgba(0,0,0,0.75)',
-                  boxShadow: [
-                    `0 0 0 9999px rgba(0,0,0,0.75)`,
-                  ].join(', '),
+                  boxShadow: ['0 0 0 9999px rgba(0,0,0,0.75)'].join(', '),
                 }}
               >
-                {/* 4 dark panels around target (clip-path cutout) */}
                 <div className="absolute inset-0 bg-black/75" style={{ clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${targetRect.left}px ${targetRect.top}px, ${targetRect.left + targetRect.width}px ${targetRect.top}px, ${targetRect.left + targetRect.width}px ${targetRect.top + targetRect.height}px, ${targetRect.left}px ${targetRect.top + targetRect.height}px, ${targetRect.left}px ${targetRect.top}px)` }} />
               </div>
             )}
@@ -328,7 +450,6 @@ export default function GuidedTour() {
                   background: 'transparent',
                 }}
               >
-                {/* Pulsing corner accent */}
                 <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-yellow-400 animate-ping" />
               </motion.div>
             )}
@@ -361,6 +482,26 @@ export default function GuidedTour() {
               </motion.div>
             )}
 
+            {/* Auto-play typing indicator (floating badge near top) */}
+            <AnimatePresence>
+              {isAutoPlay && typingLabel && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.9 }}
+                  className="fixed top-3 left-1/2 -translate-x-1/2 z-[95] glass-strong border border-yellow-400/50 rounded-full px-3 py-1.5 flex items-center gap-2 glow-gold"
+                >
+                  <Type className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
+                  <span className="text-yellow-400 text-[11px] font-bold">Mengetik: {typingLabel}…</span>
+                  <span className="flex gap-0.5">
+                    <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Tooltip */}
             <motion.div
               key={currentStep}
@@ -392,9 +533,20 @@ export default function GuidedTour() {
                     {currentStep + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-foreground font-bold text-sm sm:text-base leading-tight">{step.title}</h3>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="text-foreground font-bold text-sm sm:text-base leading-tight">{step.title}</h3>
+                      {isAutoPlay && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[9px] font-bold uppercase tracking-wide">
+                          <Radio className="w-2.5 h-2.5 fill-current animate-pulse" />
+                          AUTO
+                        </span>
+                      )}
+                    </div>
                     <p className="text-yellow-400/80 text-[10px] mt-0.5">
                       Langkah {currentStep + 1} dari {TOUR_STEPS.length}
+                      {isAutoPlay && !isPaused && autoCountdown > 0 && (
+                        <span className="ml-1.5 text-emerald-400">• lanjut dalam {autoCountdown}s</span>
+                      )}
                     </p>
                   </div>
                   <button
@@ -413,15 +565,28 @@ export default function GuidedTour() {
                 <div className="flex items-center gap-2">
                   {currentStep > 0 && (
                     <button
-                      onClick={prev}
+                      onClick={handleManualPrev}
                       className="px-3 h-10 glass border border-border rounded-xl text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0"
                     >
                       <ChevronLeft className="w-4 h-4" />
                       <span className="hidden sm:inline">Kembali</span>
                     </button>
                   )}
+
+                  {/* Pause/Resume button — only in auto-play */}
+                  {isAutoPlay && (
+                    <button
+                      onClick={togglePause}
+                      className="px-3 h-10 glass border border-yellow-400/40 text-yellow-400 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0 hover:bg-yellow-400/10"
+                      aria-label={isPaused ? 'Lanjutkan' : 'Jeda'}
+                    >
+                      {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
+                      <span className="hidden sm:inline">{isPaused ? 'Lanjut' : 'Jeda'}</span>
+                    </button>
+                  )}
+
                   <button
-                    onClick={next}
+                    onClick={handleManualNext}
                     className="flex-1 h-10 bg-gold-gradient text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1 text-xs sm:text-sm"
                   >
                     {currentStep === TOUR_STEPS.length - 1 ? 'Selesai' : 'Lanjut'}
@@ -429,13 +594,37 @@ export default function GuidedTour() {
                   </button>
                 </div>
 
-                {/* Skip link */}
-                <button
-                  onClick={skip}
-                  className="w-full text-center text-muted-foreground/60 hover:text-muted-foreground text-[11px] mt-2"
-                >
-                  Lewati panduan
-                </button>
+                {/* Bottom row: skip + auto-play toggle */}
+                <div className="flex items-center justify-between mt-2.5 gap-2">
+                  <button
+                    onClick={skip}
+                    className="text-muted-foreground/60 hover:text-muted-foreground text-[11px]"
+                  >
+                    Lewati panduan
+                  </button>
+                  {isAutoPlay ? (
+                    <button
+                      onClick={() => {
+                        typeCancelRef.current = true;
+                        if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+                        stopAutoPlay();
+                      }}
+                      className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline"
+                    >
+                      Matikan Auto
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        useTourStore.getState().setAutoPlay(true);
+                      }}
+                      className="text-yellow-400/80 hover:text-yellow-400 text-[11px] underline flex items-center gap-1"
+                    >
+                      <Radio className="w-3 h-3" />
+                      Nyalakan Auto
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           </>

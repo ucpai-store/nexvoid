@@ -10,18 +10,28 @@ export interface TourStep {
   description: string;
   placement?: 'bottom' | 'top' | 'left' | 'right' | 'center';
   waitForNavigation?: boolean; // if true, wait for page to load before showing
+  /** Demo fields to auto-type in auto-play mode */
+  demoFields?: { selector: string; value: string; label?: string }[];
+  /** Auto-play delay (ms) after typing/arrival before advancing. Default 3500 */
+  autoAdvanceDelay?: number;
 }
 
 interface TourState {
   isActive: boolean;
   currentStep: number;
   hasCompleted: boolean;
+  isAutoPlay: boolean;
+  isPaused: boolean;
   start: () => void;
+  startAutoPlay: () => void;
   next: () => void;
   prev: () => void;
   skip: () => void;
   goTo: (step: number) => void;
   complete: () => void;
+  togglePause: () => void;
+  setAutoPlay: (v: boolean) => void;
+  stopAutoPlay: () => void;
 }
 
 const STORAGE_KEY = 'nexvo-tour-completed';
@@ -32,8 +42,9 @@ export const TOUR_STEPS: TourStep[] = [
     page: 'login',
     title: '👋 Selamat Datang di NEXVO!',
     description:
-      'Panduan ini akan menuntun Anda langkah demi langkah: REGISTRASI → LOGIN → DEPOSIT → INVESTASI → WITHDRAW. Klik "Lanjut" untuk mengikuti. Anda bisa mengikuti sambil merekam video. Klik "Lewati" kapan saja untuk berhenti.',
+      'Panduan ini akan menuntun Anda langkah demi langkah: REGISTRASI → LOGIN → DEPOSIT → INVESTASI → WITHDRAW. Aktifkan "Mode Demo Otomatis" agar form terisi sendiri — tinggal rekam video!',
     placement: 'center',
+    autoAdvanceDelay: 5000,
   },
   {
     id: 'register-link',
@@ -43,6 +54,7 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Klik tombol "Daftar Sekarang" untuk membuat akun NEXVO Anda. Jika sudah punya akun, langsung login saja.',
     placement: 'bottom',
+    autoAdvanceDelay: 3500,
   },
   {
     id: 'register-form',
@@ -52,6 +64,14 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Isi form: Nama lengkap, Nomor WhatsApp (format +62), Email aktif, Password, dan Kode Referral (jika ada). Setelah lengkap, klik tombol "Daftar Sekarang" di bawah.',
     placement: 'top',
+    demoFields: [
+      { selector: 'input[placeholder="Masukkan nama pengguna"]', value: 'Budi Santoso', label: 'Nama' },
+      { selector: 'input[placeholder="8123456789"]', value: '8123456789', label: 'WhatsApp' },
+      { selector: 'input[placeholder="your@email.com"]', value: 'budi@gmail.com', label: 'Email' },
+      { selector: 'input[placeholder="Ketik password"]', value: 'Budi1234!', label: 'Password' },
+      { selector: 'input[placeholder="Ulangi password"]', value: 'Budi1234!', label: 'Konfirmasi' },
+    ],
+    autoAdvanceDelay: 2500,
   },
   {
     id: 'otp-verify',
@@ -61,6 +81,7 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Cek email/WhatsApp Anda untuk kode OTP. Masukkan kode 6 digit di kolom ini. Setelah verifikasi, akun Anda aktif dan bisa login.',
     placement: 'bottom',
+    autoAdvanceDelay: 4500,
   },
   {
     id: 'login-form',
@@ -70,6 +91,12 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Masukkan Email/WhatsApp + Password yang tadi dibuat, lalu klik "Masuk". Anda akan masuk ke Dashboard.',
     placement: 'top',
+    demoFields: [
+      { selector: 'input[placeholder="your@email.com"]', value: 'budi@gmail.com', label: 'Email' },
+      { selector: 'input[placeholder="8123456789"]', value: '8123456789', label: 'WhatsApp' },
+      { selector: 'input[placeholder="Ketik password"]', value: 'Budi1234!', label: 'Password' },
+    ],
+    autoAdvanceDelay: 2500,
   },
   {
     id: 'dashboard-deposit',
@@ -79,6 +106,7 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Setelah login, di Dashboard klik tombol "Deposit" untuk top-up saldo pertama Anda. Saldo ini dipakai untuk beli paket investasi.',
     placement: 'bottom',
+    autoAdvanceDelay: 4000,
   },
   {
     id: 'deposit-form',
@@ -88,6 +116,10 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       '1) Masukkan nominal (min Rp100.000). 2) Pilih metode: QRIS / USDT / Bank. 3) Upload bukti transfer. 4) Klik tombol "Deposit RpX". Admin akan verifikasi, saldo masuk otomatis setelah disetujui.',
     placement: 'top',
+    demoFields: [
+      { selector: 'input[placeholder="0"]', value: '500000', label: 'Nominal' },
+    ],
+    autoAdvanceDelay: 3000,
   },
   {
     id: 'dashboard-paket',
@@ -97,6 +129,7 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Setelah saldo masuk, kembali ke Dashboard lalu klik "Paket" untuk melihat daftar paket investasi yang tersedia.',
     placement: 'bottom',
+    autoAdvanceDelay: 4000,
   },
   {
     id: 'paket-invest',
@@ -106,6 +139,7 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Pilih paket yang sesuai budget Anda, lalu klik "Invest Sekarang". Konfirmasi pembelian — saldo akan terpotong otomatis dan paket langsung AKTIF. Profit harian masuk jam 00:00 WIB setiap hari kerja.',
     placement: 'bottom',
+    autoAdvanceDelay: 4500,
   },
   {
     id: 'dashboard-withdraw',
@@ -115,6 +149,7 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Untuk mencairkan profit/saldo, klik tombol "Withdraw" di Dashboard. Withdraw hanya bisa dilakukan di hari kerja (Senin-Jumat) jam 09:00-16:00 WIB.',
     placement: 'bottom',
+    autoAdvanceDelay: 4000,
   },
   {
     id: 'withdraw-form',
@@ -124,6 +159,10 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       '1) Pilih kategori: Bank / E-Wallet / USDT. 2) Pilih rekening tujuan. 3) Masukkan nominal (max = nilai paket terakhir). 4) Klik "Withdraw RpX". Ada potongan fee 10%. Dana masuk 1×24 jam kerja.',
     placement: 'top',
+    demoFields: [
+      { selector: 'input[placeholder="0"]', value: '100000', label: 'Nominal' },
+    ],
+    autoAdvanceDelay: 3000,
   },
   {
     id: 'done',
@@ -132,6 +171,7 @@ export const TOUR_STEPS: TourStep[] = [
     description:
       'Selamat! Anda sudah tahu alur lengkap NEXVO: Registrasi → Deposit → Investasi → Withdraw. Untuk memulai panduan lagi, klik tombol "Panduan" di pojok kanan bawah. Selamat berinvestasi! 🚀',
     placement: 'center',
+    autoAdvanceDelay: 6000,
   },
 ];
 
@@ -139,14 +179,19 @@ export const useTourStore = create<TourState>((set, get) => ({
   isActive: false,
   currentStep: 0,
   hasCompleted: false,
+  isAutoPlay: false,
+  isPaused: false,
 
   start: () => {
-    set({ isActive: true, currentStep: 0 });
+    set({ isActive: true, currentStep: 0, isAutoPlay: false, isPaused: false });
+  },
+  startAutoPlay: () => {
+    set({ isActive: true, currentStep: 0, isAutoPlay: true, isPaused: false });
   },
   next: () => {
     const { currentStep } = get();
     if (currentStep >= TOUR_STEPS.length - 1) {
-      set({ isActive: false, hasCompleted: true, currentStep: 0 });
+      set({ isActive: false, hasCompleted: true, currentStep: 0, isAutoPlay: false, isPaused: false });
       try {
         localStorage.setItem(STORAGE_KEY, '1');
       } catch {}
@@ -159,16 +204,25 @@ export const useTourStore = create<TourState>((set, get) => ({
     if (currentStep > 0) set({ currentStep: currentStep - 1 });
   },
   skip: () => {
-    set({ isActive: false, currentStep: 0 });
+    set({ isActive: false, currentStep: 0, isAutoPlay: false, isPaused: false });
   },
   goTo: (step: number) => {
     set({ currentStep: step });
   },
   complete: () => {
-    set({ isActive: false, hasCompleted: true, currentStep: 0 });
+    set({ isActive: false, hasCompleted: true, currentStep: 0, isAutoPlay: false, isPaused: false });
     try {
       localStorage.setItem(STORAGE_KEY, '1');
     } catch {}
+  },
+  togglePause: () => {
+    set((s) => ({ isPaused: !s.isPaused }));
+  },
+  setAutoPlay: (v: boolean) => {
+    set({ isAutoPlay: v });
+  },
+  stopAutoPlay: () => {
+    set({ isAutoPlay: false, isPaused: false });
   },
 }));
 
