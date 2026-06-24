@@ -1444,3 +1444,47 @@ Stage Summary:
 - Each step shows tooltip with title + description + arrow pointing to target button
 - Ready for video recording — user follows arrows on screen
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tour-mobile-polish
+Agent: main
+Task: User request — 'yang baguss wajib rapii di tampilan hp rapi sesuai ya' (GuidedTour must look neat on phone display)
+
+Work Log:
+- Reviewed existing GuidedTour.tsx (created in previous session) for mobile issues
+- Found 7 mobile-specific problems:
+  1. Tooltip width hard-coded 360px → on 360px viewport leaves 0 margin
+  2. Left/right placement impossible on small screens (360 + target > viewport)
+  3. Tooltip clamp didn't account for top header (60px) + bottom nav (80px)
+  4. Blue accent color (bg-blue-400) violated design rules (no blue/indigo)
+  5. Welcome modal too large on small phones (320-375px)
+  6. Action buttons ("Mulai Panduan" + "Nanti Saja") cramped on 320px
+  7. No safe-area-inset-bottom support for iOS notch
+- Rewrote GuidedTour.tsx with mobile-first responsive design:
+  * Viewport-aware tooltip width: Math.min(vw-24, 340) on mobile, 360 on desktop
+  * Mobile placement rule: NEVER left/right on <640px — always top/bottom
+  * Tooltip clamp: top ≥ 60px (header), bottom ≤ vh-80 (nav)
+  * Floating button: bottom = 88px + env(safe-area-inset-bottom) on mobile
+  * Welcome modal: bottom-sheet style on mobile (rounded-t-3xl, items-end),
+    centered on sm+ (items-center, rounded-3xl)
+  * Action buttons: flex-col on mobile, flex-row on sm+
+  * Typography: text-xs/text-[13px] on mobile, sm:text-sm/text-base on desktop
+  * Padding: p-4 mobile, sm:p-5 desktop (tooltip); p-5 mobile, sm:p-8 (modal)
+  * Replaced blue → cyan for "Beli Paket Investasi" accent
+  * "Kembali" button: icon-only on mobile, full text on desktop
+  * Track viewport size via useState + resize listener for re-positioning on rotate
+- TypeScript compiles clean (no errors in tour-related files)
+- Dev server verified: page renders 200 OK, 77KB HTML, proper title + meta
+- Agent Browser couldn't verify (sandbox net namespace isolation + dev server
+  dies after 3 requests due to sandbox resource limits) — verified via curl
+  + tsc --noEmit + grep for data-tour attributes on all 10 target elements
+- Committed (32d0502) + pushed to GitHub main
+- deploy-ui-update.sh confirmed accessible at raw URL (HTTP 200)
+
+Stage Summary:
+- GuidedTour is now fully mobile-first responsive
+- All 4 phone breakpoints handled: 320px (small), 375px (iPhone), 390px (iPhone 14), 640px+ (tablet/desktop)
+- Welcome modal becomes bottom-sheet on phone (thumb-friendly)
+- Tooltip never overflows viewport, never under header/nav
+- Floating "Panduan" button clears bottom nav + iOS safe area
+- Deploy command: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
