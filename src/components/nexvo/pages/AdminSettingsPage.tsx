@@ -1119,13 +1119,13 @@ export default function AdminSettingsPage() {
                   {/* Salary Rate */}
                   <div className="space-y-2">
                     <Label className="text-foreground text-sm font-medium">Rate Gaji per Minggu (%)</Label>
-                    <p className="text-muted-foreground text-xs">Persentase dari omzet grup yang dibayarkan setiap minggu</p>
+                    <p className="text-muted-foreground text-xs">Persentase dari omzet grup yang dibayarkan setiap minggu (default: 1%)</p>
                     <div className="relative">
                       <Input
                         type="number"
                         step="0.1"
-                        value={salaryConfig.salaryRate ?? 2.5}
-                        onChange={(e) => setSalaryConfig({ ...salaryConfig, salaryRate: parseFloat(e.target.value) || 2.5 })}
+                        value={salaryConfig.salaryRate ?? 1}
+                        onChange={(e) => setSalaryConfig({ ...salaryConfig, salaryRate: parseFloat(e.target.value) || 1 })}
                         className="h-12 bg-input/50 border-border/50 rounded-xl text-foreground font-semibold pr-8"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
@@ -1135,11 +1135,14 @@ export default function AdminSettingsPage() {
                   {/* Max Weeks */}
                   <div className="space-y-2">
                     <Label className="text-foreground text-sm font-medium">Maksimal Minggu</Label>
-                    <p className="text-muted-foreground text-xs">Berapa minggu gaji akan dibayarkan (contoh: 12 minggu = total {(salaryConfig.salaryRate ?? 2.5) * 12}% omzet)</p>
+                    <p className="text-muted-foreground text-xs">
+                      Isi <b className="text-primary">0</b> = <b className="text-primary">SELAMANYA</b> (tidak terbatas).
+                      Contoh: 12 = total {(salaryConfig.salaryRate ?? 1) * 12}% omzet selama 12 minggu.
+                    </p>
                     <Input
                       type="number"
-                      value={salaryConfig.maxWeeks ?? 12}
-                      onChange={(e) => setSalaryConfig({ ...salaryConfig, maxWeeks: parseInt(e.target.value) || 12 })}
+                      value={salaryConfig.maxWeeks ?? 0}
+                      onChange={(e) => setSalaryConfig({ ...salaryConfig, maxWeeks: parseInt(e.target.value) || 0 })}
                       className="h-12 bg-input/50 border-border/50 rounded-xl text-foreground font-semibold"
                     />
                   </div>
@@ -1172,7 +1175,7 @@ export default function AdminSettingsPage() {
                   <div className="p-3 rounded-xl bg-primary/5 border border-primary/10">
                     <p className="text-primary text-xs font-medium mb-1">Ringkasan Sistem:</p>
                     <p className="text-muted-foreground text-xs">
-                      User WAJIB memiliki deposit aktif sendiri + ≥{salaryConfig.minDirectRefs ?? 10} referral langsung (L1) dengan deposit aktif → sistem otomatis mendeteksi {salaryConfig.salaryRate ?? 2.5}% omzet grup/minggu selama {salaryConfig.maxWeeks ?? 12} minggu (total {(salaryConfig.salaryRate ?? 2.5) * (salaryConfig.maxWeeks ?? 12)}% omzet). Auto-credit setiap Senin 00:00 WIB.
+                      User WAJIB memiliki deposit aktif sendiri + ≥{salaryConfig.minDirectRefs ?? 10} referral langsung (L1) dengan deposit aktif → sistem otomatis mendeteksi {salaryConfig.salaryRate ?? 1}% omzet grup/minggu selama {(salaryConfig.maxWeeks ?? 0) > 0 ? `${salaryConfig.maxWeeks} minggu (total ${((salaryConfig.salaryRate ?? 1) * (salaryConfig.maxWeeks ?? 0))}% omzet)` : <span className="text-primary font-semibold">SELAMANYA (tidak terbatas)</span>}. Auto-credit setiap Senin 00:00 WIB.
                     </p>
                   </div>
 

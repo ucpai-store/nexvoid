@@ -2414,3 +2414,27 @@ Stage Summary:
   1. Main app: `bun run dev` (port 3000, auto-start sistem)
   2. Cron-service: `cd mini-services/cron-service && ( setsid bun run index.ts >> cron.log 2>&1 & )` (port 3032, wajib manual start)
   3. WA-bot (opsional): `cd mini-services/wa-bot && bun run dev` (butuh scan QR)
+
+---
+Task ID: WEB-UPDATE-GUIDE
+Agent: main (Z.ai Code)
+Task: User tanya "aku update di web gimana" — kasih tau cara update/trigger dari admin panel web. Fix UI salary config yang masih pakai default lama (2.5%, 12 minggu).
+
+Work Log:
+- Investigasi: ada 3 cara update di web admin panel:
+  1. Update Salary Config → #admin-settings → tab Salary → form Rate/MaxWeeks/MinDirectRefs/RequireActiveDeposit/IsActive
+  2. Trigger Profit Manual → #admin-dashboard → tombol "Trigger Profit" (POST /api/admin/profit-trigger) — langsung credit mainBalance
+  3. Trigger Salary Manual → #admin-salary → tombol "Process Weekly Salary" (POST /api/admin/salary-bonus)
+- Cek DB: SalaryConfig udah benar (salaryRate=1, maxWeeks=0=selamanya, minDirectRefs=10, requireActiveDeposit=true, isActive=true). Tidak perlu diubah user.
+- Fix UI AdminSettingsPage.tsx (tab Salary):
+  - Field "Rate Gaji per Minggu": default fallback 2.5 → 1 (sesuai requirement baru)
+  - Field "Maksimal Minggu": default fallback 12 → 0, hint "Isi 0 = SELAMANYA (tidak terbatas)"
+  - Summary text: kalau maxWeeks=0 tampil "SELAMANYA (tidak terbatas)" bukan "selama 0 minggu (total 0% omzet)"
+- Lint: eslint config issue (pre-existing, bukan dari perubahan ini). Dev server sehat (GET / 200).
+
+Stage Summary:
+- ✅ User bisa update Sistem Gaji dari web: login admin → #admin-settings → tab Salary → ubah Rate/MaxWeeks(0=selamanya)/MinDirectRefs/dll → klik "Simpan Konfigurasi Gaji".
+- ✅ User bisa trigger Profit Manual dari web: #admin-dashboard → klik "Trigger Profit" → profit masuk mainBalance semua user berinvestasi aktif (skip weekend, ada backfill).
+- ✅ User bisa trigger Salary Manual dari web: #admin-salary → klik "Process Weekly Salary" → gaji mingguan dikredit ke eligible users (1% omzet grup, selamanya, syarat 10 referral + investasi aktif).
+- ✅ UI salary config form sekarang konsisten dengan sistem baru (default 1%, 0=selamanya, summary benar).
+- Config DB sudah final: salaryRate=1, maxWeeks=0, minDirectRefs=10, requireActiveDeposit=true, isActive=true.
