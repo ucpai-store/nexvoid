@@ -2438,3 +2438,44 @@ Stage Summary:
 - ✅ User bisa trigger Salary Manual dari web: #admin-salary → klik "Process Weekly Salary" → gaji mingguan dikredit ke eligible users (1% omzet grup, selamanya, syarat 10 referral + investasi aktif).
 - ✅ UI salary config form sekarang konsisten dengan sistem baru (default 1%, 0=selamanya, summary benar).
 - Config DB sudah final: salaryRate=1, maxWeeks=0, minDirectRefs=10, requireActiveDeposit=true, isActive=true.
+
+---
+Task ID: PROFIT-DAILY-180D-FIX
+Agent: main (Z.ai Code)
+Task: User klarifikasi profit = DAILY 2% (bukan weekly), 180 hari, total 576k untuk 160k. "tiap hari dapet 3.200... total 180 harinya 576k". Sebelumnya cron skip weekend → cuma ~128 hari × 3,200 = 410k (BUKAN 576k). Fix biar profit tiap hari (incl. weekend) + hard cap 576k.
+
+Work Log:
+- Investigasi cron-service/index.ts: found weekend skip logic (line 437: `if (dow !== 0 && dow !== 6)` only credits Mon-Fri).
+- Investigasi /api/admin/profit-trigger/route.ts: also had weekend guard (line 121: skip if Sat/Sun).
+- Investigasi /api/products/route.ts buy logic: dailyProfit = price × profitRate% (160k × 2% = 3,200) ✓, endDate = startDate + duration (180 days) ✓.
+- Fix cron-service/index.ts:
+  1. Removed weekend skip in missedDates loop (now credits EVERY day incl. Sat/Sun)
+  2. Added HARD CAP: maxTotalProfit = dailyProfit × contractDays. totalCredit = min(rawCredit, remainingCap). Prevents over-credit past 576k.
+  3. Added auto-complete: if totalProfitEarned + totalCredit >= maxTotalProfit → shouldComplete = true → status = "completed"
+  4. Updated header comment + schedule banner + log messages ("EVERY DAY" bukan "Mon-Fri skip Sat/Sun")
+- Fix /api/admin/profit-trigger/route.ts:
+  1. Removed weekend guard (line 121 deleted)
+  2. Fixed dailyProfit calc: now uses inv.dailyProfit (stored) preferred, fallback to package.profitRate. (Previously used package.profitRate which = 0 for Product purchases linked to _internal_default package → would skip all product purchases!)
+- Restarted cron-service (pkill + setsid double-fork, PID orphaned to init, PPID=1, port 3032 stable).
+- E2E TEST 1 (backfill incl. weekend): backdated lastProfitDate to Fri 2026-06-19, triggered profit → credited 6 days × 3,200 = 19,200 (Sat 6/20 + Sun 6/21 + Mon-Thu 6/22-25). mainBalance 4,865,400 → 4,884,600 ✓. (OLD logic would only credit 4 × 3,200 = 12,800.)
+- E2E TEST 2 (hard cap): set totalProfitEarned=574,000 (cap=576,000, remaining=2,000), backdated 10 days (raw=32,000). Triggered → credited min(32,000, 2,000) = 2,000. totalProfitEarned=576,000 (cap). status="completed" (auto-complete via new flag) ✓.
+- UI verification (#products, logged in as TIERT570438): all 6 products show correct math:
+  • Aset 1: 160k × 2% = 3,200/hari × 180 = 576,000 total ✓
+  • Aset 2: 320k × 2.5% = 8,000/hari × 180 = 1,440,000 ✓
+  • Aset 3: 640k × 3% = 19,200/hari × 180 = 3,456,000 ✓
+  • Aset 4-6: all correct
+  • Text: "Profit Rp3.200/hari masuk setiap hari jam 00:00" (no more weekend-skip wording)
+  • Aset 1 shows "Sedang Aktif" (test investment active)
+- Reset test data: totalProfitEarned=32,000, lastProfitDate=now, status=active (clean for VPS deploy).
+- Dev log clean. Cron log clean.
+
+Stage Summary:
+- ✅ PROFIT = DAILY (tiap hari, incl. Sabtu & Minggu) — bukan weekday-only lagi.
+- ✅ Rate: 2% per hari (160k × 2% = 3,200/hari).
+- ✅ Duration: 180 hari (endDate = startDate + 180 days).
+- ✅ Total cap: 576,000 (hard cap prevents over-credit; auto-complete when reached).
+- ✅ Backfill: cron mati 5 hari → kredit 5 × 3,200 sekaligus saat run berikutnya.
+- ✅ Cron-service: jalan di port 3032, PPID=1 (persistent), schedule 00:00 WIB EVERY DAY.
+- ✅ Admin trigger: /api/admin/profit-trigger juga fix (no weekend guard + uses stored dailyProfit).
+- ✅ Salary (separate system): 1%/minggu selamanya, syarat 10 referral + investasi aktif (unchanged, verified previous session).
+- READY FOR VPS DEPLOY.

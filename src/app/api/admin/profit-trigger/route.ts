@@ -117,12 +117,8 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
   const dayOfWeek = wibNow.getDay();
   const todayWIB = getWibDateString(new Date());
 
-  // Weekend guard (can be bypassed with force=true for admin manual trigger)
-  if (!options?.force && (dayOfWeek === 0 || dayOfWeek === 6)) {
-    const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-    console.log(`[Admin Profit Trigger] ⏸️ SKIPPED — today is ${dayName} (weekend libur). Use force=true to override.`);
-    return { ...result, errorDetails: [`Weekend (${dayName}) — skipped. Use ?force=true to override.`] };
-  }
+  // ★ Profit dikredit TIAP HARI (termasuk Sabtu & Minggu) — 160k × 2% = 3.200/hari × 180 hari = 576.000 total.
+  // Tidak ada weekend guard lagi. force=true hanya untuk bypass "already credited today" check.
 
   const investments = await db.investment.findMany({
     where: { status: 'active' },
@@ -165,7 +161,11 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
         }
       }
 
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
+      // ★ Use stored dailyProfit (preferred) — untuk Product purchases yang link ke _internal_default package (profitRate=0).
+      // Fallback ke package.profitRate hanya kalau stored dailyProfit = 0 (legacy InvestmentPackage purchases).
+      const dailyProfit = inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * (inv.package.profitRate / 100));
       if (dailyProfit <= 0) {
         result.skipped++;
         continue;

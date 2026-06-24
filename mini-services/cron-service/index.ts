@@ -2,9 +2,10 @@
  * NEXVO Cron Service
  *
  * Runs scheduled tasks automatically:
- * - Daily Investment Profit: Every weekday (Mon-Fri) at 00:00 WIB
- *   + BACKFILL: any missed weekdays since lastProfitDate are credited in one shot
- *   + SKIP Saturday & Sunday (libur — no profit on weekends)
+ * - Daily Investment Profit: Every day at 00:00 WIB (INCLUDING Sat/Sun)
+ *   + BACKFILL: any missed days since lastProfitDate are credited in one shot
+ *   + Profit dikredit TIAP HARI (160k × 2% = 3.200/hari × 180 hari = 576.000 total)
+ *   + HARD CAP: total profit tidak boleh melebihi dailyProfit × contractDays
  *   + Immediately credits matching profit to upline (event-driven)
  * - Weekly Salary Bonus: Every Monday at 00:00 WIB
  *   + 1% per week, FOREVER (maxWeeks <= 0 = unlimited)
@@ -401,7 +402,7 @@ async function processDailyInvestmentProfits(): Promise<{
   });
 
   console.log(`[Profit Cron] WIB now: ${wibNow.toISOString()} (${dayName})`);
-  console.log(`[Profit Cron] Processing ${investments.length} active investments (with BACKFILL of missed weekdays, skip Sat/Sun)...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (with BACKFILL of missed days, EVERY DAY incl. Sat/Sun)...`);
 
   for (const inv of investments) {
     try {
@@ -427,17 +428,15 @@ async function processDailyInvestmentProfits(): Promise<{
         }
       }
 
-      // ─── Count MISSED WEEKDAYS (Mon-Fri) from (lastCreditedDay + 1 day) to endDay (inclusive) ───
-      // Skip Sat (6) and Sun (0) — libur, no profit on weekends.
+      // ─── Count MISSED DAYS (every day incl. Sat/Sun) from (lastCreditedDay + 1 day) to endDay (inclusive) ───
+      // Profit dikredit TIAP HARI (termasuk Sabtu & Minggu) sesuai requirement:
+      //   160k × 2% = 3.200/hari × 180 hari = 576.000 total.
+      // Cron auto-backfill semua hari yang terlewat (misal cron mati 5 hari → kredit 5 × 3.200 sekaligus).
       const missedDates: Date[] = [];
       const cursor = new Date(lastCreditedDay);
       cursor.setDate(cursor.getDate() + 1); // start from day AFTER last credited
       while (cursor.getTime() <= endDay.getTime()) {
-        const dow = cursor.getDay();
-        if (dow !== 0 && dow !== 6) {
-          // Weekday (Mon-Fri) — eligible for profit
-          missedDates.push(new Date(cursor));
-        }
+        missedDates.push(new Date(cursor));
         cursor.setDate(cursor.getDate() + 1);
       }
 
@@ -451,7 +450,19 @@ async function processDailyInvestmentProfits(): Promise<{
         ? inv.dailyProfit
         : Math.floor(inv.amount * (inv.package.profitRate / 100));
 
-      const totalCredit = dailyProfit * missedDates.length;
+      // ★ HARD CAP: total profit tidak boleh melebihi dailyProfit × contractDays.
+      //   Misal 160k × 2% = 3.200 × 180 hari = 576.000. Backfill tidak boleh over-credit.
+      const contractDays = inv.endDate
+        ? Math.max(1, Math.round((new Date(inv.endDate).getTime() - new Date(inv.startDate).getTime()) / 86400000))
+        : 0;
+      const maxTotalProfit = contractDays > 0 ? dailyProfit * contractDays : Infinity;
+      const remainingCap = Math.max(0, maxTotalProfit - (inv.totalProfitEarned || 0));
+      const rawCredit = dailyProfit * missedDates.length;
+      const totalCredit = Math.min(rawCredit, remainingCap);
+      // ★ Auto-complete kalau cap tercapai (totalProfitEarned + totalCredit >= maxTotalProfit)
+      if (contractDays > 0 && (inv.totalProfitEarned || 0) + totalCredit >= maxTotalProfit) {
+        shouldComplete = true;
+      }
 
       await db.$transaction(async (tx) => {
         // ★ RE-CHECK inside transaction to prevent double credit (race condition) ★
@@ -505,7 +516,7 @@ async function processDailyInvestmentProfits(): Promise<{
           // 4. Create bonus log for daily profit (with backfill date range description)
           const dateRangeStr = missedDates.length === 1
             ? `tanggal ${missedDates[0].toISOString().slice(0, 10)}`
-            : `backfill ${missedDates.length} hari kerja (${missedDates[0].toISOString().slice(0, 10)} s/d ${missedDates[missedDates.length - 1].toISOString().slice(0, 10)})`;
+            : `backfill ${missedDates.length} hari (${missedDates[0].toISOString().slice(0, 10)} s/d ${missedDates[missedDates.length - 1].toISOString().slice(0, 10)})`;
           await tx.bonusLog.create({
             data: {
               userId: inv.userId,
@@ -535,7 +546,7 @@ async function processDailyInvestmentProfits(): Promise<{
       if (totalCredit > 0) {
         result.processed++;
         result.totalProfit += totalCredit;
-        console.log(`[Profit Cron] ✅ Investment ${inv.id} (user ${inv.userId}): credited ${missedDates.length} weekday(s) × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}${shouldComplete ? ' [investasi selesai]' : ''}`);
+        console.log(`[Profit Cron] ✅ Investment ${inv.id} (user ${inv.userId}): credited ${missedDates.length} day(s) × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}${shouldComplete ? ' [investasi selesai]' : ''}`);
       } else if (shouldComplete) {
         console.log(`[Profit Cron] ✓ Investment ${inv.id} (user ${inv.userId}): marked completed (no missed profit)`);
       }
@@ -640,20 +651,15 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // Daily profit + matching bonus: Every weekday (Mon-Fri) at 00:00 WIB
-  // ★ WEEKEND LIBUR: cron scheduler SKIPS Saturday (6) & Sunday (0) ★
-  // (Manual trigger via /api/trigger/profit can still run on weekends to backfill missed weekdays)
+  // Daily profit + matching bonus: EVERY DAY at 00:00 WIB (including Sat/Sun)
+  // Profit dikredit tiap hari (160k × 2% = 3.200/hari × 180 hari = 576.000 total).
+  // Backfill otomatis kalau cron telat/nge-hang.
   if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr) {
     lastProfitRunDate = dateStr;
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-      console.log(`\n[CRON] ⏸️ Auto profit cron SKIPPED — today is ${dayName} (weekend libur). Manual trigger still works for backfill.`);
-    } else {
-      console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus (with BACKFILL) at ${wibNow.toISOString()}...`);
-      processDailyInvestmentProfits().then((result) => {
-        console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
-      }).catch(console.error);
-    }
+    console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus (with BACKFILL) at ${wibNow.toISOString()}...`);
+    processDailyInvestmentProfits().then((result) => {
+      console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
+    }).catch(console.error);
   }
 
   // Weekly salary: Every Monday at 00:00 WIB (check minute 0 with 2-min window)
@@ -763,7 +769,7 @@ const server = Bun.serve({
 console.log(`[Cron Service] 🚀 Running on port ${PORT}`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
-console.log(`  - Daily Profit + Matching (with BACKFILL): 00:00 WIB every Mon-Fri (skip Sat/Sun libur)`);
+console.log(`  - Daily Profit + Matching (with BACKFILL): 00:00 WIB EVERY DAY (incl. Sat/Sun) — 160k×2%=3.200/hari×180=576.000`);
 console.log(`  - Weekly Salary: 00:00 WIB every Monday (1%/week, unlimited weeks, require 10 refs + own active investment)`);
 console.log(`  - Quota Bump: every 15 minutes (auto-increment Kuota Terisi, reset when full)`);
 console.log(`  - Matching: Event-driven (credited automatically with daily profit)`);
