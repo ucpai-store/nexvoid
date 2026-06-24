@@ -1488,3 +1488,54 @@ Stage Summary:
 - Tooltip never overflows viewport, never under header/nav
 - Floating "Panduan" button clears bottom nav + iOS safe area
 - Deploy command: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tour-auto-play
+Agent: main
+Task: User request — 'panduan nya tu langsung berjalan kek panduan daftar jadi asli bukan teks doang terus di hp wajibb rapii' — tour harus JALAN sendiri (form terisi, langkah jalan otomatis), bukan cuma teks. Mobile wajib rapi.
+
+Work Log:
+- Inspected form field selectors in RegisterPage, LoginPage, DepositPage, WithdrawPage
+  * RegisterPage inputs: placeholder="Masukkan nama pengguna", "8123456789", "your@email.com", "Ketik password", "Ulangi password"
+  * LoginPage inputs: placeholder="your@email.com", "8123456789", "Ketik password"
+  * DepositPage: placeholder="0" (nominal input)
+  * WithdrawPage: placeholder="0" (nominal input)
+- Updated tour-store.ts:
+  * Added isAutoPlay, isPaused state
+  * Added startAutoPlay(), togglePause(), setAutoPlay(), stopAutoPlay() actions
+  * Added demoFields[] per step (selector + value + label)
+  * Added autoAdvanceDelay per step (2500-6000ms)
+  * Demo data: Budi Santoso / 8123456789 / budi@gmail.com / Budi1234! / 500000 / 100000
+- Updated GuidedTour.tsx:
+  * Added typeIntoInput() helper using native HTMLInputElement value setter
+    (bypasses React controlled-input) + dispatches 'input' event so React
+    onChange fires and state updates. Types char-by-char at 55ms + random 25ms.
+  * Added auto-play engine useEffect: waits 700ms → types demoFields one by one
+    → countdown → auto-advance. Cancel ref stops typing on manual nav.
+  * Welcome modal now has 2 start buttons:
+    1. 'Mode Demo Otomatis (untuk rekam video)' — gold, recommended
+    2. 'Mode Manual (klik sendiri)' — glass
+  * Typing badge: floating top-3, gold, shows 'Mengetik: [field]...' + 3 bounce dots
+  * AUTO badge: red, inline-flex in tooltip header, with pulsing Radio icon
+  * Countdown: 'lanjut dalam Xs' in emerald, updates every 500ms
+  * Pause/Resume button: icon-only on mobile, full text on desktop
+  * 'Matikan Auto' / 'Nyalakan Auto' toggle link at bottom of tooltip
+  * Manual next/prev cancels auto-play typing via typeCancelRef
+- Mobile-first verified:
+  * Welcome modal: bottom-sheet on phone, 2 buttons stack vertically
+  * Typing badge: top-3, compact text-[11px]
+  * AUTO badge: text-[9px], inline-flex
+  * Pause button: icon-only on phone, 'Jeda'/'Lanjut' on desktop
+  * All controls fit in 320-375px viewport
+- TypeScript: tour files compile clean (no errors in GuidedTour.tsx or tour-store.ts)
+- Dev server: HTTP 200, 77KB HTML, no runtime errors in log
+- Committed (cfc5d69) + pushed to GitHub main
+- deploy-ui-update.sh confirmed accessible (HTTP 200)
+
+Stage Summary:
+- Tour sekarang JALAN otomatis — form terisi sendiri dengan typewriter effect
+- User tinggal: klik 'Mode Demo Otomatis' → rekam video → tour jalan sendiri
+- 2 mode: Auto (untuk rekam video) + Manual (klik sendiri)
+- Pause/resume kapan saja, toggle auto on/off kapan saja
+- Mobile rapi: bottom-sheet modal, compact badges, icon-only buttons on phone
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
