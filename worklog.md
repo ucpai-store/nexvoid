@@ -1579,3 +1579,47 @@ Stage Summary:
 - Tooltip & welcome modal solid dark dengan border emas — readable di video
 - Mobile tetap rapi (semua responsive, padding/border konsisten)
 - Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: tour-bottom-sheet
+Agent: main
+Task: User request — 'teks yang mengambang tu kasi yang rapi tidak boleh menutupi ya jadi di vidio nya biar jelass panduan wajib rapii jelas' — tooltip floating nutupin form/button, harus rapi gak boleh nutupin.
+
+Work Log:
+- Root cause: tooltip floating deket target → sering nutupin form/button yang
+  lagi didemo. Di video jadi gak jelas apa yang dilakukan.
+- Fix strategy: MOBILE → fixed bottom sheet (selalu di bawah, gak pernah nutupin
+  konten). DESKTOP → floating dengan smart positioning + buffer.
+- Rewrote findAndPosition():
+  * MOBILE branch: set placement='bottom', no tooltipPos needed (fixed sheet).
+    Smart scroll: hitung visibleArea = vh - sheetHeight(220) - bottomNav(80),
+    scroll target ke center of (70, visibleArea) → always above sheet.
+  * DESKTOP branch: smart auto-flip dengan buffer 12px (tooltip gak pernah
+    nyentuh target). Clamp ke viewport dengan margin 20px.
+- Refactored tooltip rendering: extracted tooltipInner ke variable (shared
+  between mobile bottom-sheet & desktop floating). Gak duplikasi code.
+- MOBILE bottom sheet:
+  * fixed bottom: calc(76px + env(safe-area-inset-bottom))
+  * left-0 right-0 (full width), rounded-t-2xl, border-2 emas border-b-0
+  * maxHeight: 38vh (page tetap keliatan di atas)
+  * Spring animation: initial y:60 → animate y:0 (slide up)
+  * Compact: p-3.5, text-[12.5px], h-9 buttons
+- DESKTOP floating:
+  * Same tooltipWidthClass (88vw max 360px)
+  * Positioned via tooltipPos (top/left) dengan buffer 12px dari target
+  * Centered steps (welcome/done): translate(-50%,-50%) di center
+- Typing badge:
+  * MOBILE: INLINE di tooltip header (gak floating top → gak nutupin header
+    yang ada logo + menu)
+  * DESKTOP: floating top-6 (header desktop lebih tinggi, aman)
+- TypeScript compile clean (no errors in GuidedTour.tsx)
+- Dev server: HTTP 200, no runtime errors
+- Committed (6c714e5) + pushed to GitHub main
+
+Stage Summary:
+- Mobile: panduan = bottom sheet di bawah (kayak subtitle video), form/button
+  100% visible di atas. Gak pernah nutupin konten penting.
+- Desktop: floating tooltip dengan 12px buffer dari target, gak pernah overlap
+- Typing badge gak nutupin header di mobile (inline di sheet header)
+- Video sekarang JELAS: lihat halaman + ikuti panduan di bawah
+- Deploy: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
