@@ -85,3 +85,4 @@ upload/
 !src/app/api/upload/**
 !src/app/api/deposit/upload/
 !src/app/api/deposit/upload/**
+verify-*.png
