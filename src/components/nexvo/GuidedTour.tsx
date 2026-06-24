@@ -336,7 +336,7 @@ export default function GuidedTour() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-[2px]"
             onClick={() => setShowWelcome(false)}
           >
             <motion.div
@@ -345,7 +345,13 @@ export default function GuidedTour() {
               exit={{ scale: 0.95, y: 40 }}
               transition={{ type: 'spring', damping: 28, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 w-full sm:max-w-md border border-primary/30 glow-gold-strong relative overflow-hidden max-h-[92vh] overflow-y-auto"
+              className="rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 w-full sm:max-w-md border-2 border-yellow-400/70 relative overflow-hidden max-h-[92vh] overflow-y-auto"
+              style={{
+                background: 'rgba(8, 12, 24, 0.98)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                boxShadow: '0 0 0 1px rgba(234,179,8,0.3), 0 12px 48px rgba(0,0,0,0.7), 0 0 60px rgba(234,179,8,0.2)',
+              }}
             >
               <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-yellow-400/20 blur-3xl pointer-events-none" />
               <div className="absolute -bottom-20 -left-20 w-40 h-40 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
@@ -421,64 +427,98 @@ export default function GuidedTour() {
       <AnimatePresence>
         {isActive && step && (
           <>
-            {/* Dark backdrop with cutout around target */}
+            {/* NO dark backdrop — page stays fully visible for video recording.
+                Only a subtle vignette around the target so the eye knows where to look. */}
             {targetRect && !isCentered && (
-              <div
-                className="fixed inset-0 z-[90] pointer-events-none"
-                style={{
-                  backgroundColor: 'rgba(0,0,0,0.75)',
-                  boxShadow: ['0 0 0 9999px rgba(0,0,0,0.75)'].join(', '),
-                }}
-              >
-                <div className="absolute inset-0 bg-black/75" style={{ clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${targetRect.left}px ${targetRect.top}px, ${targetRect.left + targetRect.width}px ${targetRect.top}px, ${targetRect.left + targetRect.width}px ${targetRect.top + targetRect.height}px, ${targetRect.left}px ${targetRect.top + targetRect.height}px, ${targetRect.left}px ${targetRect.top}px)` }} />
-              </div>
+              <div className="fixed inset-0 z-[90] pointer-events-none" />
             )}
-            {isCentered && <div className="fixed inset-0 z-[90] bg-black/75 backdrop-blur-sm" />}
+            {isCentered && (
+              <div className="fixed inset-0 z-[90] bg-black/40 backdrop-blur-[2px]" />
+            )}
 
-            {/* Highlight ring around target */}
+            {/* Soft spotlight glow behind target (no darkening) */}
+            {targetRect && !isCentered && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="fixed z-[90] pointer-events-none rounded-2xl"
+                style={{
+                  top: targetRect.top - 24,
+                  left: targetRect.left - 24,
+                  width: targetRect.width + 48,
+                  height: targetRect.height + 48,
+                  background:
+                    'radial-gradient(circle, rgba(234,179,8,0.18) 0%, rgba(234,179,8,0.06) 50%, transparent 75%)',
+                }}
+              />
+            )}
+
+            {/* Highlight ring around target — THICK + bright + animated pulse */}
             {targetRect && !isCentered && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="fixed z-[91] pointer-events-none rounded-xl"
                 style={{
-                  top: targetRect.top - 4,
-                  left: targetRect.left - 4,
-                  width: targetRect.width + 8,
-                  height: targetRect.height + 8,
-                  boxShadow: '0 0 0 4px rgba(234,179,8,0.9), 0 0 30px rgba(234,179,8,0.6)',
+                  top: targetRect.top - 5,
+                  left: targetRect.left - 5,
+                  width: targetRect.width + 10,
+                  height: targetRect.height + 10,
+                  boxShadow:
+                    '0 0 0 5px rgba(234,179,8,1), 0 0 0 7px rgba(0,0,0,0.5), 0 0 35px rgba(234,179,8,0.8), 0 0 60px rgba(234,179,8,0.4)',
                   background: 'transparent',
                 }}
               >
-                <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-yellow-400 animate-ping" />
+                {/* Corner accents (animated) */}
+                <span className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full bg-yellow-400 animate-ping" />
+                <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-yellow-400 animate-ping" style={{ animationDelay: '200ms' }} />
+                <span className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 rounded-full bg-yellow-400 animate-ping" style={{ animationDelay: '400ms' }} />
+                <span className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-yellow-400 animate-ping" style={{ animationDelay: '600ms' }} />
               </motion.div>
             )}
 
-            {/* Arrow pointing to target */}
+            {/* Arrow pointing to target — BIG + bright + bobbing animation */}
             {targetRect && !isCentered && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
+                initial={{ opacity: 0, scale: 0.3 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="fixed z-[92] pointer-events-none text-yellow-400"
                 style={{
                   top:
                     actualPlacement === 'top'
-                      ? targetRect.top - 24
+                      ? targetRect.top - 36
                       : actualPlacement === 'bottom'
-                      ? targetRect.bottom + 8
-                      : targetRect.top + targetRect.height / 2 - 12,
+                      ? targetRect.bottom + 10
+                      : targetRect.top + targetRect.height / 2 - 18,
                   left:
                     actualPlacement === 'left'
-                      ? targetRect.left - 24
+                      ? targetRect.left - 36
                       : actualPlacement === 'right'
-                      ? targetRect.right + 8
-                      : targetRect.left + targetRect.width / 2 - 12,
+                      ? targetRect.right + 10
+                      : targetRect.left + targetRect.width / 2 - 18,
+                  filter: 'drop-shadow(0 0 10px rgba(234,179,8,1)) drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
                 }}
               >
-                {actualPlacement === 'top' && <ArrowUp className="w-6 h-6 drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />}
-                {actualPlacement === 'bottom' && <ArrowDown className="w-6 h-6 drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />}
-                {actualPlacement === 'left' && <ArrowLeft className="w-6 h-6 drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />}
-                {actualPlacement === 'right' && <ArrowRight className="w-6 h-6 drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />}
+                {actualPlacement === 'top' && (
+                  <motion.div animate={{ y: [0, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity }}>
+                    <ArrowUp className="w-9 h-9" strokeWidth={3} />
+                  </motion.div>
+                )}
+                {actualPlacement === 'bottom' && (
+                  <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 0.9, repeat: Infinity }}>
+                    <ArrowDown className="w-9 h-9" strokeWidth={3} />
+                  </motion.div>
+                )}
+                {actualPlacement === 'left' && (
+                  <motion.div animate={{ x: [0, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity }}>
+                    <ArrowLeft className="w-9 h-9" strokeWidth={3} />
+                  </motion.div>
+                )}
+                {actualPlacement === 'right' && (
+                  <motion.div animate={{ x: [0, 6, 0] }} transition={{ duration: 0.9, repeat: Infinity }}>
+                    <ArrowRight className="w-9 h-9" strokeWidth={3} />
+                  </motion.div>
+                )}
               </motion.div>
             )}
 
@@ -502,18 +542,25 @@ export default function GuidedTour() {
               )}
             </AnimatePresence>
 
-            {/* Tooltip */}
+            {/* Tooltip — solid dark background for max readability on video */}
             <motion.div
               key={currentStep}
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className={`fixed z-[93] ${tooltipWidthClass} glass-strong rounded-2xl border border-primary/30 glow-gold overflow-hidden`}
+              className={`fixed z-[93] ${tooltipWidthClass} rounded-2xl overflow-hidden border-2 border-yellow-400/80`}
               style={
-                isCentered
-                  ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
-                  : { top: tooltipPos.top, left: tooltipPos.left }
+                {
+                  background: 'rgba(8, 12, 24, 0.97)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  boxShadow:
+                    '0 0 0 1px rgba(234,179,8,0.4), 0 8px 32px rgba(0,0,0,0.6), 0 0 40px rgba(234,179,8,0.25)',
+                  ...(isCentered
+                    ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+                    : { top: tooltipPos.top, left: tooltipPos.left }),
+                }
               }
             >
               {/* Progress bar */}
