@@ -437,6 +437,31 @@ async function processDailyInvestmentProfits(): Promise<{
     return result;
   }
 
+  return processDailyInvestmentProfitsCore();
+}
+
+/**
+ * Force version — bypasses weekend guard. Used by manual trigger with ?force=true
+ * (admin catch-up). The per-investment lastProfitDate check still prevents double-credit.
+ */
+async function processDailyInvestmentProfitsForce(): Promise<{
+  processed: number;
+  totalProfit: number;
+  totalMatching: number;
+  errors: number;
+}> {
+  console.log('[Profit Cron] ⚠️ FORCE MODE — bypassing weekend guard (manual trigger).');
+  return processDailyInvestmentProfitsCore();
+}
+
+async function processDailyInvestmentProfitsCore(): Promise<{
+  processed: number;
+  totalProfit: number;
+  totalMatching: number;
+  errors: number;
+}> {
+  const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0 };
+
   const todayWIB = getTodayWibDateString();
 
   const investments = await db.investment.findMany({
@@ -755,6 +780,62 @@ async function simulateQuotaAndActivity(): Promise<{
 
 let lastSalaryRunDate = '';
 let lastProfitRunDate = '';
+let startupCatchupDone = false;
+
+/**
+ * Check if today's profit has already been credited by querying the DB.
+ * Returns true if ANY active investment already has lastProfitDate = today (WIB).
+ * This is the source of truth — the in-memory `lastProfitRunDate` flag can reset on PM2 restart.
+ */
+async function hasProfitBeenCreditedToday(): Promise<{ credited: boolean; sampleCount: number }> {
+  const todayWIB = getTodayWibDateString();
+  const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
+  const activeCount = await db.investment.count({ where: { status: 'active' } });
+  if (activeCount === 0) return { credited: false, sampleCount: 0 };
+  const creditedToday = await db.investment.count({
+    where: {
+      status: 'active',
+      lastProfitDate: { gte: startOfDayWIB },
+    },
+  });
+  return { credited: creditedToday > 0, sampleCount: creditedToday };
+}
+
+async function runProfitCronIfDue(reason: string): Promise<void> {
+  const wibNow = getWibNow();
+  const dayOfWeek = wibNow.getDay();
+  const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
+
+  // Already ran this date (in-memory guard)
+  if (lastProfitRunDate === dateStr) return;
+
+  // Weekend libur — no profit on Sat (6) & Sun (0)
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+    lastProfitRunDate = dateStr; // mark so we don't keep logging this every 10s
+    console.log(`\n[CRON] ⏸️ Profit cron SKIPPED (${reason}) — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    return;
+  }
+
+  // DB-based dedup: if profit already credited today, skip
+  const { credited, sampleCount } = await hasProfitBeenCreditedToday();
+  if (credited) {
+    lastProfitRunDate = dateStr;
+    console.log(`\n[CRON] ✅ Profit already credited today (${sampleCount} investments have lastProfitDate >= today 00:00 WIB). Skipping (${reason}).`);
+    return;
+  }
+
+  lastProfitRunDate = dateStr;
+  console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus (${reason}) at ${wibNow.toISOString()} (WIB: ${wibNow.toLocaleString('id-ID', { timeZone: 'UTC' })})...`);
+  try {
+    const result = await processDailyInvestmentProfits();
+    console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
+  } catch (err) {
+    console.error(`[CRON] 🌅 Profit cron ERROR:`, err);
+    // Reset flag so it retries on next tick
+    lastProfitRunDate = '';
+  }
+}
 
 function checkAndRunCrons() {
   const wibNow = getWibNow();
@@ -763,23 +844,25 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // Daily profit + matching bonus: Every day at 00:00 WIB
-  // ★ WEEKEND LIBUR: No profit distribution on Saturday (6) & Sunday (0) ★
-  if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr) {
-    lastProfitRunDate = dateStr;
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-      console.log(`\n[CRON] ⏸️ Profit cron SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
-    } else {
-      console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()}...`);
-      processDailyInvestmentProfits().then((result) => {
-        console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
-      }).catch(console.error);
+  // ★ STARTUP CATCH-UP: On first run, if it's past 00:05 WIB and profit hasn't run today, run it now.
+  //    This handles the case where PM2 restarted after midnight and the 00:00 window was missed.
+  if (!startupCatchupDone) {
+    startupCatchupDone = true;
+    if (hour >= 0 && (hour > 0 || minute >= 5) && lastProfitRunDate !== dateStr) {
+      console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, checking if today's profit needs to run...`);
+      runProfitCronIfDue('startup-catchup').catch(console.error);
     }
   }
 
-  // Weekly salary: Every Monday at 00:00 WIB
-  if (dayOfWeek === 1 && hour === 0 && minute <= 2 && lastSalaryRunDate !== dateStr) {
+  // Daily profit + matching bonus: trigger window is the FULL HOUR 00:00-00:59 WIB
+  // (widened from 00:00-00:02 to survive PM2 restarts/delays; DB dedup prevents double-credit)
+  // ★ WEEKEND LIBUR: No profit distribution on Saturday (6) & Sunday (0) ★
+  if (hour === 0 && lastProfitRunDate !== dateStr) {
+    runProfitCronIfDue('midnight-schedule').catch(console.error);
+  }
+
+  // Weekly salary: Every Monday at 00:00 WIB (trigger window: full hour)
+  if (dayOfWeek === 1 && hour === 0 && lastSalaryRunDate !== dateStr) {
     lastSalaryRunDate = dateStr;
     console.log(`\n[CRON] 💰 Running weekly salary bonus distribution at ${wibNow.toISOString()}...`);
     processAllSalaryBonuses().then((result) => {
@@ -834,7 +917,13 @@ const server = Bun.serve({
     }
 
     if (url.pathname === '/api/trigger/profit' && req.method === 'POST') {
-      console.log('\n[CRON] 📌 Manual trigger: Daily profit + matching');
+      const force = url.searchParams.get('force') === 'true';
+      console.log(`\n[CRON] 📌 Manual trigger: Daily profit + matching (force=${force})`);
+      if (force) {
+        // Bypass weekend guard — admin/manual catch-up
+        const result = await processDailyInvestmentProfitsForce();
+        return Response.json({ success: true, data: result, force: true }, { headers: corsHeaders });
+      }
       const result = await processDailyInvestmentProfits();
       return Response.json({ success: true, data: result }, { headers: corsHeaders });
     }
@@ -860,9 +949,17 @@ const server = Bun.serve({
     }
 
     if (url.pathname === '/api/status') {
+      const { credited, sampleCount } = await hasProfitBeenCreditedToday();
+      const wibNow = getWibNow();
+      const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       return Response.json({
-        wibTime: getWibNow().toISOString(),
-        dayOfWeek: getWibNow().getDay(),
+        wibTime: wibNow.toISOString(),
+        wibWallTime: `${wibNow.getFullYear()}-${String(wibNow.getMonth()+1).padStart(2,'0')}-${String(wibNow.getDate()).padStart(2,'0')} ${String(wibNow.getHours()).padStart(2,'0')}:${String(wibNow.getMinutes()).padStart(2,'0')}:${String(wibNow.getSeconds()).padStart(2,'0')}`,
+        dayOfWeek: wibNow.getDay(),
+        dayName: dayNames[wibNow.getDay()],
+        isWeekend: wibNow.getDay() === 0 || wibNow.getDay() === 6,
+        profitCreditedToday: credited,
+        profitCreditedCount: sampleCount,
         lastSalaryRun: lastSalaryRunDate || 'never',
         lastProfitRun: lastProfitRunDate || 'never',
         lastQuotaSimHour: lastQuotaSimHour >= 0 ? `hour ${lastQuotaSimHour}` : 'never',
