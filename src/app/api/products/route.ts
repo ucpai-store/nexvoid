@@ -188,13 +188,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Action tidak valid' }, { status: 400 });
     }
 
-    if (!productId || !quantity || quantity < 1) {
-      return NextResponse.json({ success: false, error: 'Product ID dan jumlah wajib diisi' }, { status: 400 });
+    if (!productId) {
+      return NextResponse.json({ success: false, error: 'Product ID wajib diisi' }, { status: 400 });
     }
+
+    // ★ No-duplicates rule: each product can only be bought ONCE per user.
+    // Quantity is forced to 1 — buying the same product again is rejected below.
+    const qty = 1;
 
     const product = await db.product.findUnique({ where: { id: productId } });
     if (!product || !product.isActive || product.isStopped) {
       return NextResponse.json({ success: false, error: 'Produk tidak tersedia' }, { status: 404 });
+    }
+
+    // ★ No-duplicates: reject if user already owns this product (any status).
+    const existingPurchase = await db.purchase.findFirst({
+      where: { userId: user.id, productId },
+      select: { id: true, status: true },
+    });
+    if (existingPurchase) {
+      const verb = existingPurchase.status === 'active' ? 'sedang aktif' : 'sudah pernah dibeli';
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Produk '${product.name}' ${verb}. Wajib pilih produk lain yang belum dimiliki.`,
+        },
+        { status: 400 }
+      );
     }
 
     // Auto-reset quota if full before checking
@@ -210,13 +230,15 @@ export async function POST(request: NextRequest) {
     }
 
     const remainingQuota = product.quota - product.quotaUsed;
-    if (quantity > remainingQuota) {
+    if (qty > remainingQuota) {
       return NextResponse.json({ success: false, error: 'Kuota produk tidak mencukupi' }, { status: 400 });
     }
 
-    const totalPrice = product.price * quantity;
+    const totalPrice = product.price * qty;
 
     // ★ Purchase — NO immediate profit. Profit ONLY at 00:00 WIB via cron ★
+    // ★ No-duplicates + 1-active-only: supersede any previous active purchase/investment
+    //   so that ONLY ONE product is active per user at any time.
     const purchase = await db.$transaction(async (tx) => {
       const currentUser = await tx.user.findUnique({ where: { id: user.id } });
       if (!currentUser) {
@@ -227,6 +249,19 @@ export async function POST(request: NextRequest) {
       if (totalAvailable < totalPrice) {
         throw new Error('Saldo tidak mencukupi');
       }
+
+      // ★ 1-active-only: mark all previous active Purchases of this user as 'completed'
+      await tx.purchase.updateMany({
+        where: { userId: user.id, status: 'active' },
+        data: { status: 'completed' },
+      });
+
+      // ★ 1-active-only: mark all previous active Investments of this user as 'completed'
+      //   so cron stops crediting daily profit for the old product.
+      await tx.investment.updateMany({
+        where: { userId: user.id, status: 'active' },
+        data: { status: 'completed', endDate: new Date() },
+      });
 
       // Deduct from depositBalance first, then mainBalance
       let remaining = totalPrice;
@@ -246,7 +281,7 @@ export async function POST(request: NextRequest) {
       // Update product quota
       await tx.product.update({
         where: { id: productId },
-        data: { quotaUsed: { increment: quantity } },
+        data: { quotaUsed: { increment: qty } },
       });
 
       // Create purchase record
@@ -254,7 +289,7 @@ export async function POST(request: NextRequest) {
         data: {
           userId: user.id,
           productId,
-          quantity,
+          quantity: qty,
           totalPrice,
           status: 'active',
           profitEarned: 0,
@@ -280,35 +315,33 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Create ONE investment per quantity — NO immediate profit credit
+      // Create ONE investment (qty=1) — NO immediate profit credit
       const dailyProfit = Math.floor(product.price * (investmentPackage.profitRate / 100));
       const startDate = new Date();
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + investmentPackage.contractDays);
 
-      for (let i = 0; i < quantity; i++) {
-        // Create investment WITHOUT profit — profit will come at 00:00 WIB
-        await tx.investment.create({
-          data: {
-            userId: user.id,
-            packageId: investmentPackage.id,
-            purchaseId: newPurchase.id, // Link to purchase to avoid double-counting in assets/transactions
-            amount: product.price,
-            dailyProfit,
-            totalProfitEarned: 0, // No profit yet
-            status: 'active',
-            startDate,
-            endDate,
-            lastProfitDate: null, // No profit yet — cron will handle first credit
-          },
-        });
-      }
+      // Create investment WITHOUT profit — profit will come at 00:00 WIB
+      await tx.investment.create({
+        data: {
+          userId: user.id,
+          packageId: investmentPackage.id,
+          purchaseId: newPurchase.id, // Link to purchase to avoid double-counting in assets/transactions
+          amount: product.price,
+          dailyProfit,
+          totalProfitEarned: 0, // No profit yet
+          status: 'active',
+          startDate,
+          endDate,
+          lastProfitDate: null, // No profit yet — cron will handle first credit
+        },
+      });
 
       // Update purchase tracking
       await tx.purchase.update({
         where: { id: newPurchase.id },
         data: {
-          dailyProfit: dailyProfit * quantity,
+          dailyProfit: dailyProfit * qty,
         },
       });
 
@@ -330,7 +363,7 @@ export async function POST(request: NextRequest) {
         console.error(`[PRODUCT BUY] ❌ Failed to credit referral bonuses for user ${user.id}:`, referralError);
       }
 
-      return { purchase: newPurchase, dailyProfitTotal: dailyProfit * quantity };
+      return { purchase: newPurchase, dailyProfitTotal: dailyProfit * qty };
     });
 
     const updatedUser = await db.user.findUnique({

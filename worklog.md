@@ -2044,3 +2044,155 @@ Stage Summary:
 - Halaman Paket & Produk sama-sama menampilkan VIP tier grid (Produk wraps PaketPage)
 - Deploy command:
     curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
+
+---
+Task ID: verify-produk-paket-tiers
+Agent: general-purpose
+Task: Verify Produk and Paket pages render all VIP tiers. User asked to confirm "di produk per paket nya kan ada benar kan?" — confirm each VIP tier (VIP 1..6) is present/visible on both pages. Read-only verification — no code changes.
+
+Work Log:
+- Read worklog tail (last 300 lines) for context: previous tasks (tier-system-unify, tier-system-no-duplicates, hapus-banner-pemberitahuan) established that Produk = Paket, both render the same VIP tier grid via PaketPage, no-duplicates purchase rule applies, and the "1 Paket Aktif Saja" banner was removed.
+- Read src/components/nexvo/pages/PaketPage.tsx (609 lines):
+  * Packages state is filled by fetchPackages() which calls /api/packages then merges /api/investments/tiers per-package state.
+  * Renders `packages.map((pkg, index) => <PackageCard ... />)` — NO FILTER, all returned packages are rendered.
+  * PackageCard renders one of 3 button states based on pkg.state:
+    - 'active'   → "Sedang Aktif" (green, disabled)
+    - 'bought'   → "Sudah Dimiliki" (blue, disabled)
+    - 'available'→ "Beli Sekarang" (gold, clickable)
+  * Loading skeleton shows 6 placeholder cards (so layout expects 6 tiers).
+  * Empty state only triggers when packages.length === 0.
+- Read src/components/nexvo/pages/ProductsPage.tsx (21 lines):
+  * Confirmed: `export default function ProductsPage() { return <PaketPage />; }`
+  * Produk page is literally a passthrough wrapper — no filtering, no separate data source.
+- Read src/app/api/packages/route.ts (90 lines):
+  * GET handler: `db.investmentPackage.findMany({ where: { isActive: true }, orderBy: { amount: 'asc' } })` — returns all active tiers ordered cheapest→most expensive (VIP 1 → VIP 6).
+  * No filter that would hide tiers. FALLBACK_PACKAGES (6 entries) only used if DB throws.
+- Read scripts/seed-tiers-user.ts: confirmed test user credentials
+  * email: tier-test@nexvo.test
+  * password: Test1234!
+  * whatsapp: 89900000001
+  * mainBalance: Rp 15.000.000 (enough to buy multiple tiers)
+  * Seeded VIP tiers: VIP 1 (100K, 10%/hari), VIP 2 (500K, 10%), VIP 3 (1JT, 12%), VIP 4 (2.5JT, 12%), VIP 5 (5JT, 15%), VIP 6 (10JT, 15%)
+- Dev server check: HTTP 200 on http://localhost:3000/, next-server (v16.2.6) running on port 3000.
+- Agent Browser (iPhone 14 viewport) verification:
+  * Logged in as tier-test@nexvo.test / Test1234! via Email tab — POST /api/auth/login 200, redirected to #home.
+  * Navigated to http://localhost:3000/#products — agent-browser errors output EMPTY (no console/page errors).
+  * JS eval on #products captured all 6 VIP tier cards (h3 titles + per-card text):
+    - VIP 1 → state=bought, ribbon="SELESAI", button="Sudah Dimiliki", reason="Sudah pernah dibeli — pilih paket lain yang belum dimiliki", Modal Rp 100.000, Profit Rp 10.000/hari
+    - VIP 2 → state=bought, ribbon="SELESAI", button="Sudah Dimiliki", reason="Sudah pernah dibeli — pilih paket lain yang belum dimiliki", Modal Rp 500.000, Profit Rp 50.000/hari
+    - VIP 3 → state=available, ribbon="⭐ POPULER", button="Beli Sekarang", Modal Rp 1.000.000, Profit Rp 120.000/hari
+    - VIP 4 → state=available, button="Beli Sekarang", Modal Rp 2.500.000, Profit Rp 300.000/hari
+    - VIP 5 → state=available, button="Beli Sekarang", Modal Rp 5.000.000, Profit Rp 750.000/hari
+    - VIP 6 → state=active, ribbon="AKTIF", button="Sedang Aktif", reason="Paket aktif Anda hari ini", Modal Rp 10.000.000, Profit Rp 1.500.000/hari
+  * Full-page screenshot saved to /tmp/produk-page.png (1.36 MB).
+  * Navigated to http://localhost:3000/#paket — agent-browser errors output EMPTY.
+  * JS eval on #paket captured all 6 VIP tier cards:
+    - VIP 1 → state=bought,  Rp 100.000
+    - VIP 2 → state=bought,  Rp 500.000
+    - VIP 3 → state=available, Rp 1.000.000
+    - VIP 4 → state=available, Rp 2.500.000
+    - VIP 5 → state=available, Rp 5.000.000
+    - VIP 6 → state=active,  Rp 10.000.000
+  * Full-page screenshot saved to /tmp/paket-page.png (1.36 MB).
+  * Both pages render the IDENTICAL 6-tier grid (because ProductsPage wraps PaketPage).
+- Read tail of /home/z/my-project/dev.log (last ~80 lines):
+  * POST /api/auth/login 200 (login success)
+  * GET /api/user/profile 200
+  * GET /api/packages 200 (×4 — once per page visit + refresh)
+  * GET /api/investments/tiers 200 (×4 — merges per-user state)
+  * GET /api/banners 200, /api/system 200, /api/products 200, /api/files/* 200
+  * NO 4xx, NO 5xx, NO stack traces.
+  * Only pre-existing warning: "[browser] [DB] DATABASE_URL not set - database operations will fail. This is expected on the client side." — this is a harmless client-side notice, server-side DB calls succeed (200 responses prove it).
+
+Stage Summary:
+- Produk page (#products): ALL 6 VIP TIER CARDS PRESENT ✓
+  * VIP 1 — Sudah Dimiliki (bought)
+  * VIP 2 — Sudah Dimiliki (bought)
+  * VIP 3 — Beli Sekarang (available, featured ⭐ POPULER)
+  * VIP 4 — Beli Sekarang (available)
+  * VIP 5 — Beli Sekarang (available)
+  * VIP 6 — Sedang Aktif (active)
+- Paket page (#paket): ALL 6 VIP TIER CARDS PRESENT ✓ (identical grid — Produk wraps PaketPage)
+  * Same states as above.
+- Source code confirms no filter would hide tiers:
+  * PaketPage renders every package returned by /api/packages (packages.map → PackageCard).
+  * ProductsPage.tsx is a 1-line wrapper: `return <PaketPage />`.
+  * /api/packages GET returns `findMany({ where: { isActive: true }, orderBy: { amount: 'asc' } })` — returns all 6 active VIP tiers, no filter hiding any.
+- No missing tiers. No rendering issues. No dev.log errors during visit.
+- No source code modified (read-only verification as instructed).
+- Answer to user's question "di produk per paket nya kan ada benar kan?": BENAR — di halaman Produk (dan juga Paket), semua 6 VIP tier (VIP 1 s/d VIP 6) tampil lengkap dengan state masing-masing (Sudah Dimiliki / Beli Sekarang / Sedang Aktif). Tidak ada tier yang hilang.
+
+---
+Task ID: produk-tampil-sesuai-admin
+Agent: main
+Task: User request — 'paket tetap mksd ku yg di fitur produk yang ini lo banner ini mksd ku tu kan di fitur admin jadi tampilan tetap cuman ubah sistem nya aja paham kan' — Halaman user-facing Produk/Paket harus TAMPIL SAMA dengan halaman admin (menampilkan Product model dengan banner emas), cuma SISTEM pembelian yang diubah ke aturan no-duplicates + 1-active-only.
+
+Work Log:
+- Analyzed screenshot dari user: halaman admin #admin-products menampilkan 6 produk "Gold Premium Aset 1-6" dengan banner emas (harga 160K-17.28JT, profit 2-5%/hari, duration 180h)
+- Investigasi: ada DUA model di Prisma schema:
+  * `Product` (model lama) — punya banner, quota, description; dipakai di admin #admin-products
+  * `InvestmentPackage` (model baru) — tanpa banner; dipakai di user-facing #paket/#products (sebelum perubahan ini)
+- Sebelumnya, user-facing PaketPage menggunakan InvestmentPackage via /api/packages — TIDAK SAMA dengan tampilan admin
+- Perubahan backend:
+  * Updated /api/products POST (action='buy'):
+    - Quantity dipaksa = 1 (no-duplicates rule)
+    - Cek existing Purchase by (userId, productId) — REJECT jika sudah pernah dibeli (status apapun)
+    - Saat beli produk baru: mark all previous active Purchases → 'completed' (1-active-only)
+    - Saat beli produk baru: mark all previous active Investments → 'completed' (so cron stops crediting old product)
+    - Tetap create Purchase + Investment baru (cron akan credit profit jam 00:00 WIB)
+  * Created /api/products/tiers GET endpoint:
+    - Return state per produk: 'available' | 'active' | 'bought'
+    - 'active' = ada Purchase dgn status='active' untuk produk ini
+    - 'bought' = ada Purchase dgn status='completed' (sudah pernah dibeli)
+    - 'available' = belum pernah dibeli
+    - Plus: currentProductName, remainingCount, boughtCount, maxedOut
+- Perubahan frontend:
+  * Rewrote src/components/nexvo/pages/PaketPage.tsx:
+    - Fetch dari /api/products (Product model dengan banner) bukan /api/packages
+    - Merge state dari /api/products/tiers (jika authenticated)
+    - Tampilkan banner image (via getFileUrl) di setiap kartu produk
+    - State ribbon di pojok kiri atas banner: AKTIF (hijau) / SELESAI (biru)
+    - Tombol state: Beli Sekarang (gold) / Sedang Aktif (emerald) / Sudah Dimiliki (blue)
+    - Tetap ada Profit Rate badge, quota bar, total profit, kontrak, daily profit
+    - Dialog konfirmasi pembelian + dialog sukses
+    - Setelah beli: re-fetch products + tiers supaya state update real-time
+  * Updated src/components/nexvo/pages/ProductsPage.tsx comment — PaketPage sekarang pakai Product model
+- Seeded 6 produk "Gold Premium Aset 1-6" di dev DB (160K-17.28JT, 2-5%/hari, 180h) supaya tampilan dev = tampilan admin production
+- TypeScript clean (tsc --noEmit) on all changed files
+
+Verification (API + Agent Browser + VLM, iPhone 14 viewport, dev server kept alive):
+  * /api/products GET: returns 6 products (Gold Premium Aset 1-6, all active) ✓
+  * /api/products/tiers GET (authenticated, before buy): all 6 state=available, remainingCount=6, boughtCount=0 ✓
+  * BUY Gold Premium Aset 1 (160K) → SUCCESS, "Profit harian Rp3.200 akan masuk setiap hari jam 00:00 WIB" ✓
+  * RE-BUY Aset 1 (should be REJECTED) → "Produk 'Gold Premium Aset 1' sedang aktif. Wajib pilih produk lain yang belum dimiliki." ✓
+  * BUY Gold Premium Aset 3 (640K, different product) → SUCCESS, "Profit harian Rp19.200 akan masuk setiap hari jam 00:00 WIB" ✓
+  * /api/products/tiers GET (after buys):
+    - Aset 1: state=bought (superseded) ✓
+    - Aset 2: state=available ✓
+    - Aset 3: state=active (current product) ✓
+    - Aset 4-6: state=available ✓
+    - currentProductName=Gold Premium Aset 3, remainingCount=4, boughtCount=1 ✓
+  * Agent Browser (#products page, iPhone 14):
+    - All 6 products visible: Gold Premium Aset 1-6 ✓
+    - Aset 1: "Sudah Dimiliki" (DIPESAN state) ✓
+    - Aset 2: "Beli Sekarang" (TERSEDIA) ✓
+    - Aset 3: "Sedang Aktif" (AKTIF, green button) ✓
+    - Aset 4-6: "Beli Sekarang" (TERSEDIA) ✓
+    - Banner image area on each card (icon ShoppingBag when no banner URL) ✓
+    - Profit rate badge (+X%/hari), quota bar, total profit, contract days — all rendered ✓
+  * Agent Browser (#paket page, iPhone 14): SAME 6 products with same states ✓ (PaketPage shared by both routes)
+  * VLM screenshot analysis confirmed layout neat, mobile-friendly, no overlap
+  * Dev log clean — only pre-existing client-side DB warning
+  * Browser errors: none
+- Cleaned up test purchases + reset test user balance to 4.4M (verifikasi done, dev DB restored)
+
+Stage Summary:
+- Halaman user-facing #paket & #products sekarang MENAMPILKAN PRODUCT MODEL dengan banner emas — sama persis dengan tampilan admin #admin-products
+- Sistem pembelian diubah ke aturan no-duplicates + 1-active-only:
+  * Setiap produk hanya bisa dibeli SEKALI (no-duplicates)
+  * Pembelian TIDAK harus berurutan — boleh pilih produk mana saja yang belum dimiliki
+  * Hanya 1 produk aktif saja per user — beli produk baru otomatis menggantikan produk aktif lama (status Purchase + Investment lama → 'completed')
+- Profit masuk otomatis jam 00:00 WIB via cron (tetap pakai Investment table, tidak diubah)
+- Backend: /api/products POST + new /api/products/tiers GET
+- Frontend: PaketPage.tsx rewritten pakai Product model; ProductsPage.tsx wraps PaketPage
+- Mobile-verified neat by VLM (iPhone 14 viewport)
