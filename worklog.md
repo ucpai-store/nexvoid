@@ -2539,3 +2539,34 @@ Stage Summary:
     curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-ui-update.sh | bash
   Atau verify-only:
     curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-check.sh | bash
+
+---
+Task ID: profit-salary-final
+Agent: main (Z.ai Code)
+Task: Fix profit WAJIB masuk tiap hari + hard cap 576k + auto-catchup + salary permanen
+
+Work Log:
+- Audit cron-service/index.ts: found weekend skip STILL active (lines 368-375, 588-599) despite previous "fix"
+- Audit profit-trigger/route.ts: found weekend guard STILL active (lines 120-125)
+- Found NO hard cap logic (576k) existed — only endDate check
+- Found NO auto-catchup logic — if cron stopped N days, only 1 day credited
+- Found salary bug: maxWeeks=0 caused immediate skip (weeksReceived >= 0 always true)
+- Rewrote cron-service processDailyInvestmentProfits():
+  • Removed weekend skip → profit runs EVERY DAY (Sat/Sun included)
+  • Added hard cap: dailyProfit × contractDays (e.g. 3,200 × 180 = 576,000)
+  • Added auto-catchup: calculate missedDays from lastProfitDate → credit all at once
+  • Cap reached → auto-mark investment 'completed'
+  • BonusLog shows [CATCHUP N hari] and [HARD CAP → SELESAI] tags
+- Fixed salary: maxWeeks=0 means PERMANENT (only check limit if maxWeeks > 0)
+- Applied same fixes to profit-trigger/route.ts (admin manual trigger)
+- Fixed bug: mainBalance increment was using dailyProfit instead of creditAmount
+- Resolved merge conflict with remote (kept local = complete fix version)
+- Committed + pushed to origin/main (commit 516b956)
+- Verified cron-service starts cleanly, API route returns 401 (compiles OK)
+
+Stage Summary:
+- Profit: 2%/day × 180 days = 576k HARD CAP, runs EVERY DAY (no weekend skip)
+- Auto-catchup: cron down N days → credit N days at once (capped by 576k)
+- Salary: 1%/week PERMANENT (maxWeeks=0 = no limit), min 10 refs + active investment
+- Salary triggers every Monday 00:00 WIB
+- Both files pushed to GitHub origin/main
