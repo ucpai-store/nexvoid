@@ -539,6 +539,36 @@ export default function SalaryBonusPage() {
             </div>
           </li>
         </ol>
+
+        {/* ★ Contoh perhitungan ilustrasi ★ */}
+        <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <p className="text-xs font-semibold text-foreground mb-3 flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+            Contoh Perhitungan Gaji
+          </p>
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between">
+              <span>10 undangan × Rp 160.000</span>
+              <span className="text-foreground font-medium tabular-nums">= Rp 1.600.000</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Omzet grup minimum</span>
+              <span className="text-foreground font-medium tabular-nums">Rp 1.600.000</span>
+            </div>
+            <div className="h-px bg-border my-2" />
+            <div className="flex items-center justify-between">
+              <span className="text-foreground font-semibold">Gaji mingguan ({salaryRate}%)</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm tabular-nums">
+                = Rp 16.000
+              </span>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+            <span className="font-medium text-foreground">Catatan:</span> 1% dihitung dari total omzet grup (investasi Anda + semua downline aktif).
+            Semakin besar omzet grup, semakin besar gaji. Berlaku selamanya selama syarat terpenuhi.
+          </p>
+        </div>
+
         <div className="mt-5 flex items-center gap-2 p-3.5 rounded-xl bg-muted/50 border border-border">
           <Wallet className="w-4 h-4 text-primary shrink-0" />
           <p className="text-xs text-foreground">
