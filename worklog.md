@@ -3483,3 +3483,40 @@ Stage Summary:
 - DB config: salaryRate=1, maxWeeks=0, minDirectRefs=10 — all correct, no changes needed to backend
 - Frontend SalaryBonusPage.tsx updated with clearer "no time limit" messaging
 - Stale .next cache issue resolved by clearing cache + restarting dev server
+
+---
+Task ID: salary-clean-redesign-no-ai-look
+Agent: main (Z.ai Code)
+Task: User: "gaji nya kasi desain yg bagus ya jangan ada unsur kek ai kasi desain yg bagus tidak boleh ada 2.5% intinya gaji lama hapus total"
+
+Work Log:
+- READ previous worklog: confirmed prior design had heavy "AI-looking" aesthetic (gold gradient glows, Sparkles/Crown/InfinityIcon scattered everywhere, "NEXVO PREMIUM SALARY" badge, motion animations, glass-gold + glow-gold effects, AI-generated salary-logo.png).
+- DECISION: completely rewrite SalaryBonusPage.tsx from scratch (delete old design totally, per "gaji lama hapus total").
+- WROTE new SalaryBonusPage.tsx (691 -> ~430 lines, clean professional fintech design):
+  * Removed ALL: framer-motion, Sparkles, Crown, InfinityIcon, glow-gold, glass-gold, bg-gold-gradient, animate-float, animate-shimmer, "NEXVO PREMIUM SALARY" badge, salary-logo.png reference, dark navy hero with grid pattern, gold gradient text.
+  * New design uses ONLY: bg-card, border-border, text-foreground, text-muted-foreground, primary/10 accents (theme-aware). Inspired by Wise/Revolut/GoPay.
+  * Sections: (1) Header with Banknote icon + "Gaji Mingguan" title + status badge + 4-card quick facts (Jadwal/Min. Undangan/Rate/Durasi). (2) Eligibility with numbered requirements (1=invite 10, 2=active investment) + clean progress bar + claim button. (3) 4-column stats grid. (4) History list with clean rows. (5) "Cara Kerja" numbered list (no decorative icons).
+  * Business logic preserved: salaryRate (1%), unlimited (maxWeeks<=0 => "Selamanya"), minDirectRefs=10, "Tanpa batas waktu" for invites.
+- REMOVED public/salary-logo.png (old AI-generated logo, no longer referenced anywhere in src/).
+- Verified NO "2.5%" anywhere in salary code (only in seed.ts for "Gold Premium Aset 2" product profitRate, unrelated to salary).
+- Type-check: npx tsc --noEmit shows ZERO errors in SalaryBonusPage.tsx (errors only in unrelated mini-services/scripts).
+- Cleared .next cache + restarted dev server (port 3000).
+- Verified via Agent Browser (logged in as Test Produk user 6281234567890, password reset to "password123"):
+  * Navigated to Salary page (click "Salary" nav button).
+  * Confirmed new content renders: "Gaji Mingguan", "1% omzet grup · dibayar setiap Senin", "Belum Layak" badge, 4 quick-fact cards (Senin 00:00 WIB / 10 orang / 1% / Selamanya), "Syarat Kelayakan" with numbered steps, "0 / 10" progress, "Tanpa batas waktu" pill, "Riwayat Gaji" (empty state), "Cara Kerja" 4-step numbered list.
+  * OLD design markers GONE: no "NEXVO Premium Salary", no "Bonus Gaji Mingguan" gold gradient, no "SELAMANYA" with infinity icon.
+- VLM (glm-4.6v) verification on desktop screenshot:
+  * "leans strongly toward a clean, professional fintech style (similar to Wise, Revolut, or GoPay)"
+  * "No Excessive Ornamentation: No gold glows, sparkles, crowns, or infinity symbols"
+  * "free of AI-generated excess"
+  * History + Cara Kerja sections: "professional, uncluttered, and free of AI-like design quirks"
+- VLM verification on mobile (iPhone 14): "responsive and clean, with no visible overflow, cramping, or broken elements"
+- No errors in dev.log.
+
+Stage Summary:
+- Salary page COMPLETELY redesigned: old AI-looking design deleted, new clean professional fintech design in place.
+- NO 2.5% anywhere in salary code (salaryRate=1, confirmed in DB + UI).
+- Old AI-generated salary-logo.png removed.
+- Design verified clean by VLM on both desktop + mobile.
+- Business logic intact: 1%/week, forever (selamanya), invite 10 (no time limit), active investment required.
+- Commit pending (user did not request git push this turn).
