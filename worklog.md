@@ -3358,3 +3358,34 @@ Stage Summary:
 - LandingPage sudah menyebut "weekly salary 1% forever"
 - API verified: salaryRate=1, maxWeeks=0, minDirectRefs=10, requireActiveDeposit=true
 - Commit + push ke origin/main
+
+---
+Task ID: fix-admin-salary-12minggu-example
+Agent: main (Z.ai Code)
+Task: User: "sistem gaji nya bukan gitu 2.5% hapus ganti 1% terus tiap 1minggu dapet gaji! 1% omzet setiap 1 minggu ya tanpa batas jadi pendapatan selamanya paham kan tu kok masih 12 minggu syarat wajib invite 10 dan wajib akyif investasi"
+
+Investigation:
+- DB SalaryConfig verified: salaryRate=1, maxWeeks=0, minDirectRefs=10, requireActiveDeposit=true (CORRECT)
+- User-facing SalaryBonusPage.tsx verified CORRECT: uses API values, shows badges "1% / Minggu Selamanya", "Wajib Invite 10 Orang", "Wajib Aktif Investasi", "Setiap Senin 00:00 WIB"
+- i18n strings verified CORRECT in all 20 locale files: weeklySalaryDesc = "1% ... SELAMANYA", omzetMin25 = "1% dari omzet grup"
+- LandingPage.tsx verified CORRECT: "Weekly salary 1% of group omzet FOREVER. Invite 10 active members + active investment required."
+- ROOT CAUSE FOUND: AdminSettingsPage.tsx line 1137 had misleading help text "Contoh: 12 = total ... omzet selama 12 minggu" — this was the ONLY remaining "12 minggu" reference visible to admin
+
+Work Log:
+- FIX: AdminSettingsPage.tsx — removed "Contoh: 12 = total ... omzet selama 12 minggu" example
+- Replaced with: "Isi 0 = SELAMANYA (tanpa batas, pendapatan selamanya). PENTING: Biarkan 0 agar gaji 1% dibayar setiap minggu selamanya."
+- Added prominent banner "SISTEM GAJI AKTIF SAAT INI" at top of salary config tab showing:
+  * Rate: 1% / minggu
+  * Durasi: SELAMANYA (when maxWeeks=0)
+  * Min. Invite: 10 orang
+  * Wajib Investasi: YA
+  * "Auto-credit setiap Senin 00:00 WIB. Gaji = 1% × omzet grup"
+- Verified via Agent Browser: admin settings salary tab now shows correct values, NO "12 minggu" text anywhere
+- grep confirmed: no remaining "12 minggu" / "12 week" / "selama 12" references in salary pages
+
+Stage Summary:
+- Admin salary config page: NO MORE "12 minggu" example, clear banner shows 1%/SELAMANYA/10/YA
+- User-facing salary page: already correct (1% forever, weekly, invite 10, active investment)
+- DB: salaryRate=1, maxWeeks=0 (verified directly via Prisma query)
+- Commit: 02b12b4 pushed to origin/main
+- Deploy command: pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && sleep 3 && pm2 status
