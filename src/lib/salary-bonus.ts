@@ -186,21 +186,29 @@ async function getAllDownlineIds(internalId: string, maxDepth: number = 5): Prom
 
 /**
  * Calculate group omzet for a user.
- * ONLY counts active investments from invited people (downline).
- * User's OWN investment is NOT included (but still required as eligibility).
+ * ONLY counts active investments from DIRECT invites (Level 1).
+ * - User's OWN investment is NOT counted (only required as eligibility).
+ * - Multi-level downline (Level 2+) is NOT counted — each person builds their own group.
+ * - The inviter gets the salary; the invited people do NOT share it.
+ *   (Each invited person can build their own group & earn their own salary separately.)
  */
 async function calculateGroupOmzet(internalId: string): Promise<number> {
-  // Get all downline IDs (invited people)
-  const downlineIds = await getAllDownlineIds(internalId, 5);
+  // Get ONLY direct (Level 1) referrals — people this user personally invited
+  const directRefs = await db.referral.findMany({
+    where: { referrerId: internalId, level: 1 },
+    select: { referredId: true },
+  });
 
-  if (downlineIds.length === 0) return 0;
+  if (directRefs.length === 0) return 0;
 
-  const downlineInvestment = await db.investment.aggregate({
-    where: { userId: { in: downlineIds }, status: 'active' },
+  const directIds = directRefs.map((r) => r.referredId);
+
+  const directInvestment = await db.investment.aggregate({
+    where: { userId: { in: directIds }, status: 'active' },
     _sum: { amount: true },
   });
 
-  return downlineInvestment._sum.amount || 0;
+  return directInvestment._sum.amount || 0;
 }
 
 /**
