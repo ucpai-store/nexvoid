@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+// FALLBACK hanya muncul kalau DB error. Data sama dengan seed (QRIS + USDT).
+// Admin wajib upload QR QRIS & isi wallet USDT via panel — di sini qrImage & accountNo kosong.
 const FALLBACK_PAYMENT_METHODS = [
   {
-    id: '1',
+    id: 'fb-qris',
     type: 'qris',
-    name: 'QRIS',
+    name: 'QRIS Universal',
     accountNo: '',
     holderName: 'NEXVO',
     qrImage: '',
@@ -15,10 +17,10 @@ const FALLBACK_PAYMENT_METHODS = [
     order: 1,
   },
   {
-    id: '2',
+    id: 'fb-usdt',
     type: 'usdt',
     name: 'USDT (BEP20)',
-    accountNo: 'TRX_WALLET_ADDRESS',
+    accountNo: '',
     holderName: 'NEXVO',
     qrImage: '',
     iconUrl: '',

@@ -129,16 +129,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Seed payment methods
-    const existingPaymentMethods = await db.paymentMethod.count();
-    if (existingPaymentMethods === 0) {
-      await db.paymentMethod.createMany({
-        data: [
-          // QRIS
-          { type: 'qris', name: 'QRIS Universal', qrImage: '', color: '#10B981', isActive: true, order: 1 },
-          // USDT
-          { type: 'usdt', name: 'USDT (BEP20)', accountNo: '', holderName: '', color: '#26A17B', isActive: true, order: 2 },
-        ],
+    // Seed payment methods — QRIS + USDT (yang dipakai deposit page).
+    // Hapus pm lama yang type-nya bukan qris/usdt, lalu pastikan qris+usdt ada.
+    const legacyPms = await db.paymentMethod.findMany({
+      where: { NOT: { type: { in: ['qris', 'usdt'] } } },
+    });
+    for (const lp of legacyPms) {
+      try { await db.paymentMethod.delete({ where: { id: lp.id } }); } catch (_) {}
+    }
+
+    const existingQris = await db.paymentMethod.findFirst({ where: { type: 'qris' } });
+    if (!existingQris) {
+      await db.paymentMethod.create({
+        data: { type: 'qris', name: 'QRIS Universal', accountNo: '', holderName: 'NEXVO', qrImage: '', iconUrl: '', color: '#E31E24', isActive: true, order: 1 },
+      });
+    }
+    const existingUsdt = await db.paymentMethod.findFirst({ where: { type: 'usdt' } });
+    if (!existingUsdt) {
+      await db.paymentMethod.create({
+        data: { type: 'usdt', name: 'USDT (BEP20)', accountNo: '', holderName: 'NEXVO', qrImage: '', iconUrl: '', color: '#26A17B', isActive: true, order: 2 },
       });
     }
 

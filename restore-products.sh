@@ -229,25 +229,47 @@ const fmt = (n) => n.toLocaleString("id-ID");
   }
 
   // ════════════════════════════════════════════════════════════
-  // 6. PAYMENT METHODS (jika kosong)
+  // 6. PAYMENT METHODS — QRIS + USDT (yang dipakai deposit page)
   // ════════════════════════════════════════════════════════════
-  const pmCount = await db.paymentMethod.count();
-  if (pmCount === 0) {
-    console.log("\n💳 Restoring payment methods...");
-    await db.paymentMethod.createMany({ data: [
-      { type: "bank",    name: "Bank BCA",     accountNo: "", holderName: "NEXVO", color: "#003D79", iconUrl: "/images/payment/bca.png",       isActive: true, order: 1 },
-      { type: "bank",    name: "Bank Mandiri", accountNo: "", holderName: "NEXVO", color: "#003366", iconUrl: "/images/payment/mandiri.png",   isActive: true, order: 2 },
-      { type: "bank",    name: "Bank BNI",     accountNo: "", holderName: "NEXVO", color: "#F37021", iconUrl: "/images/payment/bni.png",       isActive: true, order: 3 },
-      { type: "bank",    name: "Bank BRI",     accountNo: "", holderName: "NEXVO", color: "#00529B", iconUrl: "/images/payment/bri.png",       isActive: true, order: 4 },
-      { type: "ewallet", name: "DANA",         accountNo: "", holderName: "NEXVO", color: "#108EE9", iconUrl: "/images/payment/dana.png",      isActive: true, order: 5 },
-      { type: "ewallet", name: "OVO",          accountNo: "", holderName: "NEXVO", color: "#4C3494", iconUrl: "/images/payment/ovo.jpg",       isActive: true, order: 6 },
-      { type: "ewallet", name: "GoPay",        accountNo: "", holderName: "NEXVO", color: "#00AED6", iconUrl: "/images/payment/gopay.png",     isActive: true, order: 7 },
-      { type: "ewallet", name: "ShopeePay",    accountNo: "", holderName: "NEXVO", color: "#EE4D2D", iconUrl: "/images/payment/shopeepay.png", isActive: true, order: 8 },
-    ]});
-    console.log("   ✅ 8 payment methods restored");
-  } else {
-    console.log(`\n💳 Payment methods already exist (${pmCount}) — skipped`);
+  // Deposit page filter: WHERE type IN ('qris','usdt')
+  // Jadi kita HANYA simpan qris + usdt. Bank/ewallet lama dihapus
+  // karena nggak pernah ditampilkan ke user.
+  console.log("\n💳 Sync payment methods (QRIS + USDT)...");
+
+  // Cleanup: hapus semua payment method yang typenya BUKAN qris/usdt
+  const legacyPms = await db.paymentMethod.findMany({ where: { NOT: { type: { in: ["qris", "usdt"] } } }});
+  for (const legacy of legacyPms) {
+    try { await db.paymentMethod.delete({ where: { id: legacy.id } }); } catch (_) {}
   }
+  if (legacyPms.length > 0) console.log(`   🗑️  Hapus ${legacyPms.length} payment method lama (bank/ewallet)`);
+
+  // Pastikan QRIS ada
+  let qrisPm = await db.paymentMethod.findFirst({ where: { type: "qris" }});
+  if (!qrisPm) {
+    qrisPm = await db.paymentMethod.create({ data: {
+      type: "qris", name: "QRIS Universal", accountNo: "", holderName: "NEXVO",
+      qrImage: "", iconUrl: "", color: "#E31E24", isActive: true, order: 1,
+    }});
+    console.log("   ✅ QRIS created (qrImage belum diisi — admin upload via panel)");
+  } else {
+    // pastikan isActive=true & nama standar
+    await db.paymentMethod.update({ where: { id: qrisPm.id }, data: { name: "QRIS Universal", isActive: true, order: 1, color: "#E31E24" }});
+    console.log(`   ✏️  QRIS updated (qrImage: ${qrisPm.qrImage ? "sudah ada" : "belum ada"})`);
+  }
+
+  // Pastikan USDT ada
+  let usdtPm = await db.paymentMethod.findFirst({ where: { type: "usdt" }});
+  if (!usdtPm) {
+    usdtPm = await db.paymentMethod.create({ data: {
+      type: "usdt", name: "USDT (BEP20)", accountNo: "", holderName: "NEXVO",
+      qrImage: "", iconUrl: "", color: "#26A17B", isActive: true, order: 2,
+    }});
+    console.log("   ✅ USDT created (accountNo belum diisi — admin isi wallet via panel)");
+  } else {
+    await db.paymentMethod.update({ where: { id: usdtPm.id }, data: { name: "USDT (BEP20)", isActive: true, order: 2, color: "#26A17B" }});
+    console.log(`   ✏️  USDT updated (accountNo: ${usdtPm.accountNo ? "sudah ada" : "belum ada"})`);
+  }
+  console.log("   💡 Admin wajib upload QR QRIS & isi wallet USDT via panel Deposit → Payment Methods");
 
   // ════════════════════════════════════════════════════════════
   // 7. DEFAULT ADMIN (jika belum ada)
@@ -266,18 +288,22 @@ const fmt = (n) => n.toLocaleString("id-ID");
   // ════════════════════════════════════════════════════════════
   console.log("\n" + "═".repeat(60));
   console.log("📋 FINAL STATE:");
-  const [fAdmins, fUsers, fProducts, fPackages, fBanners] = await Promise.all([
+  const [fAdmins, fUsers, fProducts, fPackages, fBanners, fQris, fUsdt] = await Promise.all([
     db.admin.count(),
     db.user.count(),
     db.product.count(),
     db.investmentPackage.count(),
     db.banner.count(),
+    db.paymentMethod.findFirst({ where: { type: "qris" }}),
+    db.paymentMethod.findFirst({ where: { type: "usdt" }}),
   ]);
   console.log(`   Admins:   ${fAdmins}`);
   console.log(`   Users:    ${fUsers}`);
   console.log(`   Products: ${fProducts}`);
   console.log(`   Packages: ${fPackages}`);
   console.log(`   Banners:  ${fBanners}`);
+  console.log(`   QRIS:     ${fQris ? "✓ ada" : "✗ MISSING"} (qrImage: ${fQris?.qrImage ? "sudah diupload" : "BELUM — admin upload via panel"})`);
+  console.log(`   USDT:     ${fUsdt ? "✓ ada" : "✗ MISSING"} (accountNo: ${fUsdt?.accountNo ? "sudah diisi" : "BELUM — admin isi wallet via panel"})`);
 
   console.log(`\n📦 Investment Packages (kontrak ${CONTRACT_DAYS} hari, modal TIDAK dikembalikan):`);
   const allPkgs = await db.investmentPackage.findMany({ orderBy: { order: "asc" }});

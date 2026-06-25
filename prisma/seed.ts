@@ -58,72 +58,60 @@ async function seed() {
     console.log('⏭️  System settings already exist (skipped)\n');
   }
 
-  // 3. Create default payment methods if none exist
-  const paymentMethodCount = await prisma.paymentMethod.count();
-  if (paymentMethodCount === 0) {
-    await prisma.paymentMethod.createMany({
-      data: [
-        {
-          type: 'bank',
-          name: 'Bank BCA',
-          accountNo: '',
-          holderName: 'NEXVO',
-          qrImage: '',
-          iconUrl: '',
-          color: '#003D79',
-          isActive: true,
-          order: 1,
-        },
-        {
-          type: 'bank',
-          name: 'Bank Mandiri',
-          accountNo: '',
-          holderName: 'NEXVO',
-          qrImage: '',
-          iconUrl: '',
-          color: '#003366',
-          isActive: true,
-          order: 2,
-        },
-        {
-          type: 'ewallet',
-          name: 'DANA',
-          accountNo: '',
-          holderName: 'NEXVO',
-          qrImage: '',
-          iconUrl: '',
-          color: '#108EE9',
-          isActive: true,
-          order: 3,
-        },
-        {
-          type: 'ewallet',
-          name: 'OVO',
-          accountNo: '',
-          holderName: 'NEXVO',
-          qrImage: '',
-          iconUrl: '',
-          color: '#4C3494',
-          isActive: true,
-          order: 4,
-        },
-        {
-          type: 'ewallet',
-          name: 'GoPay',
-          accountNo: '',
-          holderName: 'NEXVO',
-          qrImage: '',
-          iconUrl: '',
-          color: '#00AED6',
-          isActive: true,
-          order: 5,
-        },
-      ],
-    });
-    console.log('✅ Payment methods created (Bank BCA, Bank Mandiri, DANA, OVO, GoPay)\n');
-  } else {
-    console.log('⏭️  Payment methods already exist (skipped)\n');
+  // 3. Create default payment methods — QRIS + USDT (deposit page filter type IN qris/usdt)
+  //    Hapus dulu payment lama yang type-nya bank/ewallet (nggak dipakai deposit page),
+  //    lalu pastikan qris + usdt ada.
+  console.log('Syncing payment methods (QRIS + USDT)...');
+  const legacyPms = await prisma.paymentMethod.findMany({
+    where: { NOT: { type: { in: ['qris', 'usdt'] } } },
+  });
+  for (const lp of legacyPms) {
+    try { await prisma.paymentMethod.delete({ where: { id: lp.id } }); } catch (_) {}
   }
+  if (legacyPms.length > 0) {
+    console.log(`   🗑️  Hapus ${legacyPms.length} payment method lama (bank/ewallet)`);
+  }
+
+  const existingQris = await prisma.paymentMethod.findFirst({ where: { type: 'qris' } });
+  if (!existingQris) {
+    await prisma.paymentMethod.create({
+      data: {
+        type: 'qris',
+        name: 'QRIS Universal',
+        accountNo: '',
+        holderName: 'NEXVO',
+        qrImage: '',
+        iconUrl: '',
+        color: '#E31E24',
+        isActive: true,
+        order: 1,
+      },
+    });
+    console.log('✅ QRIS payment created (qrImage belum diisi — admin upload via panel)');
+  } else {
+    console.log('⏭️  QRIS payment already exists');
+  }
+
+  const existingUsdt = await prisma.paymentMethod.findFirst({ where: { type: 'usdt' } });
+  if (!existingUsdt) {
+    await prisma.paymentMethod.create({
+      data: {
+        type: 'usdt',
+        name: 'USDT (BEP20)',
+        accountNo: '',
+        holderName: 'NEXVO',
+        qrImage: '',
+        iconUrl: '',
+        color: '#26A17B',
+        isActive: true,
+        order: 2,
+      },
+    });
+    console.log('✅ USDT payment created (accountNo belum diisi — admin isi wallet via panel)');
+  } else {
+    console.log('⏭️  USDT payment already exists');
+  }
+  console.log('   💡 Admin wajib upload QR QRIS & isi wallet USDT via panel\n');
 
   // 4. Create default investment packages if none exist — Gold Premium Aset 1-6
   //    (kontrak 180 hari, modal TIDAK dikembalikan, user hanya terima profit harian)

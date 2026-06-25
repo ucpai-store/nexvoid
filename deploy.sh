@@ -447,6 +447,22 @@ if [ "$CHECK_ONLY" = false ]; then
           console.log("✓ 3 banners");
         }
 
+        // ===== PAYMENT METHODS: QRIS + USDT (deposit page filter type IN qris/usdt) =====
+        // Hapus semua pm type bank/ewallet lama, lalu pastikan qris+usdt ada
+        const legacyPms = await db.paymentMethod.findMany({ where: { NOT: { type: { in: ["qris", "usdt"] } } }});
+        for (const lp of legacyPms) { try { await db.paymentMethod.delete({ where: { id: lp.id } }); } catch (_) {} }
+        let qrisPm = await db.paymentMethod.findFirst({ where: { type: "qris" }});
+        if (!qrisPm) {
+          await db.paymentMethod.create({ data: { type: "qris", name: "QRIS Universal", accountNo: "", holderName: "NEXVO", qrImage: "", iconUrl: "", color: "#E31E24", isActive: true, order: 1 }});
+          console.log("✓ QRIS payment created");
+        }
+        let usdtPm = await db.paymentMethod.findFirst({ where: { type: "usdt" }});
+        if (!usdtPm) {
+          await db.paymentMethod.create({ data: { type: "usdt", name: "USDT (BEP20)", accountNo: "", holderName: "NEXVO", qrImage: "", iconUrl: "", color: "#26A17B", isActive: true, order: 2 }});
+          console.log("✓ USDT payment created");
+        }
+        console.log("✓ Payment methods synced (QRIS + USDT)");
+
         await db.$disconnect();
       })().catch(e => { console.error("seed error:", e.message); process.exit(1); });
     ' 2>&1 | tail -10
