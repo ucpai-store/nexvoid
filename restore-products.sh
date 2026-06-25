@@ -6,9 +6,9 @@
 #  Yang di-restore:
 #    - 6 Investment Packages: Gold Premium Aset 1 s/d 6
 #    - 6 Products:            Gold Premium Aset 1 s/d 6
-#    - 5 Payment methods (BCA, Mandiri, BNI, BRI, DANA, OVO, GoPay, ShopeePay)
+#    - 2 Payment methods (QRIS Universal + USDT BEP20) — bank/ewallet lama dihapus
 #    - Banners (jika kosong)
-#    - Salary config (1%/week PERMANEN)
+#    - Salary config (1%/week PERMANEN, maxWeeks=0)
 #    - Matching config (5%,4%,3%,2%,1%)
 #    - Default admin (username: admin, password: Admin@2024)
 #
