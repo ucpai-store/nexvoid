@@ -2873,3 +2873,26 @@ Stage Summary:
 - Fix: buat 2 route baru (deposit/upload + upload), ubah re-activation rule di 4 file backend + 2 file frontend
 - User sekarang bisa: ajukan deposit (dengan/without bukti) + re-aktivasi produk/paket yg kontraknya sudah habis (180 hari)
 - Komit akan di-push ke origin/main
+
+---
+Task ID: deploy-text-final
+Agent: main (Z.ai Code)
+Task: User minta "mana teks deploy nya cek detail tidak boleh salah" — berikan teks deploy final yang akurat.
+
+Work Log:
+- Audit state: git log, git status, remote sync (local HEAD = remote HEAD = de9078d)
+- Verify deploy.sh: 10/10 step lengkap (pre-flight, stop old, pull/clone, install deps, build, DB protection + auto-seed, start Next.js, start cron-service, start wa-bot, save pm2, verify + self-heal)
+- Verify restore-products.sh: seed 6 packages + 6 products Gold Premium Aset 1-6 + salary 1% permanent + matching 5/4/3/2/1% + banners + QRIS + USDT + admin default
+- Fix stale comment di restore-products.sh (baris 9: tadinya mention bank/ewallet, sekarang QRIS+USDT)
+- Verify /api/payment-methods/route.ts: FALLBACK = QRIS + USDT (bukan bank/ewallet lagi)
+- Verify /api/deposit/route.ts: validasi amount + weekend block + status pending (admin approve)
+- Verify /api/deposit/upload/route.ts: handle proof image upload (JPG/PNG/WebP/GIF, max 8MB)
+- Verify /api/upload/route.ts: handle avatar upload
+- Verify re-activation logic: /api/products POST block hanya kalau status='active', /lib/tier-system.ts allow re-aktivasi kalau status='completed'
+- Commit de9078d: fix stale comment, push ke origin/main ✓
+
+Stage Summary:
+- Semua fix sudah push ke GitHub origin/main (HEAD: de9078d)
+- Deploy script (deploy.sh) sudah lengkap & self-contained: auto-clone, auto-seed QRIS+USDT+Gold Premium Aset 1-6, self-heal port 3000, verify profit+salary trigger
+- User tinggal jalankan 1 perintah di VPS: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy.sh | bash
+- Setelah deploy: admin wajib login → menu Payment Methods → upload QR QRIS + isi wallet USDT BEP20
