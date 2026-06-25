@@ -355,45 +355,102 @@ if [ "$CHECK_ONLY" = false ]; then
   ' 2>/dev/null || echo "0")
 
   if [ "$PRODUCT_COUNT" -le 1 ] 2>/dev/null; then
-    warn "products/packages missing (count=$PRODUCT_COUNT) → restoring defaults..."
-    DATABASE_URL="file:$ABS_DB_PATH" bun run prisma/seed.ts 2>&1 | tail -10 || warn "seed.ts failed"
-    # Also restore default products via seed API route logic
+    warn "products/packages missing (count=$PRODUCT_COUNT) → restoring Gold Premium Aset 1-6..."
+    DATABASE_URL="file:$ABS_DB_PATH" bun run prisma/seed.ts 2>&1 | tail -5 || warn "seed.ts failed (non-fatal)"
+    # Restore Gold Premium Aset 1-6 (data BENAR, bukan dummy)
     DATABASE_URL="file:$ABS_DB_PATH" bun -e '
       const { PrismaClient } = require("@prisma/client");
       const db = new PrismaClient();
+      const CONTRACT_DAYS = 180;
+      const QUOTA_HIGH = 9999;
+      const randBaseline = () => Math.floor(QUOTA_HIGH * (0.35 + Math.random() * 0.40));
       (async () => {
-        const existing = await db.product.count();
-        if (existing === 0) {
-          await db.product.createMany({ data: [
-            { name: "Emas Starter Pack", price: 100000, duration: 30, estimatedProfit: 8000, quota: 500, quotaUsed: 342, description: "Paket investasi emas untuk pemula. Dapatkan keuntungan stabil dari pergerakan harga emas dengan modal minimal.", banner: "", isActive: true, isStopped: false, profitRate: 8.0 },
-            { name: "Silver Mining Portfolio", price: 500000, duration: 60, estimatedProfit: 55000, quota: 300, quotaUsed: 187, description: "Portfolio penambangan perak dengan diversifikasi aset. Keuntungan lebih tinggi dari paket starter.", banner: "", isActive: true, isStopped: false, profitRate: 11.0 },
-            { name: "Gold Premium Asset", price: 1000000, duration: 90, estimatedProfit: 150000, quota: 200, quotaUsed: 98, description: "Aset emas premium dengan estimasi profit tinggi. Kelola portofolio emas Anda secara profesional.", banner: "", isActive: true, isStopped: false, profitRate: 15.0 },
-            { name: "Diamond Elite Investment", price: 5000000, duration: 120, estimatedProfit: 1000000, quota: 100, quotaUsed: 43, description: "Investasi berlian elite untuk investor serius. Akses eksklusif ke portfolio berlian dan mineral langka.", banner: "", isActive: true, isStopped: false, profitRate: 20.0 },
-          ]});
-          console.log("✓ 4 default products restored");
+        // ===== 6 INVESTMENT PACKAGES: Gold Premium Aset 1-6 =====
+        const packages = [
+          { name: "Gold Premium Aset 1", amount: 160000,    profitRate: 2,   contractDays: CONTRACT_DAYS, order: 1 },
+          { name: "Gold Premium Aset 2", amount: 320000,    profitRate: 2.5, contractDays: CONTRACT_DAYS, order: 2 },
+          { name: "Gold Premium Aset 3", amount: 640000,    profitRate: 3,   contractDays: CONTRACT_DAYS, order: 3 },
+          { name: "Gold Premium Aset 4", amount: 1920000,   profitRate: 3.5, contractDays: CONTRACT_DAYS, order: 4 },
+          { name: "Gold Premium Aset 5", amount: 5760000,   profitRate: 4,   contractDays: CONTRACT_DAYS, order: 5 },
+          { name: "Gold Premium Aset 6", amount: 17280000,  profitRate: 5,   contractDays: CONTRACT_DAYS, order: 6 },
+        ];
+        const validPkgNames = packages.map(p => p.name);
+        const oldPkgs = await db.investmentPackage.findMany();
+        for (const old of oldPkgs) {
+          if (!validPkgNames.includes(old.name)) {
+            try { await db.investment.deleteMany({ where: { packageId: old.id } }); } catch (_) {}
+            try { await db.investmentPackage.delete({ where: { id: old.id } }); console.log("  🗑️  hapus paket lama:", old.name); } catch (_) {}
+          }
         }
-        const pkgCount = await db.investmentPackage.count();
-        if (pkgCount === 0) {
-          await db.investmentPackage.createMany({ data: [
-            { name: "Paket Starter", amount: 500000, profitRate: 10, contractDays: 90, isActive: true, order: 1 },
-            { name: "Paket Silver", amount: 1000000, profitRate: 10, contractDays: 90, isActive: true, order: 2 },
-            { name: "Paket Gold", amount: 5000000, profitRate: 10, contractDays: 90, isActive: true, order: 3 },
-            { name: "Paket Platinum", amount: 10000000, profitRate: 10, contractDays: 90, isActive: true, order: 4 },
-          ]});
-          console.log("✓ 4 default packages restored");
+        for (const pkg of packages) {
+          const ex = await db.investmentPackage.findFirst({ where: { name: pkg.name } });
+          if (ex) {
+            await db.investmentPackage.update({ where: { id: ex.id }, data: { ...pkg, isActive: true } });
+          } else {
+            await db.investmentPackage.create({ data: pkg });
+          }
         }
+        console.log("✓ 6 packages: Gold Premium Aset 1-6");
+
+        // ===== 6 PRODUCTS: Gold Premium Aset 1-6 =====
+        const products = [
+          { name: "Gold Premium Aset 1", price: 160000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(160000   * 0.02  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 2,   description: "Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari × 180 hari = Rp 576.000. Modal TIDAK dikembalikan, user hanya menerima profit." },
+          { name: "Gold Premium Aset 2", price: 320000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(320000   * 0.025 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 2.5, description: "Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari × 180 hari = Rp 1.440.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 3", price: 640000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(640000   * 0.03  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 3,   description: "Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari × 180 hari = Rp 3.456.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 4", price: 1920000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(1920000  * 0.035 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 3.5, description: "Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari × 180 hari = Rp 12.096.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 5", price: 5760000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(5760000  * 0.04  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 4,   description: "Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari × 180 hari = Rp 41.472.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 6", price: 17280000,  duration: CONTRACT_DAYS, estimatedProfit: Math.round(17280000 * 0.05  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 5,   description: "Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari × 180 hari = Rp 155.520.000. Modal TIDAK dikembalikan." },
+        ];
+        const validProdNames = products.map(p => p.name);
+        const oldProds = await db.product.findMany();
+        for (const old of oldProds) {
+          if (!validProdNames.includes(old.name)) {
+            try { await db.purchase.deleteMany({ where: { productId: old.id } }); } catch (_) {}
+            try { await db.product.delete({ where: { id: old.id } }); console.log("  🗑️  hapus produk lama:", old.name); } catch (_) {}
+          }
+        }
+        for (const prod of products) {
+          const ex = await db.product.findFirst({ where: { name: prod.name } });
+          if (ex) {
+            await db.product.update({ where: { id: ex.id }, data: { ...prod, isActive: true, isStopped: false } });
+          } else {
+            await db.product.create({ data: prod });
+          }
+        }
+        console.log("✓ 6 products: Gold Premium Aset 1-6");
+
+        // ===== SALARY CONFIG: 1%/week PERMANEN =====
         const salaryCfg = await db.salaryConfig.findFirst();
         if (!salaryCfg) {
           await db.salaryConfig.create({ data: { minDirectRefs: 10, salaryRate: 1, maxWeeks: 0, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true }});
-          console.log("✓ salary config created (1%/week, permanent)");
+          console.log("✓ salary config: 1%/week PERMANEN");
         } else if (salaryCfg.maxWeeks !== 0 || salaryCfg.salaryRate !== 1) {
-          await db.salaryConfig.update({ where: { id: salaryCfg.id }, data: { salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, isActive: true }});
-          console.log("✓ salary config fixed (1%/week, permanent)");
+          await db.salaryConfig.update({ where: { id: salaryCfg.id }, data: { salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true }});
+          console.log("✓ salary config fixed: 1%/week PERMANEN");
         }
+
+        // ===== MATCHING CONFIG: 5%,4%,3%,2%,1% =====
+        const matchingCfg = await db.matchingConfig.findFirst();
+        if (!matchingCfg) {
+          await db.matchingConfig.create({ data: { level1: 5, level2: 4, level3: 3, level4: 2, level5: 1, isActive: true }});
+          console.log("✓ matching config: 5%,4%,3%,2%,1%");
+        }
+
+        // ===== BANNERS (jika kosong) =====
+        const bannerCount = await db.banner.count();
+        if (bannerCount === 0) {
+          await db.banner.createMany({ data: [
+            { title: "Selamat Datang di NEXVO", subtitle: "Platform Investasi Digital #1", description: "NEXVO menghadirkan solusi investasi digital berbasis komoditas yang aman, transparan, dan menguntungkan.", ctaText: "Mulai Sekarang", ctaLink: "register", image: "/images/banner-1.jpg", order: 1, isActive: true },
+            { title: "Profit Harian Hingga 5%", subtitle: "Investasi Cerdas, Hasil Maksimal", description: "Dapatkan profit harian hingga 5% selama 180 hari kontrak. Hanya profit yang dibayarkan — modal awal TIDAK dikembalikan.", ctaText: "Lihat Paket", ctaLink: "paket", image: "/images/banner-2.jpg", order: 2, isActive: true },
+            { title: "Bonus Sponsor 5 Level", subtitle: "Ajak Teman, Raih Bonus", description: "Dapatkan bonus sponsor hingga 5 level: 5%, 4%, 3%, 2%, 1%.", ctaText: "Lihat Jaringan", ctaLink: "network", image: "/images/banner-3.jpg", order: 3, isActive: true },
+          ]});
+          console.log("✓ 3 banners");
+        }
+
         await db.$disconnect();
-      })();
-    ' 2>&1 | tail -5
-    ok "default products/packages restored"
+      })().catch(e => { console.error("seed error:", e.message); process.exit(1); });
+    ' 2>&1 | tail -10
+    ok "Gold Premium Aset 1-6 + salary/matching/banners restored"
   else
     ok "products/packages exist (count=$PRODUCT_COUNT) — no seed needed"
   fi
