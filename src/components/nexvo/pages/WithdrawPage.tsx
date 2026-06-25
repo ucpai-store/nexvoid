@@ -40,12 +40,12 @@ const BANK_OPTIONS: PaymentOption[] = [
   { value: 'BNI',       label: 'Bank BNI',          shortLabel: 'BNI',       color: '#F15A22', logo: '/images/payment/bni.png' },
   { value: 'BRI',       label: 'Bank BRI',          shortLabel: 'BRI',       color: '#00529C', logo: '/images/payment/bri.png' },
   { value: 'Mandiri',   label: 'Bank Mandiri',      shortLabel: 'Mandiri',   color: '#003066', logo: '/images/payment/mandiri.png' },
-  { value: 'BSI',       label: 'Bank BSI',          shortLabel: 'BSI',       color: '#00A650', logo: '/images/payment/bsi.jpg' },
+  { value: 'BSI',       label: 'Bank BSI',          shortLabel: 'BSI',       color: '#00A650', logo: '/images/payment/bsi.png' },
   { value: 'CIMB',      label: 'CIMB Niaga',        shortLabel: 'CIMB',      color: '#7B0E24', logo: '/images/payment/cimb.png' },
-  { value: 'Danamon',   label: 'Bank Danamon',      shortLabel: 'Danamon',   color: '#FDDA24', logo: '/images/payment/danamon.jpg' },
+  { value: 'Danamon',   label: 'Bank Danamon',      shortLabel: 'Danamon',   color: '#FDDA24', logo: '/images/payment/danamon.png' },
   { value: 'Permata',   label: 'Bank Permata',      shortLabel: 'Permata',   color: '#005BAA', logo: '/images/payment/permata.png' },
-  { value: 'Bukopin',   label: 'Bank KB Bukopin',   shortLabel: 'Bukopin',   color: '#006B3F', logo: '/images/payment/bukopin.jpg' },
-  { value: 'OCBC',      label: 'OCBC NISP',         shortLabel: 'OCBC',      color: '#E31937', logo: '/images/payment/ocbc.jpeg' },
+  { value: 'Bukopin',   label: 'Bank KB Bukopin',   shortLabel: 'Bukopin',   color: '#006B3F', logo: '/images/payment/bukopin.png' },
+  { value: 'OCBC',      label: 'OCBC NISP',         shortLabel: 'OCBC',      color: '#E31937', logo: '/images/payment/ocbc.png' },
   { value: 'Panin',     label: 'Panin Bank',        shortLabel: 'Panin',     color: '#003366', logo: '/images/payment/panin.png' },
   { value: 'Sinarmas',  label: 'Bank Sinarmas',     shortLabel: 'Sinarmas',  color: '#FF6600', logo: '/images/payment/sinarmas.png' },
   { value: 'Maybank',   label: 'Maybank',           shortLabel: 'Maybank',   color: '#003366', logo: '/images/payment/maybank.png' },
@@ -55,14 +55,14 @@ const BANK_OPTIONS: PaymentOption[] = [
 
 const EWALLET_OPTIONS: PaymentOption[] = [
   { value: 'DANA',       label: 'DANA',       shortLabel: 'DANA',       color: '#118EEA', logo: '/images/payment/dana.png' },
-  { value: 'OVO',        label: 'OVO',        shortLabel: 'OVO',        color: '#4C2A86', logo: '/images/payment/ovo.jpg' },
+  { value: 'OVO',        label: 'OVO',        shortLabel: 'OVO',        color: '#4C2A86', logo: '/images/payment/ovo.png' },
   { value: 'GoPay',      label: 'GoPay',      shortLabel: 'GoPay',      color: '#00AED6', logo: '/images/payment/gopay.png' },
   { value: 'ShopeePay',  label: 'ShopeePay',  shortLabel: 'ShopeePay',  color: '#EE4D2D', logo: '/images/payment/shopeepay.png' },
-  { value: 'LinkAja',    label: 'LinkAja',    shortLabel: 'LinkAja',    color: '#E82529', logo: '/images/payment/linkaja.jpg' },
+  { value: 'LinkAja',    label: 'LinkAja',    shortLabel: 'LinkAja',    color: '#E82529', logo: '/images/payment/linkaja.png' },
   { value: 'Doku',       label: 'Doku',       shortLabel: 'Doku',       color: '#FF6C00', logo: '/images/payment/doku.png' },
-  { value: 'Sakuku',     label: 'Sakuku',     shortLabel: 'Sakuku',     color: '#003D79', logo: '/images/payment/sakuku.jpg' },
+  { value: 'Sakuku',     label: 'Sakuku',     shortLabel: 'Sakuku',     color: '#003D79', logo: '/images/payment/sakuku.png' },
   { value: 'Jenius',     label: 'Jenius',     shortLabel: 'Jenius',     color: '#F7941D', logo: '/images/payment/jenius.png' },
-  { value: 'Flip',       label: 'Flip',       shortLabel: 'Flip',       color: '#FF5722', logo: '/images/payment/flip.jpeg' },
+  { value: 'Flip',       label: 'Flip',       shortLabel: 'Flip',       color: '#FF5722', logo: '/images/payment/flip.png' },
 ];
 
 interface Withdrawal {
