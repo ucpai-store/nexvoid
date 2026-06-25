@@ -142,10 +142,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ★ No-duplicates tier enforcement ★
-    // Paket & produk sama. User hanya boleh membeli 1 macam per transaksi.
-    // Pembelian TIDAK harus berurutan — user boleh beli tier mana saja yang
-    // BELUM pernah dibeli. Tier yang sudah dibeli tidak bisa dibeli lagi.
+    // ★ Multi-active rule: user BOLEH punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst) ★
+    // Tiap paket generate profit sendiri jam 00:00 WIB. Cron credit SEMUA active investments.
+    // Aturan tunggal: tiap paket hanya bisa dibeli SEKALI per kontrak (180 hari).
+    // Kalau kontrak sudah habis (status='completed'), bisa di-aktivasi lagi.
     const tierCheck = await validateSequentialPurchase(user.id, packageId);
     if (!tierCheck.ok) {
       return NextResponse.json(
@@ -198,14 +198,10 @@ export async function POST(request: NextRequest) {
           data: updateData,
         });
 
-        // ★ Only ONE active tier per user ★
-        // When buying a new tier, supersede all previously active investments
-        // so the system runs solely on the newly purchased tier. Sistem wajib
-        // berjalan sesuai paket/produk yg aktif hari ini (latest purchase).
-        await tx.investment.updateMany({
-          where: { userId: user.id, status: 'active' },
-          data: { status: 'completed' },
-        });
+        // ★ MULTI-ACTIVE: user boleh punya banyak paket aktif bersamaan ★
+        // JANGAN mark previous investments as completed — biarkan VIP1+VIP2+VIP3 semua aktif.
+        // Cron akan credit SEMUA active investments jam 00:00 WIB, masing-masing dapat dailyProfit-nya.
+        // Profit PERTAMA tunggu jam 00:00 WIB (lastProfitDate: null di bawah).
 
         // Create investment WITHOUT immediate profit — cron will credit at 00:00 WIB
         const investment = await tx.investment.create({

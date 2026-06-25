@@ -179,51 +179,48 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // Helper: safe fetch JSON — never throws on 404/HTML response
+  const safeFetchJson = async (url: string, token: string): Promise<any> => {
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return null;
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  };
+
   const fetchData = async () => {
     if (!adminToken) return;
-    try {
-      const res = await fetch('/api/admin/auth/me', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAdmins(data.data.admins || []);
-      }
+    setLoading(true);
+    // Run all fetches independently — a 404 on one must NOT block the others
+    const [meData, logsData, settingsData, salaryData] = await Promise.all([
+      safeFetchJson('/api/admin/auth/me', adminToken),
+      safeFetchJson('/api/admin/auth/logs?limit=50', adminToken),
+      safeFetchJson('/api/admin/settings', adminToken),
+      safeFetchJson('/api/admin/salary-config', adminToken),
+    ]);
 
-      const logsRes = await fetch('/api/admin/auth/logs?limit=50', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      const logsData = await logsRes.json();
-      if (logsData.success) {
-        setLogs(logsData.data || []);
-      }
-
-      // Fetch deposit fee setting
-      const settingsRes = await fetch('/api/admin/settings', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      const settingsData = await settingsRes.json();
-      if (settingsData.success && settingsData.data) {
-        if (settingsData.data.deposit_fee) setDepositFee(settingsData.data.deposit_fee);
-        if (settingsData.data.withdraw_fee) setWithdrawFee(settingsData.data.withdraw_fee);
-        if (settingsData.data.bot_admin_number) setAdminNumber(settingsData.data.bot_admin_number);
-        if (settingsData.data.deposit_admin_number) setDepositAdminNumber(settingsData.data.deposit_admin_number);
-        if (settingsData.data.cs_admin_number) setCsAdminNumber(settingsData.data.cs_admin_number);
-      }
-
-      // Fetch salary config
-      const salaryRes = await fetch('/api/admin/salary-config', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      const salaryData = await salaryRes.json();
-      if (salaryData.success && salaryData.data) {
-        setSalaryConfig(salaryData.data);
-      }
-    } catch (error) {
-      console.error('Fetch error:', error);
-    } finally {
-      setLoading(false);
+    if (meData?.success) {
+      setAdmins(meData.data.admins || []);
     }
+    if (logsData?.success) {
+      setLogs(logsData.data || []);
+    }
+    if (settingsData?.success && settingsData.data) {
+      if (settingsData.data.deposit_fee) setDepositFee(settingsData.data.deposit_fee);
+      if (settingsData.data.withdraw_fee) setWithdrawFee(settingsData.data.withdraw_fee);
+      if (settingsData.data.bot_admin_number) setAdminNumber(settingsData.data.bot_admin_number);
+      if (settingsData.data.deposit_admin_number) setDepositAdminNumber(settingsData.data.deposit_admin_number);
+      if (settingsData.data.cs_admin_number) setCsAdminNumber(settingsData.data.cs_admin_number);
+    }
+    // ★ Salary config — MUST load even if other APIs 404 ★
+    if (salaryData?.success && salaryData.data) {
+      setSalaryConfig(salaryData.data);
+    }
+    setLoading(false);
   };
 
   const fetchWhatsAppAdmins = async () => {
@@ -1102,6 +1099,27 @@ export default function AdminSettingsPage() {
             </h3>
 
             <div className="glass rounded-xl p-5 space-y-5">
+              {/* ★ BANNER: Sistem Gaji Aktif ★ */}
+              <div className="p-4 rounded-xl bg-gold-gradient/10 border border-primary/30">
+                <p className="text-primary text-sm font-bold mb-2 flex items-center gap-2">
+                  <Banknote className="w-4 h-4" /> SISTEM GAJI AKTIF SAAT INI:
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Rate: <b className="text-primary">{salaryConfig?.salaryRate ?? 1}%</b> / minggu
+                  </div>
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Durasi: <b className="text-primary">{(salaryConfig?.maxWeeks ?? 0) > 0 ? `${salaryConfig?.maxWeeks} minggu` : 'SELAMANYA'}</b>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Min. Invite: <b className="text-primary">{salaryConfig?.minDirectRefs ?? 10}</b> orang
+                  </div>
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Wajib Investasi: <b className="text-primary">{salaryConfig?.requireActiveDeposit ? 'YA' : 'TIDAK'}</b>
+                  </div>
+                </div>
+                <p className="text-muted-foreground text-[10px] mt-2">Auto-credit setiap Senin 00:00 WIB. Gaji = {salaryConfig?.salaryRate ?? 1}% × omzet grup (user + semua downline aktif).</p>
+              </div>
               {salaryConfig ? (
                 <>
                   {/* Min Direct Refs */}
@@ -1136,8 +1154,7 @@ export default function AdminSettingsPage() {
                   <div className="space-y-2">
                     <Label className="text-foreground text-sm font-medium">Maksimal Minggu</Label>
                     <p className="text-muted-foreground text-xs">
-                      Isi <b className="text-primary">0</b> = <b className="text-primary">SELAMANYA</b> (tidak terbatas).
-                      Contoh: 12 = total {(salaryConfig.salaryRate ?? 1) * 12}% omzet selama 12 minggu.
+                      Isi <b className="text-primary">0</b> = <b className="text-primary">SELAMANYA</b> (tanpa batas, pendapatan selamanya). <b className="text-emerald-400">PENTING: Biarkan 0 agar gaji 1% dibayar setiap minggu selamanya.</b>
                     </p>
                     <Input
                       type="number"

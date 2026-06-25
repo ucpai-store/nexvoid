@@ -15,11 +15,13 @@ import { PrismaClient } from '@prisma/client';
 const PORT = 3032;
 const WIB_OFFSET = 7; // UTC+7 for Asia/Jakarta
 
-// Prisma client with absolute path
+// Prisma client with absolute path (resolve from project root, not mini-services folder)
+import path from 'path';
+const DB_PATH = path.resolve(process.cwd(), 'db/custom.db');
 const db = new PrismaClient({
   datasources: {
     db: {
-      url: `file:${process.cwd()}/../../db/custom.db`,
+      url: `file:${DB_PATH}`,
     },
   },
 });
@@ -385,6 +387,46 @@ async function processDailyInvestmentProfits(): Promise<{
 }> {
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0 };
 
+  // ★ SELF-HEAL: Auto-reactivate investments that were wrongly marked 'completed'
+  //   by the old buggy cron (which used inv.package.profitRate instead of stored
+  //   inv.dailyProfit, causing hardCap=0 → immediate completion).
+  try {
+    const completed = await db.investment.findMany({
+      where: { status: 'completed' },
+      include: { package: true },
+    });
+    let reactivated = 0;
+    for (const inv of completed) {
+      if (!inv.endDate) continue;
+      if (new Date(inv.endDate).getTime() <= Date.now()) continue;
+
+      const storedDailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
+      if (storedDailyProfit <= 0) continue;
+
+      let contractDays = 0;
+      if (inv.startDate && inv.endDate) {
+        const msDiff = new Date(inv.endDate).getTime() - new Date(inv.startDate).getTime();
+        contractDays = Math.max(1, Math.round(msDiff / (24 * 60 * 60 * 1000)));
+      } else {
+        contractDays = inv.package?.contractDays || 180;
+      }
+      const hardCap = storedDailyProfit * contractDays;
+      if ((inv.totalProfitEarned || 0) >= hardCap) continue;
+
+      await db.investment.update({
+        where: { id: inv.id },
+        data: { status: 'active', dailyProfit: storedDailyProfit },
+      });
+      reactivated++;
+      console.log(`[Profit Cron] ♻️  SELF-HEAL: Reactivated ${inv.id} — dailyProfit=${storedDailyProfit}, hardCap=${hardCap}, earned=${inv.totalProfitEarned}`);
+    }
+    if (reactivated > 0) console.log(`[Profit Cron] ♻️  SELF-HEAL: Reactivated ${reactivated} investment(s)`);
+  } catch (e: any) {
+    console.error('[Profit Cron] SELF-HEAL error (non-fatal):', e.message);
+  }
+
   // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) — semua aktivitas mati ★
   const wibNow = getWibNow();
   const dayOfWeek = wibNow.getDay();
@@ -407,12 +449,25 @@ async function processDailyInvestmentProfits(): Promise<{
 
   for (const inv of investments) {
     try {
+      // ★ NO IMMEDIATE PROFIT ON PURCHASE ★
+      // Kalau lastProfitDate = null (investment baru), cek startDate.
+      // Kalau startDate HARI INI → SKIP (profit pertama tunggu 00:00 WIB besok).
+      // Kalau startDate < hari ini → credit catchup semua weekdays yang lewat.
+      if (!inv.lastProfitDate) {
+        const startWib = new Date(inv.startDate.getTime() + inv.startDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
+        const startDay = new Date(startWib.getFullYear(), startWib.getMonth(), startWib.getDate());
+        // Kalau startDay == today → belum waktunya credit (profit pertama besok 00:00 WIB)
+        if (startDay.getTime() === today.getTime()) {
+          continue; // Skip — investment baru dibeli hari ini, profit tunggu besok 00:00 WIB
+        }
+      }
+
       // Check if already credited today
       if (inv.lastProfitDate) {
         const lastDate = new Date(inv.lastProfitDate);
-        if (lastDate.getFullYear() === today.getFullYear() &&
-            lastDate.getMonth() === today.getMonth() &&
-            lastDate.getDate() === today.getDate()) {
+        const lastWib = new Date(lastDate.getTime() + lastDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
+        const lastDay = new Date(lastWib.getFullYear(), lastWib.getMonth(), lastWib.getDate());
+        if (lastDay.getTime() === today.getTime()) {
           continue; // Already credited today
         }
       }
@@ -430,19 +485,38 @@ async function processDailyInvestmentProfits(): Promise<{
       }
 
       // ★ HARD CAP: total profit cannot exceed dailyProfit × contractDays
-      // e.g. 3,200/day × 180 days = 576,000 (for 160k investment @ 2%/day)
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
-      const contractDays = inv.package.contractDays || 180;
-      const hardCap = dailyProfit * contractDays;
+      // ★ BUG FIX: Use stored inv.dailyProfit & derive contractDays from (endDate - startDate).
+      //   Do NOT read from inv.package — for Product (VIP) purchases the packageId is linked
+      //   to `_internal_default` (profitRate=0, contractDays=0), which made hardCap=0 →
+      //   investment was wrongly marked `completed` immediately after purchase.
+      //   The stored `inv.dailyProfit` is the TRUE daily profit (set at purchase time).
+      const storedDailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100)); // fallback for legacy rows
+
+      let contractDays = 0;
+      if (inv.startDate && inv.endDate) {
+        const msDiff = new Date(inv.endDate).getTime() - new Date(inv.startDate).getTime();
+        contractDays = Math.max(1, Math.round(msDiff / (24 * 60 * 60 * 1000)));
+      } else {
+        contractDays = inv.package?.contractDays || 180;
+      }
+      const hardCap = storedDailyProfit * contractDays;
       const remainingCap = Math.max(0, hardCap - inv.totalProfitEarned);
 
-      if (remainingCap <= 0) {
+      if (remainingCap <= 0 && inv.totalProfitEarned > 0) {
         // Already hit hard cap → mark as completed
         await db.investment.update({
           where: { id: inv.id },
           data: { status: 'completed' },
         });
         console.log(`[Profit Cron] ✅ Investment ${inv.id} hit hard cap ${formatRupiahSimple(hardCap)} → marked completed`);
+        continue;
+      }
+      // ★ If remainingCap is 0 but earned is also 0, this is a fresh investment with
+      //   storedDailyProfit=0 (shouldn't happen). Skip rather than mark completed.
+      if (storedDailyProfit <= 0) {
+        console.log(`[Profit Cron] ⚠️ Investment ${inv.id} has dailyProfit=0 — skipping (not marking completed)`);
         continue;
       }
 
@@ -456,14 +530,14 @@ async function processDailyInvestmentProfits(): Promise<{
         if (missedDays <= 0) continue; // already credited all weekdays up to today
       }
 
-      // Total profit to credit = dailyProfit × missedDays, but capped by remainingCap
-      let creditAmount = dailyProfit * missedDays;
+      // Total profit to credit = storedDailyProfit × missedDays, but capped by remainingCap
+      let creditAmount = storedDailyProfit * missedDays;
       let willComplete = false;
       if (creditAmount >= remainingCap) {
         creditAmount = remainingCap;
         willComplete = true;
       }
-      const daysCredited = Math.ceil(creditAmount / dailyProfit);
+      const daysCredited = Math.ceil(creditAmount / storedDailyProfit);
 
       await db.$transaction(async (tx) => {
         // ★ RE-CHECK inside transaction to prevent double credit (race condition) ★
@@ -505,7 +579,7 @@ async function processDailyInvestmentProfits(): Promise<{
           where: { id: inv.id },
           data: {
             totalProfitEarned: { increment: finalCredit },
-            dailyProfit: dailyProfit,
+            dailyProfit: storedDailyProfit,
             lastProfitDate: now,
             ...(willComplete ? { status: 'completed' as const, endDate: now } : {}),
           },

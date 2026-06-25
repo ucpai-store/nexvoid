@@ -65,11 +65,18 @@ function ProductCard({
   const isAvailable = state === 'available';
   const isBought = state === 'bought';
 
+  // Re-activation: available AND has a "Kontrak sebelumnya sudah berakhir" reason
+  const isReactivation = isAvailable && !!(product.reason || '').toLowerCase().includes('berakhir');
+
   const canBuy = isAvailable;
 
   const quotaPercent = product.quota > 0 ? Math.round((product.quotaUsed / product.quota) * 100) : 0;
   const remaining = Math.max(product.quota - product.quotaUsed, 0);
-  const dailyProfit = product.duration > 0 ? product.estimatedProfit / product.duration : 0;
+  // Compute daily profit directly from price × profitRate / 100 (source of truth).
+  // Avoids drift if estimatedProfit in DB is stale — always matches what the cron credits.
+  const dailyProfit = Math.floor(product.price * ((product.profitRate || 0) / 100));
+  // Total profit = dailyProfit × duration (modal TIDAK dikembalikan, hanya profit)
+  const totalProfit = dailyProfit * (product.duration || 0);
 
   return (
     <motion.div
@@ -103,7 +110,7 @@ function ProductCard({
           </Badge>
         </div>
 
-        {/* State ribbon (AKTIF / SELESAI) */}
+        {/* State ribbon (AKTIF / SELESAI / RE-AKTIVASI) */}
         {isActive && (
           <div className="absolute top-0 left-0 bg-emerald-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" /> AKTIF
@@ -112,6 +119,11 @@ function ProductCard({
         {isBought && (
           <div className="absolute top-0 left-0 bg-blue-500/80 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" /> SELESAI
+          </div>
+        )}
+        {isReactivation && (
+          <div className="absolute top-0 left-0 bg-amber-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
+            <RefreshCw className="w-3 h-3" /> RE-AKTIVASI
           </div>
         )}
       </div>
@@ -164,7 +176,7 @@ function ProductCard({
               <Coins className="w-3 h-3 text-primary" />
               <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Total Profit</span>
             </div>
-            <span className="text-gold-gradient text-xs sm:text-sm font-bold">{formatRupiah(product.estimatedProfit)}</span>
+            <span className="text-gold-gradient text-xs sm:text-sm font-bold">{formatRupiah(totalProfit)}</span>
           </div>
         </div>
 
@@ -188,15 +200,19 @@ function ProductCard({
           </div>
         </div>
 
-        {/* Bought/active reason */}
-        {(isActive || isBought) && product.reason && (
-          <div className="flex items-start gap-1.5 mb-3 p-2 rounded-lg bg-slate-400/5 border border-slate-400/15">
-            <Info className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
-            <p className="text-slate-400 text-[10px] leading-tight">{product.reason}</p>
+        {/* Bought/active/reactivation reason */}
+        {(isActive || isBought || isReactivation) && product.reason && (
+          <div className={`flex items-start gap-1.5 mb-3 p-2 rounded-lg border ${
+            isReactivation
+              ? 'bg-amber-400/5 border-amber-400/20'
+              : 'bg-slate-400/5 border-slate-400/15'
+          }`}>
+            <Info className={`w-3 h-3 shrink-0 mt-0.5 ${isReactivation ? 'text-amber-400' : 'text-slate-400'}`} />
+            <p className={`text-[10px] leading-tight ${isReactivation ? 'text-amber-400/90' : 'text-slate-400'}`}>{product.reason}</p>
           </div>
         )}
 
-        {/* Buy button — any unbought product is purchasable */}
+        {/* Buy button — any available product is purchasable (incl. re-activation after contract end) */}
         {isActive ? (
           <div className="w-full h-9 sm:h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 mt-auto">
             <CheckCircle2 className="w-4 h-4" /> Sedang Aktif
@@ -211,8 +227,8 @@ function ProductCard({
             className="w-full bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold mt-auto h-9 sm:h-11 text-xs sm:text-sm"
           >
             <div className="flex items-center gap-2">
-              <Wallet className="w-4 h-4" />
-              Beli Sekarang
+              {isReactivation ? <RefreshCw className="w-4 h-4" /> : <Wallet className="w-4 h-4" />}
+              {isReactivation ? 'Aktifkan Lagi' : 'Beli Sekarang'}
               <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </Button>
@@ -335,7 +351,7 @@ export default function ProductsPage() {
         purpose: 'investment',
         packageId: p.id,
         packageName: p.name,
-        dailyProfit: p.duration > 0 ? p.estimatedProfit / p.duration : 0,
+        dailyProfit: Math.floor(p.price * ((p.profitRate || 0) / 100)),
         contractDays: p.duration,
       });
     }
@@ -450,7 +466,7 @@ export default function ProductsPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Profit Harian</span>
                 <span className="text-emerald-400 font-semibold">
-                  {formatRupiah(confirmPkg.duration > 0 ? confirmPkg.estimatedProfit / confirmPkg.duration : 0)}
+                  {formatRupiah(Math.floor(confirmPkg.price * ((confirmPkg.profitRate || 0) / 100)))}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
@@ -459,7 +475,7 @@ export default function ProductsPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Total Profit</span>
-                <span className="text-emerald-400 font-semibold">{formatRupiah(confirmPkg.estimatedProfit)}</span>
+                <span className="text-emerald-400 font-semibold">{formatRupiah(Math.floor(confirmPkg.price * ((confirmPkg.profitRate || 0) / 100)) * confirmPkg.duration)}</span>
               </div>
 
               {/* Modal tidak kembali warning */}
@@ -468,7 +484,7 @@ export default function ProductsPage() {
                   <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <p className="text-amber-400/90 text-[10px] leading-tight">
                     <strong>Modal tidak dikembalikan.</strong> Anda hanya menerima profit harian{' '}
-                    {formatRupiah(confirmPkg.duration > 0 ? confirmPkg.estimatedProfit / confirmPkg.duration : 0)}{' '}
+                    {formatRupiah(Math.floor(confirmPkg.price * ((confirmPkg.profitRate || 0) / 100)))}{' '}
                     selama {confirmPkg.duration} hari.
                   </p>
                 </div>
@@ -544,7 +560,7 @@ export default function ProductsPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Profit Harian</span>
                 <span className="text-emerald-400 font-semibold">
-                  {formatRupiah(successPkg.duration > 0 ? successPkg.estimatedProfit / successPkg.duration : 0)}
+                  {formatRupiah(Math.floor(successPkg.price * ((successPkg.profitRate || 0) / 100)))}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
@@ -554,7 +570,7 @@ export default function ProductsPage() {
               <Separator className="bg-primary/10" />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Total Profit Diterima</span>
-                <span className="text-emerald-400 font-bold">{formatRupiah(successPkg.estimatedProfit)}</span>
+                <span className="text-emerald-400 font-bold">{formatRupiah(Math.floor(successPkg.price * ((successPkg.profitRate || 0) / 100)) * successPkg.duration)}</span>
               </div>
               <div className="p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15 mt-2">
                 <p className="text-amber-400/80 text-[10px] leading-tight flex items-center gap-1.5">

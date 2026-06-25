@@ -1,20 +1,21 @@
 import { PrismaClient, Prisma } from '@prisma/client'
+import path from 'path'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
 function createPrismaClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL
+  let connectionString = process.env.DATABASE_URL
 
-  // If DATABASE_URL is not set (e.g., on client-side), return a dummy client
-  // This prevents crashes when the module is accidentally imported in client code
+  // If DATABASE_URL is not set, fall back to a default SQLite path at <cwd>/db/custom.db.
+  // This makes the app resilient even if .env is missing at runtime (e.g. on a fresh VPS
+  // where someone forgot to run setup-env, or if .env was accidentally deleted).
+  // scripts/setup-env.mjs normally creates .env automatically, but this is a safety net.
   if (!connectionString) {
-    // On the client side, Prisma should never be used. Return a client that will
-    // throw a helpful error if someone tries to use it.
-    console.warn('[DB] DATABASE_URL not set - database operations will fail. This is expected on the client side.')
-    // Use an empty SQLite connection string as fallback - it won't work but prevents crash at import time
-    return new PrismaClient({ datasourceUrl: 'file:./nonexistent.db' })
+    const fallbackPath = path.resolve(process.cwd(), 'db', 'custom.db')
+    connectionString = `file:${fallbackPath}`
+    console.warn(`[DB] DATABASE_URL not set — falling back to ${connectionString}. Run 'bun run db:push' to initialize the schema.`)
   }
 
   const isPostgreSQL = connectionString.startsWith('postgresql://') || connectionString.startsWith('postgres://')

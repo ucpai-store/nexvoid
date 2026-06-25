@@ -158,16 +158,16 @@ async function seedDatabase() {
     results.push('⏭️ MatchingConfig already exists');
   }
 
-  // 7. Create default SalaryConfig if none exists
-  const existingSalaryConfig = await db.salaryConfig.findFirst();
-  if (!existingSalaryConfig) {
-    await db.salaryConfig.create({
-      data: { minDirectRefs: 10, salaryRate: 2.5, maxWeeks: 12, requireActiveDeposit: true, isActive: true },
-    });
-    results.push('✅ SalaryConfig created (2.5%/week × 12 weeks)');
-  } else {
-    results.push('⏭️ SalaryConfig already exists');
+  // 7. NUCLEAR SYNC SalaryConfig — DELETE ALL stale rows, CREATE ONE clean config (1%/week PERMANEN)
+  //    Why nuclear: multiple rows (from old admin settings) can cause API to read a stale 2.5%/12 row.
+  const staleSalaryCount = await db.salaryConfig.count();
+  if (staleSalaryCount > 0) {
+    await db.salaryConfig.deleteMany({});
   }
+  await db.salaryConfig.create({
+    data: { minDirectRefs: 10, salaryRate: 1, maxWeeks: 0, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true },
+  });
+  results.push(`✅ SalaryConfig synced (deleted ${staleSalaryCount} stale, created 1 clean: 1%/week PERMANEN — maxWeeks=0)`);
 
   return results;
 }

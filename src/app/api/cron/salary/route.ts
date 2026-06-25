@@ -185,7 +185,8 @@ async function processAllSalaryBonuses(): Promise<{
       }
 
       const weeksReceived = await db.salaryBonus.count({ where: { userId: user.id, status: 'paid' } });
-      if (weeksReceived >= config.maxWeeks) {
+      // maxWeeks = 0 means PERMANENT (no limit). Only check limit if maxWeeks > 0.
+      if (config.maxWeeks > 0 && weeksReceived >= config.maxWeeks) {
         result.completed++;
         continue;
       }
@@ -222,7 +223,7 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
-      const currentWeekOfTotal = weeksReceived + 1;
+      const currentWeekOfTotal = config.maxWeeks > 0 ? weeksReceived + 1 : 0;
 
       await db.$transaction(async (tx) => {
         await tx.user.update({
@@ -256,7 +257,7 @@ async function processAllSalaryBonuses(): Promise<{
             type: 'salary',
             level: 0,
             amount: salaryAmount,
-            description: `Gaji mingguan otomatis Minggu ${weekNumber}/${year} (${currentWeekOfTotal}/${config.maxWeeks}) - ${refCheck.active}/${refCheck.total} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
+            description: `Gaji mingguan otomatis Minggu ${weekNumber}/${year} ${config.maxWeeks > 0 ? `(${currentWeekOfTotal}/${config.maxWeeks})` : '(permanen)'} - ${refCheck.active}/${refCheck.total} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
           },
         });
       });
@@ -264,7 +265,7 @@ async function processAllSalaryBonuses(): Promise<{
       result.eligible++;
       result.totalAmount += salaryAmount;
       result.processed++;
-      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} (Week ${currentWeekOfTotal}/${config.maxWeeks})`);
+      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} ${config.maxWeeks > 0 ? `(Week ${currentWeekOfTotal}/${config.maxWeeks})` : '(permanen)'}`);
     } catch (error: unknown) {
       result.errors++;
       const message = error instanceof Error ? error.message : String(error);

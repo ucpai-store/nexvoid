@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import {
   Banknote, CheckCircle2, XCircle, TrendingUp,
-  Calendar, AlertTriangle, RefreshCw, Clock, Award, Zap, Users
+  Calendar, AlertTriangle, RefreshCw, Clock, Users, Wallet, ArrowRight,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatRupiah } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n';
 
@@ -56,7 +54,6 @@ interface SalaryData {
   canClaim: boolean;
   alreadyClaimedThisWeek: boolean;
   currentWeek: number;
-  currentYear: number;
 }
 
 export default function SalaryBonusPage() {
@@ -127,29 +124,28 @@ export default function SalaryBonusPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6">
-        <div className="animate-pulse space-y-4">
-          <div className="glass rounded-2xl p-4 sm:p-6 h-48" />
-          <div className="glass rounded-2xl p-4 sm:p-6 h-32" />
-          <div className="glass rounded-2xl p-4 sm:p-6 h-32" />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+        <div className="h-40 rounded-2xl bg-muted/40 animate-pulse" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-24 rounded-xl bg-muted/40 animate-pulse" />
+          ))}
         </div>
+        <div className="h-64 rounded-2xl bg-muted/40 animate-pulse" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6">
-        <div className="glass glow-gold rounded-2xl p-5 sm:p-8 lg:p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-7 h-7 text-red-400" />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6 text-destructive" />
           </div>
           <h3 className="text-foreground font-semibold mb-1">{t('salary.loadFailed')}</h3>
           <p className="text-muted-foreground text-sm mb-6">{error}</p>
-          <Button
-            onClick={retry}
-            className="bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 glow-gold"
-          >
+          <Button onClick={retry} variant="default" className="rounded-xl">
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('salary.tryAgain')}
           </Button>
@@ -161,407 +157,399 @@ export default function SalaryBonusPage() {
   const eligibility = data?.eligibility;
   const isEligible = eligibility?.isEligible ?? false;
   const isCompleted = eligibility?.isCompleted ?? false;
-  const salaryRate = eligibility?.salaryRate ?? 2.5;
-  const maxWeeks = eligibility?.maxWeeks ?? 12;
+  const salaryRate = eligibility?.salaryRate ?? 1;
+  const maxWeeks = eligibility?.maxWeeks ?? 0;
   const weeksReceived = eligibility?.weeksReceived ?? 0;
-  const weeksRemaining = eligibility?.weeksRemaining ?? 12;
-  const estimatedSalary = eligibility?.estimatedSalary ?? 0;
   const activeRefDeposits = eligibility?.activeRefDeposits ?? 0;
   const directRefs = eligibility?.directRefs ?? 0;
   const minDirectRefs = eligibility?.minDirectRefs ?? 10;
   const meetsMinDirectRefs = eligibility?.meetsMinDirectRefs ?? false;
-  const groupOmzet = eligibility?.groupOmzet ?? 0;
   const userHasActiveDeposit = eligibility?.userHasActiveDeposit ?? false;
   const allRefsActive = eligibility?.allRefsActive ?? false;
-  // ★ maxWeeks <= 0 = UNLIMITED (selamanya) ★
   const unlimited = !maxWeeks || maxWeeks <= 0;
-  const maxWeeksLabel = unlimited ? 'selamanya' : `${maxWeeks} minggu`;
-  const weeksRemainingLabel = unlimited ? 'selamanya' : `${weeksRemaining} minggu`;
+  const refPct = Math.min((directRefs / minDirectRefs) * 100, 100);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-          <Banknote className="w-6 h-6 text-primary" />
-          Bonus Gaji Mingguan
-        </h1>
-        <p className="text-muted-foreground text-sm">Dapatkan {salaryRate}% dari omzet grup setiap minggu selama {maxWeeksLabel}</p>
-      </div>
-
-      {/* Completed Banner */}
-      {isCompleted && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-2xl p-4 sm:p-6 lg:p-8 text-center border border-emerald-500/20"
-        >
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5 pb-6">
+      {/* ─────────── HEADER ─────────── */}
+      <header className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="p-5 sm:p-7">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Banknote className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+                  Gaji Mingguan
+                </h1>
+                <p className="text-muted-foreground text-sm mt-0.5">
+                  {salaryRate}% omzet grup · dibayar setiap Senin
+                </p>
+              </div>
+            </div>
+            <Badge
+              variant="outline"
+              className={
+                isEligible
+                  ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5'
+                  : 'border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5'
+              }
+            >
+              {isEligible ? (
+                <><CheckCircle2 className="w-3 h-3 mr-1" />Layak</>
+              ) : (
+                <><XCircle className="w-3 h-3 mr-1" />Belum Layak</>
+              )}
+            </Badge>
           </div>
-          <h2 className="text-foreground text-lg font-bold mb-1">Program Gaji Selesai! 🎉</h2>
+
+          {/* Quick facts */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+            <div className="rounded-xl border border-border bg-background/50 p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                <Clock className="w-3 h-3" /> Jadwal
+              </div>
+              <p className="text-foreground text-sm font-semibold mt-1">Senin 00:00 WIB</p>
+            </div>
+            <div className="rounded-xl border border-border bg-background/50 p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                <Users className="w-3 h-3" /> Min. Undangan
+              </div>
+              <p className="text-foreground text-sm font-semibold mt-1">{minDirectRefs} orang</p>
+            </div>
+            <div className="rounded-xl border border-border bg-background/50 p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                <TrendingUp className="w-3 h-3" /> Rate
+              </div>
+              <p className="text-foreground text-sm font-semibold mt-1">{salaryRate}% / minggu</p>
+            </div>
+            <div className="rounded-xl border border-border bg-background/50 p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                <Calendar className="w-3 h-3" /> Durasi
+              </div>
+              <p className="text-foreground text-sm font-semibold mt-1">
+                {unlimited ? 'Selamanya' : `${maxWeeks} minggu`}
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ─────────── COMPLETED BANNER ─────────── */}
+      {isCompleted && (
+        <div className="rounded-2xl border border-border bg-card p-6 text-center">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+          </div>
+          <h2 className="text-foreground text-lg font-semibold mb-1">Program Gaji Selesai</h2>
           <p className="text-muted-foreground text-sm">
-            Anda telah menerima gaji mingguan selama {maxWeeksLabel}. Total: {formatRupiah(data?.totalSalaryEarned || 0)}
+            Anda telah menerima gaji mingguan selama {unlimited ? 'selamanya' : `${maxWeeks} minggu`}.
+            Total: <span className="font-semibold text-foreground">{formatRupiah(data?.totalSalaryEarned || 0)}</span>
           </p>
-        </motion.div>
+        </div>
       )}
 
-      {/* Eligibility Card */}
+      {/* ─────────── ELIGIBILITY / REQUIREMENTS ─────────── */}
       {!isCompleted && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-gold glow-gold rounded-2xl p-4 sm:p-6 lg:p-8 relative overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-[#1E3A5F]/10 blur-3xl" />
+        <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+          <h2 className="text-base font-semibold text-foreground mb-5">Syarat Kelayakan</h2>
 
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center glow-gold animate-float">
-                  <Banknote className="w-6 h-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h2 className="text-foreground font-semibold">Status Kelayakan</h2>
-                  <p className="text-muted-foreground text-xs">
-                    Gaji {salaryRate}% dari omzet grup / minggu
-                  </p>
-                </div>
+          {/* Requirement 1: Invite */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  meetsMinDirectRefs
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  {meetsMinDirectRefs ? '✓' : '1'}
+                </span>
+                <span className="text-sm font-medium text-foreground">
+                  Undang {minDirectRefs} orang (Level 1)
+                </span>
+                <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                  Tanpa batas waktu
+                </Badge>
               </div>
-              <Badge className={`${isEligible ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'} border text-xs font-bold px-3 py-1`}>
-                {isEligible ? (
-                  <><CheckCircle2 className="w-3 h-3 mr-1" />Layak</>
-                ) : (
-                  <><XCircle className="w-3 h-3 mr-1" />Belum Layak</>
-                )}
-              </Badge>
+              <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                {directRefs} / {minDirectRefs}
+              </span>
             </div>
+            <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  meetsMinDirectRefs ? 'bg-emerald-500' : 'bg-primary'
+                }`}
+                style={{ width: `${refPct}%` }}
+              />
+            </div>
+            {!meetsMinDirectRefs && (
+              <p className="text-xs text-muted-foreground pt-1">
+                Undang minimal {minDirectRefs} orang. Bebas kapan saja — tidak ada tenggat waktu.
+              </p>
+            )}
+          </div>
 
-            {/* 12-Week Progress */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-foreground text-sm font-medium">Progress Mingguan</span>
-                <span className="text-muted-foreground text-xs font-bold">
-                  {weeksReceived} {unlimited ? 'minggu diterima (selamanya)' : `/ ${maxWeeks} Minggu`}
+          {/* Divider */}
+          <div className="h-px bg-border my-5" />
+
+          {/* Requirement 2: Active investment */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                userHasActiveDeposit
+                  ? 'bg-emerald-500 text-white'
+                  : meetsMinDirectRefs
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-muted text-muted-foreground'
+              }`}>
+                {userHasActiveDeposit ? '✓' : '2'}
+              </span>
+              <span className="text-sm font-medium text-foreground">Aktif investasi</span>
+            </div>
+            <span className={`text-xs font-medium ${
+              userHasActiveDeposit ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+            }`}>
+              {userHasActiveDeposit ? 'Terpenuhi' : 'Belum'}
+            </span>
+          </div>
+
+          {/* Refs active warning (only if req 1 + req 2 ok but refs not all active) */}
+          {meetsMinDirectRefs && userHasActiveDeposit && !allRefsActive && (
+            <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Semua undangan langsung wajib aktif investasi. Saat ini {activeRefDeposits}/{directRefs} undangan sudah aktif.
+              </p>
+            </div>
+          )}
+
+          {/* Claim area */}
+          <div className="mt-6">
+            {data?.alreadyClaimedThisWeek ? (
+              <div className="flex items-center justify-center gap-2 p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  Gaji minggu ini sudah dikreditkan otomatis
                 </span>
               </div>
-              <div className="w-full h-3 rounded-full bg-foreground/5 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: unlimited ? '100%' : `${(weeksReceived / maxWeeks) * 100}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                  className="h-full rounded-full bg-gold-gradient"
-                />
-              </div>
-              <div className="flex justify-between mt-1.5">
-                <span className="text-muted-foreground text-[10px]">Sisa: {weeksRemainingLabel}</span>
-                <span className="text-muted-foreground text-[10px]">{unlimited ? '∞' : `${Math.round((weeksReceived / maxWeeks) * 100)}%`}</span>
-              </div>
-            </div>
-
-            {/* ★ SYARAT 1: Wajib invite minimal 10 orang (dicek DULU) */}
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-foreground text-sm font-medium flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-primary" />
-                    Syarat 1: Min. {minDirectRefs} Undangan Langsung
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {directRefs} / {minDirectRefs} orang
-                  </span>
-                </div>
-                <div className="w-full h-2.5 rounded-full bg-foreground/5 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((directRefs / minDirectRefs) * 100, 100)}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                    className={`h-full rounded-full ${meetsMinDirectRefs ? 'bg-emerald-400' : 'bg-primary'}`}
-                  />
-                </div>
-                {!meetsMinDirectRefs ? (
-                  <p className="text-yellow-400 text-[10px] mt-1">
-                    ⚠️ Syarat 1 belum terpenuhi: undang minimal {minDirectRefs} orang ({directRefs}/{minDirectRefs})
-                  </p>
+            ) : isEligible ? (
+              <Button
+                onClick={handleClaim}
+                disabled={claiming}
+                className="w-full h-12 rounded-xl font-semibold"
+                size="lg"
+              >
+                {claiming ? (
+                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Memproses...</>
                 ) : (
-                  <p className="text-emerald-400 text-[10px] mt-1">
-                    ✅ Syarat 1 terpenuhi: {directRefs} undangan langsung
-                  </p>
+                  <>Klaim Gaji Mingguan <ArrowRight className="w-4 h-4 ml-2" /></>
                 )}
+              </Button>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {!meetsMinDirectRefs
+                    ? `Selesaikan syarat 1: undang minimal ${minDirectRefs} orang.`
+                    : !userHasActiveDeposit
+                      ? 'Selesaikan syarat 2: wajib memiliki investasi aktif.'
+                      : 'Pastikan semua undangan langsung sudah aktif investasi.'}
+                </p>
               </div>
-
-              {/* ★ SYARAT 2: Wajib aktif investasi (hanya dicek kalau syarat 1 sudah terpenuhi) */}
-              {meetsMinDirectRefs && (
-                <div className={`flex items-center gap-2 p-3 rounded-xl border ${
-                  userHasActiveDeposit
-                    ? 'bg-emerald-500/10 border-emerald-500/20'
-                    : 'bg-red-500/10 border-red-500/20'
-                }`}>
-                  {userHasActiveDeposit ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                  )}
-                  <span className={`text-xs font-medium ${userHasActiveDeposit ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {userHasActiveDeposit
-                      ? `✅ Syarat 2 terpenuhi: Anda punya investasi aktif`
-                      : `Syarat 2 belum terpenuhi: Wajib memiliki investasi aktif untuk klaim gaji`
-                    }
-                  </span>
-                </div>
-              )}
-
-              {/* Estimated Salary Info - HANYA muncul kalau KEDUA syarat terpenuhi */}
-              {meetsMinDirectRefs && userHasActiveDeposit ? (
-                <>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground text-xs">Estimasi Gaji/Minggu</span>
-                    </div>
-                    <span className="text-emerald-400 font-bold text-sm">
-                      {formatRupiah(estimatedSalary)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground text-xs">Omzet Grup</span>
-                    </div>
-                    <span className="text-foreground font-semibold text-sm">
-                      {formatRupiah(groupOmzet)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <Banknote className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground text-xs">Rate Gaji</span>
-                    </div>
-                    <span className="text-primary font-bold text-sm">
-                      {salaryRate}% / minggu
-                    </span>
-                  </div>
-                </>
-              ) : !meetsMinDirectRefs ? (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
-                  <Users className="w-4 h-4 text-yellow-400 shrink-0" />
-                  <span className="text-yellow-400 text-xs font-medium">
-                    Gaji belum tersedia. Selesaikan Syarat 1: undang minimal {minDirectRefs} orang dulu.
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/10">
-                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span className="text-red-400 text-xs font-medium">
-                    Gaji belum tersedia. Selesaikan Syarat 2: wajib memiliki investasi aktif.
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Claim Button / Status */}
-            <div className="mt-6">
-              {data?.alreadyClaimedThisWeek ? (
-                <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <span className="text-emerald-400 text-sm font-medium">Gaji minggu ini sudah dikreditkan otomatis</span>
-                </div>
-              ) : isEligible ? (
-                <Button
-                  onClick={handleClaim}
-                  disabled={claiming}
-                  className="w-full bg-gold-gradient text-primary-foreground font-bold rounded-xl hover:opacity-90 glow-gold h-12 text-sm"
-                >
-                  {claiming ? (
-                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Memproses...</>
-                  ) : (
-                    <><Banknote className="w-4 h-4 mr-2" />Klaim Gaji Mingguan</>
-                  )}
-                </Button>
-              ) : (
-                <div className="space-y-2">
-                  {/* Syarat 1 belum terpenuhi */}
-                  {!meetsMinDirectRefs && (
-                    <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                      <XCircle className="w-5 h-5 text-yellow-400" />
-                      <span className="text-yellow-400 text-sm font-medium">
-                        Syarat 1: Undang minimal {minDirectRefs} orang ({directRefs}/{minDirectRefs})
-                      </span>
-                    </div>
-                  )}
-                  {/* Syarat 1 OK, tapi Syarat 2 belum */}
-                  {meetsMinDirectRefs && !userHasActiveDeposit && (
-                    <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                      <XCircle className="w-5 h-5 text-red-400" />
-                      <span className="text-red-400 text-sm font-medium">
-                        Syarat 2: Wajib memiliki investasi aktif
-                      </span>
-                    </div>
-                  )}
-                  {/* Kedua syarat OK, tapi ada referral yang belum aktif investasi */}
-                  {meetsMinDirectRefs && userHasActiveDeposit && !allRefsActive && (
-                    <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                      <XCircle className="w-5 h-5 text-yellow-400" />
-                      <span className="text-yellow-400 text-sm font-medium">
-                        Semua undangan langsung (Level 1) wajib aktif investasi ({activeRefDeposits}/{directRefs} aktif)
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            )}
           </div>
-        </motion.div>
+        </section>
       )}
 
-      {/* Summary Stats - Only show salary-related stats when eligible or already received salary */}
-      {(meetsMinDirectRefs && userHasActiveDeposit) || (data?.totalSalaryEarned || 0) > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
+      {/* ─────────── STATS ─────────── */}
+      {((meetsMinDirectRefs && userHasActiveDeposit) || (data?.totalSalaryEarned || 0) > 0) && (
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-2">
+              <Wallet className="w-4 h-4 text-emerald-500" />
             </div>
-            <p className="text-2xl font-bold text-emerald-400">{formatRupiah(data?.totalSalaryEarned || 0)}</p>
-            <p className="text-muted-foreground text-xs">Total Gaji Diterima</p>
-          </motion.div>
+            <p className="text-lg font-bold text-foreground tabular-nums">
+              {formatRupiah(data?.totalSalaryEarned || 0)}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Total diterima</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+              <Calendar className="w-4 h-4 text-primary" />
+            </div>
+            <p className="text-lg font-bold text-foreground tabular-nums">
+              {weeksReceived}
+              {unlimited && <span className="text-sm text-muted-foreground ml-1">minggu</span>}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {unlimited ? 'Minggu diterima' : `dari ${maxWeeks} minggu`}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center mb-2">
+              <TrendingUp className="w-4 h-4 text-amber-500" />
+            </div>
+            <p className="text-lg font-bold text-foreground tabular-nums">{salaryRate}%</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Rate / minggu</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center mb-2">
+              <Users className="w-4 h-4 text-blue-500" />
+            </div>
+            <p className="text-lg font-bold text-foreground tabular-nums">{activeRefDeposits}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Undangan aktif</p>
+          </div>
+        </section>
+      )}
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <Clock className="w-5 h-5 text-primary" />
-            </div>
-            <p className="text-foreground text-lg font-bold">{weeksReceived} <span className="text-muted-foreground text-sm font-normal">{unlimited ? '(selamanya)' : `/ ${maxWeeks}`}</span></p>
-            <p className="text-muted-foreground text-xs">Minggu Diterima</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <Zap className="w-5 h-5 text-primary" />
-            </div>
-            <p className="text-foreground text-lg font-bold">{salaryRate}%</p>
-            <p className="text-muted-foreground text-xs">Rate / Minggu</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <Users className="w-5 h-5 text-primary" />
-            </div>
-            <p className="text-foreground text-lg font-bold">{activeRefDeposits}</p>
-            <p className="text-muted-foreground text-xs">Direct Invites</p>
-          </motion.div>
+      {/* ─────────── HISTORY ─────────── */}
+      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            Riwayat Gaji
+          </h2>
+          {data?.salaryBonuses && data.salaryBonuses.length > 0 && (
+            <span className="text-xs text-muted-foreground">{data.salaryBonuses.length} entri</span>
+          )}
         </div>
-      ) : null}
-
-      {/* Salary History */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
-      >
-        <h3 className="text-foreground font-semibold text-sm mb-3 sm:mb-4 flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-primary" />
-          Riwayat Gaji Mingguan
-        </h3>
 
         {data?.salaryBonuses && data.salaryBonuses.length > 0 ? (
-          <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
-            {data.salaryBonuses.map((bonus, i) => (
-              <div key={bonus.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Award className="w-5 h-5 text-primary" />
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+            {data.salaryBonuses.map((bonus) => (
+              <div
+                key={bonus.id}
+                className="flex items-center gap-3 p-3 rounded-xl border border-border bg-background/50 hover:bg-muted/40 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Banknote className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-foreground text-sm font-medium">
-                      Minggu {bonus.weekOfTotal}{unlimited ? ' (selamanya)' : `/${maxWeeks}`}
+                    <p className="text-sm font-semibold text-foreground">
+                      Minggu {bonus.weekOfTotal}
                     </p>
-                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
-                      Lunas
-                    </Badge>
-                    <Badge className="bg-primary/10 text-primary border-primary/20 border text-[10px] px-1.5 py-0">
+                    <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
                       {bonus.salaryRate}%
                     </Badge>
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    Omzet: {formatRupiah(bonus.baseOmzet)} | Direct Invites: {bonus.activeRefDeposits}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Omzet {formatRupiah(bonus.baseOmzet)} · {bonus.activeRefDeposits} undangan aktif
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-emerald-400 text-sm font-bold">{formatRupiah(bonus.amount)}</p>
-                  <p className="text-muted-foreground text-[10px]">
-                    {new Date(bonus.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    {formatRupiah(bonus.amount)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {new Date(bonus.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })}
                   </p>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-8">
-            <Calendar className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-            <p className="text-muted-foreground text-sm">Belum ada riwayat gaji</p>
+          <div className="text-center py-10">
+            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+              <Calendar className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Belum ada riwayat gaji</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Gaji dikreditkan otomatis setiap Senin 00:00 WIB setelah syarat terpenuhi
+            </p>
           </div>
         )}
-      </motion.div>
+      </section>
 
-      {/* Info Box */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
-      >
-        <h3 className="text-foreground font-semibold text-sm mb-3 flex items-center gap-2">
-          <Zap className="w-4 h-4 text-primary" />
-          Cara Kerja Bonus Gaji
-        </h3>
-        <div className="space-y-2 text-muted-foreground text-xs">
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">1.</span>
-            <span><strong className="text-foreground">Syarat 1:</strong> Wajib mengundang minimal <strong className="text-foreground">{minDirectRefs} orang</strong> (Level 1)</span>
+      {/* ─────────── HOW IT WORKS ─────────── */}
+      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <h2 className="text-base font-semibold text-foreground mb-4">Cara Kerja</h2>
+        <ol className="space-y-3">
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
+              1
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">Undang {minDirectRefs} orang (Level 1)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Bebas kapan saja — tidak ada tenggat waktu.
+              </p>
+            </div>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
+              2
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">Aktif investasi</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Anda dan semua undangan langsung wajib punya investasi aktif.
+              </p>
+            </div>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
+              3
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">Gaji {salaryRate}% dikreditkan setiap Senin</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Dihitung dari omzet grup, dibayar otomatis setiap Senin 00:00 WIB.
+              </p>
+            </div>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
+              4
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">Berlangsung selamanya</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Tidak ada batas minggu. Selama syarat terpenuhi, gaji terus mengalir.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        {/* ★ Contoh perhitungan ilustrasi ★ */}
+        <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <p className="text-xs font-semibold text-foreground mb-3 flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+            Contoh Perhitungan Gaji
+          </p>
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between">
+              <span>10 undangan × Rp 160.000</span>
+              <span className="text-foreground font-medium tabular-nums">= Rp 1.600.000</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Omzet grup minimum</span>
+              <span className="text-foreground font-medium tabular-nums">Rp 1.600.000</span>
+            </div>
+            <div className="h-px bg-border my-2" />
+            <div className="flex items-center justify-between">
+              <span className="text-foreground font-semibold">Gaji mingguan ({salaryRate}%)</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm tabular-nums">
+                = Rp 16.000
+              </span>
+            </div>
           </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">2.</span>
-            <span><strong className="text-foreground">Syarat 2:</strong> Wajib memiliki <strong className="text-foreground">investasi aktif</strong> + semua undangan Level 1 juga wajib aktif investasi</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">3.</span>
-            <span>Setelah <strong className="text-foreground">kedua syarat</strong> terpenuhi, gaji <strong className="text-foreground">{salaryRate}%</strong> dari omzet grup dikreditkan setiap <strong className="text-foreground\">Senin pukul 00:00 WIB</strong></span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">4.</span>
-            <span>Gaji berlangsung <strong className="text-foreground">{unlimited ? 'selamanya' : `selama ${maxWeeks} minggu`}</strong> sejak syarat terpenuhi</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">5.</span>
-            <span>Profit & bonus gaji masuk <strong className="text-foreground">saldo utama</strong> (bisa ditarik)</span>
-          </div>
+          <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+            <span className="font-medium text-foreground">Catatan:</span> 1% dihitung dari total investasi semua undangan langsung (Level 1) yang aktif.
+            Investasi Anda sendiri tidak dihitung. Semakin banyak undangan & semakin besar investasi mereka, semakin besar gaji Anda.
+            Setiap undangan juga bisa membangun group sendiri & mendapat gaji sendiri.
+          </p>
         </div>
-      </motion.div>
+
+        <div className="mt-5 flex items-center gap-2 p-3.5 rounded-xl bg-muted/50 border border-border">
+          <Wallet className="w-4 h-4 text-primary shrink-0" />
+          <p className="text-xs text-foreground">
+            Gaji masuk ke <span className="font-semibold">saldo utama</span> dan bisa ditarik kapan saja.
+          </p>
+        </div>
+      </section>
     </div>
   );
 }
-
-// touch Wed Jun 24 17:59:10 UTC 2026

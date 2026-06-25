@@ -10,7 +10,7 @@
 #  After this script finishes, ALL systems MUST be 100% working:
 #    - Next.js app on :3000
 #    - Cron-service on :3032 (profit + salary auto-credit)
-#    - Profit 2%/day × 180 days = 576k cap (EVERY day incl. weekend)
+#    - Profit 2%/day × 180 days = 576k cap (WEEKDAYS ONLY — Sat/Sun LIBUR)
 #    - Salary 1%/week FOREVER (10 refs + active investment)
 # ═══════════════════════════════════════════════════════════════
 set -eo pipefail
@@ -121,26 +121,53 @@ fi
 if [ "$CHECK_ONLY" = false ]; then
   section "2/10 STOP OLD SERVICES"
 
-  # Stop via pm2 (if any)
-  for name in nexvo-app nexvo-cron nexvo-wa-bot; do
+  # Stop via pm2 (if any) — include ALL possible old process names
+  for name in nexvo-app nexvo-cron nexvo-wa-bot nexvo-web nexvo-next nexvo; do
     if pm2 describe "$name" >/dev/null 2>&1; then
       pm2 delete "$name" >/dev/null 2>&1 && ok "stopped $name" || warn "could not stop $name"
     fi
   done
 
+  # Also kill ANY pm2 process that might still hold our ports (leftover from old deploys)
+  # NOTE: wrap in || true and use { } group so set -eo pipefail doesn't kill the script
+  # when pm2 jlist returns empty or grep finds no matches
+  {
+    pm2_jlist_out=$(pm2 jlist 2>/dev/null || echo '[]')
+    echo "$pm2_jlist_out" | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sort -u | while read -r pname; do
+      [ -z "$pname" ] && continue
+      case "$pname" in
+        nexvo*|nexa*|next*) pm2 delete "$pname" >/dev/null 2>&1 && warn "killed leftover pm2 process: $pname" || true ;;
+      esac
+    done
+  } || true
+
   # Kill anything still holding our ports (leftover/rogue processes)
+  # Use multiple methods: lsof → ss → fuser → pkill (belt + suspenders)
+  # All wrapped with || true so set -eo pipefail won't exit on empty results
   for port in $PORT_APP $PORT_CRON $PORT_WABOT; do
+    pids=""
     if command -v lsof >/dev/null; then
       pids=$(lsof -ti :$port 2>/dev/null || true)
-    else
-      pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2 | tr '\n' ' ')
+    fi
+    if [ -z "$pids" ] && command -v ss >/dev/null; then
+      pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2 | tr '\n' ' ' || true)
+    fi
+    if [ -z "$pids" ] && command -v fuser >/dev/null; then
+      pids=$(fuser $port/tcp 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//' || true)
     fi
     if [ -n "$pids" ]; then
       warn "killing leftover process on port $port (PID: $pids)"
       kill -9 $pids 2>/dev/null || true
-      sleep 2
+      sleep 3
     fi
   done
+
+  # Final belt-and-suspenders: kill ANY node/bun/next process that might be rogue
+  # (but DON'T kill pm2 itself or our ssh session)
+  pkill -9 -f "next start" 2>/dev/null || true
+  pkill -9 -f "next dev" 2>/dev/null || true
+  pkill -9 -f "bun run index.ts" 2>/dev/null || true
+  sleep 2
   ok "ports cleared"
 fi
 
@@ -234,8 +261,15 @@ if [ "$CHECK_ONLY" = false ]; then
     warn "skipping build (--skip-build or --dev mode)"
   else
     log "running: bun run build (prisma generate + next build)..."
-    bun run build 2>&1 | tail -10
-    ok "build complete"
+    # Run build with explicit DATABASE_URL to avoid prisma issues
+    DATABASE_URL="file:$ABS_DB_PATH" bun run build 2>&1 | tail -15
+    BUILD_EXIT=${PIPESTATUS[0]}
+    if [ "$BUILD_EXIT" -ne 0 ]; then
+      err "BUILD FAILED (exit $BUILD_EXIT) — nexvo-app will not start correctly"
+      warn "check build errors above. Trying to continue anyway (existing .next may be used)..."
+    else
+      ok "build complete"
+    fi
   fi
 fi
 
@@ -263,19 +297,178 @@ if [ "$CHECK_ONLY" = false ]; then
   # ★ CRITICAL: explicitly export DATABASE_URL so prisma uses our path (not inherited from shell env)
   export DATABASE_URL="file:$ABS_DB_PATH"
 
-  # Generate prisma client
+  # Generate prisma client (SAFE — never touches data)
   bun run db:generate 2>&1 | tail -3 || warn "db:generate issue"
   ok "prisma client generated"
 
-  # Push schema (safe, idempotent). Use env var explicitly to avoid stale .env caching.
-  DATABASE_URL="file:$ABS_DB_PATH" bun run db:push 2>&1 | tail -5
-  ok "db schema pushed"
+  # ★ DATA PROTECTION: Backup DB before any schema operations ★
+  DB_HAD_DATA=false
+  if [ -f "$ABS_DB_PATH" ] && [ -s "$ABS_DB_PATH" ]; then
+    DB_HAD_DATA=true
+    BACKUP_FILE="$ABS_DB_PATH.backup-$(date +%Y%m%d-%H%M%S)"
+    cp "$ABS_DB_PATH" "$BACKUP_FILE" 2>/dev/null && ok "DB backed up → $BACKUP_FILE" || warn "backup failed"
+    # Keep only the 5 most recent backups
+    ls -t "$ABS_DB_PATH".backup-* 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || true
+  fi
+
+  # ★ SAFE DB PUSH: Only push schema if DB is fresh OR --fresh flag ★
+  # On existing installs, db:push can RESET DATA if schema changed — we AVOID that.
+  # Instead: generate client (done above), and only push schema if DB is empty/new.
+  if [ "$DB_HAD_DATA" = true ] && [ "$FRESH_CLONE" = false ]; then
+    # Check if schema is in sync (if migration shadow table exists)
+    SCHEMA_IN_SYNC=$(bun -e '
+      const { PrismaClient } = require("@prisma/client");
+      const db = new PrismaClient();
+      db.user.count().then(c => { console.log(c > 0 ? "HAS_DATA" : "EMPTY"); }).catch(() => console.log("ERROR"));
+    ' 2>/dev/null || echo "UNKNOWN")
+
+    if [ "$SCHEMA_IN_SYNC" = "HAS_DATA" ]; then
+      ok "DB has data → SKIPPING db:push (data protection)"
+      warn "if schema changed, run: bash deploy.sh --fresh (will backup + reset)"
+    else
+      # DB exists but no data, or unknown — safe to push
+      log "DB empty or new → running db:push..."
+      DATABASE_URL="file:$ABS_DB_PATH" bun run db:push 2>&1 | tail -5
+      ok "db schema pushed"
+    fi
+  else
+    # Fresh install or --fresh → push schema
+    log "fresh install → running db:push..."
+    DATABASE_URL="file:$ABS_DB_PATH" bun run db:push 2>&1 | tail -5
+    ok "db schema pushed"
+  fi
 
   # Verify DB file actually exists
   if [ -f "$ABS_DB_PATH" ]; then
     ok "DB file: $ABS_DB_PATH ($(du -h "$ABS_DB_PATH" | cut -f1))"
   else
     warn "DB file not found at $ABS_DB_PATH — check prisma config"
+  fi
+
+  # ★ AUTO-SEED: If products/packages are missing, restore defaults ★
+  PRODUCT_COUNT=$(bun -e '
+    const { PrismaClient } = require("@prisma/client");
+    const db = new PrismaClient();
+    Promise.all([db.product.count(), db.investmentPackage.count()]).then(([p, pkg]) => {
+      console.log(p + pkg);
+    }).catch(() => console.log("0"));
+  ' 2>/dev/null || echo "0")
+
+  if [ "$PRODUCT_COUNT" -le 1 ] 2>/dev/null; then
+    warn "products/packages missing (count=$PRODUCT_COUNT) → restoring Gold Premium Aset 1-6..."
+    DATABASE_URL="file:$ABS_DB_PATH" bun run prisma/seed.ts 2>&1 | tail -5 || warn "seed.ts failed (non-fatal)"
+    # Restore Gold Premium Aset 1-6 (data BENAR, bukan dummy)
+    DATABASE_URL="file:$ABS_DB_PATH" bun -e '
+      const { PrismaClient } = require("@prisma/client");
+      const db = new PrismaClient();
+      const CONTRACT_DAYS = 180;
+      const QUOTA_HIGH = 9999;
+      const randBaseline = () => Math.floor(QUOTA_HIGH * (0.35 + Math.random() * 0.40));
+      (async () => {
+        // ===== 6 INVESTMENT PACKAGES: Gold Premium Aset 1-6 =====
+        const packages = [
+          { name: "Gold Premium Aset 1", amount: 160000,    profitRate: 2,   contractDays: CONTRACT_DAYS, order: 1 },
+          { name: "Gold Premium Aset 2", amount: 320000,    profitRate: 2.5, contractDays: CONTRACT_DAYS, order: 2 },
+          { name: "Gold Premium Aset 3", amount: 640000,    profitRate: 3,   contractDays: CONTRACT_DAYS, order: 3 },
+          { name: "Gold Premium Aset 4", amount: 1920000,   profitRate: 3.5, contractDays: CONTRACT_DAYS, order: 4 },
+          { name: "Gold Premium Aset 5", amount: 5760000,   profitRate: 4,   contractDays: CONTRACT_DAYS, order: 5 },
+          { name: "Gold Premium Aset 6", amount: 17280000,  profitRate: 5,   contractDays: CONTRACT_DAYS, order: 6 },
+        ];
+        const validPkgNames = packages.map(p => p.name);
+        const oldPkgs = await db.investmentPackage.findMany();
+        for (const old of oldPkgs) {
+          if (!validPkgNames.includes(old.name)) {
+            try { await db.investment.deleteMany({ where: { packageId: old.id } }); } catch (_) {}
+            try { await db.investmentPackage.delete({ where: { id: old.id } }); console.log("  🗑️  hapus paket lama:", old.name); } catch (_) {}
+          }
+        }
+        for (const pkg of packages) {
+          const ex = await db.investmentPackage.findFirst({ where: { name: pkg.name } });
+          if (ex) {
+            await db.investmentPackage.update({ where: { id: ex.id }, data: { ...pkg, isActive: true } });
+          } else {
+            await db.investmentPackage.create({ data: pkg });
+          }
+        }
+        console.log("✓ 6 packages: Gold Premium Aset 1-6");
+
+        // ===== 6 PRODUCTS: Gold Premium Aset 1-6 =====
+        const products = [
+          { name: "Gold Premium Aset 1", price: 160000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(160000   * 0.02  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 2,   description: "Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari × 180 hari = Rp 576.000. Modal TIDAK dikembalikan, user hanya menerima profit." },
+          { name: "Gold Premium Aset 2", price: 320000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(320000   * 0.025 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 2.5, description: "Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari × 180 hari = Rp 1.440.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 3", price: 640000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(640000   * 0.03  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 3,   description: "Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari × 180 hari = Rp 3.456.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 4", price: 1920000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(1920000  * 0.035 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 3.5, description: "Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari × 180 hari = Rp 12.096.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 5", price: 5760000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(5760000  * 0.04  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 4,   description: "Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari × 180 hari = Rp 41.472.000. Modal TIDAK dikembalikan." },
+          { name: "Gold Premium Aset 6", price: 17280000,  duration: CONTRACT_DAYS, estimatedProfit: Math.round(17280000 * 0.05  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 5,   description: "Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari × 180 hari = Rp 155.520.000. Modal TIDAK dikembalikan." },
+        ];
+        const validProdNames = products.map(p => p.name);
+        const oldProds = await db.product.findMany();
+        for (const old of oldProds) {
+          if (!validProdNames.includes(old.name)) {
+            try { await db.purchase.deleteMany({ where: { productId: old.id } }); } catch (_) {}
+            try { await db.product.delete({ where: { id: old.id } }); console.log("  🗑️  hapus produk lama:", old.name); } catch (_) {}
+          }
+        }
+        for (const prod of products) {
+          const ex = await db.product.findFirst({ where: { name: prod.name } });
+          if (ex) {
+            await db.product.update({ where: { id: ex.id }, data: { ...prod, isActive: true, isStopped: false } });
+          } else {
+            await db.product.create({ data: prod });
+          }
+        }
+        console.log("✓ 6 products: Gold Premium Aset 1-6");
+
+        // ===== SALARY CONFIG: 1%/week PERMANEN =====
+        const salaryCfg = await db.salaryConfig.findFirst();
+        if (!salaryCfg) {
+          await db.salaryConfig.create({ data: { minDirectRefs: 10, salaryRate: 1, maxWeeks: 0, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true }});
+          console.log("✓ salary config: 1%/week PERMANEN");
+        } else if (salaryCfg.maxWeeks !== 0 || salaryCfg.salaryRate !== 1) {
+          await db.salaryConfig.update({ where: { id: salaryCfg.id }, data: { salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true }});
+          console.log("✓ salary config fixed: 1%/week PERMANEN");
+        }
+
+        // ===== MATCHING CONFIG: 5%,4%,3%,2%,1% =====
+        const matchingCfg = await db.matchingConfig.findFirst();
+        if (!matchingCfg) {
+          await db.matchingConfig.create({ data: { level1: 5, level2: 4, level3: 3, level4: 2, level5: 1, isActive: true }});
+          console.log("✓ matching config: 5%,4%,3%,2%,1%");
+        }
+
+        // ===== BANNERS (jika kosong) =====
+        const bannerCount = await db.banner.count();
+        if (bannerCount === 0) {
+          await db.banner.createMany({ data: [
+            { title: "Selamat Datang di NEXVO", subtitle: "Platform Investasi Digital #1", description: "NEXVO menghadirkan solusi investasi digital berbasis komoditas yang aman, transparan, dan menguntungkan.", ctaText: "Mulai Sekarang", ctaLink: "register", image: "/images/banner-1.jpg", order: 1, isActive: true },
+            { title: "Profit Harian Hingga 5%", subtitle: "Investasi Cerdas, Hasil Maksimal", description: "Dapatkan profit harian hingga 5% selama 180 hari kontrak. Hanya profit yang dibayarkan — modal awal TIDAK dikembalikan.", ctaText: "Lihat Paket", ctaLink: "paket", image: "/images/banner-2.jpg", order: 2, isActive: true },
+            { title: "Bonus Sponsor 5 Level", subtitle: "Ajak Teman, Raih Bonus", description: "Dapatkan bonus sponsor hingga 5 level: 5%, 4%, 3%, 2%, 1%.", ctaText: "Lihat Jaringan", ctaLink: "network", image: "/images/banner-3.jpg", order: 3, isActive: true },
+          ]});
+          console.log("✓ 3 banners");
+        }
+
+        // ===== PAYMENT METHODS: QRIS + USDT (deposit page filter type IN qris/usdt) =====
+        // Hapus semua pm type bank/ewallet lama, lalu pastikan qris+usdt ada
+        const legacyPms = await db.paymentMethod.findMany({ where: { NOT: { type: { in: ["qris", "usdt"] } } }});
+        for (const lp of legacyPms) { try { await db.paymentMethod.delete({ where: { id: lp.id } }); } catch (_) {} }
+        let qrisPm = await db.paymentMethod.findFirst({ where: { type: "qris" }});
+        if (!qrisPm) {
+          await db.paymentMethod.create({ data: { type: "qris", name: "QRIS Universal", accountNo: "", holderName: "NEXVO", qrImage: "", iconUrl: "", color: "#E31E24", isActive: true, order: 1 }});
+          console.log("✓ QRIS payment created");
+        }
+        let usdtPm = await db.paymentMethod.findFirst({ where: { type: "usdt" }});
+        if (!usdtPm) {
+          await db.paymentMethod.create({ data: { type: "usdt", name: "USDT (BEP20)", accountNo: "", holderName: "NEXVO", qrImage: "", iconUrl: "", color: "#26A17B", isActive: true, order: 2 }});
+          console.log("✓ USDT payment created");
+        }
+        console.log("✓ Payment methods synced (QRIS + USDT)");
+
+        await db.$disconnect();
+      })().catch(e => { console.error("seed error:", e.message); process.exit(1); });
+    ' 2>&1 | tail -10
+    ok "Gold Premium Aset 1-6 + salary/matching/banners restored"
+  else
+    ok "products/packages exist (count=$PRODUCT_COUNT) — no seed needed"
   fi
 fi
 
@@ -285,6 +478,28 @@ fi
 if [ "$CHECK_ONLY" = false ]; then
   section "7/10 START NEXT.JS (port $PORT_APP)"
   cd "$APP_DIR"
+
+  # ★ FINAL PORT CHECK: if port 3000 is still occupied, abort with clear message
+  if command -v lsof >/dev/null && lsof -i :$PORT_APP >/dev/null 2>&1; then
+    warn "port $PORT_APP STILL occupied after cleanup — force killing..."
+    lsof -ti :$PORT_APP | xargs -r kill -9 2>/dev/null || true
+    sleep 3
+  elif command -v ss >/dev/null && ss -tlnp 2>/dev/null | grep -q ":$PORT_APP "; then
+    warn "port $PORT_APP STILL occupied (ss) — force killing..."
+    ss -tlnp 2>/dev/null | grep ":$PORT_APP " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill -9 2>/dev/null || true
+    sleep 3
+  fi
+
+  # Verify .next build exists for prod mode (otherwise next start will fail silently)
+  if [ "$DEV_MODE" = false ] && [ ! -d "$APP_DIR/.next" ]; then
+    err "❌ .next build directory missing — next start will fail!"
+    warn "running emergency build..."
+    DATABASE_URL="file:$ABS_DB_PATH" bun run build 2>&1 | tail -10
+    if [ ! -d "$APP_DIR/.next" ]; then
+      die "build failed — cannot start nexvo-app. Run: bash deploy.sh (full rebuild)"
+    fi
+    ok "emergency build complete"
+  fi
 
   if [ "$DEV_MODE" = true ]; then
     warn "starting in DEV mode (next dev — no build needed)"
@@ -317,7 +532,7 @@ if [ "$CHECK_ONLY" = false ]; then
     --cwd "$APP_DIR/mini-services/cron-service" \
     --log "$LOG_DIR/nexvo-cron.log" \
     --time 2>&1 | tail -3
-  ok "nexvo-cron started (profit 2%/day × 180d + salary 1%/week forever)"
+  ok "nexvo-cron started (profit 2%/day × 180d WEEKDAYS + salary 1%/week forever)"
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -357,6 +572,10 @@ fi
 # ═══════════════════════════════════════════════════════════════
 section "10/10 VERIFY ALL SYSTEMS"
 
+# ★ Disable set -e for verification — we want to continue even if checks fail
+# (we track failures manually via FAIL_COUNT and report at the end)
+set +eo pipefail
+
 log "warming up (8s)..."
 sleep 8
 
@@ -391,8 +610,16 @@ check_http() {
   fi
 }
 
-# ── 10a. Port checks ──
+# ── 10a. Port checks (with self-heal restart for nexvo-app) ──
 check_port $PORT_APP  "nexvo-app"
+APP_PORT_OK=$?
+if [ "$APP_PORT_OK" -ne 0 ]; then
+  warn "self-heal: nexvo-app not listening — checking logs + restart..."
+  pm2 logs nexvo-app --lines 20 --nostream 2>/dev/null | tail -20 || true
+  pm2 restart nexvo-app 2>/dev/null || true
+  sleep 10
+  check_port $PORT_APP  "nexvo-app (retry)" || true
+fi
 check_port $PORT_CRON "nexvo-cron"
 
 # ── 10b. HTTP health ──
@@ -515,10 +742,10 @@ if [ "$FAIL_COUNT" -eq 0 ]; then
   echo -e "║  Next.js app:     http://localhost:$PORT_APP                       ║"
   echo -e "║  Cron-service:    http://localhost:$PORT_CRON                      ║"
   echo -e "║                                                              ║"
-  echo -e "║  💰 Profit:  2%/day × 180 days = 576k cap (EVERY day)        ║"
+  echo -e "║  💰 Profit:  2%/day × 180 days = 576k cap (WEEKDAYS, Sat/Sun LIBUR)║"
   echo -e "║  📅 Salary:  1%/week FOREVER (10 refs + active investment)   ║"
-  echo -e "║  🔄 Backfill: auto-credits all missed days in one shot       ║"
-  echo -e "║  ⏰ Schedule: 00:00 WIB daily (profit) + Mon 00:00 (salary)  ║"
+  echo -e "║  🔄 Catchup: auto-credit all missed WEEKDAYS in one shot      ║"
+  echo -e "║  ⏰ Schedule: 00:00 WIB weekdays (profit) + Mon 00:00 (salary)║"
   echo -e "╚══════════════════════════════════════════════════════════════╝${C_NC}"
   echo ""
   echo -e "${C_BOLD}Logs:${C_NC}"

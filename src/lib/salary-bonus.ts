@@ -2,17 +2,53 @@ import { db } from '@/lib/db';
 
 /**
  * NEXVO Bonus Salary System
- * 
+ *
  * Rules:
  * - User MUST have an active deposit (investment) themselves
  * - ALL Level 1/direct referrals MUST have active deposits
- * - At least 1 direct referral required
- * - Salary = 2.5% of group omzet (own + all downline active investments)
- * - System automatically detects 2.5% regardless of omzet amount
- * - Maximum: 12 weeks of salary
+ * - At least 10 direct referrals required (minDirectRefs)
+ * - Salary = 1% of group omzet (own + all downline active investments)
+ * - maxWeeks = 0 means PERMANENT (selamanya, tanpa batas)
  * - Auto-credited at 00:00 WIB every Monday via cron service
- * - Once a user reaches 12 weeks, they no longer receive salary bonus
  */
+
+/**
+ * ★ SELF-HEAL: Force-correct SalaryConfig on every read.
+ * If any config row has salaryRate !== 1 OR maxWeeks !== 0, delete ALL rows
+ * and create ONE clean config (1% / maxWeeks=0 / min 10 refs).
+ *
+ * This guarantees the UI NEVER shows stale "2.5%" or "12 minggu" values,
+ * even if the seed didn't run or an admin accidentally set wrong values.
+ * Called lazily from getUserSalaryEligibility and checkAndCreditSalaryBonus.
+ */
+let _selfHealChecked = false; // per-process cache: only run once per server restart
+async function selfHealSalaryConfig(): Promise<void> {
+  if (_selfHealChecked) return;
+  _selfHealChecked = true;
+  try {
+    const all = await db.salaryConfig.findMany();
+    const hasStale = all.some(c => c.salaryRate !== 1 || c.maxWeeks !== 0);
+    if (hasStale || all.length === 0) {
+      if (all.length > 0) {
+        await db.salaryConfig.deleteMany({});
+      }
+      await db.salaryConfig.create({
+        data: {
+          minDirectRefs: 10,
+          salaryRate: 1,
+          maxWeeks: 0,
+          requireActiveDeposit: true,
+          fixedSalaryAmount: 25000,
+          isActive: true,
+        },
+      });
+      console.log('[salary] Self-heal: reset SalaryConfig to 1% / maxWeeks=0 (killed stale rows)');
+    }
+  } catch (e) {
+    // Non-fatal — don't break the API if self-heal fails (e.g. table not migrated yet)
+    console.error('[salary] Self-heal skipped:', (e as Error).message);
+  }
+}
 
 /**
  * Get the current ISO week number and year using WIB (UTC+7) timezone
@@ -149,28 +185,30 @@ async function getAllDownlineIds(internalId: string, maxDepth: number = 5): Prom
 }
 
 /**
- * Calculate group omzet for a user (sum of all active investments from user + all downline)
+ * Calculate group omzet for a user.
+ * ONLY counts active investments from DIRECT invites (Level 1).
+ * - User's OWN investment is NOT counted (only required as eligibility).
+ * - Multi-level downline (Level 2+) is NOT counted — each person builds their own group.
+ * - The inviter gets the salary; the invited people do NOT share it.
+ *   (Each invited person can build their own group & earn their own salary separately.)
  */
 async function calculateGroupOmzet(internalId: string): Promise<number> {
-  // Include the user's own investments
-  const ownInvestment = await db.investment.aggregate({
-    where: { userId: internalId, status: 'active' },
+  // Get ONLY direct (Level 1) referrals — people this user personally invited
+  const directRefs = await db.referral.findMany({
+    where: { referrerId: internalId, level: 1 },
+    select: { referredId: true },
+  });
+
+  if (directRefs.length === 0) return 0;
+
+  const directIds = directRefs.map((r) => r.referredId);
+
+  const directInvestment = await db.investment.aggregate({
+    where: { userId: { in: directIds }, status: 'active' },
     _sum: { amount: true },
   });
 
-  // Get all downline IDs
-  const downlineIds = await getAllDownlineIds(internalId, 5);
-
-  let downlineOmzet = 0;
-  if (downlineIds.length > 0) {
-    const downlineInvestment = await db.investment.aggregate({
-      where: { userId: { in: downlineIds }, status: 'active' },
-      _sum: { amount: true },
-    });
-    downlineOmzet = downlineInvestment._sum.amount || 0;
-  }
-
-  return (ownInvestment._sum.amount || 0) + downlineOmzet;
+  return directInvestment._sum.amount || 0;
 }
 
 /**
@@ -196,9 +234,9 @@ function formatRupiahSimple(amount: number): string {
  * Logic:
  * - User MUST have an active deposit (investment) themselves
  * - ALL Level 1/direct referrals MUST have active deposits
- * - At least 1 direct referral required
- * - Salary = salaryRate% (2.5%) of group omzet (auto-detected)
- * - Maximum maxWeeks (12) weeks of salary
+ * - At least 10 direct referrals required (minDirectRefs)
+ * - Salary = salaryRate% (1%) of group omzet (auto-detected)
+ * - maxWeeks = 0 means PERMANENT (selamanya, tanpa batas)
  * - Unique per userId+weekNumber+year
  */
 export async function checkAndCreditSalaryBonus(userId: string): Promise<{
@@ -211,6 +249,9 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
   weeksRemaining?: number;
 }> {
   const { weekNumber, year } = getCurrentWeekInfo();
+
+  // ★ SELF-HEAL: ensure config is always 1% / maxWeeks=0 (kills stale 2.5%/12)
+  await selfHealSalaryConfig();
 
   return await db.$transaction(async (tx) => {
     // Get active salary config
@@ -292,7 +333,7 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
       };
     }
 
-    // Calculate group omzet (auto-detect 2.5%)
+    // Calculate group omzet
     const groupOmzet = await calculateGroupOmzet(userId);
 
     // Calculate salary: salaryRate% of group omzet
@@ -381,6 +422,9 @@ export async function processAllSalaryBonuses(): Promise<{
     details: [] as Array<{ userId: string; amount: number; weekOfTotal: number; message: string }>,
   };
 
+  // ★ SELF-HEAL: ensure config is always 1% / maxWeeks=0 (kills stale 2.5%/12)
+  await selfHealSalaryConfig();
+
   // Get active salary config
   const config = await db.salaryConfig.findFirst({ where: { isActive: true } });
   if (!config) {
@@ -410,7 +454,8 @@ export async function processAllSalaryBonuses(): Promise<{
 
       // Check weeks received
       const weeksReceived = await getSalaryWeeksReceived(user.id);
-      if (weeksReceived >= config.maxWeeks) {
+      // maxWeeks = 0 means PERMANENT (no limit). Only check limit if maxWeeks > 0.
+      if (config.maxWeeks > 0 && weeksReceived >= config.maxWeeks) {
         result.completed++;
         continue;
       }
@@ -439,7 +484,7 @@ export async function processAllSalaryBonuses(): Promise<{
     }
   }
 
-  console.log(`[Salary Cron] Done. Processed: ${result.processed}, Eligible: ${result.eligible}, Skipped: ${result.skipped}, Completed(12w): ${result.completed}, Errors: ${result.errors}, Total: Rp${result.totalAmount.toLocaleString('id-ID')}`);
+  console.log(`[Salary Cron] Done. Processed: ${result.processed}, Eligible: ${result.eligible}, Skipped: ${result.skipped}, Completed: ${result.completed}, Errors: ${result.errors}, Total: Rp${result.totalAmount.toLocaleString('id-ID')}`);
   return result;
 }
 
@@ -465,14 +510,17 @@ export async function getUserSalaryEligibility(userId: string): Promise<{
   allRefsActive: boolean;
   meetsMinDirectRefs: boolean;
 }> {
+  // ★ SELF-HEAL: ensure config is always 1% / maxWeeks=0 (kills stale 2.5%/12)
+  await selfHealSalaryConfig();
+
   // Get active salary config
   const config = await db.salaryConfig.findFirst({
     where: { isActive: true },
   });
 
   const isActive = !!config;
-  const salaryRate = config?.salaryRate ?? 2.5;
-  const maxWeeks = config?.maxWeeks ?? 12;
+  const salaryRate = config?.salaryRate ?? 1;
+  const maxWeeks = config?.maxWeeks ?? 0;
   const requireActiveDeposit = config?.requireActiveDeposit ?? true;
   const minDirectRefs = config?.minDirectRefs ?? 10;
   // ★ maxWeeks <= 0 = UNLIMITED (selamanya) ★
@@ -486,14 +534,14 @@ export async function getUserSalaryEligibility(userId: string): Promise<{
   // Check all direct referrals - must ALL have active deposits
   const refCheck = await checkAllDirectRefsActive(userId);
 
-  // Calculate group omzet (auto-detect 2.5%)
+  // Calculate group omzet
   const groupOmzet = await calculateGroupOmzet(userId);
 
   // Weeks received
   const weeksReceived = await getSalaryWeeksReceived(userId);
   const weeksRemaining = unlimited ? -1 : Math.max(0, maxWeeks - weeksReceived);
 
-  // Estimated salary (2.5% of group omzet, auto-detected)
+  // Estimated salary (salaryRate% of group omzet)
   const estimatedSalary = Math.floor(groupOmzet * (salaryRate / 100));
 
   // Check minimum direct referrals requirement

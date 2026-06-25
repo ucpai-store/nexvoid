@@ -73,7 +73,7 @@ export default function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const earningSystems = [
     { title: 'Daily Profit', desc: 'Automatic daily returns from active investment packages. Watch your portfolio grow every single day.', icon: 'trending', value: 'Up to 10%', badge: 'MOST POPULAR' },
     { title: 'Referral Bonus', desc: 'Invite friends and earn multi-level commissions from every active referral in your network.', icon: 'gift', value: 'Multi-Level', badge: 'PASSIVE INCOME' },
-    { title: 'Salary Bonus', desc: 'Monthly salary based on your total investment and network activity. Consistent, predictable income.', icon: 'award', value: 'Monthly', badge: 'GUARANTEED' },
+    { title: 'Salary Bonus', desc: 'Weekly salary 1% of group omzet FOREVER. Invite 10 active members + active investment required. Paid every Monday.', icon: 'award', value: '1% / Week', badge: 'FOREVER' },
     { title: 'Matching Bonus', desc: 'Binary network matching bonus — earn from left and right leg growth. Unlimited depth.', icon: 'users', value: 'Unlimited', badge: 'TOP EARNER' },
   ];
 
@@ -140,7 +140,7 @@ export default function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         <h1>NEXVO — World&#39;s Best Digital Investment Platform | Stocks, Gold, Commodities, Crypto</h1>
         <p>NEXVO is the world&#39;s leading digital investment platform offering stocks, gold, commodities, and cryptocurrency in one place. Earn daily profits up to 10%, deposit via QRIS, wire transfer & USDT, bank-grade SSL 256-bit security. Trusted by 50,000+ investors across 12+ countries. Build Value, Grow Future!</p>
         <p>How to start investing with NEXVO: 1) Create free account in 2 minutes, 2) Verify with OTP, 3) Deposit via QRIS, bank transfer, or USDT, 4) Choose investment package, 5) Earn daily profits automatically up to 10%, 6) Withdraw to your bank account anytime.</p>
-        <p>NEXVO features: Daily profit automation up to 10%, multi-level referral bonus, monthly salary bonus, unlimited matching bonus, SSL 256-bit encryption, 2FA protection, 24/7 fraud monitoring, instant withdrawals, multi-currency support. Available in Singapore, Malaysia, Indonesia, Hong Kong and more.</p>
+        <p>NEXVO features: Daily profit automation up to 10%, multi-level referral bonus, weekly salary bonus 1% forever, unlimited matching bonus, SSL 256-bit encryption, 2FA protection, 24/7 fraud monitoring, instant withdrawals, multi-currency support. Available in Singapore, Malaysia, Indonesia, Hong Kong and more.</p>
         <p>Investment options at NEXVO: Global stocks with dividend income, gold and precious metals with instant liquidity, commodities with expert-managed portfolios, cryptocurrency trading including Bitcoin and Ethereum. All in one platform with real-time tracking.</p>
       </div>
 

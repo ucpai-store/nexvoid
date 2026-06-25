@@ -348,8 +348,8 @@ model MatchingBonus {
 model SalaryConfig {
   id                  String   @id @default(cuid())
   minDirectRefs       Int      @default(10)
-  salaryRate          Float    @default(2.5)
-  maxWeeks            Int      @default(12)
+  salaryRate          Float    @default(1)
+  maxWeeks            Int      @default(0)
   requireActiveDeposit Boolean @default(true)
   fixedSalaryAmount  Float    @default(25000)
   isActive            Boolean  @default(true)

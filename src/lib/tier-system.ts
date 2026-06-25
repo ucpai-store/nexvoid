@@ -1,24 +1,24 @@
 /**
- * Tier System — Unified Package/Product purchasing (no-duplicates rule).
+ * Tier System — Unified Package/Product purchasing with contract-end re-activation.
  *
  * Business rules (per product owner):
  *  - "Paket" dan "Produk" itu sama → both map to the same VIP tier list
  *    (sourced from InvestmentPackage, ordered by `amount` ascending).
- *  - Beli hanya 1 macam: a user may hold ONLY ONE active tier at a time.
- *  - Pembelian TIDAK harus berurutan. User boleh beli tier mana saja yang
- *    BELUM pernah dibeli, dalam urutan apapun (VIP 1, lalu VIP 5, misalnya).
- *  - Setiap tier hanya bisa dibeli SEKALI. Tier yang sudah dibeli tidak bisa
- *    dibeli lagi — user wajib pilih tier lain yang belum dimiliki.
- *  - Sistem berjalan sesuai paket/produk aktif hari ini → daily profit at 00:00
- *    WIB is credited by the cron based on the single active investment.
+ *  - MULTI-ACTIVE: user BOLEH punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst).
+ *    Tiap paket generate profit sendiri jam 00:00 WIB. Cron credit SEMUA active
+ *    investments — bukan cuma satu.
+ *  - Setiap tier hanya bisa dibeli SEKALI per kontrak (180 hari). Tier yang sedang
+ *    aktif tidak bisa dibeli lagi sampai kontrak selesai.
+ *  - Tier yang kontraknya sudah HABIS (status='completed') BISA dibeli lagi.
+ *  - Profit PERTAMA tidak langsung masuk saat beli — tunggu jam 00:00 WIB.
  */
 
 import { db } from '@/lib/db';
 
 export type TierState =
-  | 'available' // tier the user has NOT bought yet — purchasable now
-  | 'active' // user's currently active tier (most recently purchased)
-  | 'bought'; // already owned but superseded by a later purchase
+  | 'available' // tier the user can buy right now (never bought, OR contract ended)
+  | 'active' // user's currently active tier (most recently purchased, still in contract)
+  | 'bought'; // already owned AND contract still running (superseded by a later purchase)
 
 export interface TierInfo {
   id: string;
@@ -34,13 +34,15 @@ export interface TierInfo {
   state: TierState;
   /** human reason for current state, shown to user */
   reason?: string;
+  /** true when user has at least one COMPLETED (expired) investment for this tier */
+  hasExpiredPurchase?: boolean;
 }
 
 export interface TierAvailability {
   tiers: TierInfo[];
-  /** number of tiers still purchasable (not yet bought) */
+  /** number of tiers still purchasable right now */
   remainingCount: number;
-  /** true when user has bought every tier */
+  /** true when user has bought every tier AND none have expired */
   maxedOut: boolean;
   /** id of the user's currently active tier (null if none) */
   currentTierId: string | null;
@@ -73,56 +75,92 @@ export async function loadOrderedTiers() {
 
 /**
  * Compute the user's tier availability:
- *  - which tier is currently active
- *  - which tiers are already bought (cannot buy again)
- *  - which tiers are still available to buy (any order)
+ *  - which tier is currently active (still in contract)
+ *  - which tiers are blocked because contract is still running
+ *  - which tiers are available to buy (never bought OR contract ended)
  *
- * No-duplicates rule: any tier the user has NEVER bought is "available".
- * Already-bought tiers are either "active" (the latest purchase) or
- * "bought" (superseded by a later purchase).
+ * Re-activation rule: a tier is "available" if the user has NO active
+ * investment for it. If all previous investments for that tier have
+ * status='completed' (contract ended), the tier becomes available again.
  */
 export async function getUserTierAvailability(
   userId: string
 ): Promise<TierAvailability> {
   const tiers = await loadOrderedTiers();
 
-  // Every tier the user has ever bought (active or completed/superseded),
-  // ordered by creation time so we can identify the most recent purchase.
+  // Every tier the user has ever bought, with status + endDate for re-activation check.
   const userInvestments = await db.investment.findMany({
     where: { userId },
-    select: { packageId: true, status: true, createdAt: true },
+    select: { packageId: true, status: true, endDate: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   });
 
+  // Set of tier IDs the user has EVER bought (any status).
   const boughtTierIds = new Set(userInvestments.map((i) => i.packageId));
-  const activeInvestment = userInvestments.find((i) => i.status === 'active');
 
+  // Map: tierId -> does user have an ACTIVE investment for it right now?
+  const activeTierIds = new Set(
+    userInvestments
+      .filter((i) => i.status === 'active')
+      .map((i) => i.packageId)
+  );
+
+  // Map: tierId -> does user have at least one COMPLETED (expired) investment?
+  const expiredTierIds = new Set(
+    userInvestments
+      .filter((i) => i.status === 'completed')
+      .map((i) => i.packageId)
+  );
+
+  // ★ MULTI-ACTIVE: user boleh punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst).
+  //   currentTier = first active investment (for backwards-compat display), tapi SEMUA
+  //   tier yang active harus dapat state='active' (bukan 'bought').
+  const activeInvestment = userInvestments.find((i) => i.status === 'active');
   const currentTier = activeInvestment
     ? tiers.find((t) => t.id === activeInvestment.packageId) || null
     : null;
+  const hasAnyActive = !!activeInvestment;
 
-  const remainingCount = tiers.filter((t) => !boughtTierIds.has(t.id)).length;
-  const maxedOut = tiers.length > 0 && remainingCount === 0;
+  // A tier is "available" if user has NO active investment for it
+  // (either never bought, or all previous purchases are completed/expired).
+  const remainingCount = tiers.filter((t) => !activeTierIds.has(t.id)).length;
+  // "Maxed out" only if user has bought every tier AND none have expired (no re-activation possible).
+  const maxedOut =
+    tiers.length > 0 &&
+    remainingCount === 0 &&
+    [...boughtTierIds].every((id) => !expiredTierIds.has(id));
 
   const result: TierAvailability = {
     tiers: tiers.map((tier) => {
       let state: TierState;
       let reason: string | undefined;
 
-      if (currentTier && tier.id === currentTier.id) {
+      if (activeTierIds.has(tier.id)) {
+        // ★ MULTI-ACTIVE: SEMUA tier yang sedang active dapat state='active' (bukan 'bought').
+        //   User boleh lihat badge AKTIF di semua paket yang sedang berjalan.
         state = 'active';
-        reason = 'Paket aktif Anda hari ini';
+        reason = 'Paket aktif — kontrak masih berjalan. Profit masuk jam 00:00 WIB setiap hari.';
+      } else if (boughtTierIds.has(tier.id) && expiredTierIds.has(tier.id)) {
+        // Contract ended → can re-activate!
+        state = 'available';
+        reason = 'Kontrak sebelumnya sudah berakhir — bisa diaktifkan lagi';
       } else if (boughtTierIds.has(tier.id)) {
+        // Bought but not active and not expired (shouldn't happen, but defensive).
         state = 'bought';
         reason = 'Sudah pernah dibeli — pilih paket lain yang belum dimiliki';
       } else {
         state = 'available';
-        reason = currentTier
-          ? `Beli paket lain yang belum dimiliki`
+        reason = hasAnyActive
+          ? 'Beli paket lain — boleh punya banyak paket aktif bersamaan'
           : 'Belum dimiliki — silakan beli';
       }
 
-      return { ...tier, state, reason };
+      return {
+        ...tier,
+        state,
+        reason,
+        hasExpiredPurchase: expiredTierIds.has(tier.id),
+      };
     }),
     remainingCount,
     maxedOut,
@@ -136,8 +174,9 @@ export async function getUserTierAvailability(
 }
 
 /**
- * Validate that a purchase request targets a tier the user has NOT bought yet.
- * Order does NOT matter — any unbought tier is allowed.
+ * Validate that a purchase request targets a tier the user can buy right now.
+ * A tier is purchasable if the user has NO active investment for it.
+ * (Never bought → OK. Previously bought but contract ended → OK. Currently active → REJECT.)
  * Returns { ok: true } or { ok: false, error }.
  */
 export async function validateTierPurchase(
@@ -157,24 +196,18 @@ export async function validateTierPurchase(
   if (tier.state === 'active') {
     return {
       ok: false,
-      error: `Paket "${tier.name}" sedang aktif. Tidak bisa dibeli lagi — silakan pilih paket lain yang belum dimiliki.`,
+      error: `Paket "${tier.name}" sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai (180 hari).`,
     };
   }
 
   if (tier.state === 'bought') {
     return {
       ok: false,
-      error: `Paket "${tier.name}" sudah pernah dibeli. Wajib pilih paket lain yang belum dimiliki.`,
+      error: `Paket "${tier.name}" sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai.`,
     };
   }
 
-  if (availability.maxedOut) {
-    return {
-      ok: false,
-      error: 'Anda sudah memiliki semua paket. Tidak ada paket baru untuk dibeli.',
-    };
-  }
-
+  // state === 'available' → allow purchase (including re-activation after contract end)
   return { ok: true };
 }
 
