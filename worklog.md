@@ -2708,3 +2708,41 @@ Stage Summary:
   curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-products.sh | bash
   lalu pm2 restart nexvo-app
 - Commit: d13a724 (sudah di GitHub origin/main)
+
+---
+Task ID: fix-frontend-products-not-muncul
+Agent: main
+Task: Fix produk/paket nggak muncul di sisi user — root cause & verifikasi
+
+Work Log:
+- User komplain: "tetep gk muncul pas aku cek di user gk muncul"
+- Investigasi src/app/api/products/route.ts → ketemu FALLBACK_PRODUCTS isi data dummy SALAH (Emas Starter, Silver Mining, Gold Premium Asset, Platinum, Diamond Elite/VIP)
+- Investigasi src/app/api/packages/route.ts → ketemu FALLBACK_PACKAGES isi data dummy SALAH (Paket 100K-10JT)
+- Kalau DB error/kosong → API return fallback dummy → user lihat produk salah
+- Perbaiki FALLBACK_PRODUCTS jadi Gold Premium Aset 1-6 (6 produk, kontrak 180 hari)
+- Perbaiki FALLBACK_PACKAGES jadi Gold Premium Aset 1-6 (6 paket)
+- Perbaiki src/app/api/seed/route.ts (admin Seed button) → produk+paket+salary 1% permanen
+- Perbaiki prisma/seed.ts → 6 packages + 6 products Gold Premium Aset + salary 1% permanen
+
+BUG KRITIS di restore-products.sh:
+- Variabel 'products' & 'packages' dipakai 2x dalam scope sama (count + array data)
+- Bun -e crash: "products has already been declared"
+- Akibatnya restore NGGA JALAN sama sekali → DB tetap kosong → fallback dummy muncul
+- FIX: rename count variables jadi productCount, packageCount
+- Commit 17c46a6
+
+VERIFIKASI (agent-browser):
+- Restore di lokal: 6 packages + 6 products masuk DB ✓
+- API /api/products → return 6 Gold Premium Aset ✓
+- API /api/packages → return 6 Gold Premium Aset ✓
+- Login user testprod → halaman Products menampilkan:
+  * Gold Premium Aset 1: Rp160.000, Est. profit Rp576.000 ✓
+  * Gold Premium Aset 2: Rp320.000, Est. profit Rp1.440.000 ✓
+  * Gold Premium Aset 3: Rp640.000, Est. profit Rp3.456.000 ✓
+  * Gold Premium Aset 4: Rp1.920.000, Est. profit Rp12.096.000 ✓
+
+Stage Summary:
+- Commits: 50663b9, 657b556, 17c46a6 (semua sudah push ke GitHub origin/main)
+- Root cause produk nggak muncul: FALLBACK di API route pakai data dummy + bug conflict variabel di restore script
+- Fix: semua sistem konsisten pakai Gold Premium Aset 1-6
+- User perlu: deploy ulang + run restore-products.sh (yang sekarang sudah FIXED)
