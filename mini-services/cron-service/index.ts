@@ -15,11 +15,13 @@ import { PrismaClient } from '@prisma/client';
 const PORT = 3032;
 const WIB_OFFSET = 7; // UTC+7 for Asia/Jakarta
 
-// Prisma client with absolute path
+// Prisma client with absolute path (resolve from project root, not mini-services folder)
+import path from 'path';
+const DB_PATH = path.resolve(process.cwd(), 'db/custom.db');
 const db = new PrismaClient({
   datasources: {
     db: {
-      url: `file:${process.cwd()}/../../db/custom.db`,
+      url: `file:${DB_PATH}`,
     },
   },
 });
@@ -407,12 +409,25 @@ async function processDailyInvestmentProfits(): Promise<{
 
   for (const inv of investments) {
     try {
+      // ★ NO IMMEDIATE PROFIT ON PURCHASE ★
+      // Kalau lastProfitDate = null (investment baru), cek startDate.
+      // Kalau startDate HARI INI → SKIP (profit pertama tunggu 00:00 WIB besok).
+      // Kalau startDate < hari ini → credit catchup semua weekdays yang lewat.
+      if (!inv.lastProfitDate) {
+        const startWib = new Date(inv.startDate.getTime() + inv.startDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
+        const startDay = new Date(startWib.getFullYear(), startWib.getMonth(), startWib.getDate());
+        // Kalau startDay == today → belum waktunya credit (profit pertama besok 00:00 WIB)
+        if (startDay.getTime() === today.getTime()) {
+          continue; // Skip — investment baru dibeli hari ini, profit tunggu besok 00:00 WIB
+        }
+      }
+
       // Check if already credited today
       if (inv.lastProfitDate) {
         const lastDate = new Date(inv.lastProfitDate);
-        if (lastDate.getFullYear() === today.getFullYear() &&
-            lastDate.getMonth() === today.getMonth() &&
-            lastDate.getDate() === today.getDate()) {
+        const lastWib = new Date(lastDate.getTime() + lastDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
+        const lastDay = new Date(lastWib.getFullYear(), lastWib.getMonth(), lastWib.getDate());
+        if (lastDay.getTime() === today.getTime()) {
           continue; // Already credited today
         }
       }

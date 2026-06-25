@@ -115,43 +115,108 @@ async function seed() {
 
   // 4. Create default investment packages if none exist — Gold Premium Aset 1-6
   //    (kontrak 180 hari, modal TIDAK dikembalikan, user hanya terima profit harian)
-  const packageCount = await prisma.investmentPackage.count();
-  if (packageCount === 0) {
-    await prisma.investmentPackage.createMany({
-      data: [
-        { name: 'Gold Premium Aset 1', amount: 160000,    profitRate: 2,   contractDays: 180, isActive: true, order: 1 },
-        { name: 'Gold Premium Aset 2', amount: 320000,    profitRate: 2.5, contractDays: 180, isActive: true, order: 2 },
-        { name: 'Gold Premium Aset 3', amount: 640000,    profitRate: 3,   contractDays: 180, isActive: true, order: 3 },
-        { name: 'Gold Premium Aset 4', amount: 1920000,   profitRate: 3.5, contractDays: 180, isActive: true, order: 4 },
-        { name: 'Gold Premium Aset 5', amount: 5760000,   profitRate: 4,   contractDays: 180, isActive: true, order: 5 },
-        { name: 'Gold Premium Aset 6', amount: 17280000,  profitRate: 5,   contractDays: 180, isActive: true, order: 6 },
-      ],
-    });
-    console.log('✅ Investment packages created (Gold Premium Aset 1-6, kontrak 180 hari)\n');
-  } else {
-    console.log('⏭️  Investment packages already exist (skipped)\n');
+  //    ★ UPSERT: kalau paket sudah ada tapi datanya salah (rate/modal beda), tetap di-update ★
+  console.log('Syncing investment packages (Gold Premium Aset 1-6, kontrak 180 hari)...');
+  const packages = [
+    { name: 'Gold Premium Aset 1', amount: 160000,    profitRate: 2,   contractDays: 180, isActive: true, order: 1 },
+    { name: 'Gold Premium Aset 2', amount: 320000,    profitRate: 2.5, contractDays: 180, isActive: true, order: 2 },
+    { name: 'Gold Premium Aset 3', amount: 640000,    profitRate: 3,   contractDays: 180, isActive: true, order: 3 },
+    { name: 'Gold Premium Aset 4', amount: 1920000,   profitRate: 3.5, contractDays: 180, isActive: true, order: 4 },
+    { name: 'Gold Premium Aset 5', amount: 5760000,   profitRate: 4,   contractDays: 180, isActive: true, order: 5 },
+    { name: 'Gold Premium Aset 6', amount: 17280000,  profitRate: 5,   contractDays: 180, isActive: true, order: 6 },
+  ];
+  for (const pkg of packages) {
+    const existing = await prisma.investmentPackage.findFirst({ where: { name: pkg.name } });
+    if (existing) {
+      // Update kalau ada perubahan (fix VPS user yang rate-nya salah)
+      await prisma.investmentPackage.update({
+        where: { id: existing.id },
+        data: {
+          amount: pkg.amount,
+          profitRate: pkg.profitRate,
+          contractDays: pkg.contractDays,
+          isActive: pkg.isActive,
+          order: pkg.order,
+        },
+      });
+    } else {
+      await prisma.investmentPackage.create({ data: pkg });
+    }
   }
+  console.log(`✅ Investment packages synced (6 paket, rate 2%/2.5%/3%/3.5%/4%/5%)\n`);
 
   // 4b. Create default products if none exist — Gold Premium Aset 1-6
   //     (spec sama persis dengan InvestmentPackage di atas)
-  const productCount = await prisma.product.count();
-  if (productCount === 0) {
-    const CONTRACT_DAYS = 180;
-    const QUOTA_HIGH = 9999;
-    const randBaseline = () => Math.floor(QUOTA_HIGH * (0.35 + Math.random() * 0.40));
-    await prisma.product.createMany({
-      data: [
-        { name: 'Gold Premium Aset 1', price: 160000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(160000   * 0.02  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), description: `Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari × ${CONTRACT_DAYS} hari = Rp 576.000. Modal TIDAK dikembalikan.`, banner: '', isActive: true, isStopped: false, profitRate: 2.0 },
-        { name: 'Gold Premium Aset 2', price: 320000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(320000   * 0.025 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), description: `Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari × ${CONTRACT_DAYS} hari. Modal TIDAK dikembalikan.`, banner: '', isActive: true, isStopped: false, profitRate: 2.5 },
-        { name: 'Gold Premium Aset 3', price: 640000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(640000   * 0.03  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), description: `Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari × ${CONTRACT_DAYS} hari. Modal TIDAK dikembalikan.`, banner: '', isActive: true, isStopped: false, profitRate: 3.0 },
-        { name: 'Gold Premium Aset 4', price: 1920000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(1920000  * 0.035 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), description: `Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari × ${CONTRACT_DAYS} hari. Modal TIDAK dikembalikan.`, banner: '', isActive: true, isStopped: false, profitRate: 3.5 },
-        { name: 'Gold Premium Aset 5', price: 5760000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(5760000  * 0.04  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), description: `Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari × ${CONTRACT_DAYS} hari. Modal TIDAK dikembalikan.`, banner: '', isActive: true, isStopped: false, profitRate: 4.0 },
-        { name: 'Gold Premium Aset 6', price: 17280000,  duration: CONTRACT_DAYS, estimatedProfit: Math.round(17280000 * 0.05  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), description: `Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari × ${CONTRACT_DAYS} hari. Modal TIDAK dikembalikan.`, banner: '', isActive: true, isStopped: false, profitRate: 5.0 },
-      ],
-    });
-    console.log('✅ Products created (Gold Premium Aset 1-6, kontrak 180 hari)\n');
+  //     ★ UPSERT: kalau produk sudah ada tapi datanya salah, tetap di-update ★
+  console.log('Syncing products (Gold Premium Aset 1-6)...');
+  const CONTRACT_DAYS = 180;
+  const QUOTA_HIGH = 9999;
+  const products = [
+    { name: 'Gold Premium Aset 1', price: 160000,    profitRate: 2.0,   description: `Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari × ${CONTRACT_DAYS} hari = Rp 576.000. Modal TIDAK dikembalikan.` },
+    { name: 'Gold Premium Aset 2', price: 320000,    profitRate: 2.5,   description: `Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari × ${CONTRACT_DAYS} hari = Rp 1.440.000. Modal TIDAK dikembalikan.` },
+    { name: 'Gold Premium Aset 3', price: 640000,    profitRate: 3.0,   description: `Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari × ${CONTRACT_DAYS} hari = Rp 3.456.000. Modal TIDAK dikembalikan.` },
+    { name: 'Gold Premium Aset 4', price: 1920000,   profitRate: 3.5,   description: `Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari × ${CONTRACT_DAYS} hari = Rp 12.096.000. Modal TIDAK dikembalikan.` },
+    { name: 'Gold Premium Aset 5', price: 5760000,   profitRate: 4.0,   description: `Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari × ${CONTRACT_DAYS} hari = Rp 41.472.000. Modal TIDAK dikembalikan.` },
+    { name: 'Gold Premium Aset 6', price: 17280000,  profitRate: 5.0,   description: `Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari × ${CONTRACT_DAYS} hari = Rp 155.520.000. Modal TIDAK dikembalikan.` },
+  ];
+  for (const prod of products) {
+    const estimatedProfit = Math.round(prod.price * (prod.profitRate / 100) * CONTRACT_DAYS);
+    const existing = await prisma.product.findFirst({ where: { name: prod.name } });
+    if (existing) {
+      // Update field struktural (TIDAK touch banner, quotaUsed, isStopped — field user-generated)
+      await prisma.product.update({
+        where: { id: existing.id },
+        data: {
+          price: prod.price,
+          profitRate: prod.profitRate,
+          duration: CONTRACT_DAYS,
+          estimatedProfit,
+          description: prod.description,
+          isActive: true,
+        },
+      });
+    } else {
+      await prisma.product.create({
+        data: {
+          name: prod.name,
+          price: prod.price,
+          duration: CONTRACT_DAYS,
+          estimatedProfit,
+          quota: QUOTA_HIGH,
+          quotaUsed: Math.floor(QUOTA_HIGH * (0.35 + Math.random() * 0.40)),
+          description: prod.description,
+          banner: '',
+          isActive: true,
+          isStopped: false,
+          profitRate: prod.profitRate,
+        },
+      });
+    }
+  }
+  console.log(`✅ Products synced (6 produk, rate 2%/2.5%/3%/3.5%/4%/5%)\n`);
+
+  // 4c. ★ FIX EXISTING INVESTMENTS — sync dailyProfit ke rate terbaru ★
+  //     Kalau ada investment yang dailyProfit-nya tidak cocok dengan amount × profitRate,
+  //     update ke nilai yang benar. Ini fix VPS user yang investment-nya dibuat saat rate masih salah.
+  console.log('Fixing existing investments (sync dailyProfit ke rate terbaru)...');
+  const allInvestments = await prisma.investment.findMany({ include: { package: true } });
+  let fixedCount = 0;
+  for (const inv of allInvestments) {
+    if (!inv.package) continue;
+    const correctDailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
+    if (inv.dailyProfit !== correctDailyProfit) {
+      await prisma.investment.update({
+        where: { id: inv.id },
+        data: { dailyProfit: correctDailyProfit },
+      });
+      fixedCount++;
+      console.log(`   🔧 Fixed: ${inv.id} | ${inv.package.name} | old=${inv.dailyProfit} → new=${correctDailyProfit}`);
+    }
+  }
+  if (fixedCount > 0) {
+    console.log(`✅ Fixed ${fixedCount} investments dengan dailyProfit yang salah\n`);
   } else {
-    console.log('⏭️  Products already exist (skipped)\n');
+    console.log(`⏭️  All investments sudah punya dailyProfit yang benar\n`);
   }
 
   // 5. Create default banners if none exist (using existing images in public/images/)
