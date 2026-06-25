@@ -10,7 +10,7 @@
 #  After this script finishes, ALL systems MUST be 100% working:
 #    - Next.js app on :3000
 #    - Cron-service on :3032 (profit + salary auto-credit)
-#    - Profit 2%/day × 180 days = 576k cap (EVERY day incl. weekend)
+#    - Profit 2%/day × 180 days = 576k cap (WEEKDAYS ONLY — Sat/Sun LIBUR)
 #    - Salary 1%/week FOREVER (10 refs + active investment)
 # ═══════════════════════════════════════════════════════════════
 set -eo pipefail
@@ -121,26 +121,46 @@ fi
 if [ "$CHECK_ONLY" = false ]; then
   section "2/10 STOP OLD SERVICES"
 
-  # Stop via pm2 (if any)
-  for name in nexvo-app nexvo-cron nexvo-wa-bot; do
+  # Stop via pm2 (if any) — include ALL possible old process names
+  for name in nexvo-app nexvo-cron nexvo-wa-bot nexvo-web nexvo-next nexvo; do
     if pm2 describe "$name" >/dev/null 2>&1; then
       pm2 delete "$name" >/dev/null 2>&1 && ok "stopped $name" || warn "could not stop $name"
     fi
   done
 
+  # Also kill ANY pm2 process that might still hold our ports (leftover from old deploys)
+  pm2 jlist 2>/dev/null | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sort -u | while read -r pname; do
+    case "$pname" in
+      nexvo*|nexa*|next*) pm2 delete "$pname" >/dev/null 2>&1 && warn "killed leftover pm2 process: $pname" ;;
+    esac
+  done
+
   # Kill anything still holding our ports (leftover/rogue processes)
+  # Use multiple methods: lsof → ss → fuser → pkill (belt + suspenders)
   for port in $PORT_APP $PORT_CRON $PORT_WABOT; do
+    pids=""
     if command -v lsof >/dev/null; then
       pids=$(lsof -ti :$port 2>/dev/null || true)
-    else
+    fi
+    if [ -z "$pids" ] && command -v ss >/dev/null; then
       pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2 | tr '\n' ' ')
+    fi
+    if [ -z "$pids" ] && command -v fuser >/dev/null; then
+      pids=$(fuser $port/tcp 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//')
     fi
     if [ -n "$pids" ]; then
       warn "killing leftover process on port $port (PID: $pids)"
       kill -9 $pids 2>/dev/null || true
-      sleep 2
+      sleep 3
     fi
   done
+
+  # Final belt-and-suspenders: kill ANY node/bun/next process that might be rogue
+  # (but DON'T kill pm2 itself or our ssh session)
+  pkill -9 -f "next start" 2>/dev/null || true
+  pkill -9 -f "next dev" 2>/dev/null || true
+  pkill -9 -f "bun run index.ts" 2>/dev/null || true
+  sleep 2
   ok "ports cleared"
 fi
 
@@ -234,8 +254,15 @@ if [ "$CHECK_ONLY" = false ]; then
     warn "skipping build (--skip-build or --dev mode)"
   else
     log "running: bun run build (prisma generate + next build)..."
-    bun run build 2>&1 | tail -10
-    ok "build complete"
+    # Run build with explicit DATABASE_URL to avoid prisma issues
+    DATABASE_URL="file:$ABS_DB_PATH" bun run build 2>&1 | tail -15
+    BUILD_EXIT=${PIPESTATUS[0]}
+    if [ "$BUILD_EXIT" -ne 0 ]; then
+      err "BUILD FAILED (exit $BUILD_EXIT) — nexvo-app will not start correctly"
+      warn "check build errors above. Trying to continue anyway (existing .next may be used)..."
+    else
+      ok "build complete"
+    fi
   fi
 fi
 
@@ -286,6 +313,28 @@ if [ "$CHECK_ONLY" = false ]; then
   section "7/10 START NEXT.JS (port $PORT_APP)"
   cd "$APP_DIR"
 
+  # ★ FINAL PORT CHECK: if port 3000 is still occupied, abort with clear message
+  if command -v lsof >/dev/null && lsof -i :$PORT_APP >/dev/null 2>&1; then
+    warn "port $PORT_APP STILL occupied after cleanup — force killing..."
+    lsof -ti :$PORT_APP | xargs -r kill -9 2>/dev/null || true
+    sleep 3
+  elif command -v ss >/dev/null && ss -tlnp 2>/dev/null | grep -q ":$PORT_APP "; then
+    warn "port $PORT_APP STILL occupied (ss) — force killing..."
+    ss -tlnp 2>/dev/null | grep ":$PORT_APP " | grep -o 'pid=[0-9]*' | cut -d= -f2 | xargs -r kill -9 2>/dev/null || true
+    sleep 3
+  fi
+
+  # Verify .next build exists for prod mode (otherwise next start will fail silently)
+  if [ "$DEV_MODE" = false ] && [ ! -d "$APP_DIR/.next" ]; then
+    err "❌ .next build directory missing — next start will fail!"
+    warn "running emergency build..."
+    DATABASE_URL="file:$ABS_DB_PATH" bun run build 2>&1 | tail -10
+    if [ ! -d "$APP_DIR/.next" ]; then
+      die "build failed — cannot start nexvo-app. Run: bash deploy.sh (full rebuild)"
+    fi
+    ok "emergency build complete"
+  fi
+
   if [ "$DEV_MODE" = true ]; then
     warn "starting in DEV mode (next dev — no build needed)"
     pm2 start "npx next dev -p $PORT_APP" \
@@ -317,7 +366,7 @@ if [ "$CHECK_ONLY" = false ]; then
     --cwd "$APP_DIR/mini-services/cron-service" \
     --log "$LOG_DIR/nexvo-cron.log" \
     --time 2>&1 | tail -3
-  ok "nexvo-cron started (profit 2%/day × 180d + salary 1%/week forever)"
+  ok "nexvo-cron started (profit 2%/day × 180d WEEKDAYS + salary 1%/week forever)"
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -391,8 +440,16 @@ check_http() {
   fi
 }
 
-# ── 10a. Port checks ──
+# ── 10a. Port checks (with self-heal restart for nexvo-app) ──
 check_port $PORT_APP  "nexvo-app"
+APP_PORT_OK=$?
+if [ "$APP_PORT_OK" -ne 0 ]; then
+  warn "self-heal: nexvo-app not listening — checking logs + restart..."
+  pm2 logs nexvo-app --lines 20 --nostream 2>/dev/null | tail -20
+  pm2 restart nexvo-app 2>/dev/null || true
+  sleep 10
+  check_port $PORT_APP  "nexvo-app (retry)" || true
+fi
 check_port $PORT_CRON "nexvo-cron"
 
 # ── 10b. HTTP health ──
@@ -515,10 +572,10 @@ if [ "$FAIL_COUNT" -eq 0 ]; then
   echo -e "║  Next.js app:     http://localhost:$PORT_APP                       ║"
   echo -e "║  Cron-service:    http://localhost:$PORT_CRON                      ║"
   echo -e "║                                                              ║"
-  echo -e "║  💰 Profit:  2%/day × 180 days = 576k cap (EVERY day)        ║"
+  echo -e "║  💰 Profit:  2%/day × 180 days = 576k cap (WEEKDAYS, Sat/Sun LIBUR)║"
   echo -e "║  📅 Salary:  1%/week FOREVER (10 refs + active investment)   ║"
-  echo -e "║  🔄 Backfill: auto-credits all missed days in one shot       ║"
-  echo -e "║  ⏰ Schedule: 00:00 WIB daily (profit) + Mon 00:00 (salary)  ║"
+  echo -e "║  🔄 Catchup: auto-credit all missed WEEKDAYS in one shot      ║"
+  echo -e "║  ⏰ Schedule: 00:00 WIB weekdays (profit) + Mon 00:00 (salary)║"
   echo -e "╚══════════════════════════════════════════════════════════════╝${C_NC}"
   echo ""
   echo -e "${C_BOLD}Logs:${C_NC}"
