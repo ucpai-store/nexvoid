@@ -1099,6 +1099,27 @@ export default function AdminSettingsPage() {
             </h3>
 
             <div className="glass rounded-xl p-5 space-y-5">
+              {/* ★ BANNER: Sistem Gaji Aktif ★ */}
+              <div className="p-4 rounded-xl bg-gold-gradient/10 border border-primary/30">
+                <p className="text-primary text-sm font-bold mb-2 flex items-center gap-2">
+                  <Banknote className="w-4 h-4" /> SISTEM GAJI AKTIF SAAT INI:
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Rate: <b className="text-primary">{salaryConfig?.salaryRate ?? 1}%</b> / minggu
+                  </div>
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Durasi: <b className="text-primary">{(salaryConfig?.maxWeeks ?? 0) > 0 ? `${salaryConfig?.maxWeeks} minggu` : 'SELAMANYA'}</b>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Min. Invite: <b className="text-primary">{salaryConfig?.minDirectRefs ?? 10}</b> orang
+                  </div>
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Wajib Investasi: <b className="text-primary">{salaryConfig?.requireActiveDeposit ? 'YA' : 'TIDAK'}</b>
+                  </div>
+                </div>
+                <p className="text-muted-foreground text-[10px] mt-2">Auto-credit setiap Senin 00:00 WIB. Gaji = {salaryConfig?.salaryRate ?? 1}% × omzet grup (user + semua downline aktif).</p>
+              </div>
               {salaryConfig ? (
                 <>
                   {/* Min Direct Refs */}
@@ -1133,8 +1154,7 @@ export default function AdminSettingsPage() {
                   <div className="space-y-2">
                     <Label className="text-foreground text-sm font-medium">Maksimal Minggu</Label>
                     <p className="text-muted-foreground text-xs">
-                      Isi <b className="text-primary">0</b> = <b className="text-primary">SELAMANYA</b> (tidak terbatas).
-                      Contoh: 12 = total {(salaryConfig.salaryRate ?? 1) * 12}% omzet selama 12 minggu.
+                      Isi <b className="text-primary">0</b> = <b className="text-primary">SELAMANYA</b> (tanpa batas, pendapatan selamanya). <b className="text-emerald-400">PENTING: Biarkan 0 agar gaji 1% dibayar setiap minggu selamanya.</b>
                     </p>
                     <Input
                       type="number"
