@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAdminFromRequest } from '@/lib/auth';
 
+// FALLBACK = Gold Premium Aset 1-6 (sama dengan seed-all.js / restore-products.sh / deploy.sh)
+// Kontrak 180 hari, modal TIDAK dikembalikan, profit harian dikredit cron 00:00 WIB.
+const CONTRACT_DAYS = 180;
 const FALLBACK_PACKAGES = [
-  { id: '1', name: 'Paket 100K', amount: 100000, profitRate: 10, contractDays: 90, isActive: true, order: 1, totalInvestments: 0, dailyProfit: 10000, totalProfit: 900000 },
-  { id: '2', name: 'Paket 500K', amount: 500000, profitRate: 10, contractDays: 90, isActive: true, order: 2, totalInvestments: 0, dailyProfit: 50000, totalProfit: 4500000 },
-  { id: '3', name: 'Paket 1JT', amount: 1000000, profitRate: 10, contractDays: 90, isActive: true, order: 3, totalInvestments: 0, dailyProfit: 100000, totalProfit: 9000000 },
-  { id: '4', name: 'Paket 2.5JT', amount: 2500000, profitRate: 10, contractDays: 90, isActive: true, order: 4, totalInvestments: 0, dailyProfit: 250000, totalProfit: 22500000 },
-  { id: '5', name: 'Paket 5JT', amount: 5000000, profitRate: 10, contractDays: 90, isActive: true, order: 5, totalInvestments: 0, dailyProfit: 500000, totalProfit: 45000000 },
-  { id: '6', name: 'Paket 10JT', amount: 10000000, profitRate: 10, contractDays: 90, isActive: true, order: 6, totalInvestments: 0, dailyProfit: 1000000, totalProfit: 90000000 },
+  { id: 'fb-1', name: 'Gold Premium Aset 1', amount: 160000,    profitRate: 2,   contractDays: CONTRACT_DAYS, isActive: true, order: 1, totalInvestments: 0, dailyProfit: 3200,    totalProfit: 576000 },
+  { id: 'fb-2', name: 'Gold Premium Aset 2', amount: 320000,    profitRate: 2.5, contractDays: CONTRACT_DAYS, isActive: true, order: 2, totalInvestments: 0, dailyProfit: 8000,    totalProfit: 1440000 },
+  { id: 'fb-3', name: 'Gold Premium Aset 3', amount: 640000,    profitRate: 3,   contractDays: CONTRACT_DAYS, isActive: true, order: 3, totalInvestments: 0, dailyProfit: 19200,   totalProfit: 3456000 },
+  { id: 'fb-4', name: 'Gold Premium Aset 4', amount: 1920000,   profitRate: 3.5, contractDays: CONTRACT_DAYS, isActive: true, order: 4, totalInvestments: 0, dailyProfit: 67200,   totalProfit: 12096000 },
+  { id: 'fb-5', name: 'Gold Premium Aset 5', amount: 5760000,   profitRate: 4,   contractDays: CONTRACT_DAYS, isActive: true, order: 5, totalInvestments: 0, dailyProfit: 230400,  totalProfit: 41472000 },
+  { id: 'fb-6', name: 'Gold Premium Aset 6', amount: 17280000,  profitRate: 5,   contractDays: CONTRACT_DAYS, isActive: true, order: 6, totalInvestments: 0, dailyProfit: 864000,  totalProfit: 155520000 },
 ];
 
 // GET: List all active packages (ordered by amount ascending: 100K → 500K → 1JT → 2.5JT → 5JT → 10JT)
