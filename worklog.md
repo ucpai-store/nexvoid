@@ -2953,3 +2953,48 @@ Stage Summary:
   K = ribu (160K = Rp 160.000)
   J = juta (1.92J = Rp 1.920.000, 5.76J = Rp 5.760.000, 17.28J = Rp 17.280.000)
 - User bisa lihat hasil di preview panel sekarang
+
+---
+Task ID: banner-upload + profit-real-time
+Agent: main (Z.ai Code)
+Task: User keluhan: (1) "kok gk bisa uplod banner produk akuu cek semuanya" — admin tidak bisa upload banner produk; (2) "profit wajib masuk jam 00.00 setiap paket yg di beli kasi real time ya kek brpa lama profit masuk intinya jam 00.00 wajib masukk" — profit wajib masuk jam 00:00 WIB + tampilkan countdown real-time per paket.
+
+Work Log:
+- Bug 1 — Admin upload banner gagal:
+  * Root cause: AdminProductsPage.tsx (line 117) kirim POST /api/upload dengan header Authorization: Bearer <adminToken>
+  * Tapi /api/upload/route.ts pakai getUserFromRequest (hanya terima token type='user')
+  * Admin token punya type='admin', jadi ditolak → 401 → toast "Network Error"
+  * Fix: rewrite /api/upload untuk cek admin duluan (getAdminFromRequest), fallback ke user (getUserFromRequest)
+  * Filename prefix jadi 'admin-{adminId}-...' atau 'avatar-{userId}-...' (pembeda)
+  * Max size dinaikin 5MB → 8MB (banner butuh resolusi tinggi)
+
+- Fitur 2 — Real-time profit countdown di AssetPage:
+  * Buat helper getNextMidnightWIB() — hitung timestamp 00:00 WIB berikutnya
+  * Buat isWeekendWIB() — cek apakah sekarang Sabtu/Minggu (profit libur)
+  * Buat getNextWeekdayMidnightWIB() — kalau weekend, lompat ke Senin 00:00 WIB
+  * Buat useProfitCountdown() hook — interval 1 detik, return {h, m, s, weekend}
+  * Buat komponen ProfitCountdownBadge — tampil di AssetCard kalau status='active'
+  * Tampilan: badge hijau dengan icon Timer + label + HH:MM:SS countdown
+  * Label weekday: "Profit berikutnya masuk (00:00 WIB)"
+  * Label weekend: "Profit berikutnya (Senin 00:00 WIB)" — user tahu kalau weekend libur
+  * Update tiap 1 detik, real-time, tidak perlu refresh
+
+- Verifikasi cron profit timing (mini-services/cron-service/index.ts line 655-668):
+  * Cron sudah benar: trigger jam 00:00 WIB weekdays (hour===0 && minute<=2)
+  * Sabtu/Minggu di-skip (weekend libur)
+  * Auto-catchup: kalau cron down beberapa hari, credit semua missed weekdays sekaligus
+  * Hard cap: profit maksimal = dailyProfit × contractDays (e.g. 3.200 × 180 = 576.000)
+
+- Test:
+  * POST /api/upload no-token → 401 "Tidak terautentikasi" ✓
+  * POST /api/auth/admin-login (admin/Admin@2024) → 200 + token ✓
+  * POST /api/upload dengan admin token → 200, file tersaved ke /uploads/admin-*.png ✓
+  * File accessible via /api/files/admin-*.png ✓
+  * AssetPage compile clean (no TypeScript errors) ✓
+
+Stage Summary:
+- Commit b3c5f8b sudah push ke origin/main
+- Admin sekarang bisa upload banner produk (login admin → menu Produk → klik kartu produk → upload banner)
+- User sekarang lihat countdown real-time di halaman Aset: "Profit berikutnya masuk (00:00 WIB) — 05:23:11" (update tiap detik)
+- Kalau weekend: countdown auto-lompat ke Senin 00:00 WIB, label berubah jadi "Profit berikutnya (Senin 00:00 WIB)"
+- Profit cron tetap jalan jam 00:00 WIB weekdays (sudah benar sebelumnya, tidak diubah)
