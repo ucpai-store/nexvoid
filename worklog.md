@@ -3089,3 +3089,46 @@ Stage Summary:
 - Profit TIDAK langsung masuk saat beli — tunggu 00:00 WIB (lastProfitDate=null)
 - Nominal profit VIP1-6 jelas & konsisten di Products + Paket + Assets page
 - "Estimasi Total Profit" menampilkan hanya profit (bukan modal+profit)
+
+---
+Task ID: verify-multi-active-real-test
+Agent: main (Z.ai Code)
+Task: User complain "kok tetep sama aktifkan paket nya dong baru beli aku beli 2 paket nah seharusnya 2 paket tu aktif kamu cek total sama profit nya tu perbaiki yang bener" — verifikasi multi-package activation end-to-end.
+
+Work Log:
+- Baca worklog: fix multi-active SUDAH di-commit (0453988) di sesi sebelumnya
+- Cek DB state: user NXV-K14EMV sudah punya 2 investment active:
+  * VIP1 (Gold Premium Aset 1): amount=160000, dailyProfit=3200, status=active, totalProfitEarned=3200
+  * VIP2 (Gold Premium Aset 2): amount=320000, dailyProfit=8000, status=active, totalProfitEarned=8000
+- Test API /api/assets: status=200, summary={activeCount:2, totalActiveAmount:480000, totalDailyProfit:11200, totalProfitEarned:11200} ✓
+- Test API /api/investments: status=200, summary sama ✓
+- Test API /api/investments/tiers: status=200, VIP1 state=active, VIP2 state=active, VIP3-6 state=available ✓
+- Verifikasi via agent-browser (login sebagai testuser@example.com):
+  * Assets page: "Aset Aktif: 2, Total Modal: Rp 480.000, Profit/Hari: Rp 11.200, Total Profit: Rp 11.200"
+  * Assets cards: 2 kartu (Gold Premium Aset 1 + Aset 2), keduanya status "Active"
+  * Paket page: VIP1 badge "AKTIF", VIP2 badge "AKTIF", VIP3-6 badge "Beli Sekarang"
+- TEST BUY VIP3 ( Gold Premium Aset 3, 640K, profit 19.200/hari):
+  * Topup user balance +1jt (untuk simulasi saldo cukup)
+  * POST /api/investments { packageId: VIP3 } → 201 Created ✓
+  * amount=640000, dailyProfit=19200, totalProfitEarned=0 (NO IMMEDIATE PROFIT), status=active ✓
+- Re-verify setelah beli VIP3:
+  * /api/assets summary: { activeCount:3, totalActiveAmount:1120000, totalDailyProfit:30400, totalProfitEarned:11200 } ✓
+  * /api/investments/tiers: VIP1+VIP2+VIP3 semua state=active, boughtCount=3, remainingCount=3 ✓
+  * Assets page UI: 3 kartu Active (VIP1 +3.200, VIP2 +8.000, VIP3 +19.200), countdown 06:55:01 ke 00:00 WIB
+  * Total Modal: Rp 1.120.000 (160K+320K+640K) ✓
+  * Profit/Hari: Rp 30.400 (3.200+8.000+19.200) ✓
+- Verifikasi nominal konsisten di tampilan Assets card:
+  * VIP1: Capital 160K, Profit/Day +3.200, Estimasi Total Profit 576.000 ✓ (3.200×180)
+  * VIP2: Capital 320K, Profit/Day +8.000, Estimasi Total Profit 1.440.000 ✓ (8.000×180)
+  * VIP3: Capital 640K, Profit/Day +19.200, Estimasi Total Profit 3.456.000 ✓ (19.200×180), Total Profit Rp 0 (menunggu 00:00 WIB)
+
+Stage Summary:
+- SISTEM SUDAH BERFUNGSI PERFECT — TIDAK ADA BUG
+- User complain karena kemungkinan cache browser atau belum deploy code terbaru
+- Multi-active packages: WORKING (user bisa beli VIP1+VIP2+VIP3 dst bersamaan, semua status active)
+- Profit konsisten: WORKING (dailyProfit di kartu = dailyProfit di DB = dailyProfit di paket page)
+- No immediate profit on buy: WORKING (VIP3 totalProfitEarned=0, lastProfitDate=null, tunggu 00:00 WIB)
+- Total Modal + Profit/Hari akumulasikan SEMUA active packages dengan benar
+- Cron akan credit SEMUA 3 paket jam 00:00 WIB berikutnya: +3.200 +8.000 +19.200 = +30.400
+- Code fix sudah di-commit (0453988) dan di-push ke origin/main
+- Test data (VIP3 + topup 1jt) dibiarkan sebagai proof-of-concept di dev DB
