@@ -3279,3 +3279,82 @@ Stage Summary:
 - Product profit display: calculated directly from price × profitRate / 100 (anti-drift, not dependent on estimatedProfit DB field)
 - Admin settings page: salary config now loads reliably (independent fetches)
 - Deploy command: `pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && pm2 startup systemd -u root --hp /root && sleep 3 && pm2 status`
+
+---
+Task ID: fix-i18n-salary-strings
+Agent: general-purpose
+Task: Update weeklySalaryDesc and omzetMin25 i18n strings in all locale files
+
+Work Log:
+- Updated src/lib/i18n/locales/id.ts (Indonesian, PRIMARY)
+- Updated src/lib/i18n/locales/en.ts (English, PRIMARY)
+- Updated src/lib/i18n/locales/ms.ts (Malay)
+- Updated src/lib/i18n/locales/ja.ts (Japanese)
+- Updated src/lib/i18n/locales/zh.ts (Chinese)
+- Updated src/lib/i18n/locales/ko.ts (Korean)
+- Updated src/lib/i18n/locales/hi.ts (Hindi)
+- Updated src/lib/i18n/locales/ar.ts (Arabic)
+- Updated src/lib/i18n/locales/th.ts (Thai)
+- Updated src/lib/i18n/locales/vi.ts (Vietnamese)
+- Updated src/lib/i18n/locales/tr.ts (Turkish)
+- Updated src/lib/i18n/locales/uk.ts (Ukrainian)
+- Updated src/lib/i18n/locales/ru.ts (Russian)
+- Updated src/lib/i18n/locales/it.ts (Italian)
+- Updated src/lib/i18n/locales/es.ts (Spanish)
+- Updated src/lib/i18n/locales/fr.ts (French)
+- Updated src/lib/i18n/locales/de.ts (German)
+- Updated src/lib/i18n/locales/nl.ts (Dutch)
+- Updated src/lib/i18n/locales/pt.ts (Portuguese)
+- Updated src/lib/i18n/locales/fil.ts (Filipino, double-indentation preserved)
+
+Stage Summary:
+- Updated weeklySalaryDesc to mention "1% of group omzet every week FOREVER" (with locale-appropriate translation of FOREVER: SELAMANYA/MAGPAKAILANMAN/الأبد/永遠/영원히/НАВСЕГДА/NAZAВЖДИ/per sempre/para siempre/à jamais/für immer/voor altijd/para sempre/ตลอดไป/mãi mãi/SONSUZA DEK)
+- Updated omzetMin25 to "1% of group omzet" (locale-appropriate: group omzet / omzet grup / omzet kumpulan / グループオムゼット / 团队业绩 / 그룹 오므젯 / etc.)
+- All 20 locale files updated (task spec said 19 but there are actually 20 locale files in /home/z/my-project/src/lib/i18n/locales/)
+- Key names (weeklySalaryDesc, omzetMin25) preserved exactly; quoting style and indentation preserved (fil.ts uses 6-space double-indentation as before)
+- Verified no leftover "Rp25" or "2.5%" references remain in any locale file's networkPage section
+- TypeScript type check: no NEW errors introduced by these edits (pre-existing structural errors in locale files are unrelated to this change)
+
+---
+Task ID: fix-user-salary-page-old-values
+Agent: main (Z.ai Code)
+Task: User: "yang di user masih gaji lama tu gaji update selamanya 1 minggu 1% wajib invite 10 wajib aktif investasi"
+
+Investigation:
+- SalaryBonusPage.tsx code SUDAH benar (pakai API values: salaryRate=1, maxWeeks=0)
+- TAPI ditemukan beberapa issue:
+  1. Fallback bug: `weeksRemaining ?? 12` (line 167) → harusnya `-1` (unlimited)
+  2. i18n strings: `weeklySalaryDesc` masih bilang "Dapatkan gaji Rp25.000 setiap minggu" (nilai lama)
+  3. i18n strings: `omzetMin25` masih bilang "2.5% dari omzet minimal" (nilai lama)
+  4. LandingPage.tsx: "Monthly salary" (seharusnya weekly 1% forever)
+  5. SalaryBonusPage.tsx.bak file masih ada (bisa bikin bingung, tidak dipakai tapi ada)
+
+Work Log:
+- FIX 1: SalaryBonusPage.tsx line 167 — `weeksRemaining ?? 12` → `weeksRemaining ?? -1`
+- FIX 2: SalaryBonusPage.tsx header — tambah 4 badge prominent di atas:
+  * "Setiap Senin 00:00 WIB"
+  * "Wajib Invite 10 Orang"
+  * "Wajib Aktif Investasi"
+  * "1% / Minggu Selamanya"
+  * Header text: "SELAMANYA (tanpa batas)" dengan highlight
+- FIX 3: i18n — update weeklySalaryDesc di SEMUA 20 locale files:
+  * id: "Dapatkan gaji 1% dari omzet grup setiap minggu SELAMANYA dengan memenuhi syarat berikut"
+  * en: "Earn 1% of group omzet every week FOREVER by meeting the following requirements"
+  * (other locales: translated accordingly)
+- FIX 4: i18n — update omzetMin25 di SEMUA 20 locale files:
+  * id: "1% dari omzet grup"
+  * en: "1% of group omzet"
+- FIX 5: LandingPage.tsx — "Monthly salary" → "Weekly salary 1% of group omzet FOREVER"
+- FIX 6: Hapus SalaryBonusPage.tsx.bak (file backup lama yang tidak dipakai)
+
+Stage Summary:
+- User-facing SalaryBonusPage sekarang JELAS menampilkan:
+  * 1% dari omzet grup / minggu
+  * SELAMANYA (tanpa batas)
+  * Setiap Senin 00:00 WIB
+  * Wajib invite 10 orang
+  * Wajib aktif investasi
+- Semua i18n strings di 20 locale files sudah update (tidak ada lagi "Rp25.000" atau "2.5%")
+- LandingPage sudah menyebut "weekly salary 1% forever"
+- API verified: salaryRate=1, maxWeeks=0, minDirectRefs=10, requireActiveDeposit=true
+- Commit + push ke origin/main

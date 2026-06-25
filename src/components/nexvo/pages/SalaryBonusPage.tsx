@@ -164,7 +164,7 @@ export default function SalaryBonusPage() {
   const salaryRate = eligibility?.salaryRate ?? 1;
   const maxWeeks = eligibility?.maxWeeks ?? 0;
   const weeksReceived = eligibility?.weeksReceived ?? 0;
-  const weeksRemaining = eligibility?.weeksRemaining ?? 12;
+  const weeksRemaining = eligibility?.weeksRemaining ?? -1;
   const estimatedSalary = eligibility?.estimatedSalary ?? 0;
   const activeRefDeposits = eligibility?.activeRefDeposits ?? 0;
   const directRefs = eligibility?.directRefs ?? 0;
@@ -186,7 +186,24 @@ export default function SalaryBonusPage() {
           <Banknote className="w-6 h-6 text-primary" />
           Bonus Gaji Mingguan
         </h1>
-        <p className="text-muted-foreground text-sm">Dapatkan {salaryRate}% dari omzet grup setiap minggu selama {maxWeeksLabel}</p>
+        <p className="text-muted-foreground text-sm">
+          Dapatkan <span className="text-primary font-bold">{salaryRate}%</span> dari omzet grup setiap minggu — <span className="text-primary font-bold">SELAMANYA</span> (tanpa batas)
+        </p>
+        {/* ★ Aturan utama — tampilkan prominent di atas ★ */}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Badge className="bg-primary/10 text-primary border-primary/20 border text-[10px] font-bold px-2.5 py-1">
+            <Clock className="w-3 h-3 mr-1" />Setiap Senin 00:00 WIB
+          </Badge>
+          <Badge className="bg-blue-400/10 text-blue-400 border-blue-400/20 border text-[10px] font-bold px-2.5 py-1">
+            <Users className="w-3 h-3 mr-1" />Wajib Invite {minDirectRefs} Orang
+          </Badge>
+          <Badge className="bg-emerald-400/10 text-emerald-400 border-emerald-400/20 border text-[10px] font-bold px-2.5 py-1">
+            <CheckCircle2 className="w-3 h-3 mr-1" />Wajib Aktif Investasi
+          </Badge>
+          <Badge className="bg-primary/10 text-primary border-primary/20 border text-[10px] font-bold px-2.5 py-1">
+            <Zap className="w-3 h-3 mr-1" />{salaryRate}% / Minggu Selamanya
+          </Badge>
+        </div>
       </div>
 
       {/* Completed Banner */}
