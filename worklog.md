@@ -3175,3 +3175,34 @@ Stage Summary:
 - Seed.ts sekarang UPSERT — run `bun run prisma/seed.ts` di VPS akan auto-fix rate/modal yang salah
 - User perlu deploy ulang untuk dapat fix ini
 - Teks deploy: `pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && mkdir -p db && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && pm2 startup systemd -u root --hp /root && sleep 3 && pm2 status`
+
+---
+Task ID: fix-deploy-env-auto
+Agent: main (Z.ai Code)
+Task: User report dari screenshot: di Hostinger VPS, `prisma db push` gagal dengan error "Environment variable not found: DATABASE_URL" (P1012). Akibatnya database tidak terbentuk → paket yang dibeli "hilang" (tidak tersimpan). User juga tegaskan: profit harus masuk jam 00:00 WIB saja.
+
+Investigation:
+- Baca screenshot user (VLM): terminal Hostinger VPS menampilkan error P1012 "Environment variable not found: DATABASE_URL" di prisma/schema.prisma:7
+- Cek .gitignore: `.env` di-gitignore (benar — jangan commit secret)
+- Cek deploy command sebelumnya: `git clone ... && bun install && mkdir -p db && bun run db:push` — TIDAK pernah buat .env!
+- Akibatnya: di VPS fresh clone, tidak ada .env → `prisma db push` gagal → tidak ada DB → investasi tidak tersimpan → "hilang"
+- Cek code profit logic (cron-service lines 412-423): SUDAH benar — kalau lastProfitDate=null DAN startDate==hari ini → SKIP (profit tunggu 00:00 WIB besok)
+- Cek investment POST handler (lines 207-228): SUDAH benar — totalProfitEarned=0, lastProfitDate=null, status='active' (NO immediate profit)
+- Cek AssetPage "Estimasi Total Profit" (lines 301-303): SUDAH benar — `dailyProfit × contractDays` (modal TIDAK dikembalikan)
+
+Root Cause: DEPLOYMENT issue, bukan code issue. `.env` tidak pernah dibuat di VPS.
+
+Work Log:
+- BUAT scripts/setup-env.mjs: auto-create .env dengan DATABASE_URL="file:<cwd>/db/custom.db" kalau .env tidak ada. Kalau .env sudah ada, biarkan (preserv user edit). Kalau .env ada tapi tidak ada DATABASE_URL, append.
+- UPDATE package.json scripts: `db:push`, `db:generate`, `db:migrate`, `db:reset`, `build`, `postinstall` semua jalankan `node scripts/setup-env.mjs` dulu sebelum prisma command. Ini ensure .env selalu ada sebelum prisma jalan.
+- UPDATE src/lib/db.ts: tambah fallback — kalau DATABASE_URL tidak set di runtime, pakai `file:<cwd>/db/custom.db` (safety net kalau .env hilang setelah install).
+- TEST: simulasi fresh VPS (rm .env, run `bun run db:push`) → setup-env auto-create .env, prisma db push sukses ✓
+- TEST: .env sudah ada → setup-env no-op (preserv file) ✓
+
+Stage Summary:
+- Fix di-commit dan di-push ke origin/main
+- Deploy command baru (works on Hostinger VPS tanpa manual .env):
+  `pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && pm2 startup systemd -u root --hp /root && sleep 3 && pm2 status`
+- Profit logic: VERIFIED CORRECT (profit hanya masuk jam 00:00 WIB Senin-Jumat, no immediate profit on purchase)
+- Estimasi Total Profit: VERIFIED CORRECT (dailyProfit × 180, modal TIDAK dikembalikan)
+- Multi-active packages: VERIFIED CORRECT (VIP1+VIP2+VIP3 semua bisa aktif bersamaan)
