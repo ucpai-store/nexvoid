@@ -160,12 +160,10 @@ export default function SalaryBonusPage() {
   const salaryRate = eligibility?.salaryRate ?? 1;
   const maxWeeks = eligibility?.maxWeeks ?? 0;
   const weeksReceived = eligibility?.weeksReceived ?? 0;
-  const estimatedSalary = eligibility?.estimatedSalary ?? 0;
   const activeRefDeposits = eligibility?.activeRefDeposits ?? 0;
   const directRefs = eligibility?.directRefs ?? 0;
   const minDirectRefs = eligibility?.minDirectRefs ?? 10;
   const meetsMinDirectRefs = eligibility?.meetsMinDirectRefs ?? false;
-  const groupOmzet = eligibility?.groupOmzet ?? 0;
   const userHasActiveDeposit = eligibility?.userHasActiveDeposit ?? false;
   const allRefsActive = eligibility?.allRefsActive ?? false;
   const unlimited = !maxWeeks || maxWeeks <= 0;
@@ -255,12 +253,7 @@ export default function SalaryBonusPage() {
       {/* ─────────── ELIGIBILITY / REQUIREMENTS ─────────── */}
       {!isCompleted && (
         <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-base font-semibold text-foreground">Syarat Kelayakan</h2>
-            <span className="text-xs text-muted-foreground">
-              Estimasi: <span className="font-semibold text-foreground">{formatRupiah(estimatedSalary)}</span>
-            </span>
-          </div>
+          <h2 className="text-base font-semibold text-foreground mb-5">Syarat Kelayakan</h2>
 
           {/* Requirement 1: Invite */}
           <div className="space-y-2">
@@ -330,26 +323,6 @@ export default function SalaryBonusPage() {
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 Semua undangan langsung wajib aktif investasi. Saat ini {activeRefDeposits}/{directRefs} undangan sudah aktif.
               </p>
-            </div>
-          )}
-
-          {/* Estimasi detail - only when both reqs met */}
-          {meetsMinDirectRefs && userHasActiveDeposit && (
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border bg-background/50 p-3">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Estimasi gaji/minggu</p>
-                <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                  {formatRupiah(estimatedSalary)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-border bg-background/50 p-3">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Omzet grup</p>
-                <p className="text-base font-bold text-foreground mt-1">{formatRupiah(groupOmzet)}</p>
-              </div>
-              <div className="rounded-xl border border-border bg-background/50 p-3">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Rate</p>
-                <p className="text-base font-bold text-foreground mt-1">{salaryRate}% / minggu</p>
-              </div>
             </div>
           )}
 
