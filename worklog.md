@@ -2626,3 +2626,28 @@ Stage Summary:
 - Port 3000 will be free before nexvo-app starts
 - Self-heal: if nexvo-app fails to listen, auto-restart + retry
 - Profit/salary logic unchanged: weekdays only, Sat/Sun libur, salary permanen
+
+---
+Task ID: deploy-step2-crash-fix
+Agent: main (Z.ai Code)
+Task: Fix deploy.sh crash di step 2 (script berhenti setelah STOP OLD SERVICES)
+
+Work Log:
+- User screenshot: deploy berhenti di "2/10 STOP OLD SERVICES" — gak lanjut ke step 3
+- Root cause: 'set -eo pipefail' di awal script + pm2 jlist scanner
+  • `pm2 jlist | grep -o ...` → kalau grep gak nemu match, exit code 1
+  • pipefail → pipeline fail
+  • set -e → script EXIT
+- Fix 1: pm2 jlist scanner dibungkus { } group + || true, fallback echo '[]'
+- Fix 2: semua port kill pipeline (lsof/ss/fuser) dikasih || true
+- Fix 3: VERIFY section (step 10) diawali 'set +eo pipefail'
+  • Verification gak boleh exit script di failure pertama
+  • Kita track failure manual via FAIL_COUNT, report di akhir
+- Fix 4: pm2 logs pipeline dikasih || true
+- Verified bash syntax OK
+- Committed + pushed (commit 3075e68)
+
+Stage Summary:
+- deploy.sh sekarang akan lanjut dari step 2 → 3 → 4 → ... → 10 tanpa crash
+- Semua error di verification section di-track, gak langsung exit
+- Final report tetap kasih exit code 1 kalau ada failure (untuk CI/automation)
