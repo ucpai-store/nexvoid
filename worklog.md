@@ -2931,3 +2931,25 @@ Stage Summary:
 - WithdrawPage.tsx updated: semua logo path pakai .png
 - User sekarang bisa lihat logo asli BCA/Mandiri/DANA/OVO/USDT/dll di halaman Withdraw
 - Script fetch-payment-logos.ts bisa di-rerun kapan saja kalau perlu refresh logo
+
+---
+Task ID: m-to-j-label-fix
+Agent: main (Z.ai Code)
+Task: User minta "yg bagian deposit yg pilihan tu160k yg mulai 1.92m tu jangan m j ya jadi 1.92j di windraw juga sama tu rubah itu aja m jadi j" — rubah label "M" jadi "J" (juta Indonesia) di preset amount deposit & withdraw.
+
+Work Log:
+- Search: hanya 2 file pakai label 'M' suffix — DepositPage.tsx dan WithdrawPage.tsx
+- Di kedua file, presetAmounts punya 6 entry: 160K, 320K, 640K, 1.92M, 5.76M, 17.28M
+- User minta rubah hanya 'M' → 'J' (K tetap karena K=ribu)
+- Edit DepositPage.tsx baris 62-64: 1.92M/5.76M/17.28M → 1.92J/5.76J/17.28J
+- Edit WithdrawPage.tsx baris 397-399: sama, 1.92M/5.76M/17.28M → 1.92J/5.76J/17.28J
+- Verified: grep konfirmasi 6 label baru (3 di deposit, 3 di withdraw)
+- Tidak ada tempat lain di src/ pakai 'M' suffix untuk amount
+- Restart dev server: Home 200 OK
+- Commit 6d586ec + push ke origin/main ✓
+
+Stage Summary:
+- Deposit & Withdraw preset amount labels sekarang pakai konvensi Indonesia:
+  K = ribu (160K = Rp 160.000)
+  J = juta (1.92J = Rp 1.920.000, 5.76J = Rp 5.760.000, 17.28J = Rp 17.280.000)
+- User bisa lihat hasil di preview panel sekarang
