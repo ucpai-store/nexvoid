@@ -2651,3 +2651,33 @@ Stage Summary:
 - deploy.sh sekarang akan lanjut dari step 2 → 3 → 4 → ... → 10 tanpa crash
 - Semua error di verification section di-track, gak langsung exit
 - Final report tetap kasih exit code 1 kalau ada failure (untuk CI/automation)
+
+---
+Task ID: db-data-protection
+Agent: main (Z.ai Code)
+Task: User lost products/packages after deploy — "paket dan produk kok ilang aku kan minta perbaiki profit sama bonus gaji aja"
+
+Work Log:
+- Root cause: deploy.sh ran 'prisma db:push' every deploy → if schema changed, RESET DB
+- User only wanted profit+salary fix, NOT data wipe
+- Fixed deploy.sh DATABASE section:
+  • Backup DB before any schema ops (keep 5 most recent .backup-* files)
+  • SKIP db:push if DB has data (data protection mode)
+  • Only run db:push on fresh install or --fresh flag
+  • Auto-seed: if products/packages count <= 1 → restore defaults
+  • Auto-fix salary config (1%/week, maxWeeks=0, permanent)
+- Created standalone restore-products.sh:
+  • Restores 4 products (Emas/Silver/Gold/Diamond)
+  • Restores 4 packages (Starter/Silver/Gold/Platinum)
+  • Restores 5 banners
+  • Creates salary config if missing
+  • Creates default admin (admin / Admin@2024)
+  • Creates matching config (5%,4%,3%,2%,1%)
+  • Idempotent — only creates if missing
+- Verified both scripts syntax OK
+- Committed + pushed (commit 296f662)
+
+Stage Summary:
+- deploy.sh now PROTECTS existing data (no more accidental wipes)
+- restore-products.sh available for immediate restore on VPS
+- User can run restore now, then profit+salary logic stays intact
