@@ -445,19 +445,38 @@ async function processDailyInvestmentProfits(): Promise<{
       }
 
       // ★ HARD CAP: total profit cannot exceed dailyProfit × contractDays
-      // e.g. 3,200/day × 180 days = 576,000 (for 160k investment @ 2%/day)
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
-      const contractDays = inv.package.contractDays || 180;
-      const hardCap = dailyProfit * contractDays;
+      // ★ BUG FIX: Use stored inv.dailyProfit & derive contractDays from (endDate - startDate).
+      //   Do NOT read from inv.package — for Product (VIP) purchases the packageId is linked
+      //   to `_internal_default` (profitRate=0, contractDays=0), which made hardCap=0 →
+      //   investment was wrongly marked `completed` immediately after purchase.
+      //   The stored `inv.dailyProfit` is the TRUE daily profit (set at purchase time).
+      const storedDailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100)); // fallback for legacy rows
+
+      let contractDays = 0;
+      if (inv.startDate && inv.endDate) {
+        const msDiff = new Date(inv.endDate).getTime() - new Date(inv.startDate).getTime();
+        contractDays = Math.max(1, Math.round(msDiff / (24 * 60 * 60 * 1000)));
+      } else {
+        contractDays = inv.package?.contractDays || 180;
+      }
+      const hardCap = storedDailyProfit * contractDays;
       const remainingCap = Math.max(0, hardCap - inv.totalProfitEarned);
 
-      if (remainingCap <= 0) {
+      if (remainingCap <= 0 && inv.totalProfitEarned > 0) {
         // Already hit hard cap → mark as completed
         await db.investment.update({
           where: { id: inv.id },
           data: { status: 'completed' },
         });
         console.log(`[Profit Cron] ✅ Investment ${inv.id} hit hard cap ${formatRupiahSimple(hardCap)} → marked completed`);
+        continue;
+      }
+      // ★ If remainingCap is 0 but earned is also 0, this is a fresh investment with
+      //   storedDailyProfit=0 (shouldn't happen). Skip rather than mark completed.
+      if (storedDailyProfit <= 0) {
+        console.log(`[Profit Cron] ⚠️ Investment ${inv.id} has dailyProfit=0 — skipping (not marking completed)`);
         continue;
       }
 
@@ -471,14 +490,14 @@ async function processDailyInvestmentProfits(): Promise<{
         if (missedDays <= 0) continue; // already credited all weekdays up to today
       }
 
-      // Total profit to credit = dailyProfit × missedDays, but capped by remainingCap
-      let creditAmount = dailyProfit * missedDays;
+      // Total profit to credit = storedDailyProfit × missedDays, but capped by remainingCap
+      let creditAmount = storedDailyProfit * missedDays;
       let willComplete = false;
       if (creditAmount >= remainingCap) {
         creditAmount = remainingCap;
         willComplete = true;
       }
-      const daysCredited = Math.ceil(creditAmount / dailyProfit);
+      const daysCredited = Math.ceil(creditAmount / storedDailyProfit);
 
       await db.$transaction(async (tx) => {
         // ★ RE-CHECK inside transaction to prevent double credit (race condition) ★
@@ -520,7 +539,7 @@ async function processDailyInvestmentProfits(): Promise<{
           where: { id: inv.id },
           data: {
             totalProfitEarned: { increment: finalCredit },
-            dailyProfit: dailyProfit,
+            dailyProfit: storedDailyProfit,
             lastProfitDate: now,
             ...(willComplete ? { status: 'completed' as const, endDate: now } : {}),
           },

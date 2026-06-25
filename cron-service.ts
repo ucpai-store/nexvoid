@@ -552,8 +552,17 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         }
       }
 
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
-      if (dailyProfit <= 0) continue;
+      // ★ BUG FIX: Use stored inv.dailyProfit — do NOT recompute from inv.package.profitRate.
+      //   For Product (VIP) purchases, packageId is linked to `_internal_default` (profitRate=0)
+      //   which made dailyProfit=0 → profit never credited.
+      //   The stored `inv.dailyProfit` is the TRUE daily profit (set at purchase time).
+      const dailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
+      if (dailyProfit <= 0) {
+        console.log(`[Profit Cron] ⚠️ Investment ${inv.id} has dailyProfit=0 — skipping`);
+        continue;
+      }
 
       // ─── BACKFILL LOGIC: Calculate missed weekdays ───
       // lastCreditDate = lastProfitDate (WIB) or startDate (WIB) if null
@@ -604,9 +613,11 @@ async function processDailyInvestmentProfitsCore(): Promise<{
           },
         });
 
+        const pkgName = inv.package?.name || 'Investment';
+        const pkgRate = inv.package?.profitRate || (inv.amount > 0 ? (dailyProfit / inv.amount) * 100 : 0);
         const desc = totalDays === 1
-          ? `Profit harian ${inv.package.name} — ${formatRupiahSimple(inv.amount)} x ${inv.package.profitRate}% = ${formatRupiahSimple(dailyProfit)}`
-          : `Profit ${totalDays} hari (${isBackfill ? `${missedDays} tertinggal + ${isTodayWeekday ? 'hari ini' : '0'}` : 'semua hari ini'}) — ${inv.package.name}: ${formatRupiahSimple(dailyProfit)} x ${totalDays} = ${formatRupiahSimple(totalCredit)}`;
+          ? `Profit harian ${pkgName} — ${formatRupiahSimple(inv.amount)} x ${pkgRate.toFixed(2)}% = ${formatRupiahSimple(dailyProfit)}`
+          : `Profit ${totalDays} hari (${isBackfill ? `${missedDays} tertinggal + ${isTodayWeekday ? 'hari ini' : '0'}` : 'semua hari ini'}) — ${pkgName}: ${formatRupiahSimple(dailyProfit)} x ${totalDays} = ${formatRupiahSimple(totalCredit)}`;
 
         await tx.bonusLog.create({
           data: {
