@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 
 /**
  * NEXVO Bonus Salary System
- * 
+ *
  * Rules:
  * - User MUST have an active deposit (investment) themselves
  * - ALL Level 1/direct referrals MUST have active deposits
@@ -11,6 +11,44 @@ import { db } from '@/lib/db';
  * - maxWeeks = 0 means PERMANENT (selamanya, tanpa batas)
  * - Auto-credited at 00:00 WIB every Monday via cron service
  */
+
+/**
+ * ★ SELF-HEAL: Force-correct SalaryConfig on every read.
+ * If any config row has salaryRate !== 1 OR maxWeeks !== 0, delete ALL rows
+ * and create ONE clean config (1% / maxWeeks=0 / min 10 refs).
+ *
+ * This guarantees the UI NEVER shows stale "2.5%" or "12 minggu" values,
+ * even if the seed didn't run or an admin accidentally set wrong values.
+ * Called lazily from getUserSalaryEligibility and checkAndCreditSalaryBonus.
+ */
+let _selfHealChecked = false; // per-process cache: only run once per server restart
+async function selfHealSalaryConfig(): Promise<void> {
+  if (_selfHealChecked) return;
+  _selfHealChecked = true;
+  try {
+    const all = await db.salaryConfig.findMany();
+    const hasStale = all.some(c => c.salaryRate !== 1 || c.maxWeeks !== 0);
+    if (hasStale || all.length === 0) {
+      if (all.length > 0) {
+        await db.salaryConfig.deleteMany({});
+      }
+      await db.salaryConfig.create({
+        data: {
+          minDirectRefs: 10,
+          salaryRate: 1,
+          maxWeeks: 0,
+          requireActiveDeposit: true,
+          fixedSalaryAmount: 25000,
+          isActive: true,
+        },
+      });
+      console.log('[salary] Self-heal: reset SalaryConfig to 1% / maxWeeks=0 (killed stale rows)');
+    }
+  } catch (e) {
+    // Non-fatal — don't break the API if self-heal fails (e.g. table not migrated yet)
+    console.error('[salary] Self-heal skipped:', (e as Error).message);
+  }
+}
 
 /**
  * Get the current ISO week number and year using WIB (UTC+7) timezone
@@ -210,6 +248,9 @@ export async function checkAndCreditSalaryBonus(userId: string): Promise<{
 }> {
   const { weekNumber, year } = getCurrentWeekInfo();
 
+  // ★ SELF-HEAL: ensure config is always 1% / maxWeeks=0 (kills stale 2.5%/12)
+  await selfHealSalaryConfig();
+
   return await db.$transaction(async (tx) => {
     // Get active salary config
     const config = await tx.salaryConfig.findFirst({
@@ -379,6 +420,9 @@ export async function processAllSalaryBonuses(): Promise<{
     details: [] as Array<{ userId: string; amount: number; weekOfTotal: number; message: string }>,
   };
 
+  // ★ SELF-HEAL: ensure config is always 1% / maxWeeks=0 (kills stale 2.5%/12)
+  await selfHealSalaryConfig();
+
   // Get active salary config
   const config = await db.salaryConfig.findFirst({ where: { isActive: true } });
   if (!config) {
@@ -464,6 +508,9 @@ export async function getUserSalaryEligibility(userId: string): Promise<{
   allRefsActive: boolean;
   meetsMinDirectRefs: boolean;
 }> {
+  // ★ SELF-HEAL: ensure config is always 1% / maxWeeks=0 (kills stale 2.5%/12)
+  await selfHealSalaryConfig();
+
   // Get active salary config
   const config = await db.salaryConfig.findFirst({
     where: { isActive: true },
