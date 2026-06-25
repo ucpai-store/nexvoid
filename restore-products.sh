@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
-#  NEXVO — Restore Default Products & Packages
+#  NEXVO — Restore Gold Premium Aset 1-6 (Packages + Products)
 #  Run this if your products/packages disappeared after deploy
+#
+#  Yang di-restore:
+#    - 6 Investment Packages: Gold Premium Aset 1 s/d 6
+#    - 6 Products:            Gold Premium Aset 1 s/d 6
+#    - 5 Payment methods (BCA, Mandiri, BNI, BRI, DANA, OVO, GoPay, ShopeePay)
+#    - Banners (jika kosong)
+#    - Salary config (1%/week PERMANEN)
+#    - Matching config (5%,4%,3%,2%,1%)
+#    - Default admin (username: admin, password: Admin@2024)
+#
+#  Spec investasi:
+#    - Kontrak 180 hari
+#    - Modal TIDAK dikembalikan
+#    - User hanya terima profit harian
 #
 #  Usage:
 #    curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-products.sh | bash
@@ -42,7 +56,7 @@ fi
 
 export DATABASE_URL="file:$ABS_DB_PATH"
 
-echo -e "\n${C_CYAN}══════ Restoring Default Products & Packages ══════${C_NC}"
+echo -e "\n${C_CYAN}══════ Restore Gold Premium Aset 1-6 ══════${C_NC}"
 echo "App dir: $APP_DIR"
 echo "DB:      $ABS_DB_PATH"
 echo ""
@@ -56,119 +70,239 @@ fi
 # Run the restore via bun
 bun -e '
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 const db = new PrismaClient();
+
+const CONTRACT_DAYS = 180;
+const QUOTA_HIGH = 9999;
+const randBaseline = () => Math.floor(QUOTA_HIGH * (0.35 + Math.random() * 0.40));
+const fmt = (n) => n.toLocaleString("id-ID");
 
 (async () => {
   console.log("\n📋 Current state:");
-  const [users, products, packages, banners, salaryCfg] = await Promise.all([
+  const [admins, users, products, packages, banners, salaryCfg, matchingCfg] = await Promise.all([
+    db.admin.count(),
     db.user.count(),
     db.product.count(),
     db.investmentPackage.count(),
     db.banner.count(),
     db.salaryConfig.findFirst(),
+    db.matchingConfig.findFirst(),
   ]);
+  console.log(`   Admins:   ${admins}`);
   console.log(`   Users:    ${users}`);
   console.log(`   Products: ${products}`);
   console.log(`   Packages: ${packages}`);
   console.log(`   Banners:  ${banners}`);
-  console.log(`   Salary:   rate=${salaryCfg?.salaryRate}%, maxWeeks=${salaryCfg?.maxWeeks}`);
 
-  // 1. Restore products if missing
-  if (products === 0) {
-    console.log("\n🌱 Restoring default products...");
-    await db.product.createMany({ data: [
-      { name: "Emas Starter Pack", price: 100000, duration: 30, estimatedProfit: 8000, quota: 500, quotaUsed: 342, description: "Paket investasi emas untuk pemula. Dapatkan keuntungan stabil dari pergerakan harga emas dengan modal minimal.", banner: "", isActive: true, isStopped: false, profitRate: 8.0 },
-      { name: "Silver Mining Portfolio", price: 500000, duration: 60, estimatedProfit: 55000, quota: 300, quotaUsed: 187, description: "Portfolio penambangan perak dengan diversifikasi aset. Keuntungan lebih tinggi dari paket starter.", banner: "", isActive: true, isStopped: false, profitRate: 11.0 },
-      { name: "Gold Premium Asset", price: 1000000, duration: 90, estimatedProfit: 150000, quota: 200, quotaUsed: 98, description: "Aset emas premium dengan estimasi profit tinggi. Kelola portofolio emas Anda secara profesional.", banner: "", isActive: true, isStopped: false, profitRate: 15.0 },
-      { name: "Diamond Elite Investment", price: 5000000, duration: 120, estimatedProfit: 1000000, quota: 100, quotaUsed: 43, description: "Investasi berlian elite untuk investor serius. Akses eksklusif ke portfolio berlian dan mineral langka.", banner: "", isActive: true, isStopped: false, profitRate: 20.0 },
-    ]});
-    console.log("   ✓ 4 products restored");
-  } else {
-    console.log(`   ⏭️  Products already exist (${products}) — skipped`);
+  // ════════════════════════════════════════════════════════════
+  // 1. INVESTMENT PACKAGES — Gold Premium Aset 1 s/d 6
+  // ════════════════════════════════════════════════════════════
+  console.log("\n📦 Restoring Investment Packages (Gold Premium Aset 1-6)...");
+  const packages = [
+    { name: "Gold Premium Aset 1", amount: 160000,    profitRate: 2,   contractDays: CONTRACT_DAYS, order: 1 },
+    { name: "Gold Premium Aset 2", amount: 320000,    profitRate: 2.5, contractDays: CONTRACT_DAYS, order: 2 },
+    { name: "Gold Premium Aset 3", amount: 640000,    profitRate: 3,   contractDays: CONTRACT_DAYS, order: 3 },
+    { name: "Gold Premium Aset 4", amount: 1920000,   profitRate: 3.5, contractDays: CONTRACT_DAYS, order: 4 },
+    { name: "Gold Premium Aset 5", amount: 5760000,   profitRate: 4,   contractDays: CONTRACT_DAYS, order: 5 },
+    { name: "Gold Premium Aset 6", amount: 17280000,  profitRate: 5,   contractDays: CONTRACT_DAYS, order: 6 },
+  ];
+
+  // Cleanup: hapus paket lama yang namanya TIDAK termasuk 6 nama baru
+  const validPkgNames = packages.map(p => p.name);
+  const oldPkgs = await db.investmentPackage.findMany();
+  let deletedPkgs = 0;
+  for (const old of oldPkgs) {
+    if (!validPkgNames.includes(old.name)) {
+      try {
+        try { await db.investment.deleteMany({ where: { packageId: old.id } }); } catch (_) {}
+        await db.investmentPackage.delete({ where: { id: old.id } });
+        console.log(`   🗑️  Hapus paket lama: ${old.name}`);
+        deletedPkgs++;
+      } catch (e) {
+        console.log(`   ⚠️  Gagal hapus paket lama "${old.name}": ${e.message}`);
+      }
+    }
   }
+  if (deletedPkgs > 0) console.log(`   ✓ ${deletedPkgs} paket lama dihapus`);
 
-  // 2. Restore investment packages if missing
-  if (packages === 0) {
-    console.log("\n🌱 Restoring default investment packages...");
-    await db.investmentPackage.createMany({ data: [
-      { name: "Paket Starter", amount: 500000, profitRate: 10, contractDays: 90, isActive: true, order: 1 },
-      { name: "Paket Silver", amount: 1000000, profitRate: 10, contractDays: 90, isActive: true, order: 2 },
-      { name: "Paket Gold", amount: 5000000, profitRate: 10, contractDays: 90, isActive: true, order: 3 },
-      { name: "Paket Platinum", amount: 10000000, profitRate: 10, contractDays: 90, isActive: true, order: 4 },
-    ]});
-    console.log("   ✓ 4 packages restored");
-  } else {
-    console.log(`   ⏭️  Packages already exist (${packages}) — skipped`);
+  for (const pkg of packages) {
+    const existing = await db.investmentPackage.findFirst({ where: { name: pkg.name } });
+    if (existing) {
+      await db.investmentPackage.update({
+        where: { id: existing.id },
+        data: { amount: pkg.amount, profitRate: pkg.profitRate, contractDays: pkg.contractDays, order: pkg.order, isActive: true }
+      });
+      console.log(`   ✏️  Update: ${pkg.name} - Rp ${fmt(pkg.amount)} (${pkg.profitRate}% × ${pkg.contractDays} hari)`);
+    } else {
+      await db.investmentPackage.create({ data: pkg });
+      console.log(`   ✅ Buat:   ${pkg.name} - Rp ${fmt(pkg.amount)} (${pkg.profitRate}% × ${pkg.contractDays} hari)`);
+    }
   }
+  console.log(`   📦 Total packages: ${packages.length}`);
 
-  // 3. Restore banners if missing
-  if (banners === 0) {
-    console.log("\n🌱 Restoring default banners...");
-    await db.banner.createMany({ data: [
-      { title: "Mulai Investasi Aset Digital", subtitle: "Build Value, Grow Future", description: "Platform manajemen aset digital berbasis komoditas terpercaya.", ctaText: "Daftar Sekarang", ctaLink: "register", image: "", order: 1, isActive: true },
-      { title: "Profit Hingga 20%", subtitle: "Gold Premium Asset", description: "Dapatkan keuntungan hingga 20% dari investasi aset emas premium.", ctaText: "Lihat Produk", ctaLink: "products", image: "", order: 2, isActive: true },
-      { title: "Bonus Referral Besar", subtitle: "Ajak Teman, Raih Bonus", description: "Dapatkan bonus referral untuk setiap teman yang bergabung.", ctaText: "Pelajari Lebih", ctaLink: "register", image: "", order: 3, isActive: true },
-      { title: "Penarikan Cepat & Aman", subtitle: "Proses 1x24 Jam", description: "Withdraw profit Anda dengan cepat dan aman.", ctaText: "Mulai Sekarang", ctaLink: "register", image: "", order: 4, isActive: true },
-      { title: "Aset Digital Terdiversifikasi", subtitle: "Emas, Perak, Mineral", description: "Diversifikasi portofolio aset digital Anda dengan berbagai komoditas premium.", ctaText: "Jelajahi", ctaLink: "products", image: "", order: 5, isActive: true },
-    ]});
-    console.log("   ✓ 5 banners restored");
-  } else {
-    console.log(`   ⏭️  Banners already exist (${banners}) — skipped`);
+  // ════════════════════════════════════════════════════════════
+  // 2. PRODUCTS — Gold Premium Aset 1 s/d 6
+  // ════════════════════════════════════════════════════════════
+  console.log("\n🛒 Restoring Products (Gold Premium Aset 1-6)...");
+  const products = [
+    { name: "Gold Premium Aset 1", price: 160000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(160000   * 0.02  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 2,   description: `Gold Premium Aset 1 - Rp 160.000. Profit 2%/hari = Rp 3.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 576.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.` },
+    { name: "Gold Premium Aset 2", price: 320000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(320000   * 0.025 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 2.5, description: `Gold Premium Aset 2 - Rp 320.000. Profit 2,5%/hari = Rp 8.000/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 1.440.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.` },
+    { name: "Gold Premium Aset 3", price: 640000,    duration: CONTRACT_DAYS, estimatedProfit: Math.round(640000   * 0.03  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 3,   description: `Gold Premium Aset 3 - Rp 640.000. Profit 3%/hari = Rp 19.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 3.456.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.` },
+    { name: "Gold Premium Aset 4", price: 1920000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(1920000  * 0.035 * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 3.5, description: `Gold Premium Aset 4 - Rp 1.920.000. Profit 3,5%/hari = Rp 67.200/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 12.096.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.` },
+    { name: "Gold Premium Aset 5", price: 5760000,   duration: CONTRACT_DAYS, estimatedProfit: Math.round(5760000  * 0.04  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 4,   description: `Gold Premium Aset 5 - Rp 5.760.000. Profit 4%/hari = Rp 230.400/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 41.472.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.` },
+    { name: "Gold Premium Aset 6", price: 17280000,  duration: CONTRACT_DAYS, estimatedProfit: Math.round(17280000 * 0.05  * CONTRACT_DAYS), quota: QUOTA_HIGH, quotaUsed: randBaseline(), profitRate: 5,   description: `Gold Premium Aset 6 - Rp 17.280.000. Profit 5%/hari = Rp 864.000/hari selama ${CONTRACT_DAYS} hari. Total profit Rp 155.520.000. Modal awal TIDAK dikembalikan, user hanya menerima profit.` },
+  ];
+
+  // Cleanup: hapus produk lama yang namanya TIDAK termasuk 6 nama baru
+  const validProdNames = products.map(p => p.name);
+  const oldProds = await db.product.findMany();
+  let deletedProds = 0;
+  for (const old of oldProds) {
+    if (!validProdNames.includes(old.name)) {
+      try {
+        try { await db.purchase.deleteMany({ where: { productId: old.id } }); } catch (_) {}
+        await db.product.delete({ where: { id: old.id } });
+        console.log(`   🗑️  Hapus produk lama: ${old.name}`);
+        deletedProds++;
+      } catch (e) {
+        console.log(`   ⚠️  Gagal hapus produk lama "${old.name}": ${e.message}`);
+      }
+    }
   }
+  if (deletedProds > 0) console.log(`   ✓ ${deletedProds} produk lama dihapus`);
 
-  // 4. Fix salary config (1%/week permanent)
+  for (const prod of products) {
+    const existing = await db.product.findFirst({ where: { name: prod.name } });
+    if (existing) {
+      await db.product.update({
+        where: { id: existing.id },
+        data: { ...prod, isActive: true, isStopped: false }
+      });
+      console.log(`   ✏️  Update: ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari)`);
+    } else {
+      await db.product.create({ data: prod });
+      console.log(`   ✅ Buat:   ${prod.name} - Rp ${fmt(prod.price)} → profit ${fmt(prod.estimatedProfit)} (${prod.duration} hari)`);
+    }
+  }
+  console.log(`   🛒 Total products: ${products.length}`);
+
+  // ════════════════════════════════════════════════════════════
+  // 3. SALARY CONFIG — 1%/week PERMANEN (maxWeeks=0)
+  // ════════════════════════════════════════════════════════════
+  console.log("\n💰 Salary config (1%/week PERMANEN)...");
   if (!salaryCfg) {
-    console.log("\n🌱 Creating salary config...");
     await db.salaryConfig.create({ data: { minDirectRefs: 10, salaryRate: 1, maxWeeks: 0, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true }});
-    console.log("   ✓ salary config created (1%/week, permanent)");
-  } else if (salaryCfg.maxWeeks !== 0 || salaryCfg.salaryRate !== 1) {
-    console.log("\n🔧 Fixing salary config...");
-    await db.salaryConfig.update({ where: { id: salaryCfg.id }, data: { salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, isActive: true }});
-    console.log("   ✓ salary config fixed (1%/week, permanent)");
+    console.log("   ✅ salary config created (1%/week, PERMANEN)");
   } else {
-    console.log("   ⏭️  Salary config already correct (1%/week, permanent)");
+    await db.salaryConfig.update({
+      where: { id: salaryCfg.id },
+      data: { salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true }
+    });
+    console.log("   ✏️  salary config updated (1%/week, PERMANEN)");
   }
 
-  // 5. Create default admin if none
-  if (users === 0) {
-    console.log("\n🌱 Creating default admin...");
-    const bcrypt = require("bcryptjs");
+  // ════════════════════════════════════════════════════════════
+  // 4. MATCHING CONFIG — 5%,4%,3%,2%,1%
+  // ════════════════════════════════════════════════════════════
+  console.log("\n🤝 Matching config (5%,4%,3%,2%,1%)...");
+  if (!matchingCfg) {
+    await db.matchingConfig.create({ data: { level1: 5, level2: 4, level3: 3, level4: 2, level5: 1, isActive: true }});
+    console.log("   ✅ matching config created");
+  } else {
+    console.log("   ⏭️  matching config already exists");
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 5. BANNERS (jika kosong)
+  // ════════════════════════════════════════════════════════════
+  if (banners === 0) {
+    console.log("\n🖼️  Restoring banners...");
+    await db.banner.createMany({ data: [
+      { title: "Selamat Datang di NEXVO", subtitle: "Platform Investasi Digital #1", description: "NEXVO menghadirkan solusi investasi digital berbasis komoditas yang aman, transparan, dan menguntungkan. Mulai perjalanan investasi Anda dengan profit harian terukur dan sistem keamanan berlapis.", ctaText: "Mulai Sekarang", ctaLink: "register", image: "/images/banner-1.jpg", order: 1, isActive: true },
+      { title: "Profit Harian Hingga 5%", subtitle: "Investasi Cerdas, Hasil Maksimal", description: `Dapatkan profit harian hingga 5% selama ${CONTRACT_DAYS} hari kontrak. Hanya profit yang dibayarkan — modal awal TIDAK dikembalikan.`, ctaText: "Lihat Paket", ctaLink: "paket", image: "/images/banner-2.jpg", order: 2, isActive: true },
+      { title: "Bonus Sponsor 5 Level", subtitle: "Ajak Teman, Raih Bonus", description: "Dapatkan bonus sponsor hingga 5 level: 5%, 4%, 3%, 2%, 1%. Semakin banyak referral, semakin besar bonus Anda!", ctaText: "Lihat Jaringan", ctaLink: "network", image: "/images/banner-3.jpg", order: 3, isActive: true },
+    ]});
+    console.log("   ✅ 3 banners restored");
+  } else {
+    console.log(`\n🖼️  Banners already exist (${banners}) — skipped`);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 6. PAYMENT METHODS (jika kosong)
+  // ════════════════════════════════════════════════════════════
+  const pmCount = await db.paymentMethod.count();
+  if (pmCount === 0) {
+    console.log("\n💳 Restoring payment methods...");
+    await db.paymentMethod.createMany({ data: [
+      { type: "bank",    name: "Bank BCA",     accountNo: "", holderName: "NEXVO", color: "#003D79", iconUrl: "/images/payment/bca.png",       isActive: true, order: 1 },
+      { type: "bank",    name: "Bank Mandiri", accountNo: "", holderName: "NEXVO", color: "#003366", iconUrl: "/images/payment/mandiri.png",   isActive: true, order: 2 },
+      { type: "bank",    name: "Bank BNI",     accountNo: "", holderName: "NEXVO", color: "#F37021", iconUrl: "/images/payment/bni.png",       isActive: true, order: 3 },
+      { type: "bank",    name: "Bank BRI",     accountNo: "", holderName: "NEXVO", color: "#00529B", iconUrl: "/images/payment/bri.png",       isActive: true, order: 4 },
+      { type: "ewallet", name: "DANA",         accountNo: "", holderName: "NEXVO", color: "#108EE9", iconUrl: "/images/payment/dana.png",      isActive: true, order: 5 },
+      { type: "ewallet", name: "OVO",          accountNo: "", holderName: "NEXVO", color: "#4C3494", iconUrl: "/images/payment/ovo.jpg",       isActive: true, order: 6 },
+      { type: "ewallet", name: "GoPay",        accountNo: "", holderName: "NEXVO", color: "#00AED6", iconUrl: "/images/payment/gopay.png",     isActive: true, order: 7 },
+      { type: "ewallet", name: "ShopeePay",    accountNo: "", holderName: "NEXVO", color: "#EE4D2D", iconUrl: "/images/payment/shopeepay.png", isActive: true, order: 8 },
+    ]});
+    console.log("   ✅ 8 payment methods restored");
+  } else {
+    console.log(`\n💳 Payment methods already exist (${pmCount}) — skipped`);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 7. DEFAULT ADMIN (jika belum ada)
+  // ════════════════════════════════════════════════════════════
+  if (admins === 0) {
+    console.log("\n👑 Creating default admin...");
     const hashedPassword = await bcrypt.hash("Admin@2024", 8);
     await db.admin.create({ data: { username: "admin", email: "admin@nexvo.id", password: hashedPassword, name: "Super Admin", role: "super_admin" }});
-    console.log("   ✓ admin created (username: admin, password: Admin@2024)");
+    console.log("   ✅ admin created (username: admin, password: Admin@2024)");
+  } else {
+    console.log(`\n👑 Admin already exists (${admins}) — skipped`);
   }
 
-  // 6. Ensure matching config exists
-  const matching = await db.matchingConfig.findFirst();
-  if (!matching) {
-    console.log("\n🌱 Creating matching config...");
-    await db.matchingConfig.create({ data: { level1: 5, level2: 4, level3: 3, level4: 2, level5: 1, isActive: true }});
-    console.log("   ✓ matching config created (5%, 4%, 3%, 2%, 1%)");
-  }
-
-  // Final summary
-  console.log("\n📋 Final state:");
-  const [finalUsers, finalProducts, finalPackages, finalBanners] = await Promise.all([
+  // ════════════════════════════════════════════════════════════
+  // FINAL SUMMARY
+  // ════════════════════════════════════════════════════════════
+  console.log("\n" + "═".repeat(60));
+  console.log("📋 FINAL STATE:");
+  const [fAdmins, fUsers, fProducts, fPackages, fBanners] = await Promise.all([
+    db.admin.count(),
     db.user.count(),
     db.product.count(),
     db.investmentPackage.count(),
     db.banner.count(),
   ]);
-  console.log(`   Users:    ${finalUsers}`);
-  console.log(`   Products: ${finalProducts}`);
-  console.log(`   Packages: ${finalPackages}`);
-  console.log(`   Banners:  ${finalBanners}`);
+  console.log(`   Admins:   ${fAdmins}`);
+  console.log(`   Users:    ${fUsers}`);
+  console.log(`   Products: ${fProducts}`);
+  console.log(`   Packages: ${fPackages}`);
+  console.log(`   Banners:  ${fBanners}`);
+
+  console.log(`\n📦 Investment Packages (kontrak ${CONTRACT_DAYS} hari, modal TIDAK dikembalikan):`);
+  const allPkgs = await db.investmentPackage.findMany({ orderBy: { order: "asc" }});
+  for (const p of allPkgs) {
+    const daily = Math.round(p.amount * (p.profitRate / 100));
+    const total = Math.round(p.amount * (p.profitRate / 100) * p.contractDays);
+    console.log(`   ${p.order}. ${p.name}: Rp ${fmt(p.amount)} - ${p.profitRate}%/hari = Rp ${fmt(daily)}/hari × ${p.contractDays} hari = Rp ${fmt(total)} total`);
+  }
+
+  console.log(`\n🛒 Products:`);
+  const allProds = await db.product.findMany({ orderBy: { price: "asc" }});
+  for (const p of allProds) {
+    console.log(`   - ${p.name}: Rp ${fmt(p.price)} → profit Rp ${fmt(p.estimatedProfit)} (${p.duration} hari) | Kuota: ${p.quotaUsed}/${p.quota}`);
+  }
 
   await db.$disconnect();
   console.log("\n✅ Restore complete!");
-})().catch(e => { console.error("❌ Error:", e.message); process.exit(1); });
+})().catch(e => { console.error("❌ Error:", e.message); console.error(e.stack); process.exit(1); });
 ' 2>&1
 
 echo ""
-ok "Done. Products & packages restored."
+ok "Done. Gold Premium Aset 1-6 restored."
 echo ""
 echo "Next steps:"
 echo "  1. Restart nexvo-app:    pm2 restart nexvo-app"
-echo "  2. Check admin panel:    http://localhost:3000/#admin-login"
+echo "  2. Check admin panel:    https://nexvo.id/#admin-login"
 echo "     (username: admin, password: Admin@2024)"
 echo ""
