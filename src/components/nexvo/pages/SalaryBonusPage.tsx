@@ -537,8 +537,8 @@ export default function SalaryBonusPage() {
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-            <span className="font-medium text-foreground">Catatan:</span> 1% dihitung dari total omzet grup (investasi Anda + semua downline aktif).
-            Semakin besar omzet grup, semakin besar gaji. Berlaku selamanya selama syarat terpenuhi.
+            <span className="font-medium text-foreground">Catatan:</span> 1% dihitung dari total omzet grup (investasi semua downline aktif).
+            Semakin banyak anggota & semakin besar investasi mereka, semakin besar gaji. Berlaku selamanya selama syarat terpenuhi.
           </p>
         </div>
 

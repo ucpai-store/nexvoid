@@ -185,28 +185,22 @@ async function getAllDownlineIds(internalId: string, maxDepth: number = 5): Prom
 }
 
 /**
- * Calculate group omzet for a user (sum of all active investments from user + all downline)
+ * Calculate group omzet for a user.
+ * ONLY counts active investments from invited people (downline).
+ * User's OWN investment is NOT included (but still required as eligibility).
  */
 async function calculateGroupOmzet(internalId: string): Promise<number> {
-  // Include the user's own investments
-  const ownInvestment = await db.investment.aggregate({
-    where: { userId: internalId, status: 'active' },
+  // Get all downline IDs (invited people)
+  const downlineIds = await getAllDownlineIds(internalId, 5);
+
+  if (downlineIds.length === 0) return 0;
+
+  const downlineInvestment = await db.investment.aggregate({
+    where: { userId: { in: downlineIds }, status: 'active' },
     _sum: { amount: true },
   });
 
-  // Get all downline IDs
-  const downlineIds = await getAllDownlineIds(internalId, 5);
-
-  let downlineOmzet = 0;
-  if (downlineIds.length > 0) {
-    const downlineInvestment = await db.investment.aggregate({
-      where: { userId: { in: downlineIds }, status: 'active' },
-      _sum: { amount: true },
-    });
-    downlineOmzet = downlineInvestment._sum.amount || 0;
-  }
-
-  return (ownInvestment._sum.amount || 0) + downlineOmzet;
+  return downlineInvestment._sum.amount || 0;
 }
 
 /**
