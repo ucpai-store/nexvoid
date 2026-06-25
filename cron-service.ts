@@ -12,15 +12,33 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
 
 const PORT = 3032;
 const WIB_OFFSET = 7; // UTC+7 for Asia/Jakarta
 
-// Prisma client with absolute path
+// ─── DB path resolution (auto-detect — works on VPS /home/nexvo AND locally) ───
+const DB_CANDIDATES = [
+  '/home/nexvo/prisma/custom.db',
+  '/home/nexvo/db/custom.db',
+  path.join(process.cwd(), 'prisma/custom.db'),
+  path.join(process.cwd(), 'db/custom.db'),
+  path.join(process.cwd(), 'custom.db'),
+];
+const DB_PATH = DB_CANDIDATES.find((p) => fs.existsSync(p));
+
+if (!DB_PATH) {
+  console.error('❌ [CRON] Database file not found. Checked:');
+  DB_CANDIDATES.forEach((p) => console.error(`   - ${p}`));
+  process.exit(1);
+}
+console.log(`📁 [CRON] Using DB: ${DB_PATH}`);
+
 const db = new PrismaClient({
   datasources: {
     db: {
-      url: `file:/home/nexvo/prisma/custom.db`,
+      url: `file:${DB_PATH}`,
     },
   },
 });
@@ -552,8 +570,16 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         }
       }
 
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
-      if (dailyProfit <= 0) continue;
+      // ★ BUG FIX: Use stored inv.dailyProfit — do NOT recompute from inv.package.profitRate.
+      //   For Product (VIP) purchases, packageId is linked to `_internal_default` (profitRate=0)
+      //   which made dailyProfit=0 → profit never credited.
+      const dailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
+      if (dailyProfit <= 0) {
+        console.log(`[Profit Cron] ⚠️ Investment ${inv.id}: dailyProfit=0 (stored=${inv.dailyProfit}, pkgRate=${inv.package?.profitRate}) — skipping`);
+        continue;
+      }
 
       // ─── BACKFILL LOGIC: Calculate missed weekdays ───
       // lastCreditDate = lastProfitDate (WIB) or startDate (WIB) if null
