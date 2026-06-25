@@ -111,6 +111,9 @@ function PackageCard({
   const isAvailable = state === 'available';
   const isBought = state === 'bought';
 
+  // Re-activation: available AND has a "Kontrak sebelumnya sudah berakhir" reason
+  const isReactivation = isAvailable && !!(pkg.reason || '').toLowerCase().includes('berakhir');
+
   const canBuy = isAvailable;
 
   return (
@@ -128,7 +131,7 @@ function PackageCard({
         </div>
       )}
 
-      {/* State ribbon (Aktif / Selesai) */}
+      {/* State ribbon (Aktif / Selesai / Re-aktivasi) */}
       {isActive && (
         <div className="absolute top-0 left-0 bg-emerald-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
           <CheckCircle2 className="w-3 h-3" /> AKTIF
@@ -137,6 +140,11 @@ function PackageCard({
       {isBought && (
         <div className="absolute top-0 left-0 bg-blue-500/80 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
           <CheckCircle2 className="w-3 h-3" /> SELESAI
+        </div>
+      )}
+      {isReactivation && (
+        <div className="absolute top-0 left-0 bg-amber-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
+          <RefreshCw className="w-3 h-3" /> RE-AKTIVASI
         </div>
       )}
 
@@ -211,15 +219,19 @@ function PackageCard({
           <p className="text-gold-gradient text-lg sm:text-xl font-bold mt-0.5">{formatRupiah(pkg.totalProfit)}</p>
         </div>
 
-        {/* Bought/active reason */}
-        {(isActive || isBought) && pkg.reason && (
-          <div className="flex items-start gap-1.5 mb-3 p-2 rounded-lg bg-slate-400/5 border border-slate-400/15">
-            <Info className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
-            <p className="text-slate-400 text-[10px] leading-tight">{pkg.reason}</p>
+        {/* Bought/active/reactivation reason */}
+        {(isActive || isBought || isReactivation) && pkg.reason && (
+          <div className={`flex items-start gap-1.5 mb-3 p-2 rounded-lg border ${
+            isReactivation
+              ? 'bg-amber-400/5 border-amber-400/20'
+              : 'bg-slate-400/5 border-slate-400/15'
+          }`}>
+            <Info className={`w-3 h-3 shrink-0 mt-0.5 ${isReactivation ? 'text-amber-400' : 'text-slate-400'}`} />
+            <p className={`text-[10px] leading-tight ${isReactivation ? 'text-amber-400/90' : 'text-slate-400'}`}>{pkg.reason}</p>
           </div>
         )}
 
-        {/* Invest button — any unbought tier is purchasable */}
+        {/* Invest button — any available tier is purchasable (incl. re-activation after contract end) */}
         {isActive ? (
           <div className="w-full h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Sedang Aktif
@@ -234,8 +246,8 @@ function PackageCard({
             className="w-full h-11 bg-gold-gradient text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all glow-gold text-sm"
           >
             <div className="flex items-center gap-2">
-              <Wallet className="w-4 h-4" />
-              Beli Sekarang
+              {isReactivation ? <RefreshCw className="w-4 h-4" /> : <Wallet className="w-4 h-4" />}
+              {isReactivation ? 'Aktifkan Lagi' : 'Beli Sekarang'}
             </div>
           </Button>
         )}

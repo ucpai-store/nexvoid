@@ -5,17 +5,18 @@ import { getUserFromRequest } from '@/lib/auth';
 /**
  * GET /api/products/tiers
  *
- * No-duplicates purchase state for the logged-in user.
+ * Purchase state for the logged-in user (with contract-end re-activation).
  *
  * Rules (per product owner's request):
  *   - Pembelian TIDAK harus berurutan — user boleh beli produk mana saja yang BELUM pernah dibeli.
- *   - Setiap produk hanya bisa dibeli SEKALI.
+ *   - Setiap produk hanya bisa dibeli SEKALI per kontrak (180 hari).
  *   - Hanya 1 produk aktif saja per user — beli produk baru menggantikan produk aktif lama.
+ *   - Produk yang kontraknya sudah HABIS (status='completed') BISA dibeli lagi.
  *
  * Returns per-product state:
- *   - 'available'  → belum pernah dibeli, bisa dibeli sekarang
- *   - 'active'     → sedang aktif (sedang menghasilkan profit harian)
- *   - 'bought'     → sudah pernah dibeli (selesai/superseded), tidak bisa dibeli lagi
+ *   - 'available'  → belum pernah dibeli ATAU kontrak sudah habis, bisa dibeli sekarang
+ *   - 'active'     → sedang aktif (sedang menghasilkan profit harian, kontrak masih berjalan)
+ *   - 'bought'     → sudah pernah dibeli TAPI kontrak masih berjalan (superseded) — tidak bisa dibeli lagi
  *
  * Also returns aggregate info: currentProductName, remainingCount, boughtCount, maxedOut.
  */
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       select: { id: true, name: true },
     });
 
-    // All purchases for this user (any status) — used to compute no-duplicates state
+    // All purchases for this user (any status)
     const purchases = await db.purchase.findMany({
       where: { userId: user.id },
       select: { productId: true, status: true },
@@ -56,10 +57,11 @@ export async function GET(request: NextRequest) {
       let reason = '';
       if (s === 'active') {
         state = 'active';
-        reason = 'Produk aktif Anda hari ini';
+        reason = 'Produk aktif Anda hari ini — kontrak masih berjalan';
       } else if (s === 'completed') {
-        state = 'bought';
-        reason = 'Sudah pernah dibeli — pilih produk lain yang belum dimiliki';
+        // Contract ended → can re-activate!
+        state = 'available';
+        reason = 'Kontrak sebelumnya sudah berakhir — bisa diaktifkan lagi';
       } else {
         state = 'available';
         reason = 'Tersedia untuk dibeli';
@@ -68,9 +70,12 @@ export async function GET(request: NextRequest) {
     });
 
     const activeTier = tiers.find((t) => t.state === 'active') || null;
+    // 'bought' (superseded but still in contract) is now rare since we auto-complete
+    // old purchases when buying a new one. Counted for backward compatibility.
     const boughtCount = tiers.filter((t) => t.state === 'bought').length;
     const remainingCount = tiers.filter((t) => t.state === 'available').length;
-    const maxedOut = remainingCount === 0;
+    // Maxed out only if NO tier is available (every tier is currently active or bought-but-in-contract).
+    const maxedOut = remainingCount === 0 && products.length > 0;
 
     return NextResponse.json({
       success: true,

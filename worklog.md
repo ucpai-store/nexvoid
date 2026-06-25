@@ -2786,3 +2786,90 @@ Stage Summary:
 - Commit ac6db96 sudah push ke GitHub origin/main
 - Deposit page sekarang punya tab QRIS + USDT (bukan kosong lagi)
 - Admin tinggal upload QR + isi wallet USDT via panel
+
+---
+Task ID: fix-deposit-upload-and-reactivation
+Agent: main (Z.ai Code)
+Task: Fix two user complaints: (1) "pas ajukan deposit gk bisa ya teruss" — deposit submission keeps failing; (2) "produk dan paket itu tidak bisa aktifin produk/paket yg sama... bisa di aktifkan lagi kalo sudah habis kontrak" — same product/package cannot be re-activated, only after contract ends.
+
+Work Log:
+- Investigasi deposit flow (DepositPage.tsx, /api/deposit/route.ts):
+  * Frontend calls fetch('/api/deposit/upload', ...) untuk upload bukti transfer
+  * ROOT CAUSE: route /api/deposit/upload TIDAK ADA — folder route-nya belum dibuat
+  * Akibatnya: kalau user upload bukti → 404 → Next.js return HTML → res.json() throws → catch block return early → deposit NGGA pernah tersubmit
+  * File ProfilePage.tsx juga panggil /api/upload (juga nggak ada) — broken untuk avatar upload
+
+- Investigasi re-activation rule:
+  * /api/products/route.ts POST (line 207-221): reject kalau user punya purchase existing (ANY status) → user nggak bisa beli produk yg sama walau kontrak sudah habis
+  * /api/investments/route.ts POST pakai validateSequentialPurchase dari tier-system.ts
+  * tier-system.ts: tier.state='bought' (blocked) kalau user pernah beli tier itu (any status) → user nggak bisa beli paket yg sama walau kontrak sudah habis
+  * Ini bertentangan dengan requirement: "produk/paket bisa di aktifkan lagi kalo sudah habis kontrak"
+
+FIXES (8 file):
+
+1. CREATE /api/deposit/upload/route.ts (NEW FILE):
+   - Handle proof image upload (JPG/PNG/WebP/GIF, max 8MB)
+   - Authenticated users only, reject suspended
+   - Save ke /uploads/proof-{userId}-{timestamp}-{rand}.{ext}
+   - Return { url: '/api/files/{filename}' } — diserved oleh /api/files/[...path]
+   - MIME + size validation
+
+2. CREATE /api/upload/route.ts (NEW FILE):
+   - Handle general avatar upload (JPG/PNG/WebP/GIF, max 5MB)
+   - Authenticated users only
+   - Save ke /uploads/avatar-{userId}-{timestamp}-{rand}.{ext}
+   - Return { url, filePath } — dipake ProfilePage.tsx
+
+3. UPDATE /src/lib/tier-system.ts:
+   - getUserTierAvailability: tier state logic diubah
+     * 'active' = user punya investment ACTIVE untuk tier ini (kontrak masih jalan)
+     * 'available' = NEVER bought ATAU semua investment status='completed' (kontrak habis)
+     * 'bought' = bought tapi kontrak masih jalan (superseded, rare karena auto-complete)
+   - validateTierPurchase: allow re-purchase kalau user nggak punya investment ACTIVE untuk tier itu
+   - maxedOut: hanya true kalau semua tier active/bought DAN nggak ada expired
+   - Tambah field hasExpiredPurchase untuk tracking
+
+4. UPDATE /api/products/route.ts POST:
+   - Cek existingPurchase → ubah jadi cek activePurchase (where status='active')
+   - Kalau ada active → reject "sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai (180 hari)"
+   - Kalau semua purchase 'completed' → ALLOW re-purchase
+
+5. UPDATE /api/products/tiers/route.ts:
+   - State logic diubah: 'completed' status → 'available' (bisa re-aktivasi)
+   - Hanya 'active' yang masih diblok
+   - maxedOut hanya kalau 0 available
+
+6. UPDATE ProductsPage.tsx (UI):
+   - Tambah isReactivation detection (available + reason contains "berakhir")
+   - Ribbon RE-AKTIVASI (warna amber) di pojok kartu
+   - Reason box warna amber untuk re-activation
+   - Button text: "Aktifkan Lagi" (bukan "Beli Sekarang") untuk re-activation
+   - Icon RefreshCw untuk re-activation button
+
+7. UPDATE PaketPage.tsx (UI):
+   - Sama dengan ProductsPage: isReactivation, ribbon, reason box, button "Aktifkan Lagi"
+
+VERIFIKASI (agent-browser + API tests):
+- Login testprod → halaman Deposit → input 160.000 → pilih QRIS → click "Saya Sudah Scan QR & Bayar" → click "Lanjut Upload Bukti" → click "Deposit Rp160.000" → SUCCESS "Deposit Diterima!" ✓
+- Test /api/deposit/upload via curl: upload test-proof.png → 200, return URL ✓
+- Test /api/files/{filename}: file accessible (200, 70 bytes) ✓
+- Test /api/products POST re-activation:
+  * Buy Aset 1 (first time) → SUCCESS ✓
+  * Buy Aset 1 again (active) → FAIL "sedang aktif" ✓
+  * Mark purchase 'completed' (simulate contract end)
+  * Buy Aset 1 again → SUCCESS (re-activation!) ✓
+- Test /api/investments POST re-activation:
+  * Buy Aset 2 (first time) → SUCCESS ✓
+  * Buy Aset 2 again (active) → FAIL "sedang aktif" ✓
+  * Mark investment 'completed'
+  * Buy Aset 2 again → SUCCESS (re-activation!) ✓
+- /api/investments/tiers returns correct state:
+  * Aset 1: available + "Kontrak sebelumnya sudah berakhir — bisa diaktifkan lagi" ✓
+  * Aset 2: active + "Paket aktif Anda hari ini — kontrak masih berjalan" ✓
+
+Stage Summary:
+- ROOT CAUSE deposit gagal: route /api/deposit/upload NGGA ADA → kalau user upload bukti, 404 menggagalkan submit
+- ROOT CAUSE nggak bisa re-aktivasi: tier-system dan products route nge-block ANY existing purchase (any status), padahal harusnya hanya block ACTIVE
+- Fix: buat 2 route baru (deposit/upload + upload), ubah re-activation rule di 4 file backend + 2 file frontend
+- User sekarang bisa: ajukan deposit (dengan/without bukti) + re-aktivasi produk/paket yg kontraknya sudah habis (180 hari)
+- Komit akan di-push ke origin/main

@@ -204,17 +204,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Produk tidak tersedia' }, { status: 404 });
     }
 
-    // ★ No-duplicates: reject if user already owns this product (any status).
-    const existingPurchase = await db.purchase.findFirst({
-      where: { userId: user.id, productId },
+    // ★ Re-activation rule: reject ONLY if user has an ACTIVE purchase for this product.
+    // If all previous purchases are 'completed' (contract ended after 180 days),
+    // the user is allowed to re-activate the same product again.
+    const activePurchase = await db.purchase.findFirst({
+      where: { userId: user.id, productId, status: 'active' },
       select: { id: true, status: true },
     });
-    if (existingPurchase) {
-      const verb = existingPurchase.status === 'active' ? 'sedang aktif' : 'sudah pernah dibeli';
+    if (activePurchase) {
       return NextResponse.json(
         {
           success: false,
-          error: `Produk '${product.name}' ${verb}. Wajib pilih produk lain yang belum dimiliki.`,
+          error: `Produk '${product.name}' sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai (180 hari).`,
         },
         { status: 400 }
       );
