@@ -3389,3 +3389,38 @@ Stage Summary:
 - DB: salaryRate=1, maxWeeks=0 (verified directly via Prisma query)
 - Commit: 02b12b4 pushed to origin/main
 - Deploy command: pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && sleep 3 && pm2 status
+
+---
+Task ID: fix-homepage-salary-card-bulanan
+Agent: main (Z.ai Code)
+Task: User: "di user masih ada gaji lama masih 2.5% seharusmya update ke 1% dan yang 12 minggu masih ada tu seharusnya tanpa batas paham kann"
+
+Investigation (deep dive via Agent Browser — login as test user):
+- SalaryBonusPage.tsx (#salary-bonus): VERIFIED CORRECT via browser
+  * "Dapatkan 1% dari omzet grup setiap minggu — SELAMANYA (tanpa batas)"
+  * "Gaji 1% dari omzet grup / minggu"
+  * "minggu diterima (selamanya)"
+  * "Wajib Invite 10 Orang", "Wajib Aktif Investasi", "Setiap Senin 00:00 WIB"
+  * All values come from API (salaryRate=1, maxWeeks=0, minDirectRefs=10)
+- ROOT CAUSE FOUND: HomePage.tsx (tab "Sistem Investasi") had OLD salary card:
+  * OLD tag: 'Bulanan' (Monthly) — WRONG, should be Mingguan (Weekly)
+  * OLD desc: 'Bonus gaji yang didapatkan berdasarkan total investasi aktif. Semakin besar investasi, semakin besar salary bonus yang kamu terima.' — WRONG
+- This was the "gaji lama" the user saw on the user side (home page)
+
+Work Log:
+- FIX: HomePage.tsx line 1507-1509 — update Salary Bonus card:
+  * tag: 'Bulanan' -> 'Mingguan'
+  * desc: -> 'Gaji 1% dari omzet grup setiap minggu SELAMANYA. Wajib invite 10 orang + aktif investasi. Dibayar setiap Senin 00:00 WIB.'
+- Verified via Agent Browser (logged in as testprod user, clicked "Sistem Investasi" tab):
+  * Card now shows: heading "Salary Bonus", tag "Mingguan", desc "Gaji 1% dari omzet grup setiap minggu SELAMANYA. Wajib invite 10 orang + aktif investasi. Dibayar setiap Senin 00:00 WIB."
+- Comprehensive grep: no remaining "Bulanan"/"2.5% gaji"/"12 minggu gaji" salary references anywhere
+- The only "2.5" in codebase = Gold Premium Aset 2 product profit rate (2.5%/day) — CORRECT, unrelated to salary
+- LandingPage.tsx already correct: "Weekly salary 1% of group omzet FOREVER. Invite 10 active members + active investment required."
+
+Stage Summary:
+- HomePage salary card: FIXED (Bulanan -> Mingguan, desc updated to 1%/SELAMANYA/invite 10/aktif investasi)
+- SalaryBonusPage: already correct (1%/SELAMANYA/invite 10/aktif investasi)
+- Admin settings: already correct (banner with 1%/SELAMANYA/10/YA)
+- DB: salaryRate=1, maxWeeks=0 (verified)
+- Commit: e359f09 pushed to origin/main
+- Deploy: pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && sleep 3 && pm2 status
