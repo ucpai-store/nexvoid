@@ -194,6 +194,39 @@ async function main() {
   const matchingRates = await getMatchingRates();
   console.log('Matching rates:', matchingRates, '\n');
 
+  // ─── SELF-HEAL: Reactivate investments wrongly marked 'completed' ───
+  if (!DRY_RUN) {
+    const completed = await db.investment.findMany({
+      where: { status: 'completed' },
+      include: { package: true },
+    });
+    let reactivated = 0;
+    for (const inv of completed) {
+      if (!inv.endDate) continue;
+      if (new Date(inv.endDate).getTime() <= Date.now()) continue;
+      const storedDailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
+      if (storedDailyProfit <= 0) continue;
+      let contractDays = 0;
+      if (inv.startDate && inv.endDate) {
+        const msDiff = new Date(inv.endDate).getTime() - new Date(inv.startDate).getTime();
+        contractDays = Math.max(1, Math.round(msDiff / (24 * 60 * 60 * 1000)));
+      } else {
+        contractDays = inv.package?.contractDays || 180;
+      }
+      const hardCap = storedDailyProfit * contractDays;
+      if ((inv.totalProfitEarned || 0) >= hardCap) continue;
+      await db.investment.update({
+        where: { id: inv.id },
+        data: { status: 'active', dailyProfit: storedDailyProfit },
+      });
+      reactivated++;
+      console.log(`   ♻️  SELF-HEAL: Reactivated ${inv.id} — dailyProfit=${storedDailyProfit}, hardCap=${hardCap}, earned=${inv.totalProfitEarned}`);
+    }
+    if (reactivated > 0) console.log(`   ♻️  SELF-HEAL: Reactivated ${reactivated} investment(s)\n`);
+  }
+
   // ─── Process Investments ───
   const investments = await db.investment.findMany({
     where: { status: 'active' },
@@ -241,9 +274,14 @@ async function main() {
         }
       }
 
-      const dailyProfit = Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
+      // ★ BUG FIX: Use stored inv.dailyProfit — do NOT recompute from inv.package.profitRate.
+      //   For Product (VIP) purchases, packageId is linked to _internal_default (profitRate=0)
+      //   which made dailyProfit=0 → profit never credited.
+      const dailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
       if (dailyProfit <= 0) {
-        console.log(`   ⚠️  ${inv.userId}: dailyProfit=0 (amount=${inv.amount}, rate=${inv.package?.profitRate})`);
+        console.log(`   ⚠️  ${inv.userId}: dailyProfit=0 (stored=${inv.dailyProfit}, amount=${inv.amount}, pkgRate=${inv.package?.profitRate})`);
         continue;
       }
 
