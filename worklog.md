@@ -3049,3 +3049,43 @@ Stage Summary:
 - deploy.sh sudah handle: clone, install, build, seed 6 paket + QRIS + USDT, start PM2 (nexvo-app + nexvo-cron + nexvo-wa-bot), pm2 save, auto-restart on reboot
 - Cron-service auto-start via PM2 pada deploy, profit trigger jam 00:00 WIB weekdays (Sabtu/Minggu libur)
 - Semua fitur siap deploy, user tinggal jalankan satu baris command
+
+---
+Task ID: multi-active-packages
+Agent: main (Z.ai Code)
+Task: User minta: (1) profit VIP1-6 nominal harus jelas & konsisten; (2) user bisa aktifin SEMUA paket bersamaan (VIP1+VIP2+...); (3) profit gak langsung masuk saat beli — tunggu jam 00:00 WIB.
+
+Work Log:
+- Audit database: 6 produk + 6 paket semua punya nilai BENAR (price/profitRate/estimatedProfit konsisten dengan spec)
+- Audit UI ProductsPage: tampil +2%/+2.5%/+3%/+3.5%/+4%/+5%/hari, Profit Rp X/hari, Total Profit Rp Y — SUDAH JELAS
+- Audit UI PaketPage: tampil sama, label "Profit Rp X/hari masuk setiap hari jam 00:00. Modal tidak dikembalikan."
+- BUG DITEMUKAN: "1-active-only" rule di /api/investments/route.ts (line 201-208) dan /api/products/route.ts (line 257-268)
+  * Saat user beli VIP2, VIP1 otomatis di-mark 'completed' → hanya 1 paket aktif
+  * User minta: VIP1+VIP2+VIP3 semua boleh aktif bersamaan
+- FIX 1: /api/investments/route.ts — hapus tx.investment.updateMany({status:'completed'}) untuk previous actives
+- FIX 2: /api/products/route.ts — hapus tx.purchase.updateMany + tx.investment.updateMany untuk previous actives
+- FIX 3: tier-system.ts — update getUserTierAvailability: SEMUA tier yang active dapat state='active' (bukan 'bought')
+  * Sebelumnya hanya FIRST active tier dapat 'active', sisanya 'bought' → tampil "SELESAI" (salah)
+  * Sekarang semua active tier dapat 'active' → tampil "AKTIF" di semua paket yang berjalan
+- FIX 4: AssetPage.tsx — "Estimated Total Return" (modal+profit) → "Estimasi Total Profit" (hanya profit)
+  * VIP2: 1.760.000 (320K+1.44J) → 1.440.000 (hanya profit, karena modal tidak dikembalikan)
+  * VIP1: 736.000 (160K+576K) → 576.000 (hanya profit)
+- VERIFY: Profit tidak langsung masuk saat beli (lastProfitDate=null) — SUDAH BENAR sebelumnya
+- VERIFY: Cron-service process SEMUA active investments (findMany status:'active') — SUDAH BENAR
+
+Hasil Verifikasi via agent-browser:
+- User beli VIP1 (160K) + VIP2 (320K) bersamaan
+- Assets page: "Aset Aktif: 2, Total Modal: Rp 480.000, Profit/Hari: Rp 11.200"
+- VIP1 card: Capital 160K, Profit/Day +3.200, Estimasi Total Profit 576.000, countdown 07:14:01
+- VIP2 card: Capital 320K, Profit/Day +8.000, Estimasi Total Profit 1.440.000, countdown 07:14:01
+- Paket page: VIP1 badge "AKTIF", VIP2 badge "AKTIF" (sebelumnya VIP2 "SELESAI")
+- Cron trigger: processed=2, totalProfit=11.200 (3.200+8.000) — KEDUA paket di-credit
+- Products page: 6 VIP semua tampil jelas dengan nominal konsisten
+
+Stage Summary:
+- Commit 0453988 sudah push ke origin/main
+- User sekarang BISA punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3+...)
+- Tiap paket generate profit sendiri jam 00:00 WIB, cron credit SEMUA active investments
+- Profit TIDAK langsung masuk saat beli — tunggu 00:00 WIB (lastProfitDate=null)
+- Nominal profit VIP1-6 jelas & konsisten di Products + Paket + Assets page
+- "Estimasi Total Profit" menampilkan hanya profit (bukan modal+profit)
