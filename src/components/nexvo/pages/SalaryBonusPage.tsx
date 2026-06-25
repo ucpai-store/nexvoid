@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Banknote, CheckCircle2, XCircle, TrendingUp,
-  Calendar, AlertTriangle, RefreshCw, Clock, Award, Zap, Users
+  Calendar, AlertTriangle, RefreshCw, Clock, Award, Zap, Users, Infinity as InfinityIcon, Sparkles, Crown, Wallet
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatRupiah } from '@/lib/auth';
@@ -129,7 +129,7 @@ export default function SalaryBonusPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6">
         <div className="animate-pulse space-y-4">
-          <div className="glass rounded-2xl p-4 sm:p-6 h-48" />
+          <div className="glass rounded-3xl p-4 sm:p-6 h-64" />
           <div className="glass rounded-2xl p-4 sm:p-6 h-32" />
           <div className="glass rounded-2xl p-4 sm:p-6 h-32" />
         </div>
@@ -180,31 +180,94 @@ export default function SalaryBonusPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-foreground text-xl font-bold flex items-center gap-2">
-          <Banknote className="w-6 h-6 text-primary" />
-          Bonus Gaji Mingguan
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Dapatkan <span className="text-primary font-bold">{salaryRate}%</span> dari omzet grup setiap minggu — <span className="text-primary font-bold">SELAMANYA</span> (tanpa batas)
-        </p>
-        {/* ★ Aturan utama — tampilkan prominent di atas ★ */}
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Badge className="bg-primary/10 text-primary border-primary/20 border text-[10px] font-bold px-2.5 py-1">
-            <Clock className="w-3 h-3 mr-1" />Setiap Senin 00:00 WIB
-          </Badge>
-          <Badge className="bg-blue-400/10 text-blue-400 border-blue-400/20 border text-[10px] font-bold px-2.5 py-1">
-            <Users className="w-3 h-3 mr-1" />Wajib Invite {minDirectRefs} Orang
-          </Badge>
-          <Badge className="bg-emerald-400/10 text-emerald-400 border-emerald-400/20 border text-[10px] font-bold px-2.5 py-1">
-            <CheckCircle2 className="w-3 h-3 mr-1" />Wajib Aktif Investasi
-          </Badge>
-          <Badge className="bg-primary/10 text-primary border-primary/20 border text-[10px] font-bold px-2.5 py-1">
-            <Zap className="w-3 h-3 mr-1" />{salaryRate}% / Minggu Selamanya
-          </Badge>
+      {/* ═══════════ HERO SECTION — Premium Salary Banner ═══════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative overflow-hidden rounded-3xl border border-primary/20"
+      >
+        {/* Background gradient + glow effects */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a0f1c] via-[#1a1f2e] to-[#0a0f1c]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-primary/10" />
+        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-primary/20 blur-[100px]" />
+        <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-[#D4AF37]/15 blur-[100px]" />
+        {/* Decorative grid pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(212,175,55,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.5) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
+        />
+
+        <div className="relative z-10 p-5 sm:p-8 lg:p-10">
+          <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
+            {/* Logo + Crown */}
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="relative shrink-0"
+            >
+              <div className="absolute inset-0 bg-gold-gradient rounded-full blur-2xl opacity-40 animate-pulse" />
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-gradient-to-br from-[#1a1f2e] to-[#0a0f1c] border-2 border-primary/40 flex items-center justify-center overflow-hidden">
+                <img
+                  src="/salary-logo.png"
+                  alt="NEXVO Salary Bonus"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <Banknote className="w-14 h-14 sm:w-16 sm:h-16 text-primary hidden" />
+              </div>
+              {/* Crown badge on top */}
+              <div className="absolute -top-2 -right-2 w-9 h-9 rounded-full bg-gold-gradient flex items-center justify-center shadow-lg border-2 border-[#0a0f1c]">
+                <Crown className="w-4 h-4 text-[#0a0f1c]" />
+              </div>
+            </motion.div>
+
+            {/* Title + Description */}
+            <div className="flex-1 text-center lg:text-left">
+              <div className="inline-flex items-center gap-1.5 mb-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30">
+                <Sparkles className="w-3 h-3 text-primary" />
+                <span className="text-primary text-[10px] font-bold tracking-wider uppercase">NEXVO Premium Salary</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-[#F5E6A3] to-[#D4AF37] mb-2">
+                Bonus Gaji Mingguan
+              </h1>
+              <p className="text-white/70 text-sm sm:text-base mb-4 max-w-xl">
+                Dapatkan{' '}
+                <span className="text-primary font-bold">{salaryRate}%</span> dari omzet grup setiap minggu —{' '}
+                <span className="text-primary font-bold inline-flex items-center gap-1">
+                  SELAMANYA
+                  <InfinityIcon className="w-4 h-4" />
+                </span>{' '}
+                tanpa batas
+              </p>
+
+              {/* Feature badges */}
+              <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
+                <Badge className="bg-primary/15 text-primary border-primary/30 border text-[10px] font-bold px-3 py-1.5 backdrop-blur-sm">
+                  <Clock className="w-3 h-3 mr-1.5" />Senin 00:00 WIB
+                </Badge>
+                <Badge className="bg-blue-400/15 text-blue-300 border-blue-400/30 border text-[10px] font-bold px-3 py-1.5 backdrop-blur-sm">
+                  <Users className="w-3 h-3 mr-1.5" />Wajib Invite {minDirectRefs}
+                </Badge>
+                <Badge className="bg-emerald-400/15 text-emerald-300 border-emerald-400/30 border text-[10px] font-bold px-3 py-1.5 backdrop-blur-sm">
+                  <CheckCircle2 className="w-3 h-3 mr-1.5" />Aktif Investasi
+                </Badge>
+                <Badge className="bg-amber-400/15 text-amber-300 border-amber-400/30 border text-[10px] font-bold px-3 py-1.5 backdrop-blur-sm">
+                  <InfinityIcon className="w-3 h-3 mr-1.5" />{salaryRate}% / Minggu
+                </Badge>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Completed Banner */}
       {isCompleted && (
@@ -223,11 +286,12 @@ export default function SalaryBonusPage() {
         </motion.div>
       )}
 
-      {/* Eligibility Card */}
+      {/* ═══════════ Eligibility Card ═══════════ */}
       {!isCompleted && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
           className="glass-gold glow-gold rounded-2xl p-4 sm:p-6 lg:p-8 relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 blur-3xl" />
@@ -255,25 +319,35 @@ export default function SalaryBonusPage() {
               </Badge>
             </div>
 
-            {/* 12-Week Progress */}
+            {/* ★ Forever Progress — since unlimited, show weeks received with infinity ★ */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-foreground text-sm font-medium">Progress Mingguan</span>
+                <span className="text-foreground text-sm font-medium flex items-center gap-1.5">
+                  <InfinityIcon className="w-3.5 h-3.5 text-primary" />
+                  Progress Mingguan (Selamanya)
+                </span>
                 <span className="text-muted-foreground text-xs font-bold">
-                  {weeksReceived} {unlimited ? 'minggu diterima (selamanya)' : `/ ${maxWeeks} Minggu`}
+                  {weeksReceived} minggu diterima{' '}
+                  <span className="text-primary">∞ selamanya</span>
                 </span>
               </div>
-              <div className="w-full h-3 rounded-full bg-foreground/5 overflow-hidden">
+              <div className="w-full h-3 rounded-full bg-foreground/5 overflow-hidden relative">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: unlimited ? '100%' : `${(weeksReceived / maxWeeks) * 100}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                  className="h-full rounded-full bg-gold-gradient"
-                />
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 1.5, ease: 'easeOut' }}
+                  className="h-full rounded-full bg-gradient-to-r from-primary/60 via-primary to-[#D4AF37] relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                </motion.div>
               </div>
               <div className="flex justify-between mt-1.5">
-                <span className="text-muted-foreground text-[10px]">Sisa: {weeksRemainingLabel}</span>
-                <span className="text-muted-foreground text-[10px]">{unlimited ? '∞' : `${Math.round((weeksReceived / maxWeeks) * 100)}%`}</span>
+                <span className="text-muted-foreground text-[10px] flex items-center gap-1">
+                  <InfinityIcon className="w-3 h-3" /> Sisa: <span className="text-primary font-semibold">{weeksRemainingLabel}</span>
+                </span>
+                <span className="text-muted-foreground text-[10px]">
+                  {weeksReceived > 0 ? `Total ${weeksReceived} minggu ✓` : 'Mulai perjalanan Anda'}
+                </span>
               </div>
             </div>
 
@@ -332,34 +406,37 @@ export default function SalaryBonusPage() {
               {/* Estimated Salary Info - HANYA muncul kalau KEDUA syarat terpenuhi */}
               {meetsMinDirectRefs && userHasActiveDeposit ? (
                 <>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground text-xs">Estimasi Gaji/Minggu</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Estimasi Gaji */}
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                      <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                        <Zap className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-muted-foreground text-[10px]">Estimasi Gaji/Minggu</p>
+                        <p className="text-emerald-400 font-bold text-sm truncate">{formatRupiah(estimatedSalary)}</p>
+                      </div>
                     </div>
-                    <span className="text-emerald-400 font-bold text-sm">
-                      {formatRupiah(estimatedSalary)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground text-xs">Omzet Grup</span>
+                    {/* Omzet Grup */}
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                      <div className="w-9 h-9 rounded-lg bg-blue-400/10 flex items-center justify-center shrink-0">
+                        <TrendingUp className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-muted-foreground text-[10px]">Omzet Grup</p>
+                        <p className="text-foreground font-semibold text-sm truncate">{formatRupiah(groupOmzet)}</p>
+                      </div>
                     </div>
-                    <span className="text-foreground font-semibold text-sm">
-                      {formatRupiah(groupOmzet)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <Banknote className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground text-xs">Rate Gaji</span>
+                    {/* Rate Gaji */}
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                      <div className="w-9 h-9 rounded-lg bg-amber-400/10 flex items-center justify-center shrink-0">
+                        <InfinityIcon className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-muted-foreground text-[10px]">Rate Gaji (Selamanya)</p>
+                        <p className="text-primary font-bold text-sm">{salaryRate}% / minggu ∞</p>
+                      </div>
                     </div>
-                    <span className="text-primary font-bold text-sm">
-                      {salaryRate}% / minggu
-                    </span>
                   </div>
                 </>
               ) : !meetsMinDirectRefs ? (
@@ -434,64 +511,70 @@ export default function SalaryBonusPage() {
         </motion.div>
       )}
 
-      {/* Summary Stats - Only show salary-related stats when eligible or already received salary */}
+      {/* ═══════════ Summary Stats — Only show when eligible or already received salary ═══════════ */}
       {(meetsMinDirectRefs && userHasActiveDeposit) || (data?.totalSalaryEarned || 0) > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
+            className="glass glow-gold rounded-2xl p-4 text-center relative overflow-hidden"
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
+            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-emerald-400/10 blur-2xl" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-400/10 flex items-center justify-center mx-auto mb-2 relative">
+              <Wallet className="w-5 h-5 text-emerald-400" />
             </div>
-            <p className="text-2xl font-bold text-emerald-400">{formatRupiah(data?.totalSalaryEarned || 0)}</p>
-            <p className="text-muted-foreground text-xs">Total Gaji Diterima</p>
+            <p className="text-xl sm:text-2xl font-bold text-emerald-400 relative">{formatRupiah(data?.totalSalaryEarned || 0)}</p>
+            <p className="text-muted-foreground text-[10px] sm:text-xs relative">Total Gaji Diterima</p>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
+            className="glass glow-gold rounded-2xl p-4 text-center relative overflow-hidden"
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <Clock className="w-5 h-5 text-primary" />
+            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-primary/10 blur-2xl" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2 relative">
+              <InfinityIcon className="w-5 h-5 text-primary" />
             </div>
-            <p className="text-foreground text-lg font-bold">{weeksReceived} <span className="text-muted-foreground text-sm font-normal">{unlimited ? '(selamanya)' : `/ ${maxWeeks}`}</span></p>
-            <p className="text-muted-foreground text-xs">Minggu Diterima</p>
+            <p className="text-foreground text-lg font-bold relative">
+              {weeksReceived} <span className="text-primary text-sm">∞</span>
+            </p>
+            <p className="text-muted-foreground text-[10px] sm:text-xs relative">Minggu Diterima (Selamanya)</p>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
+            className="glass glow-gold rounded-2xl p-4 text-center relative overflow-hidden"
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <Zap className="w-5 h-5 text-primary" />
+            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-amber-400/10 blur-2xl" />
+            <div className="w-10 h-10 rounded-xl bg-amber-400/10 flex items-center justify-center mx-auto mb-2 relative">
+              <Zap className="w-5 h-5 text-amber-400" />
             </div>
-            <p className="text-foreground text-lg font-bold">{salaryRate}%</p>
-            <p className="text-muted-foreground text-xs">Rate / Minggu</p>
+            <p className="text-foreground text-lg font-bold relative">{salaryRate}%</p>
+            <p className="text-muted-foreground text-[10px] sm:text-xs relative">Rate / Minggu</p>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="glass glow-gold rounded-2xl p-4 text-center"
+            className="glass glow-gold rounded-2xl p-4 text-center relative overflow-hidden"
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <Users className="w-5 h-5 text-primary" />
+            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-blue-400/10 blur-2xl" />
+            <div className="w-10 h-10 rounded-xl bg-blue-400/10 flex items-center justify-center mx-auto mb-2 relative">
+              <Users className="w-5 h-5 text-blue-400" />
             </div>
-            <p className="text-foreground text-lg font-bold">{activeRefDeposits}</p>
-            <p className="text-muted-foreground text-xs">Direct Invites</p>
+            <p className="text-foreground text-lg font-bold relative">{activeRefDeposits}</p>
+            <p className="text-muted-foreground text-[10px] sm:text-xs relative">Direct Invites</p>
           </motion.div>
         </div>
       ) : null}
 
-      {/* Salary History */}
+      {/* ═══════════ Salary History ═══════════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -504,16 +587,22 @@ export default function SalaryBonusPage() {
         </h3>
 
         {data?.salaryBonuses && data.salaryBonuses.length > 0 ? (
-          <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
+          <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin pr-1">
             {data.salaryBonuses.map((bonus, i) => (
-              <div key={bonus.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <motion.div
+                key={bonus.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-white/[0.03] to-transparent hover:from-primary/5 hover:to-transparent transition-colors border border-white/5"
+              >
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 border border-primary/20">
                   <Award className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-foreground text-sm font-medium">
-                      Minggu {bonus.weekOfTotal}{unlimited ? ' (selamanya)' : `/${maxWeeks}`}
+                      Minggu {bonus.weekOfTotal}{unlimited ? ' ∞' : `/${maxWeeks}`}
                     </p>
                     <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[10px] px-1.5 py-0">
                       Lunas
@@ -532,53 +621,68 @@ export default function SalaryBonusPage() {
                     {new Date(bonus.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
                   </p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         ) : (
           <div className="text-center py-8">
-            <Calendar className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+            <div className="w-14 h-14 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto mb-3">
+              <Calendar className="w-7 h-7 text-primary/30" />
+            </div>
             <p className="text-muted-foreground text-sm">Belum ada riwayat gaji</p>
+            <p className="text-muted-foreground text-[10px] mt-1">Gaji akan otomatis dikreditkan setiap Senin 00:00 WIB</p>
           </div>
         )}
       </motion.div>
 
-      {/* Info Box */}
+      {/* ═══════════ How It Works — Premium Info Box ═══════════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="glass rounded-2xl p-3 sm:p-5 lg:p-6"
+        className="relative overflow-hidden rounded-2xl border border-primary/20"
       >
-        <h3 className="text-foreground font-semibold text-sm mb-3 flex items-center gap-2">
-          <Zap className="w-4 h-4 text-primary" />
-          Cara Kerja Bonus Gaji
-        </h3>
-        <div className="space-y-2 text-muted-foreground text-xs">
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">1.</span>
-            <span><strong className="text-foreground">Syarat 1:</strong> Wajib mengundang minimal <strong className="text-foreground">{minDirectRefs} orang</strong> (Level 1)</span>
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.04] via-transparent to-primary/[0.02]" />
+        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative z-10 p-3 sm:p-5 lg:p-6">
+          <h3 className="text-foreground font-semibold text-sm mb-4 flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gold-gradient flex items-center justify-center">
+              <Crown className="w-3.5 h-3.5 text-primary-foreground" />
+            </div>
+            Cara Kerja Bonus Gaji
+            <Badge className="bg-primary/10 text-primary border-primary/20 border text-[9px] font-bold px-2 py-0.5 ml-auto">
+              <InfinityIcon className="w-2.5 h-2.5 mr-1" />SELAMANYA
+            </Badge>
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {[
+              { num: '1', icon: Users, title: 'Syarat 1', text: `Wajib mengundang minimal ${minDirectRefs} orang (Level 1)`, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+              { num: '2', icon: Banknote, title: 'Syarat 2', text: 'Wajib memiliki investasi aktif + semua undangan L1 juga aktif', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+              { num: '3', icon: Clock, title: 'Pembayaran', text: `Setelah kedua syarat terpenuhi, gaji ${salaryRate}% omzet grup dikreditkan setiap Senin 00:00 WIB`, color: 'text-primary', bg: 'bg-primary/10' },
+              { num: '4', icon: InfinityIcon, title: 'Durasi', text: 'Gaji berlangsung SELAMANYA (tanpa batas) sejak syarat terpenuhi', color: 'text-amber-400', bg: 'bg-amber-400/10' },
+            ].map((step) => (
+              <div key={step.num} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <div className={`w-8 h-8 rounded-lg ${step.bg} flex items-center justify-center shrink-0`}>
+                  <step.icon className={`w-4 h-4 ${step.color}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-foreground text-xs font-semibold flex items-center gap-1.5">
+                    <span className={`text-[10px] ${step.color} font-bold`}>{step.num}.</span>
+                    {step.title}
+                  </p>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed mt-0.5">{step.text}</p>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">2.</span>
-            <span><strong className="text-foreground">Syarat 2:</strong> Wajib memiliki <strong className="text-foreground">investasi aktif</strong> + semua undangan Level 1 juga wajib aktif investasi</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">3.</span>
-            <span>Setelah <strong className="text-foreground">kedua syarat</strong> terpenuhi, gaji <strong className="text-foreground">{salaryRate}%</strong> dari omzet grup dikreditkan setiap <strong className="text-foreground\">Senin pukul 00:00 WIB</strong></span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">4.</span>
-            <span>Gaji berlangsung <strong className="text-foreground">{unlimited ? 'selamanya' : `selama ${maxWeeks} minggu`}</strong> sejak syarat terpenuhi</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary font-bold">5.</span>
-            <span>Profit & bonus gaji masuk <strong className="text-foreground">saldo utama</strong> (bisa ditarik)</span>
+          <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-foreground text-xs">
+              Profit & bonus gaji masuk <strong className="text-primary">saldo utama</strong> (bisa ditarik kapan saja)
+            </span>
           </div>
         </div>
       </motion.div>
     </div>
   );
 }
-
-// touch Wed Jun 24 17:59:10 UTC 2026
