@@ -1505,8 +1505,8 @@ function ComprehensiveGuide() {
                   {
                     icon: Banknote,
                     title: 'Salary Bonus',
-                    desc: 'Bonus gaji yang didapatkan berdasarkan total investasi aktif. Semakin besar investasi, semakin besar salary bonus yang kamu terima.',
-                    tag: 'Bulanan',
+                    desc: 'Gaji 1% dari omzet grup setiap minggu SELAMANYA. Wajib invite 10 orang + aktif investasi. Dibayar setiap Senin 00:00 WIB.',
+                    tag: 'Mingguan',
                   },
                   {
                     icon: GitCompare,
