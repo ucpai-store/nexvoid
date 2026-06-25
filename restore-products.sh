@@ -80,7 +80,7 @@ const fmt = (n) => n.toLocaleString("id-ID");
 
 (async () => {
   console.log("\n📋 Current state:");
-  const [admins, users, products, packages, banners, salaryCfg, matchingCfg] = await Promise.all([
+  const [admins, users, productCount, packageCount, banners, salaryCfg, matchingCfg] = await Promise.all([
     db.admin.count(),
     db.user.count(),
     db.product.count(),
@@ -91,8 +91,8 @@ const fmt = (n) => n.toLocaleString("id-ID");
   ]);
   console.log(`   Admins:   ${admins}`);
   console.log(`   Users:    ${users}`);
-  console.log(`   Products: ${products}`);
-  console.log(`   Packages: ${packages}`);
+  console.log(`   Products: ${productCount}`);
+  console.log(`   Packages: ${packageCount}`);
   console.log(`   Banners:  ${banners}`);
 
   // ════════════════════════════════════════════════════════════
