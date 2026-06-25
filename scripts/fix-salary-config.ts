@@ -1,15 +1,27 @@
 /**
- * Quick fix script — force SalaryConfig to 1%/week PERMANEN (maxWeeks=0).
+ * NUCLEAR fix — kill ALL stale SalaryConfig rows (2.5%/12 minggu) and create ONE clean config.
  * Run: bun run scripts/fix-salary-config.ts
  *
- * This kills any stale "2.5%" rate or "12 minggu" maxWeeks that an admin
- * (or old deploy) may have left in the DB.
+ * This handles:
+ * - Multiple duplicate SalaryConfig rows (seed only updates first, API may read another)
+ * - Stale 2.5% rate / 12 maxWeeks left by old admin settings or old deploys
+ * - Any config with isActive: false that shouldn't be there
  */
 import { db } from '../src/lib/db';
 
 async function main() {
-  const existing = await db.salaryConfig.findFirst();
+  // 1. Show ALL existing configs (so we can see what's wrong)
+  const all = await db.salaryConfig.findMany({ orderBy: { updatedAt: 'asc' } });
+  console.log(`\nFound ${all.length} SalaryConfig row(s) BEFORE fix:`);
+  all.forEach((c, i) => {
+    console.log(`  [${i}] id=${c.id} | rate=${c.salaryRate}% | maxWeeks=${c.maxWeeks} | minRefs=${c.minDirectRefs} | active=${c.isActive}`);
+  });
 
+  // 2. DELETE ALL existing configs (nuclear — no stale data survives)
+  const deleted = await db.salaryConfig.deleteMany({});
+  console.log(`\n🗑️  Deleted ${deleted.count} stale config(s)`);
+
+  // 3. CREATE ONE clean config: 1%/week, PERMANEN (maxWeeks=0), min 10 refs
   const CORRECT = {
     minDirectRefs: 10,
     salaryRate: 1,
@@ -18,23 +30,17 @@ async function main() {
     fixedSalaryAmount: 25000,
     isActive: true,
   };
+  await db.salaryConfig.create({ data: CORRECT });
+  console.log('✅ Created ONE clean config: 1%/week PERMANEN (maxWeeks=0, min 10 refs)');
 
-  if (existing) {
-    const before = { salaryRate: existing.salaryRate, maxWeeks: existing.maxWeeks, minDirectRefs: existing.minDirectRefs };
-    await db.salaryConfig.update({
-      where: { id: existing.id },
-      data: CORRECT,
-    });
-    console.log('✅ SalaryConfig FORCE-UPDATED');
-    console.log('   BEFORE:', JSON.stringify(before));
-    console.log('   AFTER :', JSON.stringify({ salaryRate: 1, maxWeeks: 0, minDirectRefs: 10 }));
-  } else {
-    await db.salaryConfig.create({ data: CORRECT });
-    console.log('✅ SalaryConfig CREATED (1%/week PERMANEN — maxWeeks=0)');
-  }
+  // 4. Verify
+  const verify = await db.salaryConfig.findMany();
+  console.log(`\nAFTER fix: ${verify.length} config row(s):`);
+  verify.forEach((c, i) => {
+    console.log(`  [${i}] rate=${c.salaryRate}% | maxWeeks=${c.maxWeeks} | minRefs=${c.minDirectRefs} | active=${c.isActive}`);
+  });
 
-  const verify = await db.salaryConfig.findFirst();
-  console.log('\nVerify:', JSON.stringify(verify, null, 2));
+  console.log('\n🎉 Done. Refresh the salary page — 2.5% → 1%, 12 minggu → Selamanya.');
 }
 
 main()

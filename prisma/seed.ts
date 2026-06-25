@@ -279,10 +279,11 @@ async function seed() {
     console.log('⏭️  MatchingConfig already exists (skipped)\n');
   }
 
-  // 7. UPSERT SalaryConfig — 1%/week PERMANEN (maxWeeks=0), min 10 referral aktif deposit
-  //    ★ UPSERT: kalau config sudah ada tapi datanya salah (rate 2.5%/maxWeeks 12), tetap di-update ★
-  console.log('Syncing SalaryConfig (1%/week PERMANEN, min 10 referral aktif deposit)...');
-  const existingSalaryConfig = await prisma.salaryConfig.findFirst();
+  // 7. NUCLEAR SYNC SalaryConfig — DELETE ALL stale rows (2.5%/12 minggu), CREATE ONE clean config
+  //    ★ Why nuclear: if multiple SalaryConfig rows exist (from old admin settings or old deploys),
+  //      UPSERT only updates the FIRST row, but the API reads the first ACTIVE row — which may be a
+  //      DIFFERENT row with stale 2.5%/12 values. Deleting all + creating one guarantees correctness.
+  console.log('Nuclear-syncing SalaryConfig (1%/week PERMANEN, min 10 referral aktif deposit)...');
   const SALARY_DEFAULTS = {
     minDirectRefs: 10,
     salaryRate: 1,
@@ -291,16 +292,13 @@ async function seed() {
     fixedSalaryAmount: 25000,
     isActive: true,
   };
-  if (existingSalaryConfig) {
-    await prisma.salaryConfig.update({
-      where: { id: existingSalaryConfig.id },
-      data: SALARY_DEFAULTS,
-    });
-    console.log('✅ SalaryConfig updated (1%/week PERMANEN — maxWeeks=0)\n');
-  } else {
-    await prisma.salaryConfig.create({ data: SALARY_DEFAULTS });
-    console.log('✅ SalaryConfig created (1%/week PERMANEN — maxWeeks=0)\n');
+  const staleCount = await prisma.salaryConfig.count();
+  if (staleCount > 0) {
+    await prisma.salaryConfig.deleteMany({});
+    console.log(`  🗑️  Deleted ${staleCount} stale config row(s) (incl. any 2.5%/12 minggu)`);
   }
+  await prisma.salaryConfig.create({ data: SALARY_DEFAULTS });
+  console.log('  ✅ Created ONE clean SalaryConfig (1%/week PERMANEN — maxWeeks=0)\n');
 
   console.log('🎉 Seeding complete!');
   console.log('\n📋 Admin login credentials:');
