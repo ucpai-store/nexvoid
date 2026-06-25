@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Package, Clock, TrendingUp, AlertTriangle, RefreshCw,
-  Coins, Calendar, CheckCircle2, XCircle, Loader2, ShieldCheck, Zap
+  Coins, Calendar, CheckCircle2, XCircle, Loader2, ShieldCheck, Zap, Timer
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAppStore } from '@/stores/app-store';
@@ -13,6 +13,92 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useT } from '@/lib/i18n';
+
+/* ───────── Profit Countdown (real-time, next 00:00 WIB) ───────── */
+function getNextMidnightWIB(): Date {
+  // WIB = UTC+7. Hitung waktu WIB sekarang, lalu cari 00:00 WIB berikutnya.
+  const now = new Date();
+  const wibNowMs = now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60000;
+  const wibNow = new Date(wibNowMs);
+  // 00:00 WIB hari ini (dalam WIB wall-clock)
+  const wibMidnightToday = new Date(wibNow);
+  wibMidnightToday.setHours(24, 0, 0, 0); // 00:00 besok (WIB wall-clock)
+  // Konversi balik ke UTC ms
+  const utcMs = wibMidnightToday.getTime() - (7 * 60 + now.getTimezoneOffset()) * 60000;
+  return new Date(utcMs);
+}
+
+function isWeekendWIB(): boolean {
+  const now = new Date();
+  const wibNowMs = now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60000;
+  const wibNow = new Date(wibNowMs);
+  const day = wibNow.getDay(); // 0=Sun, 6=Sat
+  return day === 0 || day === 6;
+}
+
+function getNextWeekdayMidnightWIB(): Date {
+  // Cari 00:00 WIB hari kerja berikutnya (Senin-Jumat)
+  // Lewati Sabtu & Minggu — profit tidak masuk di weekend
+  const now = new Date();
+  let next = getNextMidnightWIB();
+  for (let i = 0; i < 7; i++) {
+    const wibMs = next.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60000;
+    const wibDate = new Date(wibMs);
+    const day = wibDate.getDay();
+    if (day >= 1 && day <= 5) return next; // Senin-Jumat
+    // Tambah 1 hari (24h) untuk cek 00:00 WIB berikutnya
+    next = new Date(next.getTime() + 24 * 3600000);
+  }
+  return getNextMidnightWIB();
+}
+
+function useProfitCountdown(): { h: string; m: string; s: string; weekend: boolean } {
+  const [tick, setTick] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => setTick(t => t + 1), 1000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
+
+  const weekend = isWeekendWIB();
+  // Hitung target 00:00 WIB berikutnya. Kalau weekend → lompat ke Senin 00:00 WIB.
+  // Note: kalau weekend, profit TIDAK akan masuk sampai Senin 00:00 WIB.
+  const target = weekend ? getNextWeekdayMidnightWIB() : getNextMidnightWIB();
+  const diff = Math.max(0, target.getTime() - Date.now());
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+
+  return {
+    h: String(h).padStart(2, '0'),
+    m: String(m).padStart(2, '0'),
+    s: String(s).padStart(2, '0'),
+    weekend,
+  };
+}
+
+function ProfitCountdownBadge({ dailyProfit }: { dailyProfit: number }) {
+  const { h, m, s, weekend } = useProfitCountdown();
+  return (
+    <div className="mt-3 px-3 py-2 rounded-xl bg-emerald-400/5 border border-emerald-400/15 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <Timer className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span className="text-[10px] text-muted-foreground truncate">
+          {weekend ? 'Profit berikutnya (Senin 00:00 WIB)' : 'Profit berikutnya masuk (00:00 WIB)'}
+        </span>
+      </div>
+      <div className="flex items-center gap-1 font-mono text-[11px] font-bold">
+        <span className="text-emerald-400">{h}</span>
+        <span className="text-muted-foreground">:</span>
+        <span className="text-emerald-400">{m}</span>
+        <span className="text-muted-foreground">:</span>
+        <span className="text-emerald-400">{s}</span>
+      </div>
+    </div>
+  );
+}
 
 /* ───────── Types ───────── */
 interface AssetItem {
@@ -216,6 +302,11 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
             {formatRupiah(asset.amount + (asset.dailyProfit * asset.contractDays))}
           </span>
         </div>
+      )}
+
+      {/* Real-time countdown to next 00:00 WIB profit credit */}
+      {asset.status === 'active' && (
+        <ProfitCountdownBadge dailyProfit={asset.dailyProfit} />
       )}
 
       {/* Last profit date */}

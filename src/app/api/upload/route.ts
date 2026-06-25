@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth';
+import { getUserFromRequest, getAdminFromRequest } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
@@ -13,24 +13,31 @@ const ALLOWED_MIME = new Set([
   'image/gif',
 ]);
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB (naik dari 5MB supaya banner produk bisa diupload)
 
 /**
- * General image upload (e.g. user avatar).
- * Authenticated users only. Saves file to /uploads and returns a URL
- * that can be served via /api/files/[...path].
+ * General image upload.
+ * - Authenticated users → upload avatar (filename: avatar-{userId}-...)
+ * - Authenticated admins → upload banners/product images (filename: admin-{adminId}-...)
+ * Files saved to /uploads and served via /api/files/[...path].
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
-    if (!user) {
+    // Try admin first, then user (route menerima dua jenis token)
+    const admin = await getAdminFromRequest(request);
+    let user = null;
+    if (!admin) {
+      user = await getUserFromRequest(request);
+    }
+
+    if (!admin && !user) {
       return NextResponse.json(
         { success: false, error: 'Tidak terautentikasi' },
         { status: 401 }
       );
     }
 
-    if (user.isSuspended) {
+    if (user && user.isSuspended) {
       return NextResponse.json(
         { success: false, error: 'Akun ditangguhkan' },
         { status: 403 }
@@ -58,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { success: false, error: 'File terlalu besar (maks 5MB)' },
+        { success: false, error: 'File terlalu besar (maks 8MB)' },
         { status: 400 }
       );
     }
@@ -68,10 +75,12 @@ export async function POST(request: NextRequest) {
       await mkdir(UPLOADS_DIR, { recursive: true });
     }
 
-    // Generate unique filename: avatar-{userId}-{timestamp}-{rand}.{ext}
+    // Generate unique filename with appropriate prefix
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
-    const uniqueName = `avatar-${user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${safeExt}`;
+    const ownerId = admin ? admin.id : user!.id;
+    const prefix = admin ? 'admin' : 'avatar';
+    const uniqueName = `${prefix}-${ownerId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${safeExt}`;
 
     const filePath = path.join(UPLOADS_DIR, uniqueName);
     const bytes = await file.arrayBuffer();
