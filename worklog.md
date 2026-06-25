@@ -2596,3 +2596,33 @@ Stage Summary:
 - Hard cap 576k: tetap aktif (dailyProfit × contractDays)
 - Salary: tetap PERMANEN (maxWeeks=0), tetap Senin 00:00 WIB
 - Admin manual trigger: bisa override weekend dengan ?force=true
+
+---
+Task ID: deploy-port3000-fix
+Agent: main (Z.ai Code)
+Task: Fix deploy.sh — nexvo-app NOT listening on :3000 (ghost nexvo-web process)
+
+Work Log:
+- User screenshot showed: nexvo-app failed to listen on :3000 after deploy
+- Root cause: old 'nexvo-web' PM2 process (8h uptime) was still holding port 3000
+- deploy.sh line 125 only deleted nexvo-app/nexvo-cron/nexvo-wa-bot — NOT nexvo-web
+- Fixed STOP OLD SERVICES:
+  • Expanded delete list: nexvo-app, nexvo-cron, nexvo-wa-bot, nexvo-web, nexvo-next, nexvo
+  • Added pm2 jlist scanner: kill ANY process matching nexvo*/nexa*/next*
+- Fixed PORT CLEANUP: 4-layer kill strategy (lsof → ss → fuser → pkill)
+  • Added pkill -9 for 'next start', 'next dev', 'bun run index.ts' as final fallback
+  • Increased sleep from 2s to 3s after kill
+- Fixed BUILD: pass DATABASE_URL explicitly + check BUILD_EXIT code
+- Fixed START NEXT.JS:
+  • Final port check before start (force kill if still occupied)
+  • Verify .next/ exists (emergency build if missing, die if build fails)
+- Fixed VERIFY: self-heal restart for nexvo-app (show logs + restart + retry)
+- Updated stale comments: 'EVERY day' → 'WEEKDAYS ONLY (Sat/Sun LIBUR)'
+- Verified bash syntax OK + cron-service starts cleanly
+- Committed + pushed (commit 32926ae)
+
+Stage Summary:
+- deploy.sh now kills ALL ghost nexvo* processes before starting new ones
+- Port 3000 will be free before nexvo-app starts
+- Self-heal: if nexvo-app fails to listen, auto-restart + retry
+- Profit/salary logic unchanged: weekdays only, Sat/Sun libur, salary permanen
