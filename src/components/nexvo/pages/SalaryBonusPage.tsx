@@ -255,7 +255,7 @@ export default function SalaryBonusPage() {
                   <Clock className="w-3 h-3 mr-1.5" />Senin 00:00 WIB
                 </Badge>
                 <Badge className="bg-blue-400/15 text-blue-300 border-blue-400/30 border text-[10px] font-bold px-3 py-1.5 backdrop-blur-sm">
-                  <Users className="w-3 h-3 mr-1.5" />Wajib Invite {minDirectRefs}
+                  <Users className="w-3 h-3 mr-1.5" />Invite {minDirectRefs} Orang (Bebas)
                 </Badge>
                 <Badge className="bg-emerald-400/15 text-emerald-300 border-emerald-400/30 border text-[10px] font-bold px-3 py-1.5 backdrop-blur-sm">
                   <CheckCircle2 className="w-3 h-3 mr-1.5" />Aktif Investasi
@@ -351,13 +351,16 @@ export default function SalaryBonusPage() {
               </div>
             </div>
 
-            {/* ★ SYARAT 1: Wajib invite minimal 10 orang (dicek DULU) */}
+            {/* ★ SYARAT 1: Wajib invite minimal 10 orang (TANPA BATAS WAKTU, dicek DULU) */}
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-foreground text-sm font-medium flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-primary" />
                     Syarat 1: Min. {minDirectRefs} Undangan Langsung
+                    <span className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold">
+                      <InfinityIcon className="w-2.5 h-2.5" />Tanpa Batas Waktu
+                    </span>
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {directRefs} / {minDirectRefs} orang
@@ -373,7 +376,7 @@ export default function SalaryBonusPage() {
                 </div>
                 {!meetsMinDirectRefs ? (
                   <p className="text-yellow-400 text-[10px] mt-1">
-                    ⚠️ Syarat 1 belum terpenuhi: undang minimal {minDirectRefs} orang ({directRefs}/{minDirectRefs})
+                    ⚠️ Undang minimal {minDirectRefs} orang ({directRefs}/{minDirectRefs}). <span className="text-emerald-400 font-semibold">Bebas kapan saja — tanpa deadline!</span>
                   </p>
                 ) : (
                   <p className="text-emerald-400 text-[10px] mt-1">
@@ -656,10 +659,10 @@ export default function SalaryBonusPage() {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {[
-              { num: '1', icon: Users, title: 'Syarat 1', text: `Wajib mengundang minimal ${minDirectRefs} orang (Level 1)`, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+              { num: '1', icon: Users, title: 'Syarat 1', text: `Undang minimal ${minDirectRefs} orang (Level 1) — bebas kapan saja, TANPA BATAS WAKTU`, color: 'text-blue-400', bg: 'bg-blue-400/10' },
               { num: '2', icon: Banknote, title: 'Syarat 2', text: 'Wajib memiliki investasi aktif + semua undangan L1 juga aktif', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
               { num: '3', icon: Clock, title: 'Pembayaran', text: `Setelah kedua syarat terpenuhi, gaji ${salaryRate}% omzet grup dikreditkan setiap Senin 00:00 WIB`, color: 'text-primary', bg: 'bg-primary/10' },
-              { num: '4', icon: InfinityIcon, title: 'Durasi', text: 'Gaji berlangsung SELAMANYA (tanpa batas) sejak syarat terpenuhi', color: 'text-amber-400', bg: 'bg-amber-400/10' },
+              { num: '4', icon: InfinityIcon, title: 'Durasi', text: `Gaji ${salaryRate}% berlangsung SELAMANYA — tanpa batas minggu, tanpa batas waktu undangan`, color: 'text-amber-400', bg: 'bg-amber-400/10' },
             ].map((step) => (
               <div key={step.num} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className={`w-8 h-8 rounded-lg ${step.bg} flex items-center justify-center shrink-0`}>

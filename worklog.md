@@ -3458,3 +3458,28 @@ Stage Summary:
 - System confirmed: 1% per week, forever, invite 10, active investment required
 - Commit: 2a8a5a9 pushed to origin/main
 - Deploy: pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && sleep 3 && pm2 status
+
+---
+Task ID: salary-1pct-unlimited
+Agent: main (Z.ai Code)
+Task: User confirmed salary rules: gaji = 1% (NOT 2.5%), invite has NO time limit — just invite 10 people (bebas/tanpa batas waktu)
+
+Work Log:
+- Verified DB SalaryConfig: salaryRate=1, maxWeeks=0 (unlimited/permanent), minDirectRefs=10, requireActiveDeposit=true — ALL CORRECT
+- Verified backend /api/salary-bonus returns: salaryRate=1, maxWeeks=0, minDirectRefs=10, weeksRemaining=-1 (unlimited) — ALL CORRECT
+- Verified /api/init, /api/seed, /api/admin/salary-config all default to salaryRate=1, maxWeeks=0 — CORRECT
+- Found NO "2.5%" hardcoded anywhere in salary code (the 2.5% is only for product profit rates "Gold Premium Aset 2", unrelated to salary)
+- Updated SalaryBonusPage.tsx UI to emphasize "no time limit for invite":
+  * Hero badge: "Invite 10 Orang (Bebas)" (was "Wajib Invite 10")
+  * Syarat 1 header: added green "Tanpa Batas Waktu" pill badge next to "Min. 10 Undangan Langsung"
+  * Syarat 1 warning text: "⚠️ Undang minimal 10 orang (0/10). Bebas kapan saja — tanpa deadline!" (was "Syarat 1 belum terpenuhi...")
+  * Cara Kerja step 1: "Undang minimal 10 orang (Level 1) — bebas kapan saja, TANPA BATAS WAKTU"
+  * Cara Kerja step 4: "Gaji 1% berlangsung SELAMANYA — tanpa batas minggu, tanpa batas waktu undangan"
+- Found stale .next cache was serving OLD compiled chunk (showed "Wajib Invite" text that doesn't exist in source). Cleared .next cache and restarted dev server to fix.
+- Verified via Agent Browser: all updated text now renders correctly. Confirmed "1%" rate displayed in hero, badge, and all sections.
+
+Stage Summary:
+- Salary system rules CONFIRMED and enforced: 1% per week (not 2.5%), unlimited weeks (permanent/selamanya), min 10 invites with NO time limit (bebas kapan saja)
+- DB config: salaryRate=1, maxWeeks=0, minDirectRefs=10 — all correct, no changes needed to backend
+- Frontend SalaryBonusPage.tsx updated with clearer "no time limit" messaging
+- Stale .next cache issue resolved by clearing cache + restarting dev server
