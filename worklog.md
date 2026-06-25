@@ -3132,3 +3132,46 @@ Stage Summary:
 - Cron akan credit SEMUA 3 paket jam 00:00 WIB berikutnya: +3.200 +8.000 +19.200 = +30.400
 - Code fix sudah di-commit (0453988) dan di-push ke origin/main
 - Test data (VIP3 + topup 1jt) dibiarkan sebagai proof-of-concept di dev DB
+
+---
+Task ID: fix-profit-timing-and-seed-upsert
+Agent: main (Z.ai Code)
+Task: User report dari screenshot: (1) paket baru beli tidak aktif, (2) profit langsung masuk (seharusnya tunggu 00:00 WIB), (3) total profit 180 hari salah.
+
+Investigation (via VLM analysis on user's screenshots):
+- Screenshot 1 (Pilih Produk): rate salah di VPS user (Aset 1=2.300, Aset 2=5.000, dst — seharusnya 3.200, 8.000, dst)
+- Screenshot 2 (Aset Saya): 
+  * Aset 1 status 'Selesai' (BUG rule lama 1-active-only)
+  * Aset 2 Profit Rate 2% (SEHARUSNYA 2.5%) → dailyProfit 6.400 (seharusnya 8.000)
+  * Estimasi Total Profit Aset 2 = 1.152.000 (seharusnya 1.440.000 = 8.000×180)
+  * Aset 1 Total Profit = 3.200 (PROFIT LANGSUNG MASUK — BUG)
+  * Aset 2 Total Profit = 6.400 (PROFIT LANGSUNG MASUK — BUG)
+
+Root Causes:
+1. Cron-service TIDAK ada guard 'no immediate profit on purchase' — kalau investment baru dibuat (lastProfitDate=null) dan cron jalan, langsung credit
+2. Seed.ts pakai createMany (skip if exist) — kalau VPS user punya data lama dengan rate salah, seed tidak fix
+3. VPS user belum deploy commit 0453988 (multi-active fix)
+
+Work Log:
+- FIX 1: mini-services/cron-service/index.ts — tambah guard 'no immediate profit on purchase'
+  * Kalau lastProfitDate=null DAN startDate HARI INI (WIB) → SKIP (tunggu 00:00 WIB besok)
+  * Kalau lastProfitDate=null DAN startDate < hari ini → credit catchup semua weekdays yang lewat
+  * Fix 'already credited today' check: pakai WIB date bukan UTC
+  * Fix DB path: pakai path.resolve() bukan relative path
+- FIX 2: prisma/seed.ts — ubah ke UPSERT pattern
+  * InvestmentPackage: update amount/profitRate/contractDays/isActive/order kalau sudah ada
+  * Product: update price/profitRate/duration/estimatedProfit/description/isActive (TIDAK touch banner/quotaUsed/isStopped)
+  * Tambah step 4c: fix existing investments — recalculate dailyProfit = amount × profitRate / 100, update kalau salah
+
+TEST RESULTS:
+1. Cron trigger dengan investment startDate HARI INI → processed=0 (SKIP) ✓
+2. Cron trigger dengan investment startDate KEMARIN → processed=1, credit Rp 19.200 ✓
+3. Seed upsert test: set Aset 2 ke 2%/300K (salah), run seed → fix ke 2.5%/320K ✓
+4. Seed fix existing investments: Aset 2 dailyProfit 6000 → 8000 (sesuai rate baru) ✓
+
+Stage Summary:
+- Commit 40423f5 sudah push ke origin/main
+- Cron-service sekarang hormati rule 'no immediate profit on purchase'
+- Seed.ts sekarang UPSERT — run `bun run prisma/seed.ts` di VPS akan auto-fix rate/modal yang salah
+- User perlu deploy ulang untuk dapat fix ini
+- Teks deploy: `pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && mkdir -p db && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && pm2 startup systemd -u root --hp /root && sleep 3 && pm2 status`
