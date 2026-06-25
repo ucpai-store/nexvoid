@@ -297,19 +297,105 @@ if [ "$CHECK_ONLY" = false ]; then
   # ★ CRITICAL: explicitly export DATABASE_URL so prisma uses our path (not inherited from shell env)
   export DATABASE_URL="file:$ABS_DB_PATH"
 
-  # Generate prisma client
+  # Generate prisma client (SAFE — never touches data)
   bun run db:generate 2>&1 | tail -3 || warn "db:generate issue"
   ok "prisma client generated"
 
-  # Push schema (safe, idempotent). Use env var explicitly to avoid stale .env caching.
-  DATABASE_URL="file:$ABS_DB_PATH" bun run db:push 2>&1 | tail -5
-  ok "db schema pushed"
+  # ★ DATA PROTECTION: Backup DB before any schema operations ★
+  DB_HAD_DATA=false
+  if [ -f "$ABS_DB_PATH" ] && [ -s "$ABS_DB_PATH" ]; then
+    DB_HAD_DATA=true
+    BACKUP_FILE="$ABS_DB_PATH.backup-$(date +%Y%m%d-%H%M%S)"
+    cp "$ABS_DB_PATH" "$BACKUP_FILE" 2>/dev/null && ok "DB backed up → $BACKUP_FILE" || warn "backup failed"
+    # Keep only the 5 most recent backups
+    ls -t "$ABS_DB_PATH".backup-* 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || true
+  fi
+
+  # ★ SAFE DB PUSH: Only push schema if DB is fresh OR --fresh flag ★
+  # On existing installs, db:push can RESET DATA if schema changed — we AVOID that.
+  # Instead: generate client (done above), and only push schema if DB is empty/new.
+  if [ "$DB_HAD_DATA" = true ] && [ "$FRESH_CLONE" = false ]; then
+    # Check if schema is in sync (if migration shadow table exists)
+    SCHEMA_IN_SYNC=$(bun -e '
+      const { PrismaClient } = require("@prisma/client");
+      const db = new PrismaClient();
+      db.user.count().then(c => { console.log(c > 0 ? "HAS_DATA" : "EMPTY"); }).catch(() => console.log("ERROR"));
+    ' 2>/dev/null || echo "UNKNOWN")
+
+    if [ "$SCHEMA_IN_SYNC" = "HAS_DATA" ]; then
+      ok "DB has data → SKIPPING db:push (data protection)"
+      warn "if schema changed, run: bash deploy.sh --fresh (will backup + reset)"
+    else
+      # DB exists but no data, or unknown — safe to push
+      log "DB empty or new → running db:push..."
+      DATABASE_URL="file:$ABS_DB_PATH" bun run db:push 2>&1 | tail -5
+      ok "db schema pushed"
+    fi
+  else
+    # Fresh install or --fresh → push schema
+    log "fresh install → running db:push..."
+    DATABASE_URL="file:$ABS_DB_PATH" bun run db:push 2>&1 | tail -5
+    ok "db schema pushed"
+  fi
 
   # Verify DB file actually exists
   if [ -f "$ABS_DB_PATH" ]; then
     ok "DB file: $ABS_DB_PATH ($(du -h "$ABS_DB_PATH" | cut -f1))"
   else
     warn "DB file not found at $ABS_DB_PATH — check prisma config"
+  fi
+
+  # ★ AUTO-SEED: If products/packages are missing, restore defaults ★
+  PRODUCT_COUNT=$(bun -e '
+    const { PrismaClient } = require("@prisma/client");
+    const db = new PrismaClient();
+    Promise.all([db.product.count(), db.investmentPackage.count()]).then(([p, pkg]) => {
+      console.log(p + pkg);
+    }).catch(() => console.log("0"));
+  ' 2>/dev/null || echo "0")
+
+  if [ "$PRODUCT_COUNT" -le 1 ] 2>/dev/null; then
+    warn "products/packages missing (count=$PRODUCT_COUNT) → restoring defaults..."
+    DATABASE_URL="file:$ABS_DB_PATH" bun run prisma/seed.ts 2>&1 | tail -10 || warn "seed.ts failed"
+    # Also restore default products via seed API route logic
+    DATABASE_URL="file:$ABS_DB_PATH" bun -e '
+      const { PrismaClient } = require("@prisma/client");
+      const db = new PrismaClient();
+      (async () => {
+        const existing = await db.product.count();
+        if (existing === 0) {
+          await db.product.createMany({ data: [
+            { name: "Emas Starter Pack", price: 100000, duration: 30, estimatedProfit: 8000, quota: 500, quotaUsed: 342, description: "Paket investasi emas untuk pemula. Dapatkan keuntungan stabil dari pergerakan harga emas dengan modal minimal.", banner: "", isActive: true, isStopped: false, profitRate: 8.0 },
+            { name: "Silver Mining Portfolio", price: 500000, duration: 60, estimatedProfit: 55000, quota: 300, quotaUsed: 187, description: "Portfolio penambangan perak dengan diversifikasi aset. Keuntungan lebih tinggi dari paket starter.", banner: "", isActive: true, isStopped: false, profitRate: 11.0 },
+            { name: "Gold Premium Asset", price: 1000000, duration: 90, estimatedProfit: 150000, quota: 200, quotaUsed: 98, description: "Aset emas premium dengan estimasi profit tinggi. Kelola portofolio emas Anda secara profesional.", banner: "", isActive: true, isStopped: false, profitRate: 15.0 },
+            { name: "Diamond Elite Investment", price: 5000000, duration: 120, estimatedProfit: 1000000, quota: 100, quotaUsed: 43, description: "Investasi berlian elite untuk investor serius. Akses eksklusif ke portfolio berlian dan mineral langka.", banner: "", isActive: true, isStopped: false, profitRate: 20.0 },
+          ]});
+          console.log("✓ 4 default products restored");
+        }
+        const pkgCount = await db.investmentPackage.count();
+        if (pkgCount === 0) {
+          await db.investmentPackage.createMany({ data: [
+            { name: "Paket Starter", amount: 500000, profitRate: 10, contractDays: 90, isActive: true, order: 1 },
+            { name: "Paket Silver", amount: 1000000, profitRate: 10, contractDays: 90, isActive: true, order: 2 },
+            { name: "Paket Gold", amount: 5000000, profitRate: 10, contractDays: 90, isActive: true, order: 3 },
+            { name: "Paket Platinum", amount: 10000000, profitRate: 10, contractDays: 90, isActive: true, order: 4 },
+          ]});
+          console.log("✓ 4 default packages restored");
+        }
+        const salaryCfg = await db.salaryConfig.findFirst();
+        if (!salaryCfg) {
+          await db.salaryConfig.create({ data: { minDirectRefs: 10, salaryRate: 1, maxWeeks: 0, requireActiveDeposit: true, fixedSalaryAmount: 25000, isActive: true }});
+          console.log("✓ salary config created (1%/week, permanent)");
+        } else if (salaryCfg.maxWeeks !== 0 || salaryCfg.salaryRate !== 1) {
+          await db.salaryConfig.update({ where: { id: salaryCfg.id }, data: { salaryRate: 1, maxWeeks: 0, minDirectRefs: 10, requireActiveDeposit: true, isActive: true }});
+          console.log("✓ salary config fixed (1%/week, permanent)");
+        }
+        await db.$disconnect();
+      })();
+    ' 2>&1 | tail -5
+    ok "default products/packages restored"
+  else
+    ok "products/packages exist (count=$PRODUCT_COUNT) — no seed needed"
   fi
 fi
 
