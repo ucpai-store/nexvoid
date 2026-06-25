@@ -2746,3 +2746,43 @@ Stage Summary:
 - Root cause produk nggak muncul: FALLBACK di API route pakai data dummy + bug conflict variabel di restore script
 - Fix: semua sistem konsisten pakai Gold Premium Aset 1-6
 - User perlu: deploy ulang + run restore-products.sh (yang sekarang sudah FIXED)
+
+---
+Task ID: fix-payment-deposit-qris-usdt
+Agent: main
+Task: Fix payment deposit kosong — QRIS & USDT data nggak ada di DB
+
+Work Log:
+- User komplain: "payment deposit nya mana kok gk ada"
+- Investigasi: Deposit page (DepositPage.tsx) filter `WHERE type IN ('qris','usdt')`
+- API /api/payment-methods juga filter type IN ('qris','usdt')
+- TAPI semua seed isi 8 pm type bank/ewallet (BCA, Mandiri, BNI, BRI, DANA, OVO, GoPay, ShopeePay)
+- Semua type bank/ewallet di-filter out → deposit page KOSONG
+
+FIX (5 file, commit ac6db96):
+1. restore-products.sh: hapus pm bank/ewallet, ganti QRIS + USDT + final summary tampil status
+2. deploy.sh auto-seed: hapus pm lama, create QRIS + USDT
+3. prisma/seed.ts: hapus 5 pm dummy (BCA/Mandiri/DANA/OVO/GoPay), ganti QRIS + USDT
+4. src/app/api/seed/route.ts: cleanup pm lama, create QRIS + USDT
+5. src/app/api/payment-methods/route.ts: FALLBACK QRIS+USDT (sebelumnya USDT accountNo='TRX_WALLET_ADDRESS' dummy)
+
+VERIFIKASI (agent-browser, fresh DB):
+- API /api/payment-methods return 2 record: QRIS + USDT ✓
+- Login user testprod@nexvo.test → halaman Deposit:
+  * Tab QRIS muncul (1 metode) ✓
+  * Tab USDT muncul (1 metode) ✓
+- Klik tab USDT → 'Transfer ke alamat wallet'
+  + 'Wallet address belum dikonfigurasi. Hubungi admin.' ✓
+- Klik tab QRIS → 'Scan QR untuk bayar' + placeholder QR ✓
+
+PENTING untuk user:
+- qrImage QRIS & accountNo USDT sengaja kosong (admin harus isi via panel)
+- Login admin → menu Payment Methods → edit QRIS (upload QR) & USDT (isi wallet BEP20)
+- Tanpa diisi admin, tab QRIS+USDT tetap muncul tapi:
+  * QRIS: 'QR belum dikonfigurasi'
+  * USDT: 'Wallet address belum dikonfigurasi. Hubungi admin.'
+
+Stage Summary:
+- Commit ac6db96 sudah push ke GitHub origin/main
+- Deposit page sekarang punya tab QRIS + USDT (bukan kosong lagi)
+- Admin tinggal upload QR + isi wallet USDT via panel
