@@ -129,24 +129,31 @@ if [ "$CHECK_ONLY" = false ]; then
   done
 
   # Also kill ANY pm2 process that might still hold our ports (leftover from old deploys)
-  pm2 jlist 2>/dev/null | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sort -u | while read -r pname; do
-    case "$pname" in
-      nexvo*|nexa*|next*) pm2 delete "$pname" >/dev/null 2>&1 && warn "killed leftover pm2 process: $pname" ;;
-    esac
-  done
+  # NOTE: wrap in || true and use { } group so set -eo pipefail doesn't kill the script
+  # when pm2 jlist returns empty or grep finds no matches
+  {
+    pm2_jlist_out=$(pm2 jlist 2>/dev/null || echo '[]')
+    echo "$pm2_jlist_out" | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sort -u | while read -r pname; do
+      [ -z "$pname" ] && continue
+      case "$pname" in
+        nexvo*|nexa*|next*) pm2 delete "$pname" >/dev/null 2>&1 && warn "killed leftover pm2 process: $pname" || true ;;
+      esac
+    done
+  } || true
 
   # Kill anything still holding our ports (leftover/rogue processes)
   # Use multiple methods: lsof → ss → fuser → pkill (belt + suspenders)
+  # All wrapped with || true so set -eo pipefail won't exit on empty results
   for port in $PORT_APP $PORT_CRON $PORT_WABOT; do
     pids=""
     if command -v lsof >/dev/null; then
       pids=$(lsof -ti :$port 2>/dev/null || true)
     fi
     if [ -z "$pids" ] && command -v ss >/dev/null; then
-      pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2 | tr '\n' ' ')
+      pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2 | tr '\n' ' ' || true)
     fi
     if [ -z "$pids" ] && command -v fuser >/dev/null; then
-      pids=$(fuser $port/tcp 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//')
+      pids=$(fuser $port/tcp 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//' || true)
     fi
     if [ -n "$pids" ]; then
       warn "killing leftover process on port $port (PID: $pids)"
@@ -406,6 +413,10 @@ fi
 # ═══════════════════════════════════════════════════════════════
 section "10/10 VERIFY ALL SYSTEMS"
 
+# ★ Disable set -e for verification — we want to continue even if checks fail
+# (we track failures manually via FAIL_COUNT and report at the end)
+set +eo pipefail
+
 log "warming up (8s)..."
 sleep 8
 
@@ -445,7 +456,7 @@ check_port $PORT_APP  "nexvo-app"
 APP_PORT_OK=$?
 if [ "$APP_PORT_OK" -ne 0 ]; then
   warn "self-heal: nexvo-app not listening — checking logs + restart..."
-  pm2 logs nexvo-app --lines 20 --nostream 2>/dev/null | tail -20
+  pm2 logs nexvo-app --lines 20 --nostream 2>/dev/null | tail -20 || true
   pm2 restart nexvo-app 2>/dev/null || true
   sleep 10
   check_port $PORT_APP  "nexvo-app (retry)" || true
