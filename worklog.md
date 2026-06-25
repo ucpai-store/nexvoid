@@ -2896,3 +2896,38 @@ Stage Summary:
 - Deploy script (deploy.sh) sudah lengkap & self-contained: auto-clone, auto-seed QRIS+USDT+Gold Premium Aset 1-6, self-heal port 3000, verify profit+salary trigger
 - User tinggal jalankan 1 perintah di VPS: curl -fsSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy.sh | bash
 - Setelah deploy: admin wajib login → menu Payment Methods → upload QR QRIS + isi wallet USDT BEP20
+
+---
+Task ID: real-payment-logos
+Agent: main (Z.ai Code)
+Task: User minta "logo yg di windraw yg untuk payment nya lo yg di wd tu kamu generate wajib logo asliii wajib aslii" — logo payment di halaman withdraw WAJIB logo asli (bukan placeholder/AI-generated).
+
+Work Log:
+- Audit WithdrawPage.tsx: 25 logo path referenced (/images/payment/*.png|jpg|jpeg) tapi folder /public/images/payment/ TIDAK ADA — semua logo broken
+- Strategi download logo ASLI dari sumber resmi:
+  * Wikimedia Commons API (list=search, srnamespace=6) untuk cari nama file logo resmi
+  * Wikipedia PageImages API untuk infobox image
+  * Google Favicon API (https://www.google.com/s2/favicons?domain=X&sz=128) untuk brand kecil
+  * DuckDuckGo Icons API sebagai fallback
+
+- Script 1: scripts/find-commons-logos.ts — query Wikimedia API untuk 17 brand yang gagal tebak nama file
+- Script 2: scripts/find-missing-logos.ts — query alternatif untuk 6 brand masih hilang
+- Script 3: scripts/find-pageimages.ts — query Wikipedia PageImages API untuk 4 brand kecil
+- Script 4: scripts/fetch-payment-logos.ts — download SVG + convert ke PNG via Sharp (density 300, resize 320x160 inside)
+
+Hasil download 25 logo ASLI:
+  BANKS (15): BCA, BNI, BRI, Mandiri, BSI, CIMB, Danamon, Permata, Bukopin, OCBC NISP, Panin, Sinarmas, Maybank, UOB, BTN — semua dari Wikimedia Commons SVG/PNG resmi
+  E-WALLETS (9): DANA, OVO, GoPay, ShopeePay, LinkAja, Doku, Sakuku, Jenius, Flip — mix Wikimedia + Google Favicon
+  CRYPTO (1): USDT (Tether_Logo.svg dari Wikimedia)
+
+- Update WithdrawPage.tsx: standardize semua logo path ke .png (sebelumnya campur .png/.jpg/.jpeg)
+- Verified via curl: 24/24 logo HTTP 200 (1 test loop missed BNI count, tapi BNI ter-verify di test terpisah)
+- Server dev up: Home 200, BCA logo 200 (4914 bytes), USDT logo 200 (3701 bytes)
+- agent-browser gagal connect ke localhost:3000 karena network isolation sandbox (expected) — tapi curl confirm server hidup & serving logo
+
+Stage Summary:
+- Commit 9b22ad9 sudah push ke origin/main
+- 25 logo ASLI brand resmi sekarang tersedia di /public/images/payment/*.png
+- WithdrawPage.tsx updated: semua logo path pakai .png
+- User sekarang bisa lihat logo asli BCA/Mandiri/DANA/OVO/USDT/dll di halaman Withdraw
+- Script fetch-payment-logos.ts bisa di-rerun kapan saja kalau perlu refresh logo
