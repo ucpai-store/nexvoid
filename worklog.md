@@ -3249,3 +3249,33 @@ Stage Summary:
 - Salary sekarang: 1% dari omzet grup/minggu, SELAMANYA (tanpa batas), syarat: invite 10 + aktif deposit/investasi
 - Product profit/harian & total: dihitung langsung dari price × profitRate / 100 × duration, tidak bergantung pada estimatedProfit di DB (anti-drift)
 - Deploy command: `pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && pm2 startup systemd -u root --hp /root && sleep 3 && pm2 status`
+
+---
+Task ID: fix-salary-admin-settings-load
+Agent: main (Z.ai Code)
+Task: User: "yang gaji kok tetep sama kan seharusnya 1% terus gaji yg di dapat itu selamanya namun pendapatan hanya tiap 1 minggu hari senin jam 00.00 paham kan sistem sama namun cuman jadi selamanya tanpa batas dan pendapatan gaji 1%"
+
+Investigation:
+- Previous commit 1827e1d ALREADY implemented: salaryRate=1, maxWeeks=0 (PERMANEN), minDirectRefs=10, requireActiveDeposit=true
+- Verified via /api/admin/salary-config: salaryRate=1, maxWeeks=0 ✓
+- Verified via /api/packages: all 6 paket profit/hari & total correct ✓
+- Verified cron-service: weekly Monday 00:00 WIB payout, maxWeeks=0 = unlimited ✓
+- Found BUG: AdminSettingsPage.tsx fetchData() — all 4 fetches (auth/me, auth/logs, settings, salary-config) wrapped in SINGLE try-catch. If /api/admin/auth/logs returns 404 → throws "Unexpected token '<'" → catch block runs → salary-config fetch NEVER executes → admin sees "Memuat konfigurasi gaji..." forever
+
+Root Cause: The salary config WAS correct in DB (1%/0), but admin couldn't SEE it in the settings page because a 404 on a DIFFERENT API (auth/logs) blocked the salary-config fetch.
+
+Work Log:
+- FIX: AdminSettingsPage.tsx — replaced sequential try-catch with Promise.all + safeFetchJson helper
+  * safeFetchJson: never throws — returns null on 404/HTML/non-JSON
+  * All 4 fetches run in PARALLEL independently
+  * Salary config now loads even if auth/logs 404s
+- Verified: /api/admin/salary-config returns salaryRate=1, maxWeeks=0, minDirectRefs=10, requireActiveDeposit=true
+- Verified: /api/packages returns correct dailyProfit & totalProfit for all 6 paket
+- Verified: cron-service schedules salary on Monday 00:00 WIB (dayOfWeek===1 && hour===0)
+
+Stage Summary:
+- Salary system: 1% of group omzet, PERMANENT (maxWeeks=0 = selamanya), paid every Monday 00:00 WIB
+- Requirements: invite 10 people (Level 1) + user has active investment + all 10 referrals have active investments
+- Product profit display: calculated directly from price × profitRate / 100 (anti-drift, not dependent on estimatedProfit DB field)
+- Admin settings page: salary config now loads reliably (independent fetches)
+- Deploy command: `pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && pm2 startup systemd -u root --hp /root && sleep 3 && pm2 status`
