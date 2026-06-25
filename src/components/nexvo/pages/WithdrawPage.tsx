@@ -394,9 +394,9 @@ export default function WithdrawPage() {
     { label: '160K', value: 160000 },
     { label: '320K', value: 320000 },
     { label: '640K', value: 640000 },
-    { label: '1.92M', value: 1920000 },
-    { label: '5.76M', value: 5760000 },
-    { label: '17.28M', value: 17280000 },
+    { label: '1.92J', value: 1920000 },
+    { label: '5.76J', value: 5760000 },
+    { label: '17.28J', value: 17280000 },
   ];
 
   const setPresetAmount = (val: number) => {
