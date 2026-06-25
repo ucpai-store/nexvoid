@@ -204,9 +204,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Produk tidak tersedia' }, { status: 404 });
     }
 
-    // ★ Re-activation rule: reject ONLY if user has an ACTIVE purchase for this product.
-    // If all previous purchases are 'completed' (contract ended after 180 days),
-    // the user is allowed to re-activate the same product again.
+    // ★ Re-activation rule: reject ONLY if user has an ACTIVE purchase for this SAME product.
+    // User BOLEH punya banyak produk aktif bersamaan (VIP1+VIP2+VIP3 dst).
+    // Tiap produk hanya bisa dibeli SEKALI per kontrak (180 hari).
+    // Kalau kontrak sudah habis (status='completed'), bisa di-aktivasi lagi.
     const activePurchase = await db.purchase.findFirst({
       where: { userId: user.id, productId, status: 'active' },
       select: { id: true, status: true },
@@ -241,8 +242,9 @@ export async function POST(request: NextRequest) {
     const totalPrice = product.price * qty;
 
     // ★ Purchase — NO immediate profit. Profit ONLY at 00:00 WIB via cron ★
-    // ★ No-duplicates + 1-active-only: supersede any previous active purchase/investment
-    //   so that ONLY ONE product is active per user at any time.
+    // ★ MULTI-ACTIVE: user boleh punya banyak produk aktif bersamaan (VIP1+VIP2+VIP3 dst) ★
+    //   JANGAN supersede previous active purchases/investments — biarkan semua aktif.
+    //   Cron akan credit SEMUA active investments jam 00:00 WIB.
     const purchase = await db.$transaction(async (tx) => {
       const currentUser = await tx.user.findUnique({ where: { id: user.id } });
       if (!currentUser) {
@@ -254,18 +256,8 @@ export async function POST(request: NextRequest) {
         throw new Error('Saldo tidak mencukupi');
       }
 
-      // ★ 1-active-only: mark all previous active Purchases of this user as 'completed'
-      await tx.purchase.updateMany({
-        where: { userId: user.id, status: 'active' },
-        data: { status: 'completed' },
-      });
-
-      // ★ 1-active-only: mark all previous active Investments of this user as 'completed'
-      //   so cron stops crediting daily profit for the old product.
-      await tx.investment.updateMany({
-        where: { userId: user.id, status: 'active' },
-        data: { status: 'completed', endDate: new Date() },
-      });
+      // ★ MULTI-ACTIVE: do NOT mark previous purchases/investments as completed.
+      // User boleh punya VIP1+VIP2+VIP3 semua aktif bersamaan.
 
       // Deduct from depositBalance first, then mainBalance
       let remaining = totalPrice;

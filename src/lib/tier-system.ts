@@ -4,14 +4,13 @@
  * Business rules (per product owner):
  *  - "Paket" dan "Produk" itu sama → both map to the same VIP tier list
  *    (sourced from InvestmentPackage, ordered by `amount` ascending).
- *  - Beli hanya 1 macam: a user may hold ONLY ONE active tier at a time.
- *  - Pembelian TIDAK harus berurutan. User boleh beli tier mana saja yang
- *    BELUM pernah dibeli ATAU yang kontraknya sudah habis, dalam urutan apapun.
- *  - Setiap tier hanya bisa dibeli SEKALI per kontrak. Tier yang sedang aktif
- *    tidak bisa dibeli lagi. Tier yang kontraknya sudah HABIS (status='completed')
- *    BISA dibeli lagi.
- *  - Sistem berjalan sesuai paket/produk aktif hari ini → daily profit at 00:00
- *    WIB is credited by the cron based on the single active investment.
+ *  - MULTI-ACTIVE: user BOLEH punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst).
+ *    Tiap paket generate profit sendiri jam 00:00 WIB. Cron credit SEMUA active
+ *    investments — bukan cuma satu.
+ *  - Setiap tier hanya bisa dibeli SEKALI per kontrak (180 hari). Tier yang sedang
+ *    aktif tidak bisa dibeli lagi sampai kontrak selesai.
+ *  - Tier yang kontraknya sudah HABIS (status='completed') BISA dibeli lagi.
+ *  - Profit PERTAMA tidak langsung masuk saat beli — tunggu jam 00:00 WIB.
  */
 
 import { db } from '@/lib/db';
@@ -113,11 +112,14 @@ export async function getUserTierAvailability(
       .map((i) => i.packageId)
   );
 
-  // Find the user's currently active investment (the latest 'active' one).
+  // ★ MULTI-ACTIVE: user boleh punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst).
+  //   currentTier = first active investment (for backwards-compat display), tapi SEMUA
+  //   tier yang active harus dapat state='active' (bukan 'bought').
   const activeInvestment = userInvestments.find((i) => i.status === 'active');
   const currentTier = activeInvestment
     ? tiers.find((t) => t.id === activeInvestment.packageId) || null
     : null;
+  const hasAnyActive = !!activeInvestment;
 
   // A tier is "available" if user has NO active investment for it
   // (either never bought, or all previous purchases are completed/expired).
@@ -133,13 +135,11 @@ export async function getUserTierAvailability(
       let state: TierState;
       let reason: string | undefined;
 
-      if (currentTier && tier.id === currentTier.id) {
+      if (activeTierIds.has(tier.id)) {
+        // ★ MULTI-ACTIVE: SEMUA tier yang sedang active dapat state='active' (bukan 'bought').
+        //   User boleh lihat badge AKTIF di semua paket yang sedang berjalan.
         state = 'active';
-        reason = 'Paket aktif Anda hari ini — kontrak masih berjalan';
-      } else if (activeTierIds.has(tier.id)) {
-        // Shouldn't normally happen because we supersede old actives, but guard anyway.
-        state = 'bought';
-        reason = 'Paket ini sedang aktif — tidak bisa dibeli lagi sampai kontrak selesai';
+        reason = 'Paket aktif — kontrak masih berjalan. Profit masuk jam 00:00 WIB setiap hari.';
       } else if (boughtTierIds.has(tier.id) && expiredTierIds.has(tier.id)) {
         // Contract ended → can re-activate!
         state = 'available';
@@ -150,8 +150,8 @@ export async function getUserTierAvailability(
         reason = 'Sudah pernah dibeli — pilih paket lain yang belum dimiliki';
       } else {
         state = 'available';
-        reason = currentTier
-          ? 'Beli paket lain yang belum dimiliki atau yang kontraknya sudah habis'
+        reason = hasAnyActive
+          ? 'Beli paket lain — boleh punya banyak paket aktif bersamaan'
           : 'Belum dimiliki — silakan beli';
       }
 

@@ -294,12 +294,12 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
         </div>
       )}
 
-      {/* Total Return Preview */}
+      {/* Total Profit Preview (modal TIDAK dikembalikan — hanya profit) */}
       {asset.status === 'active' && (
         <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-          <span className="text-muted-foreground text-[10px]">{t('assets.estimatedReturn')}</span>
+          <span className="text-muted-foreground text-[10px]">Estimasi Total Profit</span>
           <span className="text-emerald-400 text-xs font-bold">
-            {formatRupiah(asset.amount + (asset.dailyProfit * asset.contractDays))}
+            {formatRupiah(asset.dailyProfit * asset.contractDays)}
           </span>
         </div>
       )}
