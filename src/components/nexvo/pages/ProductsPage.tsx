@@ -72,7 +72,11 @@ function ProductCard({
 
   const quotaPercent = product.quota > 0 ? Math.round((product.quotaUsed / product.quota) * 100) : 0;
   const remaining = Math.max(product.quota - product.quotaUsed, 0);
-  const dailyProfit = product.duration > 0 ? product.estimatedProfit / product.duration : 0;
+  // Compute daily profit directly from price × profitRate / 100 (source of truth).
+  // Avoids drift if estimatedProfit in DB is stale — always matches what the cron credits.
+  const dailyProfit = Math.floor(product.price * ((product.profitRate || 0) / 100));
+  // Total profit = dailyProfit × duration (modal TIDAK dikembalikan, hanya profit)
+  const totalProfit = dailyProfit * (product.duration || 0);
 
   return (
     <motion.div
@@ -172,7 +176,7 @@ function ProductCard({
               <Coins className="w-3 h-3 text-primary" />
               <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Total Profit</span>
             </div>
-            <span className="text-gold-gradient text-xs sm:text-sm font-bold">{formatRupiah(product.estimatedProfit)}</span>
+            <span className="text-gold-gradient text-xs sm:text-sm font-bold">{formatRupiah(totalProfit)}</span>
           </div>
         </div>
 
@@ -347,7 +351,7 @@ export default function ProductsPage() {
         purpose: 'investment',
         packageId: p.id,
         packageName: p.name,
-        dailyProfit: p.duration > 0 ? p.estimatedProfit / p.duration : 0,
+        dailyProfit: Math.floor(p.price * ((p.profitRate || 0) / 100)),
         contractDays: p.duration,
       });
     }
@@ -462,7 +466,7 @@ export default function ProductsPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Profit Harian</span>
                 <span className="text-emerald-400 font-semibold">
-                  {formatRupiah(confirmPkg.duration > 0 ? confirmPkg.estimatedProfit / confirmPkg.duration : 0)}
+                  {formatRupiah(Math.floor(confirmPkg.price * ((confirmPkg.profitRate || 0) / 100)))}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
@@ -471,7 +475,7 @@ export default function ProductsPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Total Profit</span>
-                <span className="text-emerald-400 font-semibold">{formatRupiah(confirmPkg.estimatedProfit)}</span>
+                <span className="text-emerald-400 font-semibold">{formatRupiah(Math.floor(confirmPkg.price * ((confirmPkg.profitRate || 0) / 100)) * confirmPkg.duration)}</span>
               </div>
 
               {/* Modal tidak kembali warning */}
@@ -480,7 +484,7 @@ export default function ProductsPage() {
                   <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <p className="text-amber-400/90 text-[10px] leading-tight">
                     <strong>Modal tidak dikembalikan.</strong> Anda hanya menerima profit harian{' '}
-                    {formatRupiah(confirmPkg.duration > 0 ? confirmPkg.estimatedProfit / confirmPkg.duration : 0)}{' '}
+                    {formatRupiah(Math.floor(confirmPkg.price * ((confirmPkg.profitRate || 0) / 100)))}{' '}
                     selama {confirmPkg.duration} hari.
                   </p>
                 </div>
@@ -556,7 +560,7 @@ export default function ProductsPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Profit Harian</span>
                 <span className="text-emerald-400 font-semibold">
-                  {formatRupiah(successPkg.duration > 0 ? successPkg.estimatedProfit / successPkg.duration : 0)}
+                  {formatRupiah(Math.floor(successPkg.price * ((successPkg.profitRate || 0) / 100)))}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
@@ -566,7 +570,7 @@ export default function ProductsPage() {
               <Separator className="bg-primary/10" />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Total Profit Diterima</span>
-                <span className="text-emerald-400 font-bold">{formatRupiah(successPkg.estimatedProfit)}</span>
+                <span className="text-emerald-400 font-bold">{formatRupiah(Math.floor(successPkg.price * ((successPkg.profitRate || 0) / 100)) * successPkg.duration)}</span>
               </div>
               <div className="p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15 mt-2">
                 <p className="text-amber-400/80 text-[10px] leading-tight flex items-center gap-1.5">

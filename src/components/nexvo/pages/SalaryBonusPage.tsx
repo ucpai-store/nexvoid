@@ -161,8 +161,8 @@ export default function SalaryBonusPage() {
   const eligibility = data?.eligibility;
   const isEligible = eligibility?.isEligible ?? false;
   const isCompleted = eligibility?.isCompleted ?? false;
-  const salaryRate = eligibility?.salaryRate ?? 2.5;
-  const maxWeeks = eligibility?.maxWeeks ?? 12;
+  const salaryRate = eligibility?.salaryRate ?? 1;
+  const maxWeeks = eligibility?.maxWeeks ?? 0;
   const weeksReceived = eligibility?.weeksReceived ?? 0;
   const weeksRemaining = eligibility?.weeksRemaining ?? 12;
   const estimatedSalary = eligibility?.estimatedSalary ?? 0;

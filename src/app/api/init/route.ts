@@ -162,9 +162,9 @@ async function seedDatabase() {
   const existingSalaryConfig = await db.salaryConfig.findFirst();
   if (!existingSalaryConfig) {
     await db.salaryConfig.create({
-      data: { minDirectRefs: 10, salaryRate: 2.5, maxWeeks: 12, requireActiveDeposit: true, isActive: true },
+      data: { minDirectRefs: 10, salaryRate: 1, maxWeeks: 0, requireActiveDeposit: true, isActive: true },
     });
-    results.push('✅ SalaryConfig created (2.5%/week × 12 weeks)');
+    results.push('✅ SalaryConfig created (1%/week PERMANEN — maxWeeks=0)');
   } else {
     results.push('⏭️ SalaryConfig already exists');
   }

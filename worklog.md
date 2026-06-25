@@ -3206,3 +3206,46 @@ Stage Summary:
 - Profit logic: VERIFIED CORRECT (profit hanya masuk jam 00:00 WIB Senin-Jumat, no immediate profit on purchase)
 - Estimasi Total Profit: VERIFIED CORRECT (dailyProfit × 180, modal TIDAK dikembalikan)
 - Multi-active packages: VERIFIED CORRECT (VIP1+VIP2+VIP3 semua bisa aktif bersamaan)
+
+---
+Task ID: fix-salary-1pct-permanent-and-product-profit-display
+Agent: main (Z.ai Code)
+Task: User: "gaji tetep 1% ya terus yg di produk nomunimal profit/harian dan total kok gitu kamu cek tu perbaiki aja jumlah nya sama gaji tu 1% selamanya tanpa batas intinya invite 10 dan aktif deposit/investasi"
+
+Investigation:
+- Salary config harus: salaryRate=1%, maxWeeks=0 (permanent), minDirectRefs=10, requireActiveDeposit=true
+- Cek schema: SalaryConfig defaults SALAH — salaryRate=2.5, maxWeeks=12
+- Cek seed.ts: create dengan benar (1, 0) TAPI skip-if-exists → VPS dengan config lama tidak ter-fix
+- Cek admin salary-config route: GET fallback 2.5%/12, PUT validation reject maxWeeks<1 (tolak 0!), PUT create fallback 2.5%/12
+- Cek init route: create 2.5%/12
+- Cek cron/salary route: BUG! `if (weeksReceived >= config.maxWeeks)` — kalau maxWeeks=0, weeksReceived>=0 selalu true → semua user dianggap "completed"!
+- Cek lib/salary-bonus.ts: BUG sama di line 413, fallback defaults 2.5%/12, komentar outdated
+- Cek SalaryBonusPage.tsx: fallback 2.5%/12
+- Cek AdminSalaryPage.tsx: hardcoded "2.5%" di UI
+- Cek product profit display: ProductsPage & HomePage pakai `estimatedProfit / duration` untuk daily profit → kalau estimatedProfit stale di DB, daily profit salah
+
+Work Log:
+- FIX 1: prisma/schema.prisma — SalaryConfig defaults: salaryRate=1, maxWeeks=0
+- FIX 2: prisma/seed.ts — SalaryConfig UPSERT (update if exists, bukan skip)
+- FIX 3: src/app/api/admin/salary-config/route.ts — GET fallback 1%/0/10refs, PUT validation allow maxWeeks=0 (0-52), PUT create fallback 1%/0/10refs
+- FIX 4: src/app/api/init/route.ts — create 1%/0
+- FIX 5: src/app/api/seed/route.ts — SalaryConfig UPSERT (update if exists)
+- FIX 6: src/app/api/cron/salary/route.ts — fix maxWeeks=0 bug: `config.maxWeeks > 0 && weeksReceived >= maxWeeks`, fix currentWeekOfTotal & description untuk permanent
+- FIX 7: src/lib/salary-bonus.ts — fix maxWeeks=0 bug di processAllSalaryBonuses, fix fallback defaults 1%/0, update komentar outdated
+- FIX 8: src/components/nexvo/pages/SalaryBonusPage.tsx — fallback 1%/0 (bukan 2.5%/12)
+- FIX 9: src/components/nexvo/pages/AdminSalaryPage.tsx — hardcoded "2.5%" → "1%"
+- FIX 10: src/components/nexvo/pages/ProductsPage.tsx — dailyProfit & totalProfit dihitung langsung dari `price × profitRate / 100` (bukan `estimatedProfit / duration`), fix 6 tempat di card + confirm dialog + success dialog
+- FIX 11: src/components/nexvo/pages/HomePage.tsx — ProductCard: Est. profit dihitung dari `price × profitRate / 100 × duration` (bukan `product.estimatedProfit`)
+
+Test Results:
+- bun run db:push: schema sync sukses ✓
+- bun run prisma/seed.ts: "✅ SalaryConfig updated (1%/week PERMANEN — maxWeeks=0)" ✓
+- /api/packages: semua 6 paket profit/hari & total VERIFIED (3.200/576.000, 8.000/1.440.000, dst) ✓
+- /api/salary-bonus (via token): salaryRate=1, maxWeeks=0, minDirectRefs=10, requireActiveDeposit=true, isCompleted=false, weeksRemaining=-1 ✓
+- Dev server: no compile errors ✓
+
+Stage Summary:
+- Commit + push ke origin/main
+- Salary sekarang: 1% dari omzet grup/minggu, SELAMANYA (tanpa batas), syarat: invite 10 + aktif deposit/investasi
+- Product profit/harian & total: dihitung langsung dari price × profitRate / 100 × duration, tidak bergantung pada estimatedProfit di DB (anti-drift)
+- Deploy command: `pm2 delete nexvo-app nexvo-cron 2>/dev/null; cd /var/www && rm -rf nexvo && git clone https://github.com/ucpai-store/nexvoid.git nexvo && cd nexvo && bun install && bun run db:push && bun run prisma/seed.ts && bun run build && pm2 start "bun run start" --name nexvo-app && pm2 start "bun run mini-services/cron-service/index.ts" --name nexvo-cron && pm2 save && pm2 startup systemd -u root --hp /root && sleep 3 && pm2 status`

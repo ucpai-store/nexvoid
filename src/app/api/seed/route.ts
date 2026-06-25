@@ -166,19 +166,23 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Seed SalaryConfig — 1%/week PERMANEN (maxWeeks=0)
-    const existingSalaryConfig = await db.salaryConfig.findFirst({ where: { isActive: true } });
-    if (!existingSalaryConfig) {
-      await db.salaryConfig.create({
-        data: {
-          minDirectRefs: 10,
-          salaryRate: 1,
-          maxWeeks: 0,
-          requireActiveDeposit: true,
-          fixedSalaryAmount: 25000,
-          isActive: true,
-        },
+    // UPSERT SalaryConfig — 1%/week PERMANEN (maxWeeks=0), min 10 referral aktif deposit
+    const existingSalaryConfig = await db.salaryConfig.findFirst();
+    const SALARY_DEFAULTS_API = {
+      minDirectRefs: 10,
+      salaryRate: 1,
+      maxWeeks: 0,
+      requireActiveDeposit: true,
+      fixedSalaryAmount: 25000,
+      isActive: true,
+    };
+    if (existingSalaryConfig) {
+      await db.salaryConfig.update({
+        where: { id: existingSalaryConfig.id },
+        data: SALARY_DEFAULTS_API,
       });
+    } else {
+      await db.salaryConfig.create({ data: SALARY_DEFAULTS_API });
     }
 
     return NextResponse.json({ success: true, data: { message: 'Database seeded successfully' } });

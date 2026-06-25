@@ -15,13 +15,13 @@ export async function GET(request: NextRequest) {
 
     let config = await db.salaryConfig.findFirst();
 
-    // Create default config if none exists
+    // Create default config if none exists — 1%/week PERMANEN (maxWeeks=0), min 10 referral aktif deposit
     if (!config) {
       config = await db.salaryConfig.create({
         data: {
-          minDirectRefs: 0,
-          salaryRate: 2.5,
-          maxWeeks: 12,
+          minDirectRefs: 10,
+          salaryRate: 1,
+          maxWeeks: 0,
           requireActiveDeposit: true,
           isActive: true,
         },
@@ -67,9 +67,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    if (maxWeeks !== undefined && (typeof maxWeeks !== 'number' || maxWeeks < 1 || maxWeeks > 52)) {
+    if (maxWeeks !== undefined && (typeof maxWeeks !== 'number' || maxWeeks < 0 || maxWeeks > 52)) {
       return NextResponse.json(
-        { success: false, error: 'Maksimal minggu harus antara 1-52' },
+        { success: false, error: 'Maksimal minggu harus antara 0-52 (0 = selamanya/tanpa batas)' },
         { status: 400 }
       );
     }
@@ -99,9 +99,9 @@ export async function PUT(request: NextRequest) {
     } else {
       config = await db.salaryConfig.create({
         data: {
-          minDirectRefs: minDirectRefs ?? 0,
-          salaryRate: salaryRate ?? 2.5,
-          maxWeeks: maxWeeks ?? 12,
+          minDirectRefs: minDirectRefs ?? 10,
+          salaryRate: salaryRate ?? 1,
+          maxWeeks: maxWeeks ?? 0,
           requireActiveDeposit: requireActiveDeposit ?? true,
           isActive: isActive ?? true,
         },

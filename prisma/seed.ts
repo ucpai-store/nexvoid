@@ -279,22 +279,27 @@ async function seed() {
     console.log('⏭️  MatchingConfig already exists (skipped)\n');
   }
 
-  // 7. Create default SalaryConfig if none exists — 1%/week PERMANEN (maxWeeks=0)
+  // 7. UPSERT SalaryConfig — 1%/week PERMANEN (maxWeeks=0), min 10 referral aktif deposit
+  //    ★ UPSERT: kalau config sudah ada tapi datanya salah (rate 2.5%/maxWeeks 12), tetap di-update ★
+  console.log('Syncing SalaryConfig (1%/week PERMANEN, min 10 referral aktif deposit)...');
   const existingSalaryConfig = await prisma.salaryConfig.findFirst();
-  if (!existingSalaryConfig) {
-    await prisma.salaryConfig.create({
-      data: {
-        minDirectRefs: 10,
-        salaryRate: 1,
-        maxWeeks: 0,
-        requireActiveDeposit: true,
-        fixedSalaryAmount: 25000,
-        isActive: true,
-      },
+  const SALARY_DEFAULTS = {
+    minDirectRefs: 10,
+    salaryRate: 1,
+    maxWeeks: 0,
+    requireActiveDeposit: true,
+    fixedSalaryAmount: 25000,
+    isActive: true,
+  };
+  if (existingSalaryConfig) {
+    await prisma.salaryConfig.update({
+      where: { id: existingSalaryConfig.id },
+      data: SALARY_DEFAULTS,
     });
-    console.log('✅ SalaryConfig created (1%/week PERMANEN — maxWeeks=0)\n');
+    console.log('✅ SalaryConfig updated (1%/week PERMANEN — maxWeeks=0)\n');
   } else {
-    console.log('⏭️  SalaryConfig already exists (skipped)\n');
+    await prisma.salaryConfig.create({ data: SALARY_DEFAULTS });
+    console.log('✅ SalaryConfig created (1%/week PERMANEN — maxWeeks=0)\n');
   }
 
   console.log('🎉 Seeding complete!');

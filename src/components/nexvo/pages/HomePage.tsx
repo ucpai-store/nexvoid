@@ -751,6 +751,10 @@ function ProductCard({ product, navigate }: { product: Product; navigate: (page:
   const t = useT();
   const quotaPercent = product.quota > 0 ? Math.round((product.quotaUsed / product.quota) * 100) : 0;
   const remaining = product.quota - product.quotaUsed;
+  // Compute profit directly from price × profitRate / 100 (source of truth).
+  // Avoids drift if estimatedProfit in DB is stale.
+  const dailyProfit = Math.floor(product.price * ((product.profitRate || 0) / 100));
+  const totalProfit = dailyProfit * (product.duration || 0);
 
   return (
     <div className="glass glow-gold rounded-2xl overflow-hidden group hover:glow-gold-strong transition-all h-full flex flex-col">
@@ -767,7 +771,7 @@ function ProductCard({ product, navigate }: { product: Product; navigate: (page:
           {formatRupiah(product.price)}
         </div>
         <div className="text-muted-foreground text-xs sm:text-sm">
-          Est. profit: <span className="text-emerald-400 font-medium">{formatRupiah(product.estimatedProfit)}</span>
+          Est. profit: <span className="text-emerald-400 font-medium">{formatRupiah(totalProfit)}</span>
         </div>
       </div>
 

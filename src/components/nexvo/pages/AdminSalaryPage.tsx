@@ -415,7 +415,7 @@ export default function AdminSalaryPage() {
           <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03]">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             <div>
-              <p className="text-foreground text-xs font-medium">2.5%</p>
+              <p className="text-foreground text-xs font-medium">1%</p>
               <p className="text-muted-foreground text-[10px]">Auto Detect</p>
             </div>
           </div>
