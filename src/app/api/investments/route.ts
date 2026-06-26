@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
 import { validateSequentialPurchase, getUserTierAvailability } from '@/lib/tier-system';
+import { isWeekendWIB } from '@/lib/settings';
 
 // GET: List user's investments
 export async function GET(request: NextRequest) {
@@ -119,6 +120,14 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Email belum diverifikasi. Silakan verifikasi email terlebih dahulu.' },
         { status: 403 }
       );
+    }
+
+    // ─── WEEKEND BLOCK: No investment activities on Saturday & Sunday ───
+    if (isWeekendWIB()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Investasi diblokir pada hari Sabtu & Minggu. Semua aktivitas (deposit, withdrawal, investasi, profit) libur di akhir pekan. Silakan kembali pada hari kerja (Senin-Jumat).'
+      }, { status: 400 });
     }
 
     const body = await request.json();
