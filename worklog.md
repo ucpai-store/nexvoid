@@ -3567,3 +3567,36 @@ Stage Summary:
 - Salary cron untouched (pays every Monday — was never affected by weekend logic).
 - Deploy script comments + final echo updated to reflect new scoped policy.
 - Commit pending (will push to git next).
+
+---
+Task ID: weekend-profit-libur-confirmation
+Agent: main (Z.ai Code)
+Task: User konfirmasi: "ini cuman update hari libur aja ya jadi sabtu minggu libur berarti hari ini profit nya libur jadi kalo libur otomatis profit sabtu minggu tidak masuk yaa paham kan berarti hari ini kan jumat nanti jam 00.00 kan sabtu jadi malam ini libur"
+
+Investigation:
+- WIB sekarang: Jumat 26 Jun 2026, 21:53 WIB
+- Jam 00:00 malam ini = Sabtu 27 Jun 2026 00:00 WIB (day=6)
+- Cron service SEBELUMNYA tidak running → harus distart agar weekend skip aktif malam ini
+
+Work Log:
+- Verified weekend skip logic di cron-service (mini-services/cron-service/index.ts line 730-742):
+  * Setiap 10 detik, cron tick check WIB time
+  * Pada jam 00:00 WIB (hour=0, minute<=2), cek dayOfWeek
+  * Jika Sabtu(6) atau Minggu(0) → LOG "Profit cron SKIPPED — today is Sabtu (weekend libur)" + return (no profit)
+  * Jika weekday (Senin-Jumat) → jalankan processDailyInvestmentProfits()
+- Simulasi 3 skenario (verified correct):
+  * Simulasi 1: 00:00 WIB Sabtu (malam ini) → day=6 → WEEKEND → PROFIT SKIP ✅
+  * Simulasi 2: 00:00 WIB Minggu → day=0 → WEEKEND → PROFIT SKIP ✅
+  * Simulasi 3: 00:00 WIB Senin → day=1 → WEEKDAY → PROFIT MASUK LAGI ✅
+- Cek DB: profit hari Jumat SUDAH dikredit (Rp3.200 untuk invest Rp160.000 @ 20:09 WIB via manual trigger). lastProfitDate = 2026-06-26 (Jumat).
+- Started cron service: `setsid bun --hot mini-services/cron-service/index.ts` (PID 11866, port 3032)
+- Verified cron service running: "Daily Profit + Matching: 00:00 WIB WEEKDAYS ONLY (Sat/Sun = LIBUR profit & WD, deposit & salary tetap jalan)"
+
+Stage Summary:
+- Cron service NOW RUNNING (PID 11866, port 3032) — siap untuk malam ini.
+- Malam ini jam 00:00 WIB (Jumat → Sabtu): profit akan SKIP otomatis (libur).
+- Sabtu & Minggu: profit TIDAK MASUK (libur).
+- Senin 00:00 WIB: profit masuk lagi normal.
+- Hari Jumat (hari ini) profit SUDAH masuk (Rp3.200 untuk 1 investasi aktif).
+- WD (withdrawal) juga libur Sabtu & Minggu. Deposit, salary, referral, matching tetap jalan normal.
+- Tidak ada perubahan kode — hanya konfirmasi + start cron service.
