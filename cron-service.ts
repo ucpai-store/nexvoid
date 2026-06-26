@@ -492,7 +492,7 @@ async function processDailyInvestmentProfits(): Promise<{
   const dayOfWeekCheck = wibNowCheck.getDay(); // 0=Sunday, 6=Saturday
   if (dayOfWeekCheck === 0 || dayOfWeekCheck === 6) {
     const dayName = dayOfWeekCheck === 0 ? 'Minggu' : 'Sabtu';
-    console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, profit & WD libur di akhir pekan).`);
     return emptyResult;
   }
 
@@ -972,7 +972,7 @@ async function runProfitCronIfDue(reason: string): Promise<void> {
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
     lastProfitRunDate = dateStr; // mark so we don't keep logging this every 10s
-    console.log(`\n[CRON] ⏸️ Profit cron SKIPPED (${reason}) — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    console.log(`\n[CRON] ⏸️ Profit cron SKIPPED (${reason}) — today is ${dayName} (weekend libur, profit & WD libur di akhir pekan).`);
     return;
   }
 
@@ -1137,7 +1137,7 @@ console.log(`[Cron Service v2.0] 🚀 Running on port ${PORT}`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
-console.log(`  - Weekend Libur: Sabtu & Minggu (no profit distribution)`);
+console.log(`  - Weekend Libur: Sabtu & Minggu (profit & WD off — deposit & salary tetap jalan)`);
 console.log(`  - Startup Catch-up: If past 00:05 WIB and profit not credited, run immediately`);
 console.log(`  - AUTO BACKFILL: Missed weekdays auto-credited (skip Sat/Sun, cap 30 days)`);
 console.log(`  - Weekly Salary: 00:00 WIB every Monday`);

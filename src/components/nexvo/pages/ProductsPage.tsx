@@ -25,7 +25,6 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n';
-import { WeekendNoticeBanner } from '@/components/nexvo/shared/WeekendNoticeBanner';
 
 /* ───────── Types ───────── */
 type TierState = 'available' | 'active' | 'bought';
@@ -401,7 +400,7 @@ export default function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
-      <WeekendNoticeBanner activity="Pembelian produk" />
+      {/* NOTE: Product purchase is ALLOWED on weekends (only profit + WD are libur). */}
       {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

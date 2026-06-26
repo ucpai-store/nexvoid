@@ -130,7 +130,7 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
 }> {
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, errors: 0, errorDetails: [] as string[], skipped: 0 };
 
-  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) — semua aktivitas mati ★
+  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) — profit & WD libur (deposit & salary tetap jalan) ★
   // Can be bypassed with force=true for admin manual trigger
   const wibNow = getWibNow();
   const dayOfWeek = wibNow.getDay();

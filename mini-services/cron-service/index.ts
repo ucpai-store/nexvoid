@@ -427,12 +427,12 @@ async function processDailyInvestmentProfits(): Promise<{
     console.error('[Profit Cron] SELF-HEAL error (non-fatal):', e.message);
   }
 
-  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) — semua aktivitas mati ★
+  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) — profit & WD libur (deposit & salary tetap jalan) ★
   const wibNow = getWibNow();
   const dayOfWeek = wibNow.getDay();
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-    console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+    console.log(`[Profit Cron] ⏸️ SKIPPED — today is ${dayName} (weekend libur, profit & WD libur di akhir pekan).`);
     return result;
   }
 
@@ -727,12 +727,12 @@ function checkAndRunCrons() {
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
   // ★ Daily profit + matching bonus: Every day at 00:00 WIB ★
-  // ★ WEEKEND LIBUR: Skip on Saturday (6) & Sunday (0) — semua aktivitas mati ★
+  // ★ WEEKEND LIBUR: Skip on Saturday (6) & Sunday (0) — profit & WD libur (deposit & salary tetap jalan) ★
   if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr) {
     lastProfitRunDate = dateStr;
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-      console.log(`\n[CRON] ⏸️ Profit cron SKIPPED — today is ${dayName} (weekend libur, semua aktivitas mati).`);
+      console.log(`\n[CRON] ⏸️ Profit cron SKIPPED — today is ${dayName} (weekend libur, profit & WD libur di akhir pekan).`);
     } else {
       console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()} (weekday only, with auto-catchup + hard cap)...`);
       processDailyInvestmentProfits().then((result) => {
@@ -848,7 +848,7 @@ const server = Bun.serve({
 console.log(`[Cron Service] 🚀 Running on port ${PORT}`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
-console.log(`  - Daily Profit + Matching: 00:00 WIB WEEKDAYS ONLY (Sat/Sun = LIBUR, with auto-catchup + hard cap)`);
+console.log(`  - Daily Profit + Matching: 00:00 WIB WEEKDAYS ONLY (Sat/Sun = LIBUR profit & WD, deposit & salary tetap jalan, with auto-catchup + hard cap)`);
 console.log(`  - Weekly Salary: 00:00 WIB every Monday`);
 console.log(`  - Quota Bump: every 15 minutes (auto-increment Kuota Terisi, reset when full)`);
 console.log(`  - Matching: Event-driven (credited automatically with daily profit)`);

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
-import { isWeekendWIB } from '@/lib/settings';
 
 // FALLBACK = Gold Premium Aset 1-6 (sama dengan seed-all.js / restore-products.sh / deploy.sh)
 // Dipakai HANYA jika DB error. Modal TIDAK dikembalikan, user hanya terima profit harian.
@@ -185,14 +184,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Akun belum diverifikasi. Silakan verifikasi terlebih dahulu.' }, { status: 403 });
     }
 
-    // ─── WEEKEND BLOCK: No product purchase on Saturday & Sunday ───
-    if (isWeekendWIB()) {
-      return NextResponse.json({
-        success: false,
-        error: 'Pembelian produk diblokir pada hari Sabtu & Minggu. Semua aktivitas (deposit, withdrawal, investasi, profit) libur di akhir pekan. Silakan kembali pada hari kerja (Senin-Jumat).'
-      }, { status: 400 });
-    }
-
+    // NOTE: Product purchase is ALLOWED on weekends (only profit + WD are libur on Sat/Sun).
     const body = await request.json();
     const { action, productId, quantity } = body;
 

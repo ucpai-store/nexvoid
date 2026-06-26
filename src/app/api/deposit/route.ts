@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
-import { isWeekendWIB } from '@/lib/settings';
 import { notifyBot } from '@/lib/bot-notification';
 import { sendPushToAdmins } from '@/lib/push-notification';
 
@@ -39,14 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Email not verified yet.' }, { status: 403 });
     }
 
-    // ─── WEEKEND BLOCK: No deposit activities on Saturday & Sunday ───
-    if (isWeekendWIB()) {
-      return NextResponse.json({
-        success: false,
-        error: 'Deposit diblokir pada hari Sabtu & Minggu. Semua aktivitas (deposit, withdrawal, profit) libur di akhir pekan. Silakan kembali pada hari kerja (Senin-Jumat).'
-      }, { status: 400 });
-    }
-
+    // NOTE: Deposit is ALLOWED on weekends (only profit + withdrawal are libur on Sat/Sun).
     const body = await request.json();
     const { amount, proofImage, paymentMethodId, paymentType, paymentName, paymentAccount } = body;
 

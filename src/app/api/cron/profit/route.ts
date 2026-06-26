@@ -487,7 +487,7 @@ export async function POST(request: NextRequest) {
     const dayOfWeek = wibNow.getDay(); // 0=Sunday, 6=Saturday
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-      console.log(`[Cron API] ⏸️ Profit cron skipped — today is ${dayName} (weekend libur). All activities off.`);
+      console.log(`[Cron API] ⏸️ Profit cron skipped — today is ${dayName} (weekend libur). Profit & WD off — deposit & salary tetap jalan.`);
       return NextResponse.json({
         success: true,
         data: {
@@ -498,7 +498,7 @@ export async function POST(request: NextRequest) {
           errors: 0,
           errorDetails: [],
           skipped: true,
-          skipReason: `Weekend (${dayName}) — semua aktivitas libur`,
+          skipReason: `Weekend (${dayName}) — profit & WD libur di akhir pekan`,
           durationMs: 0,
           wibTime: wibNow.toISOString(),
         },
@@ -544,7 +544,7 @@ export async function GET(request: NextRequest) {
     const dayOfWeek = wibNow.getDay(); // 0=Sunday, 6=Saturday
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-      console.log(`[Cron API] ⏸️ GET profit cron skipped — today is ${dayName} (weekend libur). All activities off.`);
+      console.log(`[Cron API] ⏸️ GET profit cron skipped — today is ${dayName} (weekend libur). Profit & WD off — deposit & salary tetap jalan.`);
       return NextResponse.json({
         success: true,
         data: {
@@ -555,7 +555,7 @@ export async function GET(request: NextRequest) {
           errors: 0,
           errorDetails: [],
           skipped: true,
-          skipReason: `Weekend (${dayName}) — semua aktivitas libur`,
+          skipReason: `Weekend (${dayName}) — profit & WD libur di akhir pekan`,
           durationMs: 0,
           wibTime: wibNow.toISOString(),
         },

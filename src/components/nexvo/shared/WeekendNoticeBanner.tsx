@@ -8,13 +8,14 @@ import { CalendarX2, Clock } from 'lucide-react';
  * WeekendNoticeBanner
  *
  * Displays a prominent banner when today is Saturday or Sunday (WIB timezone),
- * informing the user that ALL activities (deposit, withdrawal, profit) are off.
+ * informing the user that ONLY profit distribution and withdrawal (WD) are off.
+ * Deposit, salary, referral bonus tetap jalan normal di akhir pekan.
  *
  * The banner computes WIB time on the client side (UTC+7) regardless of the
  * browser's local timezone, so it works for users anywhere.
  *
  * Props:
- *  - activity: the specific activity label, e.g. "Deposit", "Withdrawal", "Profit"
+ *  - activity: the specific activity label, e.g. "Withdrawal", "Profit harian"
  *               (used in the message text)
  */
 export function WeekendNoticeBanner({ activity }: { activity: string }) {
@@ -66,7 +67,7 @@ export function WeekendNoticeBanner({ activity }: { activity: string }) {
                 </h3>
                 <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                   {activity} diblokir pada hari <span className="text-foreground font-semibold">Sabtu &amp; Minggu</span>.
-                  Semua aktivitas (deposit, withdrawal, profit) libur di akhir pekan.
+                  Profit &amp; Withdrawal (WD) libur di akhir pekan — deposit &amp; aktivitas lain tetap jalan normal.
                   Silakan kembali pada hari kerja <span className="text-foreground font-semibold">Senin-Jumat</span>.
                 </p>
                 <div className="flex items-center gap-1.5 mt-2 text-[10px] text-amber-400/80">

@@ -3,7 +3,6 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
 import { validateSequentialPurchase, getUserTierAvailability } from '@/lib/tier-system';
-import { isWeekendWIB } from '@/lib/settings';
 
 // GET: List user's investments
 export async function GET(request: NextRequest) {
@@ -122,14 +121,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ─── WEEKEND BLOCK: No investment activities on Saturday & Sunday ───
-    if (isWeekendWIB()) {
-      return NextResponse.json({
-        success: false,
-        error: 'Investasi diblokir pada hari Sabtu & Minggu. Semua aktivitas (deposit, withdrawal, investasi, profit) libur di akhir pekan. Silakan kembali pada hari kerja (Senin-Jumat).'
-      }, { status: 400 });
-    }
-
+    // NOTE: Investment purchase is ALLOWED on weekends (only profit + WD are libur on Sat/Sun).
     const body = await request.json();
     const { packageId } = body;
 

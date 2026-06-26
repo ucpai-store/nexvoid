@@ -89,7 +89,8 @@ export function isWithinWorkingHours(settings: Record<string, string>): boolean 
 
 /**
  * Check if today is a weekend (Saturday or Sunday) in WIB timezone.
- * ALL activities (deposit, withdrawal, profit) are OFF on weekends.
+ * ONLY profit distribution and withdrawal (WD) are OFF on weekends.
+ * Deposit, salary, referral bonus, matching bonus tetap jalan normal.
  * Saturday (day=6) and Sunday (day=0) are considered weekends.
  */
 export function isWeekendWIB(): boolean {

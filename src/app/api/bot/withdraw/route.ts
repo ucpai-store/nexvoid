@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateBotRequest } from '@/lib/bot-auth';
+import { isWeekendWIB } from '@/lib/settings';
 
 // POST - Bot withdraw (requires API key)
 export async function POST(request: NextRequest) {
@@ -60,6 +61,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'User account is suspended' },
         { status: 403 }
+      );
+    }
+
+    // ─── WEEKEND BLOCK: WD libur on Saturday & Sunday (deposit & salary tetap jalan) ───
+    if (isWeekendWIB()) {
+      return NextResponse.json(
+        { success: false, error: 'Withdrawal (WD) diblokir pada hari Sabtu & Minggu. Profit & WD libur di akhir pekan. Silakan kembali pada hari kerja (Senin-Jumat).' },
+        { status: 400 }
       );
     }
 

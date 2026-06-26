@@ -51,11 +51,12 @@ export async function POST(request: NextRequest) {
 
     const settings = await getAllSettings();
 
-    // ─── WEEKEND BLOCK: No withdrawal activities on Saturday & Sunday ───
+    // ─── WEEKEND BLOCK: Withdrawal (WD) & Profit libur on Saturday & Sunday ───
+    // NOTE: Only WD + profit are libur on weekends. Deposit & salary tetap jalan.
     if (isWeekendWIB()) {
       return NextResponse.json({
         success: false,
-        error: 'Withdrawal diblokir pada hari Sabtu & Minggu. Semua aktivitas (deposit, withdrawal, profit) libur di akhir pekan. Silakan kembali pada hari kerja (Senin-Jumat).'
+        error: 'Withdrawal (WD) diblokir pada hari Sabtu & Minggu. Profit & WD libur di akhir pekan. Deposit tetap bisa dilakukan. Silakan kembali pada hari kerja (Senin-Jumat).'
       }, { status: 400 });
     }
 

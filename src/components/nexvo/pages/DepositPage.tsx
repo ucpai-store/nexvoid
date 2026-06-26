@@ -19,7 +19,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n';
-import { WeekendNoticeBanner } from '@/components/nexvo/shared/WeekendNoticeBanner';
 
 interface PaymentMethod {
   id: string;
@@ -431,8 +430,7 @@ export default function DepositPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
-      {/* ─── Weekend Libur Notice ─── */}
-      <WeekendNoticeBanner activity="Deposit" />
+      {/* NOTE: Deposit is ALLOWED on weekends (only profit + WD are libur). No WeekendNoticeBanner here. */}
 
       {/* ─── Success Modal ─── */}
       <AnimatePresence>

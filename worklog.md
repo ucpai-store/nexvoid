@@ -3520,3 +3520,50 @@ Stage Summary:
 - Design verified clean by VLM on both desktop + mobile.
 - Business logic intact: 1%/week, forever (selamanya), invite 10 (no time limit), active investment required.
 - Commit pending (user did not request git push this turn).
+
+---
+Task ID: weekend-only-profit-wd-libur
+Agent: main (Z.ai Code)
+Task: User clarification: "eh yang libur hanya profit sama wd aja jadi profit sama wd sabtu minggu libur" — ONLY profit & withdrawal (WD) libur on weekends. Deposit, salary, referral, matching bonus, package/product purchase tetap jalan normal di Sabtu & Minggu.
+
+Investigation:
+- Previous implementation (commit ac57dc9) incorrectly blocked deposit, withdrawal, profit, investment purchase, AND product purchase on weekends.
+- User wants ONLY profit + WD blocked. Everything else (deposit, salary, referrals, matching, package/product purchase) must work normally on weekends.
+- Verified salary cron (`/api/cron/salary/route.ts`) had NO weekend block — CORRECT (salary pays every Monday regardless).
+- Verified matching bonus, referral bonus had NO weekend block — CORRECT.
+
+Work Log:
+- REMOVED weekend block from `/api/deposit/route.ts` (deposit now ALLOWED on weekends) + removed unused `isWeekendWIB` import.
+- REMOVED weekend block from `/api/investments/route.ts` (package investment purchase now ALLOWED) + removed unused import.
+- REMOVED weekend block from `/api/products/route.ts` (product purchase now ALLOWED) + removed unused import.
+- KEPT weekend block in `/api/withdraw/route.ts` — updated error message: "Withdrawal (WD) diblokir pada hari Sabtu & Minggu. Profit & WD libur di akhir pekan. Deposit tetap bisa dilakukan..."
+- ADDED weekend block to `/api/bot/withdraw/route.ts` (WhatsApp bot withdraw path) for consistency — WD blocked on weekends via bot too.
+- KEPT weekend block in:
+  * `/api/cron/profit/route.ts` (profit cron API — skip on weekend)
+  * `/api/admin/profit-trigger/route.ts` (admin manual trigger — skip unless ?force=true)
+  * `cron-service.ts` (PM2 cron service — skip on weekend)
+  * `mini-services/cron-service/index.ts` (mini-service cron — skip on weekend)
+  * `force-credit-profit.ts` (standalone fallback script — skip on weekend unless --force)
+- REMOVED `WeekendNoticeBanner` from:
+  * `DepositPage.tsx` (deposit allowed on weekends — no banner needed)
+  * `PaketPage.tsx` (package investment allowed — no banner)
+  * `ProductsPage.tsx` (product purchase allowed — no banner)
+- KEPT `WeekendNoticeBanner` in:
+  * `WithdrawPage.tsx` (activity="Withdrawal")
+  * `ProfitPage.tsx` (activity="Profit harian")
+- UPDATED `WeekendNoticeBanner.tsx` message text: "Profit & Withdrawal (WD) libur di akhir pekan — deposit & aktivitas lain tetap jalan normal." (was "Semua aktivitas (deposit, withdrawal, profit) libur di akhir pekan.")
+- UPDATED `src/lib/settings.ts` `isWeekendWIB()` JSDoc comment: "ONLY profit distribution and withdrawal (WD) are OFF on weekends. Deposit, salary, referral bonus, matching bonus tetap jalan normal."
+- UPDATED all log messages in cron-service.ts, mini-services/cron-service/index.ts, /api/cron/profit/route.ts, /api/admin/profit-trigger/route.ts: replaced "semua aktivitas mati/libur" → "profit & WD libur di akhir pekan".
+- UPDATED `deploy-weekend-libur.sh` header + final summary: "ONLY Profit & WD OFF — deposit, salary, referral tetap jalan".
+- Verified via `npx tsc --noEmit`: NO new TypeScript errors introduced by my changes (all errors in output are pre-existing and unrelated).
+- Verified via Agent Browser: home page loads OK, no page errors, no console errors, Fast Refresh rebuilt successfully.
+
+Stage Summary:
+- Weekend libur policy is now SCOPED correctly: ONLY profit distribution + withdrawal (WD) are suspended on Saturday & Sunday.
+- Deposit, salary bonus, referral bonus, matching bonus, package/product purchase ALL work normally on weekends.
+- UI banner only appears on Withdraw & Profit pages (NOT deposit/paket/products).
+- Withdraw API + bot withdraw API both block WD on weekends with clear message: "Profit & WD libur di akhir pekan. Deposit tetap bisa dilakukan."
+- Profit cron (all 3 layers: PM2 cron-service, API cron, force-credit-profit script) still correctly skip profit distribution on weekends.
+- Salary cron untouched (pays every Monday — was never affected by weekend logic).
+- Deploy script comments + final echo updated to reflect new scoped policy.
+- Commit pending (will push to git next).
