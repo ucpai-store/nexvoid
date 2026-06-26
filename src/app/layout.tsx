@@ -19,19 +19,9 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://nexvo.id"),
-  title: "NEXVO — World's #1 Digital Investment Platform | Stocks, Gold, Commodities, Crypto",
-  description: "NEXVO is the world's leading digital investment platform. Invest in stocks, gold, commodities & crypto. Earn daily profits up to 10%. Trusted by 50,000+ investors across 12+ countries. Bank-grade SSL 256-bit security, instant withdrawals. Build Value, Grow Future!",
-  keywords: [
-    "NEXVO", "best investment platform", "digital investment", "stocks", "gold investment",
-    "commodities trading", "cryptocurrency", "bitcoin", "ethereum", "daily profit",
-    "passive income", "wealth management", "asset management", "investment Singapore",
-    "investment Malaysia", "investment Asia", "online investment platform",
-    "stock market", "gold trading", "crypto trading", "referral bonus",
-    "investment app", "secure investment", "diversified portfolio",
-    "daily returns", "investment returns", "financial freedom",
-    "portfolio management", "digital assets", "smart investment",
-    "high yield investment", "investment opportunity", "grow wealth"
-  ],
+  title: "NEXVO",
+  description: "NEXVO",
+  keywords: ["NEXVO"],
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -57,8 +47,8 @@ export const metadata: Metadata = {
     "google-site-verification": "6RorboIBMBLmY3U5i0CDru6nBtlCQcJ3v0oNnUz696o",
   },
   openGraph: {
-    title: "NEXVO — World's #1 Investment Platform",
-    description: "Invest in stocks, gold, commodities & crypto. Daily profits up to 10%. Trusted by 50K+ investors worldwide. Bank-grade security. Build Value, Grow Future!",
+    title: "NEXVO",
+    description: "NEXVO",
     url: "https://nexvo.id",
     siteName: "NEXVO",
     type: "website",
@@ -68,25 +58,26 @@ export const metadata: Metadata = {
         url: "https://nexvo.id/api/files/nexvo-logo.png",
         width: 1200,
         height: 630,
-        alt: "NEXVO - Build Value, Grow Future",
+        alt: "NEXVO",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "NEXVO — World's Best Investment Platform",
-    description: "Daily profits up to 10%. Stocks, gold, commodities, crypto — all in one platform. Build Value, Grow Future!",
+    title: "NEXVO",
+    description: "NEXVO",
     images: ["https://nexvo.id/api/files/nexvo-logo.png"],
   },
   robots: {
     index: true,
     follow: true,
+    // ★ Hide description snippet from Google search results — only show "NEXVO" title
+    nosnippet: true,
     googleBot: {
       index: true,
       follow: true,
-      "max-video-preview": -1,
+      nosnippet: true,
       "max-image-preview": "large",
-      "max-snippet": -1,
     },
   },
 };
