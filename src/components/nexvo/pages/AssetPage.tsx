@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Package, Clock, TrendingUp, AlertTriangle, RefreshCw,
-  Coins, Calendar, CheckCircle2, XCircle, Loader2, ShieldCheck, Zap, Timer
+  Coins, Calendar, CheckCircle2, XCircle, Loader2, ShieldCheck, Zap, Timer, CalendarX2
 } from 'lucide-react';
+import { WeekendNoticeBanner } from '@/components/nexvo/shared/WeekendNoticeBanner';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAppStore } from '@/stores/app-store';
 import { formatRupiah } from '@/lib/auth';
@@ -81,12 +82,31 @@ function useProfitCountdown(): { h: string; m: string; s: string; weekend: boole
 
 function ProfitCountdownBadge({ dailyProfit }: { dailyProfit: number }) {
   const { h, m, s, weekend } = useProfitCountdown();
+  if (weekend) {
+    return (
+      <div className="mt-3 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <CalendarX2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span className="text-[10px] text-amber-400 font-bold truncate">
+            ⏸️ LIBUR — Profit masuk Senin 00:00 WIB
+          </span>
+        </div>
+        <div className="flex items-center gap-1 font-mono text-[11px] font-bold">
+          <span className="text-amber-400">{h}</span>
+          <span className="text-amber-400/50">:</span>
+          <span className="text-amber-400">{m}</span>
+          <span className="text-amber-400/50">:</span>
+          <span className="text-amber-400">{s}</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mt-3 px-3 py-2 rounded-xl bg-emerald-400/5 border border-emerald-400/15 flex items-center justify-between gap-2">
       <div className="flex items-center gap-1.5 min-w-0">
         <Timer className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
         <span className="text-[10px] text-muted-foreground truncate">
-          {weekend ? 'Profit berikutnya (Senin 00:00 WIB)' : 'Profit berikutnya masuk (00:00 WIB)'}
+          Profit berikutnya masuk (00:00 WIB)
         </span>
       </div>
       <div className="flex items-center gap-1 font-mono text-[11px] font-bold">
@@ -447,6 +467,9 @@ export default function AssetPage() {
           <TrendingUp className="w-4 h-4 mr-1.5" />
           {t('assets.investNew')}</Button>
       </div>
+
+      {/* ─── Weekend Libur Banner (Profit & WD libur di Sabtu & Minggu) ─── */}
+      <WeekendNoticeBanner activity="Profit harian aset" />
 
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

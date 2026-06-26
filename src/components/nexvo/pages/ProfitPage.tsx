@@ -6,7 +6,7 @@ import {
   TrendingUp, Timer, Coins, Award, Users, Gift, Package,
   CheckCircle2, Sparkles, RefreshCw, AlertTriangle, Clock,
   Zap, ArrowDownCircle, ArrowUpCircle, ShoppingBag, ChevronRight,
-  CalendarDays, Wallet, BarChart3
+  CalendarDays, Wallet, BarChart3, CalendarX2
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -79,7 +79,7 @@ interface ProfitHistoryEntry {
 // ── WIB Countdown Hook ──
 
 function useWIBCountdown() {
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, isWeekend: false });
 
   useEffect(() => {
     const calculate = () => {
@@ -87,15 +87,29 @@ function useWIBCountdown() {
       // Convert to WIB (UTC+7)
       const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
       const wibNow = new Date(utcMs + 7 * 3600000);
+      const dayOfWeek = wibNow.getDay(); // 0=Sun, 6=Sat
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
       // Next midnight WIB
-      const nextMidnight = new Date(wibNow);
+      let nextMidnight = new Date(wibNow);
       nextMidnight.setDate(nextMidnight.getDate() + 1);
       nextMidnight.setHours(0, 0, 0, 0);
 
+      // ★ WEEKEND LIBUR: kalau weekend, lompat ke Senin 00:00 WIB (skip Sabtu & Minggu) ★
+      if (isWeekend) {
+        // Cari 00:00 WIB hari kerja berikutnya (Senin-Jumat)
+        for (let i = 0; i < 7; i++) {
+          const wibMs = nextMidnight.getTime() + 7 * 3600000 - now.getTimezoneOffset() * 60000;
+          const wibDate = new Date(wibMs);
+          const day = wibDate.getDay();
+          if (day >= 1 && day <= 5) break; // Senin-Jumat ketemu
+          nextMidnight = new Date(nextMidnight.getTime() + 24 * 3600000);
+        }
+      }
+
       const diff = nextMidnight.getTime() - wibNow.getTime();
       if (diff <= 0) {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isWeekend });
         return;
       }
 
@@ -103,6 +117,7 @@ function useWIBCountdown() {
         hours: Math.floor(diff / (1000 * 60 * 60)),
         minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
         seconds: Math.floor((diff % (1000 * 60)) / 1000),
+        isWeekend,
       });
     };
 
@@ -323,7 +338,7 @@ export default function ProfitPage() {
       </motion.div>
 
       {/* ── Profit Schedule Card ── Countdown to 00:00 WIB */}
-      <motion.div variants={itemVariants} className="glass glow-gold rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden">
+      <motion.div variants={itemVariants} className={`glass rounded-2xl p-3 sm:p-5 lg:p-6 relative overflow-hidden ${countdown.isWeekend ? 'border-amber-500/40' : 'glow-gold'}`}>
         <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/3 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-cardmerald-500/3 blur-3xl" />
 
@@ -331,47 +346,70 @@ export default function ProfitPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-cardmerald-500/10 flex items-center justify-center">
-                <Timer className="w-4 h-4 text-emerald-400" />
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${countdown.isWeekend ? 'bg-amber-500/15' : 'bg-cardmerald-500/10'}`}>
+                <Timer className={`w-4 h-4 ${countdown.isWeekend ? 'text-amber-400' : 'text-emerald-400'}`} />
               </div>
               <div>
-                <h3 className="text-foreground font-semibold text-sm">Jadwal Profit</h3>
-                <p className="text-muted-foreground text-[10px]">Profit harian otomatis jam 00:00 WIB</p>
+                <h3 className="text-foreground font-semibold text-sm">
+                  {countdown.isWeekend ? '⏸️ LIBUR AKHIR PEKAN' : 'Jadwal Profit'}
+                </h3>
+                <p className="text-muted-foreground text-[10px]">
+                  {countdown.isWeekend
+                    ? 'Profit & WD libur — masuk Senin 00:00 WIB'
+                    : 'Profit harian otomatis jam 00:00 WIB'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <div className="glass rounded-lg px-2 py-1 flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${profitStatus?.todayProfitCredited ? 'bg-cardmerald-400' : 'bg-yellow-400'} animate-pulse`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${countdown.isWeekend ? 'bg-amber-400' : profitStatus?.todayProfitCredited ? 'bg-cardmerald-400' : 'bg-yellow-400'} animate-pulse`} />
                 <span className="text-[10px] text-muted-foreground">
                   WIB: {wibTime}
                 </span>
               </div>
-              {profitStatus?.todayProfitCredited && (
+              {countdown.isWeekend ? (
+                <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0">
+                  <CalendarX2 className="w-3 h-3 mr-0.5" />
+                  LIBUR
+                </Badge>
+              ) : profitStatus?.todayProfitCredited ? (
                 <Badge className="bg-cardmerald-400/10 text-emerald-400 border-border text-[9px] px-1.5 py-0">
                   <CheckCircle2 className="w-3 h-3 mr-0.5" />
                   Hari ini sudah
                 </Badge>
-              )}
+              ) : null}
             </div>
           </div>
 
           {/* Countdown */}
           <div className="flex items-center justify-center gap-2 sm:gap-3 mb-4">
-            <div className="glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px]">
-              <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.hours)}</p>
+            <div className={`glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px] ${countdown.isWeekend ? 'border-amber-500/20' : ''}`}>
+              <p className={`text-xl sm:text-3xl font-bold font-mono ${countdown.isWeekend ? 'text-amber-400' : 'text-foreground'}`}>{pad(countdown.hours)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">JAM</p>
             </div>
-            <span className="text-lg sm:text-xl font-bold text-primary animate-pulse">:</span>
-            <div className="glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px]">
-              <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.minutes)}</p>
+            <span className={`text-lg sm:text-xl font-bold animate-pulse ${countdown.isWeekend ? 'text-amber-400' : 'text-primary'}`}>:</span>
+            <div className={`glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px] ${countdown.isWeekend ? 'border-amber-500/20' : ''}`}>
+              <p className={`text-xl sm:text-3xl font-bold font-mono ${countdown.isWeekend ? 'text-amber-400' : 'text-foreground'}`}>{pad(countdown.minutes)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">MENIT</p>
             </div>
-            <span className="text-lg sm:text-xl font-bold text-primary animate-pulse">:</span>
-            <div className="glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px]">
-              <p className="text-xl sm:text-3xl font-bold text-foreground font-mono">{pad(countdown.seconds)}</p>
+            <span className={`text-lg sm:text-xl font-bold animate-pulse ${countdown.isWeekend ? 'text-amber-400' : 'text-primary'}`}>:</span>
+            <div className={`glass-strong rounded-xl p-2 sm:p-4 text-center flex-1 min-w-[64px] sm:max-w-[90px] ${countdown.isWeekend ? 'border-amber-500/20' : ''}`}>
+              <p className={`text-xl sm:text-3xl font-bold font-mono ${countdown.isWeekend ? 'text-amber-400' : 'text-foreground'}`}>{pad(countdown.seconds)}</p>
               <p className="text-muted-foreground text-[8px] sm:text-[9px] mt-0.5">DETIK</p>
             </div>
           </div>
+
+          {/* Weekend libur notice */}
+          {countdown.isWeekend && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-3">
+              <div className="flex items-center gap-2">
+                <CalendarX2 className="w-4 h-4 text-amber-400 shrink-0" />
+                <p className="text-amber-400 text-xs font-medium">
+                  Hari ini <span className="font-bold">LIBUR</span> — profit tidak masuk. Counting down ke <span className="font-bold">Senin 00:00 WIB</span>.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Estimasi profit */}
           {hasActiveInvestments && (
