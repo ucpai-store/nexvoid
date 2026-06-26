@@ -3600,3 +3600,46 @@ Stage Summary:
 - Hari Jumat (hari ini) profit SUDAH masuk (Rp3.200 untuk 1 investasi aktif).
 - WD (withdrawal) juga libur Sabtu & Minggu. Deposit, salary, referral, matching tetap jalan normal.
 - Tidak ada perubahan kode — hanya konfirmasi + start cron service.
+
+---
+Task ID: weekend-ui-banner-aset-profit
+Agent: main (Z.ai Code)
+Task: User: "kan malam ini seharusnya real time nya mati dong yg di aset karna libur kasi pemberitahuan sabtu minggu libur"
+
+Investigation:
+- AssetPage.tsx SUDAH punya logika weekend (isWeekendWIB + getNextWeekdayMidnightWIB), countdown ke Senin 00:00 WIB kalau weekend. TAPI tidak ada banner pemberitahuan prominent, dan countdown badge tidak berubah visualnya di weekend (masih hijau, masih bilang 'Profit berikutnya (Senin 00:00 WIB)').
+- ProfitPage.tsx PUNYA countdown ke 00:00 WIB tapi TIDAK handle weekend — di weekend masih counting ke 00:00 WIB hari berikutnya (Sabtu → Minggu → Senin), padahal profit tidak masuk di Sabtu/Minggu.
+
+Work Log:
+- AssetPage.tsx:
+  * Import WeekendNoticeBanner + CalendarX2 dari lucide-react
+  * Tambah <WeekendNoticeBanner activity="Profit harian aset" /> setelah header, sebelum Summary cards
+  * ProfitCountdownBadge: kalau weekend → tampilkan versi LIBUR (border amber, ikon CalendarX2, teks '⏸️ LIBUR — Profit masuk Senin 00:00 WIB', warna amber). Kalau weekday → tampilan normal (emerald).
+- ProfitPage.tsx:
+  * Tambah CalendarX2 ke import lucide-react
+  * useWIBCountdown: tambah isWeekend flag. Kalau weekend, target lompat ke Senin 00:00 WIB berikutnya (loop cari day 1-5).
+  * Profit Schedule Card: kalau weekend → border amber, header jadi '⏸️ LIBUR AKHIR PEKAN', subheader 'Profit & WD libur — masuk Senin 00:00 WIB', badge 'LIBUR' (amber), countdown angka amber.
+  * Tambah weekend notice box di bawah countdown: 'Hari ini LIBUR — profit tidak masuk. Counting down ke Senin 00:00 WIB.'
+
+Verification (Agent Browser, simulasi Saturday 2026-06-27 10:00 WIB via Date override):
+- AssetPage: 
+  * ✅ Banner "Libur Akhir Pekan SABTU" muncul prominent
+  * ✅ Pesan: "Profit harian aset diblokir pada hari Sabtu & Minggu. Profit & Withdrawal (WD) libur di akhir pekan — deposit & aktivitas lain tetap jalan normal. Silakan kembali pada hari kerja Senin-Jumat."
+  * ✅ Waktu server: WIB (UTC+7)
+- ProfitPage:
+  * ✅ Banner "Libur Akhir Pekan SABTU" muncul (activity="Profit harian")
+  * ✅ Header card berubah: "⏸️ LIBUR AKHIR PEKAN"
+  * ✅ Subheader: "Profit & WD libur — masuk Senin 00:00 WIB"
+  * ✅ Badge: "LIBUR" (amber, bukan "Hari ini sudah" hijau)
+  * ✅ Countdown angka warna amber, counting ke Senin 00:00 WIB
+  * ✅ Notice box: "Hari ini LIBUR — profit tidak masuk. Counting down ke Senin 00:00 WIB."
+- Friday (weekday, normal state):
+  * ✅ AssetPage: no banner, countdown hijau "Profit berikutnya masuk (00:00 WIB)"
+  * ✅ ProfitPage: header "Jadwal Profit", subheader "Profit harian otomatis jam 00:00 WIB", countdown hijau
+
+Stage Summary:
+- Halaman Aset & Profit sekarang REAL-TIME menampilkan pemberitahuan "LIBUR" di Sabtu & Minggu.
+- Countdown di weekend tetap jalan (counting ke Senin 00:00 WIB) tapi dengan visual amber + label LIBUR, jadi user jelas profit tidak masuk sampai Senin.
+- Banner kuning prominent muncul otomatis di kedua halaman kalau weekend.
+- Friday/weekday: tampilan normal (hijau, "Jadwal Profit"), tidak ada banner libur.
+- Commit 1bca9b2 pushed to origin/main.
