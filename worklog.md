@@ -3851,3 +3851,34 @@ Stage Summary:
   - PHASE 4 credits today's profit to all active Investments (if weekday)
   - Cron restart ensures tomorrow profit auto-enters at 00:00 WIB
 - Going forward: admin "Profit" button on Kelola Aset page now correctly creates BonusLog + updates Investment + prevents cron double-credit
+
+---
+Task ID: profit-fix-v5-bulletproof
+Agent: main (Z.ai Code)
+Task: User reports "tetep 0" after v4 — still 0 active investments found. v4 still filtered `status: "active"` which fails if VPS has different status values. User also fears data deletion ("jangan hilangkan akun").
+
+Work Log:
+- Root cause: v4 PHASE 2 used `where: { status: "active" }` — if VPS purchases have ANY status variation (Active, ACTIVE, ongoing, completed, stopped), query returns 0
+- Created fix-profit-v5.sh — BULLETPROOF version:
+  - PHASE 2: fetch ALL purchases (NO status filter) — scans every purchase regardless of status string
+  - Uses endDate as source of truth (not status): if endDate > now → active
+  - Creates Investment with status based on endDate, not purchase status
+  - PHASE 4: credits profit to ALL investments where endDate > now (NO status filter)
+  - Explicit NO-DELETION messaging throughout (user fears data loss)
+  - Auto-backup DB before running
+- Created diag-db.sh — pure read-only diagnostic (no changes):
+  - Shows all table counts, status breakdowns, sample purchases+investments
+  - Shows linked Investment for each Purchase (so user can see which are missing)
+  - Shows BonusLog + ProfitLog entries (last 30 days)
+- Integration test: 6 purchases with statuses (active, Active, ACTIVE, ongoing, completed, stopped) → v5 created 6 investments, all status='active' (endDate in future). TEST PASSED.
+- Committed (c40211c) + pushed to GitHub main
+
+Stage Summary:
+- v5 is bulletproof: does NOT depend on status string matching at all
+- Safe: NO deletion, auto-backup, idempotent (safe to run multiple times)
+- 2 scripts ready for VPS:
+  1. diag-db.sh — READ ONLY, shows exactly what's in DB (run first to verify)
+  2. fix-profit-v5.sh — repairs everything (run second)
+- VPS deploy command:
+  cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash diag-db.sh && bash fix-profit-v5.sh && pm2 restart nexvo-cron
+- After deploy: every Purchase gets a linked active Investment → cron finds them → profit auto-enters at 00:00 WIB every weekday
