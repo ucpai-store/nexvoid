@@ -3767,3 +3767,37 @@ Stage Summary:
 - VPS deploy command: cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && pm2 restart nexvo-cron
 - After deploy, cron v2.3 will auto-credit ALL uncredited users every 10s (continuous catchup)
 - User who was manually credited is NOT double-credited (per-investment dedup + BonusLog check)
+
+---
+Task ID: manual-profit-records-fix
+Agent: main (Z.ai Code)
+Task: Fix "riwayat gak muncul + aset gak total profit" saat admin input profit manual
+
+Work Log:
+- Root cause analysis: Admin "Tambah Saldo" (add-saldo action) only updates mainBalance
+- IMPACT: No BonusLog (riwayat empty), no investment.totalProfitEarned update (aset shows 0),
+  no user.totalProfit update (stat wrong), no lastProfitDate update (cron double-credits!)
+- Fix 1: /api/admin/users/route.ts — add-saldo now supports isProfit parameter
+  When isProfit=true: updates mainBalance + totalProfit + investment.totalProfitEarned
+  + investment.lastProfitDate + creates BonusLog(type='profit') in single transaction
+- Fix 2: AdminUsersPage.tsx — added "Tambah Profit Manual" button (yellow Coins icon)
+  with clear dialog explaining all records will be updated
+- Fix 3: sync-profit-records.sh (NEW) — for users already manually credited (old behavior)
+  Syncs missing records WITHOUT touching mainBalance (already credited):
+  - Creates BonusLog (riwayat muncul)
+  - Updates investment.totalProfitEarned (aset total profit update)
+  - Updates investment.lastProfitDate = now (anti cron double-credit)
+  - Updates user.totalProfit (statistik update)
+- Tested: add-saldo isProfit=true creates all 5 records, cron skips (anti double),
+  /api/transactions returns profit entry, all assertions pass
+- Committed + pushed (commit a57f654)
+
+Stage Summary:
+- 3 fixes deployed:
+  1. add-saldo isProfit=true (future manual entries work correctly)
+  2. AdminUsersPage "Tambah Profit Manual" button (yellow, with explanation)
+  3. sync-profit-records.sh (one-time fix for already-manually-credited users)
+- VPS deploy command: cd /var/www/nexvo && git fetch origin && git reset --hard origin/main
+- After deploy: run sync-profit-records.sh to fix existing manual entries
+- Going forward: admin uses "Tambah Profit Manual" button (yellow) for profit,
+  "Tambah Saldo" (green) for non-profit top-ups
