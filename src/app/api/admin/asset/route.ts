@@ -249,6 +249,40 @@ export async function PUT(request: NextRequest) {
             },
           });
 
+          // ★ FIX: Also update the linked Investment record so:
+          //   1. Aset page shows correct totalProfitEarned
+          //   2. Cron does NOT double-credit (lastProfitDate = today)
+          const linkedInvestments = await tx.investment.findMany({
+            where: { purchaseId },
+            select: { id: true, status: true },
+          });
+          const nowDate = new Date();
+          for (const inv of linkedInvestments) {
+            await tx.investment.update({
+              where: { id: inv.id },
+              data: {
+                totalProfitEarned: { increment: profitAmount },
+                lastProfitDate: nowDate,
+                // Reactivate if wrongly completed/stopped (manual profit means it should be active)
+                ...(inv.status !== 'active' ? { status: 'active' as const } : {}),
+              },
+            });
+          }
+
+          // ★ FIX: Create BonusLog (type='profit') so Riwayat page shows the entry.
+          //   Previously only ProfitLog was created → riwayat was empty.
+          const productName = (await tx.product.findUnique({ where: { id: purchase.productId } }))?.name || 'Produk';
+          await tx.bonusLog.create({
+            data: {
+              userId: purchase.userId,
+              fromUserId: purchase.userId,
+              type: 'profit',
+              level: 0,
+              amount: profitAmount,
+              description: `Profit manual dari admin untuk ${productName} [ADMIN-MANUAL]`,
+            },
+          });
+
           await tx.profitLog.create({
             data: {
               purchaseId,
@@ -262,7 +296,7 @@ export async function PUT(request: NextRequest) {
               type: 'profit',
               userName: purchase.user.name || purchase.user.userId,
               amount: profitAmount,
-              productName: (await tx.product.findUnique({ where: { id: purchase.productId } }))?.name || '',
+              productName,
               isFake: false,
             },
           });
