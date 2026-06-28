@@ -151,20 +151,85 @@ if command -v bun &>/dev/null; then
 
       let processed = 0;
       let skipped = 0;
+      let skippedManual = 0;
       let errors = 0;
       let totalProfit = 0;
       let totalMatching = 0;
       const creditedUsers = [];
+      const skippedUsers = [];
+
+      // ★★★ PRE-SCAN: Cari user yang SUDAH dapat profit hari ini (manual atau cron) ★★★
+      // Ini mencegah double-credit kalau user sudah input manual via admin panel.
+      // Cek 2 sumber:
+      //   1. investment.lastProfitDate >= today 00:00 WIB (cron auto-credit)
+      //   2. BonusLog type='profit' createdAt >= today 00:00 WIB (manual atau cron)
+      const startOfDayWIB = new Date(todayWIB + "T00:00:00+07:00");
+      console.log("🔍 Pre-scan: cari user yang sudah dapat profit hari ini...");
+      console.log("   (cek lastProfitDate + BonusLog type=profit untuk anti double-credit)");
+      console.log("");
+
+      const alreadyCreditedInvestments = new Set();
+      let manualCreditedCount = 0;
+
+      for (const inv of investments) {
+        let alreadyCredited = false;
+        let creditSource = "";
+
+        // Cek 1: lastProfitDate
+        if (inv.lastProfitDate) {
+          const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
+          if (lastProfitWIB === todayWIB) {
+            alreadyCredited = true;
+            creditSource = "lastProfitDate";
+          }
+        }
+
+        // Cek 2: BonusLog type='profit' hari ini (catches manual credits via admin panel)
+        if (!alreadyCredited) {
+          const todayProfitLogs = await p.bonusLog.count({
+            where: {
+              userId: inv.userId,
+              type: "profit",
+              createdAt: { gte: startOfDayWIB },
+            },
+          });
+          if (todayProfitLogs > 0) {
+            alreadyCredited = true;
+            creditSource = "BonusLog (manual/cron entry)";
+            manualCreditedCount++;
+          }
+        }
+
+        if (alreadyCredited) {
+          alreadyCreditedInvestments.add(inv.id);
+          skippedUsers.push({
+            userId: inv.user?.userId,
+            name: inv.user?.name,
+            investmentId: inv.id,
+            source: creditSource,
+            amount: inv.amount,
+            dailyProfit: inv.dailyProfit,
+          });
+        }
+      }
+
+      if (alreadyCreditedInvestments.size > 0) {
+        console.log("📋 " + alreadyCreditedInvestments.size + " investasi SUDAH dapat profit hari ini (SKIP, gak double-credit):");
+        skippedUsers.forEach((u, i) => {
+          console.log("  " + (i+1) + ". " + u.userId + " (" + u.name + ") — via " + u.source + " — dailyProfit=" + formatRupiah(u.dailyProfit || 0));
+        });
+        console.log("");
+      }
+
+      console.log("📊 Investasi yang BELUM dapat profit hari ini: " + (investments.length - alreadyCreditedInvestments.size));
+      console.log("");
 
       for (const inv of investments) {
         try {
-          // ★ SKIP kalau sudah credited today (DB dedup — gak double-credit)
-          if (inv.lastProfitDate) {
-            const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
-            if (lastProfitWIB === todayWIB) {
-              skipped++;
-              continue;
-            }
+          // ★★★ DOUBLE SAFETY: Skip kalau sudah credited (pre-scan result) ★★★
+          if (alreadyCreditedInvestments.has(inv.id)) {
+            skipped++;
+            continue;
           }
 
           // ★ SKIP kalau beli hari ini (profit mulai besok)
@@ -273,26 +338,39 @@ if command -v bun &>/dev/null; then
       }
 
       console.log("");
-      console.log("═══════════════════════════════════════════════");
+      console.log("═══════════════════════════════════════════════════════");
       console.log("🎉 FORCE PROFIT SELESAI!");
-      console.log("   ✅ Processed : " + processed + " user(s)");
-      console.log("   ⏭️  Skipped   : " + skipped + " (sudah credited / beli hari ini)");
-      console.log("   ❌ Errors    : " + errors);
-      console.log("   💰 Total     : " + formatRupiah(totalProfit) + " credited ke user");
-      console.log("═══════════════════════════════════════════════");
+      console.log("   ✅ Processed      : " + processed + " user(s) — profit DI-CREDIT SEKARANG");
+      console.log("   ⏭️  Skipped (auto) : " + skipped + " (sudah credited / beli hari ini)");
+      console.log("   🔒 Skipped (manual): " + manualCreditedCount + " (user input manual — GAK di-credit lagi)");
+      console.log("   ❌ Errors         : " + errors);
+      console.log("   💰 Total credited : " + formatRupiah(totalProfit));
+      console.log("═══════════════════════════════════════════════════════");
       console.log("");
 
       if (processed > 0) {
-        console.log("📋 Daftar user yang dapat profit:");
+        console.log("📋 ✅ User yang DAPAT PROFIT SEKARANG (belum di-credit sebelumnya):");
         creditedUsers.forEach((u, i) => {
           console.log("  " + (i + 1) + ". " + u.userId + " (" + u.name + ") — " + u.packageName + " — +" + formatRupiah(u.totalCredit));
         });
         console.log("");
-        console.log("✅ Profit sudah masuk ke mainBalance semua user.");
+      }
+
+      if (manualCreditedCount > 0) {
+        console.log("🔒 User yang SUDAH DI-INPUT MANUAL (SKIP, gak double-credit):");
+        skippedUsers.forEach((u, i) => {
+          console.log("  " + (i + 1) + ". " + u.userId + " (" + u.name + ") — via " + u.source);
+        });
+        console.log("");
+      }
+
+      if (processed > 0) {
+        console.log("✅ Profit sudah masuk ke mainBalance " + processed + " user.");
         console.log("✅ User bisa cek di dashboard mereka sekarang.");
-      } else if (skipped > 0) {
-        console.log("ℹ️  Semua investasi sudah credited today.");
-        console.log("   → Profit memang sudah masuk, gak perlu force credit lagi.");
+        console.log("✅ User yang sudah di-input manual GAK di-credit lagi (anti double).");
+      } else {
+        console.log("ℹ️  Semua user sudah credited today (manual atau cron).");
+        console.log("   → Gak ada yang perlu di-credit lagi. Semua sudah dapat profit.");
       }
 
       await p.$disconnect();
