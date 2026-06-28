@@ -3712,3 +3712,30 @@ Work Log:
 Stage Summary:
 - Gave user one-liner: cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash force-profit-now.sh
 - This bypasses the divergent branch error and runs the profit script immediately
+
+---
+Task ID: fix-profit-v3-bulletproof
+Agent: main (Z.ai Code)
+Task: User reports profit STILL not entering. "tetep profit nya gk masuk jangan main main yg bener tinggal benerin kan beres" — wants definitive fix, no more back and forth.
+
+Work Log:
+- Investigated deeper: found cron-service.ts line 713 comment "Purchase tracking (product purchases, no balance change — just stats)"
+  → Purchase profit only updates profitEarned field, does NOT credit mainBalance
+  → BUT checked src/app/api/products/route.ts line 329: buying Product creates BOTH Purchase AND Investment (linked via purchaseId)
+  → So Investment should be the one getting profit credit — that part is correct
+- Real issue: force-profit-now.sh had no diagnostic output. If 0 active investments or all already credited, script silently did nothing → user sees "profit gak masuk" with no explanation
+- Created fix-profit-v3.sh — BULLETPROOF version:
+  1. DIAGNOSTIC phase: shows ALL active investments with dailyProfit, lastProfitDate, package, endDate
+  2. Shows completed investments (check if wrongly completed — endDate still in future)
+  3. Shows table counts (users, investments, purchases, bonusLogs today)
+  4. FORCE CREDIT: credits profit to ALL active investments
+  5. Anti double-credit: lastProfitDate + BonusLog check
+  6. Clear categorized output: credited vs skipped (with reason)
+  7. Auto-restart cron v2.2
+- Handles edge cases: dailyProfit=0 (shows amount+rate for debug), contract ended, bought today, manual credit detected
+- Committed (df00e9a) + pushed
+
+Stage Summary:
+- User runs: cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash fix-profit-v3.sh
+- Script shows EXACTLY what's in DB + what was credited + what was skipped + why
+- If profit still not entering, diagnostic output will reveal the root cause (0 investments? dailyProfit=0? all completed?)
