@@ -3,6 +3,11 @@ import { db } from '@/lib/db';
 import { getAdminFromRequest, logAdminAction, generateUserId, generateReferralCode } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
+// Helper format rupiah untuk logging
+function formatRupiahAdmin(amount: number): string {
+  return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
+}
+
 export async function GET(request: NextRequest) {
   try {
     const admin = await getAdminFromRequest(request);
@@ -98,6 +103,62 @@ export async function PUT(request: NextRequest) {
         if (addAmount <= 0) {
           return NextResponse.json({ success: false, error: 'Jumlah harus lebih dari 0' }, { status: 400 });
         }
+
+        // ★★★ v2.3 FIX: Jika isProfit=true, buat full records (BonusLog + investment + totalProfit) ★★★
+        // Ini fix bug "riwayat gak muncul" + "aset gak total profit" + "cron double-credit"
+        // saat admin input profit manual via tombol "Tambah Profit".
+        const isProfit = body.isProfit === true || body.source === 'profit';
+        if (isProfit) {
+          await db.$transaction(async (tx) => {
+            // 1. Update mainBalance + totalProfit
+            await tx.user.update({
+              where: { id },
+              data: {
+                mainBalance: { increment: addAmount },
+                totalProfit: { increment: addAmount },
+              },
+            });
+
+            // 2. Cari active investment user — update totalProfitEarned + lastProfitDate
+            const activeInv = await tx.investment.findFirst({
+              where: { userId: id, status: 'active' },
+              include: { package: true },
+              orderBy: { createdAt: 'desc' },
+            });
+
+            let invDesc = 'Profit manual oleh admin';
+            if (activeInv) {
+              await tx.investment.update({
+                where: { id: activeInv.id },
+                data: {
+                  totalProfitEarned: { increment: addAmount },
+                  lastProfitDate: new Date(),
+                },
+              });
+              const pkgName = activeInv.package?.name || 'Investment';
+              const pkgRate = activeInv.package?.profitRate || (activeInv.amount > 0 ? (addAmount / activeInv.amount) * 100 : 0);
+              invDesc = `Profit harian ${pkgName} (manual by admin) — ${formatRupiahAdmin(addAmount)}`;
+            }
+
+            // 3. Bikin BonusLog entry — biar muncul di riwayat + anti double-credit cron
+            await tx.bonusLog.create({
+              data: {
+                userId: id,
+                fromUserId: id,
+                type: 'profit',
+                level: 0,
+                amount: addAmount,
+                description: invDesc + ' [MANUAL]',
+              },
+            });
+          });
+
+          updatedUser = await db.user.findUnique({ where: { id } });
+          await logAdminAction(admin.id, 'ADD_PROFIT_MANUAL', `Manual profit ${formatRupiahAdmin(addAmount)} to user ${user.userId} (${user.name || 'no name'})`);
+          break;
+        }
+
+        // Default: just mainBalance (untuk top-up deposit, kompensasi, dll — BUKAN profit)
         updatedUser = await db.user.update({
           where: { id },
           data: { mainBalance: { increment: addAmount } },

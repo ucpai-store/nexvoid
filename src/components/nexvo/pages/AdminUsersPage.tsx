@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Users, Search, Plus, Minus, Ban, CheckCircle2,
   Loader2, ChevronLeft, ChevronRight, Crown, Phone,
-  Wallet, AlertTriangle, Pencil, Mail, ShieldCheck, ShieldX, Trash2,
+  Wallet, AlertTriangle, Pencil, Mail, ShieldCheck, ShieldX, Trash2, Coins,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatRupiah, formatNumber, maskWhatsApp } from '@/lib/auth';
@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [saldoDialog, setSaldoDialog] = useState<{ userId: string; type: 'add' | 'reduce' } | null>(null);
+  const [saldoDialog, setSaldoDialog] = useState<{ userId: string; type: 'add' | 'reduce' | 'profit' } | null>(null);
   const [saldoAmount, setSaldoAmount] = useState('');
   const [processing, setProcessing] = useState(false);
   const [editDialog, setEditDialog] = useState<User | null>(null);
@@ -83,14 +83,21 @@ export default function AdminUsersPage() {
     if (isNaN(amount) || amount <= 0) { toast({ title: 'Jumlah tidak valid', variant: 'destructive' }); return; }
     setProcessing(true);
     try {
-      const action = saldoDialog.type === 'add' ? 'add-saldo' : 'reduce-saldo';
+      // ★ v2.3: type='profit' → kirim isProfit=true biar backend bikin BonusLog + update investment
+      const action = saldoDialog.type === 'add' ? 'add-saldo' : saldoDialog.type === 'reduce' ? 'reduce-saldo' : 'add-saldo';
+      const payload: Record<string, unknown> = { id: saldoDialog.userId, action, amount };
+      if (saldoDialog.type === 'profit') {
+        payload.isProfit = true;
+        payload.source = 'profit';
+      }
       const res = await fetch('/api/admin/users', {
         method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
-        body: JSON.stringify({ id: saldoDialog.userId, action, amount }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: `Balance successfully ${saldoDialog.type === 'add' ? 'added' : 'deducted'}` });
+        const msg = saldoDialog.type === 'add' ? 'Saldo ditambahkan' : saldoDialog.type === 'reduce' ? 'Saldo dikurangi' : 'Profit manual dikredit (saldo + riwayat + aset updated)';
+        toast({ title: msg });
         fetchUsers();
         setSaldoDialog(null); setSaldoAmount('');
       } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
@@ -242,6 +249,9 @@ export default function AdminUsersPage() {
                           <button onClick={() => setSaldoDialog({ userId: user.id, type: 'add' })} className="w-8 h-8 rounded-lg bg-cardmerald-500/10 flex items-center justify-center hover:bg-cardmerald-500/20 transition-colors" title="Tambah Saldo">
                             <Plus className="w-3.5 h-3.5 text-emerald-400" />
                           </button>
+                          <button onClick={() => setSaldoDialog({ userId: user.id, type: 'profit' })} className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center hover:bg-yellow-500/20 transition-colors" title="Tambah Profit Manual (saldo + riwayat + aset)">
+                            <Coins className="w-3.5 h-3.5 text-yellow-400" />
+                          </button>
                           <button onClick={() => setSaldoDialog({ userId: user.id, type: 'reduce' })} className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center hover:bg-orange-500/20 transition-colors" title="Kurangi Saldo">
                             <Minus className="w-3.5 h-3.5 text-orange-400" />
                           </button>
@@ -360,18 +370,29 @@ export default function AdminUsersPage() {
       <Dialog open={!!saldoDialog} onOpenChange={(open) => { if (!open) { setSaldoDialog(null); setSaldoAmount(''); } }}>
         <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-gold-gradient">{saldoDialog?.type === 'add' ? 'Tambah Saldo' : 'Kurangi Saldo'}</DialogTitle>
-            <DialogDescription className="text-muted-foreground">Masukkan jumlah saldo yang ingin {saldoDialog?.type === 'add' ? 'ditambahkan' : 'dikurangi'}</DialogDescription>
+            <DialogTitle className="text-gold-gradient">
+              {saldoDialog?.type === 'add' ? 'Tambah Saldo' : saldoDialog?.type === 'reduce' ? 'Kurangi Saldo' : 'Tambah Profit Manual'}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {saldoDialog?.type === 'profit'
+                ? 'Kredit profit ke user. Saldo + Riwayat + Aset + Total Profit semua ter-update. Anti double-credit (cron gak akan re-credit).'
+                : `Masukkan jumlah saldo yang ingin ${saldoDialog?.type === 'add' ? 'ditambahkan' : 'dikurangi'}`}
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label className="text-muted-foreground text-xs mb-2 block">Jumlah (Rp)</Label>
             <Input type="number" value={saldoAmount} onChange={(e) => setSaldoAmount(e.target.value)} placeholder="Masukkan jumlah..." className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
             {saldoAmount && parseFloat(saldoAmount) > 0 && (<p className="text-foreground text-sm mt-2">= {formatRupiah(parseFloat(saldoAmount))}</p>)}
+            {saldoDialog?.type === 'profit' && (
+              <p className="text-yellow-400/80 text-[11px] mt-2 leading-relaxed">
+                ⚠️ Ini akan: +saldo, +total profit, +riwayat profit, +aset total profit, update lastProfitDate (anti cron double-credit).
+              </p>
+            )}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => { setSaldoDialog(null); setSaldoAmount(''); }} disabled={processing} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
-            <Button onClick={handleSaldoAction} disabled={processing || !saldoAmount} className={`rounded-xl font-semibold ${saldoDialog?.type === 'add' ? 'bg-cardmerald-600 hover:bg-cardmerald-700 text-white' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}>
-              {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : saldoDialog?.type === 'add' ? 'Tambah' : 'Kurangi'}
+            <Button onClick={handleSaldoAction} disabled={processing || !saldoAmount} className={`rounded-xl font-semibold ${saldoDialog?.type === 'add' ? 'bg-cardmerald-600 hover:bg-cardmerald-700 text-white' : saldoDialog?.type === 'profit' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}>
+              {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : saldoDialog?.type === 'add' ? 'Tambah' : saldoDialog?.type === 'profit' ? 'Kredit Profit' : 'Kurangi'}
             </Button>
           </DialogFooter>
         </DialogContent>
