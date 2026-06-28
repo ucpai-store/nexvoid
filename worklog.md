@@ -3673,3 +3673,28 @@ Stage Summary:
 - Cron v2.2 then takes over — tomorrow profit auto-enters at 00:00 WIB
 - Continuous catchup means: even if cron down at 00:00, fires within 10s of restart
 - NO data changes — only credits profit that should have entered
+
+---
+Task ID: force-profit-anti-double
+Agent: main (Z.ai Code)
+Task: User already manually credited some users via admin panel. force-profit-now.sh must NOT re-credit those (anti double-credit), only credit users who haven't received profit yet.
+
+Work Log:
+- Added PRE-SCAN logic to force-profit-now.sh: before crediting, scan all active investments and check 2 sources:
+  1. investment.lastProfitDate >= today 00:00 WIB (cron auto-credit marker)
+  2. BonusLog type='profit' createdAt >= today 00:00 WIB (catches manual credits via admin panel that may not have updated lastProfitDate)
+- If either check passes → add investment ID to alreadyCreditedInvestments Set → SKIP in main loop
+- Added manualCreditedCount counter + skippedUsers list for visibility
+- Updated output summary to show 3 categories:
+  - Processed (credited now)
+  - Skipped auto (already credited via cron lastProfitDate)
+  - Skipped manual (user input manual via admin panel — BonusLog detected)
+- Print 2 lists: users who GOT profit now + users who were SKIPPED (manual)
+- Committed (53981b3) + pushed to GitHub main
+
+Stage Summary:
+- User runs: cd /var/www/nexvo && git pull origin main && bash force-profit-now.sh
+- Script shows EXACTLY which users got credited vs which were skipped (manual)
+- Anti double-credit: if user already input manual via admin panel (BonusLog entry exists today), script skips them
+- Only users who haven't received profit today get credited
+- Safe to run multiple times — idempotent
