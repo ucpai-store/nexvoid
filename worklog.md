@@ -3801,3 +3801,53 @@ Stage Summary:
 - After deploy: run sync-profit-records.sh to fix existing manual entries
 - Going forward: admin uses "Tambah Profit Manual" button (yellow) for profit,
   "Tambah Saldo" (green) for non-profit top-ups
+
+---
+Task ID: profit-fix-v4-comprehensive
+Agent: main (Z.ai Code)
+Task: Fix "riwayat gak muncul + aset gak total profit + profit gak masuk otomatis" — user uploaded screenshots showing sync-profit-records.sh reported 0 active investments while admin Kelola Aset shows 22 assets.
+
+Work Log:
+- Analyzed 2 user screenshots via VLM:
+  - Screenshot 1 (terminal): sync-profit-records.sh on VPS reported "TIDAK ADA investasi aktif!" (0 active investments), DB URL = file:/var/www/nexvo/db/custom.db
+  - Screenshot 2 (admin Kelola Aset page): 22 aset terdaftar, Total Profit Rp 115.200, Aset Aktif 22
+- ROOT CAUSE identified: 22 assets are PURCHASE records, NOT Investment records!
+  - Admin asset API (src/app/api/admin/asset/route.ts) merges Purchase + Investment tables
+  - sync-profit-records.sh only queried Investment table → found 0 → did nothing
+  - Cron-service also only reads Investment table → profit never auto-entered
+- Second root cause: admin add-profit on Purchase path only created ProfitLog (NOT BonusLog)
+  - Riwayat page reads from BonusLog → empty → profit entries don't show
+  - Investment.totalProfitEarned not updated → aset page shows 0 total profit
+  - Investment.lastProfitDate not updated → cron double-credits
+- FIX 1: src/app/api/admin/asset/route.ts (add-profit, Purchase path)
+  - Added: update linked Investment.totalProfitEarned + lastProfitDate
+  - Added: reactivate Investment if wrongly completed/stopped
+  - Added: create BonusLog type='profit' (so riwayat shows entry)
+  - Kept: ProfitLog + LiveActivity (existing behavior)
+- FIX 2: Created fix-profit-records-v4.sh (comprehensive repair)
+  - PHASE 1: Diagnostic (table counts + status breakdowns)
+  - PHASE 2: Repair Purchase→Investment link (create missing, reactivate wrongly-completed, fix dailyProfit=0)
+  - PHASE 3: Sync BonusLog for already-manually-credited Purchases (ProfitLog exists, BonusLog missing) — does NOT touch mainBalance
+  - PHASE 4: Credit today's profit to all uncredited active Investments (weekday, anti double)
+- Integration test: created test Purchase+Investment, ran add-profit, verified ALL 9 assertions pass:
+  - User.mainBalance=8000 ✅, User.totalProfit=8000 ✅
+  - Purchase.profitEarned=8000 ✅
+  - Investment.totalProfitEarned=8000 ✅, lastProfitDate=SET ✅, status=active ✅
+  - BonusLog count=1 ✅, amount=8000 ✅
+  - ProfitLog count=1 ✅
+  - Cron will skip today (anti double-credit) ✅
+- Reactivation test: Investment wrongly 'completed' with future endDate → reactivated to 'active' ✅
+- Committed (4124597) + pushed to GitHub main
+
+Stage Summary:
+- 2 fixes deployed to GitHub:
+  1. admin/asset/route.ts add-profit Purchase path now creates ALL records (BonusLog + Investment update + anti double-credit)
+  2. fix-profit-records-v4.sh comprehensive repair script (4 phases)
+- VPS deploy command (ONE LINE):
+  cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash fix-profit-records-v4.sh && pm2 restart nexvo-cron
+- After deploy:
+  - PHASE 2 creates/reactivates the missing 22 Investment records
+  - PHASE 3 syncs BonusLog for all already-manually-credited Purchases (riwayat muncul)
+  - PHASE 4 credits today's profit to all active Investments (if weekday)
+  - Cron restart ensures tomorrow profit auto-enters at 00:00 WIB
+- Going forward: admin "Profit" button on Kelola Aset page now correctly creates BonusLog + updates Investment + prevents cron double-credit
