@@ -1003,30 +1003,35 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // ★ STARTUP CATCH-UP: On first run, if it's past 00:05 WIB and profit hasn't run today, run it now.
-  //    This handles the case where PM2 restarted after midnight and the 00:00 window was missed.
+  // ★ STARTUP CATCH-UP: On first run, run profit check immediately.
   if (!startupCatchupDone) {
     startupCatchupDone = true;
-    if (hour >= 0 && (hour > 0 || minute >= 5) && lastProfitRunDate !== dateStr) {
-      console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, checking if today's profit needs to run...`);
-      runProfitCronIfDue('startup-catchup').catch(console.error);
-    }
+    console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, day=${dayOfWeek}, hour=${hour}:${minute}`);
+    runProfitCronIfDue('startup-catchup').catch(console.error);
   }
 
-  // Daily profit + matching bonus: trigger window is the FULL HOUR 00:00-00:59 WIB
-  // (widened from 00:00-00:02 to survive PM2 restarts/delays; DB dedup prevents double-credit)
-  // ★ WEEKEND LIBUR: No profit distribution on Saturday (6) & Sunday (0) ★
-  if (hour === 0 && lastProfitRunDate !== dateStr) {
-    runProfitCronIfDue('midnight-schedule').catch(console.error);
+  // ★★★ CONTINUOUS CATCHUP — PROFIT WAJIB MASUK ★★★
+  // Fire EVERY 10 seconds on weekdays if profit hasn't been credited today.
+  // DB dedup (lastProfitDate >= today 00:00 WIB) prevents double-credit.
+  // This means: even if cron was down at 00:00, it fires within 10s of starting.
+  // Even if it's 23:59 and profit hasn't run, it fires NOW.
+  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) ★
+  if (dayOfWeek !== 0 && dayOfWeek !== 6 && lastProfitRunDate !== dateStr) {
+    runProfitCronIfDue('continuous-catchup').catch(console.error);
   }
 
-  // Weekly salary: Every Monday at 00:00 WIB (trigger window: full hour)
-  if (dayOfWeek === 1 && hour === 0 && lastSalaryRunDate !== dateStr) {
+  // Weekly salary: Every Monday — CONTINUOUS CATCHUP (fire any hour on Monday if not yet run)
+  // Original: only hour 0. Bug: if cron down at 00:00, salary never runs all Monday.
+  // Fix: fire on ANY hour of Monday if lastSalaryRunDate !== today.
+  if (dayOfWeek === 1 && lastSalaryRunDate !== dateStr) {
     lastSalaryRunDate = dateStr;
-    console.log(`\n[CRON] 💰 Running weekly salary bonus distribution at ${wibNow.toISOString()}...`);
+    console.log(`\n[CRON] 💰 Running weekly salary bonus distribution at ${wibNow.toISOString()} [Monday catchup]...`);
     processAllSalaryBonuses().then((result) => {
       console.log(`[CRON] 💰 Salary done: ${result.eligible} eligible, ${formatRupiahSimple(result.totalAmount)} total, ${result.skipped} skipped, ${result.errors} errors`);
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error(`[CRON] ❌ Salary run FAILED:`, err);
+      lastSalaryRunDate = ''; // reset so it retries
+    });
   }
 
   // Quota simulation: Run every 2 hours (at :30 minutes)
@@ -1111,20 +1116,99 @@ const server = Bun.serve({
       const { credited, sampleCount } = await hasProfitBeenCreditedToday();
       const wibNow = getWibNow();
       const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const dayOfWeek = wibNow.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      // ★ Calculate next profit fire time
+      let nextProfitFireISO = '';
+      let nextProfitFireDesc = '';
+      if (isWeekend) {
+        const daysUntilMonday = (1 - dayOfWeek + 7) % 7;
+        const monday = new Date(wibNow);
+        monday.setDate(wibNow.getDate() + daysUntilMonday);
+        monday.setHours(0, 0, 0, 0);
+        nextProfitFireISO = monday.toISOString();
+        nextProfitFireDesc = `Senin ${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')} 00:00 WIB (akhir pekan selesai)`;
+      } else if (credited) {
+        const tomorrow = new Date(wibNow);
+        tomorrow.setDate(wibNow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        const tomorrowDow = tomorrow.getDay();
+        if (tomorrowDow === 0 || tomorrowDow === 6) {
+          const daysUntilMonday = (1 - tomorrowDow + 7) % 7;
+          tomorrow.setDate(tomorrow.getDate() + daysUntilMonday);
+        }
+        nextProfitFireISO = tomorrow.toISOString();
+        nextProfitFireDesc = `${dayNames[tomorrow.getDay()]} ${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')} 00:00 WIB (profit hari ini sudah masuk)`;
+      } else {
+        nextProfitFireISO = new Date(wibNow.getTime() + 10000).toISOString();
+        nextProfitFireDesc = `SEKARANG JUGA (continuous catchup — fires dalam ≤10 detik)`;
+      }
+
       return Response.json({
         wibTime: wibNow.toISOString(),
         wibWallTime: `${wibNow.getFullYear()}-${String(wibNow.getMonth()+1).padStart(2,'0')}-${String(wibNow.getDate()).padStart(2,'0')} ${String(wibNow.getHours()).padStart(2,'0')}:${String(wibNow.getMinutes()).padStart(2,'0')}:${String(wibNow.getSeconds()).padStart(2,'0')}`,
-        dayOfWeek: wibNow.getDay(),
-        dayName: dayNames[wibNow.getDay()],
-        isWeekend: wibNow.getDay() === 0 || wibNow.getDay() === 6,
+        dayOfWeek,
+        dayName: dayNames[dayOfWeek],
+        isWeekend,
         profitCreditedToday: credited,
         profitCreditedCount: sampleCount,
         lastSalaryRun: lastSalaryRunDate || 'never',
         lastProfitRun: lastProfitRunDate || 'never',
         lastQuotaSimHour: lastQuotaSimHour >= 0 ? `hour ${lastQuotaSimHour}` : 'never',
+        nextProfitFireISO,
+        nextProfitFireDesc,
         matchingMode: 'event-driven',
         referralMode: 'per-investment (credited when downline invests)',
       }, { headers: corsHeaders });
+    }
+
+    // ★★★ DEBUG ENDPOINT — diagnose why profit not crediting ★★★
+    if (url.pathname === '/api/debug/profit') {
+      const wibNow = getWibNow();
+      const todayWIB = getTodayWibDateString();
+      const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
+
+      const activeInvestments = await db.investment.findMany({
+        where: { status: 'active' },
+        include: { package: true, user: true },
+        take: 50,
+      });
+
+      const debugInfo = {
+        wibTime: wibNow.toISOString(),
+        wibWallTime: `${wibNow.getFullYear()}-${String(wibNow.getMonth()+1).padStart(2,'0')}-${String(wibNow.getDate()).padStart(2,'0')} ${String(wibNow.getHours()).padStart(2,'0')}:${String(wibNow.getMinutes()).padStart(2,'0')}`,
+        dayOfWeek: wibNow.getDay(),
+        isWeekend: wibNow.getDay() === 0 || wibNow.getDay() === 6,
+        todayWIB,
+        startOfDayWIB: startOfDayWIB.toISOString(),
+        dbUrl: DB_URL,
+        lastProfitRunDate,
+        lastSalaryRunDate,
+        activeInvestmentsCount: activeInvestments.length,
+        investments: activeInvestments.map(inv => ({
+          id: inv.id,
+          userId: inv.userId,
+          userUserId: inv.user?.userId,
+          userName: inv.user?.name,
+          amount: inv.amount,
+          dailyProfit: inv.dailyProfit,
+          storedDailyProfit: inv.dailyProfit,
+          computedDailyProfit: Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100)),
+          packageProfitRate: inv.package?.profitRate,
+          packageName: inv.package?.name,
+          status: inv.status,
+          startDate: inv.startDate,
+          endDate: inv.endDate,
+          lastProfitDate: inv.lastProfitDate,
+          lastProfitDateWIB: inv.lastProfitDate ? getWibDateString(new Date(inv.lastProfitDate)) : null,
+          alreadyCreditedToday: inv.lastProfitDate ? (getWibDateString(new Date(inv.lastProfitDate)) === todayWIB) : false,
+          totalProfitEarned: inv.totalProfitEarned,
+          createdAt: inv.createdAt,
+        })),
+      };
+
+      return Response.json(debugInfo, { headers: corsHeaders });
     }
 
     return Response.json({ error: 'Not found' }, { status: 404, headers: corsHeaders });
