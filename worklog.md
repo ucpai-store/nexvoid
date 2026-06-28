@@ -3698,3 +3698,17 @@ Stage Summary:
 - Anti double-credit: if user already input manual via admin panel (BonusLog entry exists today), script skips them
 - Only users who haven't received profit today get credited
 - Safe to run multiple times — idempotent
+
+---
+Task ID: git-divergent-fix
+Agent: main (Z.ai Code)
+Task: User screenshot shows `git pull` failed on VPS with "fatal: Need to specify how to reconcile divergent branches" — force-profit-now.sh never ran because && chain stopped at git pull error.
+
+Work Log:
+- Diagnosed: VPS has local commits that diverged from GitHub main (likely from previous deploys that committed .env or build artifacts)
+- Solution: user must run `git fetch origin && git reset --hard origin/main` to force-sync to GitHub version, THEN run force-profit-now.sh
+- This is SAFE — only resets CODE, not database (database is in db/custom.db, gitignored)
+
+Stage Summary:
+- Gave user one-liner: cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash force-profit-now.sh
+- This bypasses the divergent branch error and runs the profit script immediately
