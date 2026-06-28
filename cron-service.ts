@@ -1,5 +1,11 @@
 /**
- * NEXVO Cron Service v2.0
+ * NEXVO Cron Service v2.3
+ *
+ * ★ v2.3 FIX: hasProfitBeenCreditedToday() now only skips if ALL active
+ *   investments are credited today (was: skipped if ANY was credited,
+ *   which caused manual admin credit of 1 user to block cron for all
+ *   other users the entire day).
+ * ★ v2.3: DB path now reads .env DATABASE_URL first (more reliable on VPS).
  *
  * Runs scheduled tasks automatically:
  * - Daily Investment Profit: Every day at 00:00 WIB
@@ -19,18 +25,64 @@ const PORT = 3032;
 const WIB_OFFSET = 7; // UTC+7 for Asia/Jakarta
 
 // ─── DB path resolution (auto-detect — works on VPS /home/nexvo AND locally) ───
-const DB_CANDIDATES = [
-  '/home/nexvo/prisma/custom.db',
-  '/home/nexvo/db/custom.db',
-  path.join(process.cwd(), 'prisma/custom.db'),
-  path.join(process.cwd(), 'db/custom.db'),
-  path.join(process.cwd(), 'custom.db'),
-];
-const DB_PATH = DB_CANDIDATES.find((p) => fs.existsSync(p));
+// ★★★ v2.3: Try .env FIRST (most reliable), then fall back to filesystem scan.
+function resolveDbPath(): string | null {
+  // 1) Try reading DATABASE_URL from .env (matches what Next.js app uses)
+  try {
+    const envCandidates = [
+      path.join(process.cwd(), '.env'),
+      '/var/www/nexvo/.env',
+      '/home/nexvo/.env',
+      path.join(process.cwd(), '.env.production'),
+    ];
+    for (const envPath of envCandidates) {
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const match = envContent.match(/^DATABASE_URL=(.+)$/m);
+        if (match) {
+          let url = match[1].trim().replace(/^["']|["']$/g, '');
+          if (url.startsWith('file:')) {
+            const dbPath = url.replace(/^file:/, '').replace(/^sqlite:/, '');
+            const absPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
+            if (fs.existsSync(absPath)) {
+              console.log(`📁 [CRON] DB from .env (${envPath}): ${absPath}`);
+              return absPath;
+            }
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    console.error(`[CRON] .env read error (non-fatal):`, e.message);
+  }
+
+  // 2) Fall back to filesystem scan
+  const DB_CANDIDATES = [
+    '/home/nexvo/prisma/custom.db',
+    '/home/nexvo/db/custom.db',
+    '/var/www/nexvo/db/custom.db',
+    '/var/www/nexvo/prisma/custom.db',
+    path.join(process.cwd(), 'prisma/custom.db'),
+    path.join(process.cwd(), 'db/custom.db'),
+    path.join(process.cwd(), 'custom.db'),
+  ];
+  const found = DB_CANDIDATES.find((p) => fs.existsSync(p));
+  if (found) {
+    console.log(`📁 [CRON] DB from filesystem scan: ${found}`);
+    return found;
+  }
+  return null;
+}
+
+const DB_PATH = resolveDbPath();
 
 if (!DB_PATH) {
-  console.error('❌ [CRON] Database file not found. Checked:');
-  DB_CANDIDATES.forEach((p) => console.error(`   - ${p}`));
+  console.error('❌ [CRON] Database file not found. Tried:');
+  console.error('   - .env DATABASE_URL');
+  console.error('   - /home/nexvo/{prisma,db}/custom.db');
+  console.error('   - /var/www/nexvo/{prisma,db}/custom.db');
+  console.error('   - cwd/{prisma,db,}/custom.db');
+  console.error('   Current cwd:', process.cwd());
   process.exit(1);
 }
 console.log(`📁 [CRON] Using DB: ${DB_PATH}`);
@@ -942,22 +994,32 @@ let lastProfitRunDate = '';
 let startupCatchupDone = false;
 
 /**
- * Check if today's profit has already been credited by querying the DB.
- * Returns true if ANY active investment already has lastProfitDate = today (WIB).
- * This is the source of truth — the in-memory `lastProfitRunDate` flag can reset on PM2 restart.
+ * Check if today's profit has already been credited for ALL active investments.
+ *
+ * ★★★ CRITICAL FIX (v2.3): Previously returned `credited: true` if ANY investment
+ *   had lastProfitDate >= today. This caused a MAJOR BUG:
+ *   - Admin manually credits 1 user via admin panel → that investment gets lastProfitDate = today
+ *   - Cron checks hasProfitBeenCreditedToday() → sees 1 credited → returns `credited: true`
+ *   - Cron sets lastProfitRunDate = dateStr and SKIPS the entire batch
+ *   - Other 20 users NEVER get credited today!
+ *
+ *   FIX: Only return `credited: true` if ALL active investments are already credited today.
+ *   The per-investment dedup in processDailyInvestmentProfitsCore() handles individual skips.
  */
-async function hasProfitBeenCreditedToday(): Promise<{ credited: boolean; sampleCount: number }> {
+async function hasProfitBeenCreditedToday(): Promise<{ credited: boolean; sampleCount: number; uncreditedCount: number; totalCount: number }> {
   const todayWIB = getTodayWibDateString();
   const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
   const activeCount = await db.investment.count({ where: { status: 'active' } });
-  if (activeCount === 0) return { credited: false, sampleCount: 0 };
+  if (activeCount === 0) return { credited: false, sampleCount: 0, uncreditedCount: 0, totalCount: 0 };
   const creditedToday = await db.investment.count({
     where: {
       status: 'active',
       lastProfitDate: { gte: startOfDayWIB },
     },
   });
-  return { credited: creditedToday > 0, sampleCount: creditedToday };
+  const uncreditedCount = activeCount - creditedToday;
+  // ★ Only skip if ALL active investments are credited today (no more work to do)
+  return { credited: uncreditedCount === 0, sampleCount: creditedToday, uncreditedCount, totalCount: activeCount };
 }
 
 async function runProfitCronIfDue(reason: string): Promise<void> {
@@ -976,13 +1038,17 @@ async function runProfitCronIfDue(reason: string): Promise<void> {
     return;
   }
 
-  // DB-based dedup: if profit already credited today, skip
-  const { credited, sampleCount } = await hasProfitBeenCreditedToday();
+  // ★★★ DB-based dedup (v2.3 FIX): Only skip if ALL active investments are credited today.
+  //   Previously: skipped if ANY was credited → manual credit of 1 user caused
+  //   cron to skip the other 20 users for the entire day!
+  const { credited, sampleCount, uncreditedCount, totalCount } = await hasProfitBeenCreditedToday();
   if (credited) {
     lastProfitRunDate = dateStr;
-    console.log(`\n[CRON] ✅ Profit already credited today (${sampleCount} investments have lastProfitDate >= today 00:00 WIB). Skipping (${reason}).`);
+    console.log(`\n[CRON] ✅ Profit already credited today for ALL ${sampleCount}/${totalCount} active investments. Skipping (${reason}).`);
     return;
   }
+  // There are still uncredited investments — run the cron now
+  console.log(`\n[CRON] 📊 Profit status: ${sampleCount}/${totalCount} credited, ${uncreditedCount} still need crediting. Running cron (${reason})...`);
 
   lastProfitRunDate = dateStr;
   console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus (${reason}) at ${wibNow.toISOString()} (WIB: ${wibNow.toLocaleString('id-ID', { timeZone: 'UTC' })})...`);
@@ -1063,7 +1129,7 @@ const server = Bun.serve({
 
     if (url.pathname === '/') {
       return Response.json({
-        service: 'NEXVO Cron Service v2.0',
+        service: 'NEXVO Cron Service v2.3',
         status: 'running',
         wibTime: getWibNow().toISOString(),
         lastSalaryRun: lastSalaryRunDate || 'never',
@@ -1113,7 +1179,7 @@ const server = Bun.serve({
     }
 
     if (url.pathname === '/api/status') {
-      const { credited, sampleCount } = await hasProfitBeenCreditedToday();
+      const { credited, sampleCount, uncreditedCount, totalCount } = await hasProfitBeenCreditedToday();
       const wibNow = getWibNow();
       const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       const dayOfWeek = wibNow.getDay();
@@ -1139,10 +1205,10 @@ const server = Bun.serve({
           tomorrow.setDate(tomorrow.getDate() + daysUntilMonday);
         }
         nextProfitFireISO = tomorrow.toISOString();
-        nextProfitFireDesc = `${dayNames[tomorrow.getDay()]} ${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')} 00:00 WIB (profit hari ini sudah masuk)`;
+        nextProfitFireDesc = `${dayNames[tomorrow.getDay()]} ${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')} 00:00 WIB (profit hari ini sudah masuk untuk semua user)`;
       } else {
         nextProfitFireISO = new Date(wibNow.getTime() + 10000).toISOString();
-        nextProfitFireDesc = `SEKARANG JUGA (continuous catchup — fires dalam ≤10 detik)`;
+        nextProfitFireDesc = `SEKARANG JUGA (continuous catchup — fires dalam ≤10 detik) — ${uncreditedCount} dari ${totalCount} investasi belum dapat profit`;
       }
 
       return Response.json({
@@ -1153,6 +1219,8 @@ const server = Bun.serve({
         isWeekend,
         profitCreditedToday: credited,
         profitCreditedCount: sampleCount,
+        profitUncreditedCount: uncreditedCount,
+        profitTotalActive: totalCount,
         lastSalaryRun: lastSalaryRunDate || 'never',
         lastProfitRun: lastProfitRunDate || 'never',
         lastQuotaSimHour: lastQuotaSimHour >= 0 ? `hour ${lastQuotaSimHour}` : 'never',
@@ -1182,7 +1250,7 @@ const server = Bun.serve({
         isWeekend: wibNow.getDay() === 0 || wibNow.getDay() === 6,
         todayWIB,
         startOfDayWIB: startOfDayWIB.toISOString(),
-        dbUrl: DB_URL,
+        dbUrl: `file:${DB_PATH}`,
         lastProfitRunDate,
         lastSalaryRunDate,
         activeInvestmentsCount: activeInvestments.length,
@@ -1217,7 +1285,7 @@ const server = Bun.serve({
 
 // ──────────── Start ────────────
 
-console.log(`[Cron Service v2.0] 🚀 Running on port ${PORT}`);
+console.log(`[Cron Service v2.3] 🚀 Running on port ${PORT}`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);

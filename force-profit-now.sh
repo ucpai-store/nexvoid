@@ -12,22 +12,24 @@
 #   ✅ BonusLog entry dibuat untuk audit trail
 #
 # CARA PAKAI (di VPS):
-#   cd /var/www/nexvo && git pull origin main && bash force-profit-now.sh
+#   cd /var/www/nexvo && bash force-profit-now.sh
+#   (git-independent — gak perlu git pull dulu)
 # ════════════════════════════════════════════════════════════════
 
 set +e
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
-echo "║  NEXVO FORCE PROFIT NOW (EMERGENCY)              ║"
+echo "║  NEXVO FORCE PROFIT NOW (GIT-INDEPENDENT v2.3)   ║"
 echo "║  Credit profit SEMUA user aktif SEKARANG         ║"
+echo "║  + Restart cron-service v2.3                     ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
 
 # ─── CARI PROJECT ───
 PROJECT_DIR=""
 for candidate in "/var/www/nexvo" "/home/nexvo" "/var/www/html/nexvo" "/var/www/nexvoid" "/home/$USER/nexvo" "/root/nexvo" "/opt/nexvo" "$HOME/nexvo" "$(pwd)"; do
-  if [ -d "$candidate/.git" ] && [ -f "$candidate/package.json" ]; then
+  if [ -f "$candidate/package.json" ] && [ -f "$candidate/.env" ]; then
     PROJECT_DIR="$candidate"
     break
   fi
@@ -44,14 +46,8 @@ echo "📌 Commit:  $(git log --oneline -1 2>/dev/null)"
 echo "🕐 WIB now: $(TZ='Asia/Jakarta' date '+%Y-%m-%d %H:%M:%S %A')"
 echo ""
 
-# ─── STEP 1: GIT PULL (pastikan cron-service v2.2 ada) ──
-echo "── Step 1: Git pull kode terbaru ──"
-git fetch origin main 2>&1 | head -3
-git reset --hard origin/main 2>&1 | head -3
-echo ""
-
-# ─── STEP 2: FORCE CREDIT PROFIT SEKARANG ──
-echo "── Step 2: Credit profit SEMUA user aktif SEKARANG ──"
+# ─── STEP 1: FORCE CREDIT PROFIT SEKARANG (GIT-INDEPENDENT) ──
+echo "── Step 1: Credit profit SEMUA user aktif SEKARANG ──"
 echo "   ⏳ Baca database, cari investasi aktif, credit profit..."
 echo ""
 
@@ -268,7 +264,7 @@ if command -v bun &>/dev/null; then
 
           // ★ Credit profit (1 hari = hari ini)
           // Note: Script ini CUMA credit hari ini. Kalau ada backfill (missed days),
-          //       cron-service v2.2 yang handle. Script emergency ini fokus HARI INI wajib masuk.
+          //       cron-service v2.3 yang handle. Script emergency ini fokus HARI INI wajib masuk.
           const totalCredit = dailyProfit;
 
           await p.$transaction(async (tx) => {
@@ -386,8 +382,8 @@ else
 fi
 echo ""
 
-# ─── STEP 3: UPDATE CRON SERVICE (biar besok gak perlu manual) ──
-echo "── Step 3: Restart cron-service v2.2 (continuous catchup) ──"
+# ─── STEP 2: UPDATE CRON SERVICE (biar besok gak perlu manual) ──
+echo "── Step 2: Restart cron-service (continuous catchup) ──"
 echo "   🔪 Kill zombie di port 3032..."
 fuser -k 3032/tcp 2>/dev/null
 sleep 2
@@ -398,17 +394,17 @@ if command -v pm2 &>/dev/null; then
   pm2 delete nexvo-cron 2>/dev/null
   pm2 start "bun --hot cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR" 2>&1 | tail -3
   pm2 save 2>/dev/null
-  echo "   ✅ PM2 nexvo-cron v2.2 di-start (continuous catchup AKTIF)"
+  echo "   ✅ PM2 nexvo-cron di-start (continuous catchup AKTIF)"
   echo "   ✅ Besok profit auto masuk jam 00:00 WIB — gak perlu manual lagi"
 fi
 echo ""
 
-# ─── STEP 4: HEALTH CHECK ──
-echo "── Step 4: Health check cron-service ──"
+# ─── STEP 3: HEALTH CHECK ──
+echo "── Step 3: Health check cron-service ──"
 sleep 8
 CRON_RESP=$(curl -s --max-time 5 http://localhost:3032/api/status 2>/dev/null || echo "")
 if [ -n "$CRON_RESP" ] && echo "$CRON_RESP" | grep -q "wibTime"; then
-  echo "   ✅ Cron-service v2.2 running"
+  echo "   ✅ Cron-service running"
   echo "$CRON_RESP" | python3 -c "
 import sys,json
 try:
@@ -430,7 +426,7 @@ echo "║  ✅ FORCE PROFIT SELESAI                         ║"
 echo "╠══════════════════════════════════════════════════╣"
 echo "║                                                  ║"
 echo "║  Profit hari ini: ✅ SUDAH DI-CREDIT             ║"
-echo "║  Cron v2.2      : ✅ AKTIF (continuous catchup) ║"
+echo "║  Cron           : ✅ AKTIF (continuous catchup) ║"
 echo "║  Besok          : ✅ AUTO jam 00:00 WIB         ║"
 echo "║                                                  ║"
 echo "║  User bisa cek dashboard mereka SEKARANG.        ║"
