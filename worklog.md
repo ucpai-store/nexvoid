@@ -3739,3 +3739,31 @@ Stage Summary:
 - User runs: cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash fix-profit-v3.sh
 - Script shows EXACTLY what's in DB + what was credited + what was skipped + why
 - If profit still not entering, diagnostic output will reveal the root cause (0 investments? dailyProfit=0? all completed?)
+
+---
+Task ID: profit-fix-v23
+Agent: main (Z.ai Code)
+Task: Fix critical profit-not-entering bug — user has 21 users / 22 active assets, manually credited some, others never get profit
+
+Work Log:
+- Diagnosed cron-service.ts v2.2 — found ROOT CAUSE bug in hasProfitBeenCreditedToday()
+- BUG: Function returned `credited: true` if ANY active investment had lastProfitDate >= today
+- IMPACT: When admin manually credits 1 user via admin panel, cron sees "already credited today" and SKIPS all other 20+ users for the ENTIRE day
+- This perfectly explains user's complaint: "yg masuk manual total profit 22.400 yg lain belom masuk"
+- FIX (v2.3): Changed hasProfitBeenCreditedToday() to only return credited=true if ALL active investments are credited today (uncreditedCount === 0)
+- Also added .env DATABASE_URL reading as primary DB path resolver (more reliable on VPS than hardcoded candidates)
+- Updated /api/status endpoint to expose profitUncreditedCount + profitTotalActive for diagnostics
+- Created credit-now.sh: git-independent script that credits profit immediately (no git pull needed)
+- Updated force-profit-now.sh: removed git pull step (was failing due to divergent branches on VPS)
+- Wrote test case simulating exact scenario: 3 investments, 1 manually credited → verified v2.3 credits the other 2 (old code skipped all)
+- Committed + pushed fix to GitHub (commit e76e267)
+
+Stage Summary:
+- Root cause identified: global skip bug in hasProfitBeenCreditedToday()
+- Fix verified via automated test (2/3 credited, 1/3 correctly skipped as manual)
+- 2 scripts ready for VPS:
+  1. credit-now.sh — git-independent, credits profit NOW
+  2. force-profit-now.sh — git-independent, credits profit + restarts cron
+- VPS deploy command: cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && pm2 restart nexvo-cron
+- After deploy, cron v2.3 will auto-credit ALL uncredited users every 10s (continuous catchup)
+- User who was manually credited is NOT double-credited (per-investment dedup + BonusLog check)
