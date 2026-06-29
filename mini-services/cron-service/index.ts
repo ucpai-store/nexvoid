@@ -607,13 +607,15 @@ async function processDailyInvestmentProfits(): Promise<{
         }
 
         // 4. Create bonus log for daily profit
+        // ★★★ v2.5 FIX: type must be 'profit' (NOT 'reward') so riwayat page shows it.
+        //   Riwayat page filters by type='profit'. Old code used 'reward' → riwayat empty!
         const catchupNote = missedDays > 1 ? ` [CATCHUP ${daysCredited} hari]` : '';
         const capNote = willComplete ? ` [HARD CAP ${formatRupiahSimple(hardCap)} → SELESAI]` : '';
         await tx.bonusLog.create({
           data: {
             userId: inv.userId,
             fromUserId: inv.userId,
-            type: 'reward',
+            type: 'profit',
             level: 0,
             amount: finalCredit,
             description: `Profit harian investasi ${formatRupiahSimple(inv.amount)} — ${formatRupiahSimple(finalCredit)}${catchupNote}${capNote}`,

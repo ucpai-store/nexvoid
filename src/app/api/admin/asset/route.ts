@@ -167,9 +167,16 @@ export async function PUT(request: NextRequest) {
         }
 
         const updated = await db.$transaction(async (tx) => {
+          // ★★★ v2.5 FIX: Update lastProfitDate (anti cron double-credit) + reactivate
+          //   if wrongly completed/stopped (manual profit means contract is active).
+          //   Also include package so description has correct name.
           const upd = await tx.investment.update({
             where: { id: purchaseId },
-            data: { totalProfitEarned: { increment: profitAmount } },
+            data: {
+              totalProfitEarned: { increment: profitAmount },
+              lastProfitDate: new Date(),
+              ...(investment.status !== 'active' ? { status: 'active' as const } : {}),
+            },
           });
 
           await tx.user.update({
@@ -180,6 +187,7 @@ export async function PUT(request: NextRequest) {
             },
           });
 
+          const pkgName = (await tx.investmentPackage.findUnique({ where: { id: investment.packageId } }))?.name || 'Investment';
           await tx.bonusLog.create({
             data: {
               userId: investment.userId,
@@ -187,7 +195,17 @@ export async function PUT(request: NextRequest) {
               type: 'profit',
               level: 0,
               amount: profitAmount,
-              description: `Profit manual dari admin untuk investasi ${investment.package?.name || ''}`,
+              description: `Profit manual dari admin untuk ${pkgName} [ADMIN-MANUAL]`,
+            },
+          });
+
+          await tx.liveActivity.create({
+            data: {
+              type: 'profit',
+              userName: investment.user?.name || investment.user?.userId || 'User',
+              amount: profitAmount,
+              productName: pkgName,
+              isFake: false,
             },
           });
 

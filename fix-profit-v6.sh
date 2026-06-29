@@ -531,6 +531,46 @@ function formatRupiah(amount) { return "Rp" + Math.floor(amount).toLocaleString(
   console.log("   (TANPA rubah mainBalance — saldo sudah di-credit manual)");
   console.log("");
 
+// ═══════════════════════════════════════════════════════════
+  // PHASE 6: SAFETY NET — Convert type='reward' (Profit) → type='profit'
+  //   Kadang cron lama salah bikin BonusLog type='reward' padahal deskripsinya
+  //   "Profit harian". Riwayat page filter type='profit' → entry gak muncul.
+  //   Phase ini convert type='reward' → 'profit' untuk semua entry yang
+  //   deskripsinya mulai dengan "Profit".
+  //   AMAN: Hanya update type, TIDAK rubah amount/userId/description.
+  // ═══════════════════════════════════════════════════════════
+  console.log("═══════════════════════════════════════════════════");
+  console.log("  PHASE 6: SAFETY NET — reward→profit conversion");
+  console.log("═══════════════════════════════════════════════════");
+
+  const rewardProfitEntries = await p.bonusLog.findMany({
+    where: {
+      type: "reward",
+      description: { startsWith: "Profit" },
+    },
+    select: { id: true, userId: true, amount: true, description: true, createdAt: true },
+  });
+  console.log("🔍 Found 'reward' entries with 'Profit' description:", rewardProfitEntries.length);
+
+  let converted = 0;
+  let convertedTotal = 0;
+  for (const entry of rewardProfitEntries) {
+    await p.bonusLog.update({
+      where: { id: entry.id },
+      data: { type: "profit" },
+    });
+    converted++;
+    convertedTotal += entry.amount;
+    console.log("  ♻️  CONVERTED — " + entry.userId.slice(-8) + " — " + formatRupiah(entry.amount) + " — " + (entry.description || "").slice(0, 60));
+  }
+
+  console.log("");
+  console.log("📊 PHASE 6 SUMMARY:");
+  console.log("   ♻️  Converted reward→profit :", converted);
+  console.log("   💰 Total amount            :", formatRupiah(convertedTotal));
+  console.log("   (Type dirubah jadi 'profit' supaya muncul di riwayat. Amount/userId TETAP.)");
+  console.log("");
+
   // ═══════════════════════════════════════════════════════════
   // FINAL
   // ═══════════════════════════════════════════════════════════
@@ -548,6 +588,7 @@ function formatRupiah(amount) { return "Rp" + Math.floor(amount).toLocaleString(
   console.log("   • Investment.totalProfitEarned di-update (aset total profit)");
   console.log("   • Profit hari ini di-credit (weekday)");
   console.log("   • Anti double-credit (lastProfitDate + BonusLog check)");
+  console.log("   • Safety net: reward→profit conversion (jika cron lama salah type)");
   console.log("");
   console.log("🔁 PENTING — Restart cron supaya profit auto-enter besok 00:00 WIB:");
   console.log("   pm2 restart nexvo-cron");
