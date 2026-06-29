@@ -3972,3 +3972,89 @@ Stage Summary:
 - After deploy: every manual profit entry will correctly create BonusLog (riwayat) + update Investment (total profit) + set lastProfitDate (anti cron double-credit)
 - VPS deploy command:
   cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash diag-db.sh && bash fix-profit-v6.sh && pm2 restart nexvo-cron
+
+---
+Task ID: profit-fix-v65-bulletproof-final
+Agent: main (Z.ai Code)
+Task: User minta "cek sampai akar akar nya sampek inti" + "jangan sampek akun user dll ilang" + "update itu aja" — verifikasi semua fix profit wajib masuk otomatis tanpa hapus data.
+
+Work Log:
+- Audit lengkap semua file kritikal:
+  1. cron-service.ts (yang DIPAKAI PM2 via ecosystem.config.cjs) — VERIFIED v2.4 bulletproof
+     • processDailyInvestmentProfitsCore: fetch ALL, filter endDate > now (NO status filter) ✅
+     • hasProfitBeenCreditedToday: count by endDate, only skip if ALL credited ✅
+     • runProfitCronIfDue: continuous catchup every 10s on weekdays ✅
+     • SELF-HEAL: reactivate wrongly-completed investments ✅
+     • Creates BonusLog type='profit' ✅
+  2. mini-services/cron-service/index.ts — VERIFIED ada BUG type='reward' (gak dipakai PM2 tapi tetap di-fix)
+  3. /api/admin/asset/route.ts (Purchase path) — VERIFIED v4 fix (BonusLog + Investment update + lastProfitDate)
+  4. /api/admin/asset/route.ts (Investment path) — DITEMUKAN BUG: gak update lastProfitDate!
+  5. /api/admin/users/route.ts (add-saldo isProfit=true) — VERIFIED v6 fix (endDate-based + BonusLog)
+  6. /api/admin/investments/route.ts (add-profit) — VERIFIED v6 fix (lastProfitDate + BonusLog + LiveActivity)
+  7. fix-profit-v6.sh — VERIFIED 5 phase (diagnostic, repair, sync, credit, sync total)
+
+- BUG #1 DITEMUKAN & DIPERBAIKI (/api/admin/asset Investment path line 169-213):
+  Problem:
+    - Update Investment.totalProfitEarned TAPI gak update lastProfitDate
+      → cron bisa double-credit hari ini!
+    - Pakai investment.package?.name padahal findUnique cuma include: { user: true }
+      → description kosong "untuk investasi "
+    - Gak bikin LiveActivity (dashboard real-time gak update)
+  Fix (commit 1085ed3):
+    - Update lastProfitDate: new Date() (anti cron double-credit)
+    - Reactivate if status != 'active' (manual profit = contract aktif)
+    - Lookup package dari investmentPackage table (description benar)
+    - Bikin LiveActivity entry (dashboard update)
+
+- BUG #2 DITEMUKAN & DIPERBAIKI (mini-services/cron-service/index.ts line 618):
+  Problem:
+    - Bikin BonusLog type='reward' (BUKAN 'profit')!
+    - Riwayat page filter type='profit' → entry profit gak muncul!
+    - (File ini gak dipakai PM2 — cron-service.ts yang dipakai — tapi di-fix supaya konsisten)
+  Fix (commit 1085ed3): type='reward' → type='profit'
+
+- SAFETY NET DITAMBAHKAN (fix-profit-v6.sh PHASE 6):
+  Problem: VPS mungkin sempat jalan cron lama yang bikin type='reward' (salah)
+  Fix: PHASE 6 convert type='reward' (desc mulai 'Profit') → type='profit'
+    - Hanya rubah type, TIDAK rubah amount/userId/description
+    - Referral reward (desc 'Referral reward') TETAP 'reward' (bukan profit)
+    - Test: 5 entries (3 reward-profit, 1 referral reward, 1 already profit)
+      → convert 3, skip 2, total Rp16.000. ALL ASSERTIONS PASSED.
+
+- VERIFIKASI PM2 CONFIG:
+  - ecosystem.config.cjs confirmed: nexvo-cron runs `bun run cron-service.ts` from /home/nexvo
+  - Jadi cron-service.ts (yang bulletproof v2.4) yang DIPAKAI VPS, BUKAN mini-services
+
+- VERIFIKASI KEAMANAN DATA:
+  - fix-profit-v6.sh: TIDAK ada perintah delete user/purchase/investment
+  - Hanya CREATE (bikin baru) atau UPDATE (perbaiki field)
+  - Backup DB otomatis sebelum jalan (db/custom.db.backup-v6-*)
+  - Idempoten (aman di-run berkali-kali)
+
+- Committed (1085ed3) + pushed to GitHub main
+
+Stage Summary:
+- SEMUA path profit (3 admin + 2 cron) sudah BULLETPROOF:
+  1. /api/admin/asset add-profit (Purchase path) — v4 fix ✅
+  2. /api/admin/asset add-profit (Investment path) — v6.5 fix (lastProfitDate + reactivation + LiveActivity) ✅
+  3. /api/admin/users add-saldo isProfit=true — v6 fix (endDate-based) ✅
+  4. /api/admin/investments add-profit — v6 fix (BonusLog + lastProfitDate + LiveActivity) ✅
+  5. cron-service.ts (PM2) — v2.4 bulletproof (endDate-based, continuous catchup) ✅
+  6. mini-services/cron-service/index.ts — v6.5 fix (type='profit') ✅
+
+- fix-profit-v6.sh sekarang 6 phase:
+  PHASE 1: Diagnostic (no filter, lihat SEMUA data)
+  PHASE 2: Repair (NO status filter, scan SEMUA purchase, endDate-based)
+  PHASE 3: Sync BonusLog (riwayat muncul)
+  PHASE 4: Credit today's profit (weekday, anti double)
+  PHASE 5: Sync total profit dari BonusLog (fix 'total profit gk ada')
+  PHASE 6: Safety net reward→profit conversion (jika cron lama salah type)
+
+- VPS deploy command (ONE LINE):
+  cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash diag-db.sh && bash fix-profit-v6.sh && pm2 restart nexvo-cron
+
+- SETELAH DEPLOY:
+  • Profit manual admin → LANGSUNG bikin BonusLog (riwayat muncul) + update Investment + set lastProfitDate (anti double)
+  • Profit otomatis cron → jalan setiap 10 detik di weekday (gak tunggu 00:00 WIB)
+  • Cron dedup via DB (lastProfitDate >= today) → gak akan double-credit
+  • Akun user TETAP AMAN (gak ada perintah delete apapun)
