@@ -455,15 +455,15 @@ function formatRupiah(amount) { return "Rp" + Math.floor(amount).toLocaleString(
   // ═══════════════════════════════════════════════════════════
   // PHASE 5: SYNC TOTAL PROFIT dari BonusLog (FIX "total profit gk ada")
   //   Untuk user yang sudah di-credit manual via admin path yang bocor
-  //   (status='active' filter → investment gak ketemu → totalProfitEarned gak update)
-  //   Sync: jumlahkan semua BonusLog type='profit' per user, pastikan
+  //   (status filter active → investment gak ketemu → totalProfitEarned gak update)
+  //   Sync: jumlahkan semua BonusLog type=profit per user, pastikan
   //   Investment.totalProfitEarned + User.totalProfit match
   // ═══════════════════════════════════════════════════════════
   console.log("═══════════════════════════════════════════════════");
-  console.log("  PHASE 5: SYNC TOTAL PROFIT (fix 'total profit gk ada')");
+  console.log("  PHASE 5: SYNC TOTAL PROFIT (fix total profit gk ada)");
   console.log("═══════════════════════════════════════════════════");
 
-  // Ambil semua user yang punya BonusLog type='profit'
+  // Ambil semua user yang punya BonusLog type=profit
   const usersWithProfitBonus = await p.bonusLog.findMany({
     where: { type: "profit" },
     select: { userId: true, amount: true, createdAt: true },
@@ -532,10 +532,10 @@ function formatRupiah(amount) { return "Rp" + Math.floor(amount).toLocaleString(
   console.log("");
 
 // ═══════════════════════════════════════════════════════════
-  // PHASE 6: SAFETY NET — Convert type='reward' (Profit) → type='profit'
-  //   Kadang cron lama salah bikin BonusLog type='reward' padahal deskripsinya
-  //   "Profit harian". Riwayat page filter type='profit' → entry gak muncul.
-  //   Phase ini convert type='reward' → 'profit' untuk semua entry yang
+  // PHASE 6: SAFETY NET - Convert type=reward (Profit) → type=profit
+  //   Kadang cron lama salah bikin BonusLog type=reward padahal deskripsinya
+  //   "Profit harian". Riwayat page filter type=profit → entry gak muncul.
+  //   Phase ini convert type=reward → profit untuk semua entry yang
   //   deskripsinya mulai dengan "Profit".
   //   AMAN: Hanya update type, TIDAK rubah amount/userId/description.
   // ═══════════════════════════════════════════════════════════
@@ -550,7 +550,7 @@ function formatRupiah(amount) { return "Rp" + Math.floor(amount).toLocaleString(
     },
     select: { id: true, userId: true, amount: true, description: true, createdAt: true },
   });
-  console.log("🔍 Found 'reward' entries with 'Profit' description:", rewardProfitEntries.length);
+  console.log("🔍 Found reward entries with Profit description:", rewardProfitEntries.length);
 
   let converted = 0;
   let convertedTotal = 0;
@@ -568,7 +568,7 @@ function formatRupiah(amount) { return "Rp" + Math.floor(amount).toLocaleString(
   console.log("📊 PHASE 6 SUMMARY:");
   console.log("   ♻️  Converted reward→profit :", converted);
   console.log("   💰 Total amount            :", formatRupiah(convertedTotal));
-  console.log("   (Type dirubah jadi 'profit' supaya muncul di riwayat. Amount/userId TETAP.)");
+  console.log("   (Type dirubah jadi profit supaya muncul di riwayat. Amount/userId TETAP.)");
   console.log("");
 
   // ═══════════════════════════════════════════════════════════

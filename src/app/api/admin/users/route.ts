@@ -76,7 +76,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, action, mainBalance, depositBalance, amount } = body;
+    const { id, action, mainBalance, depositBalance, profitBalance, amount } = body;
 
     if (!id || !action) {
       return NextResponse.json({ success: false, error: 'ID dan action wajib diisi' }, { status: 400 });
