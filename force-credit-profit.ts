@@ -112,56 +112,51 @@ async function creditMatchingOnProfit(
   matchingRates: Record<number, number>,
 ): Promise<number> {
   let totalMatchCredited = 0;
-  let currentUserId: string | null = earningUserId;
-  const visited = new Set<string>([earningUserId]);
+  if (profitAmount <= 0) return 0;
 
-  for (let level = 1; level <= MAX_MATCHING_LEVEL; level++) {
-    if (!currentUserId) break;
-    const user = await tx.user.findUnique({
-      where: { id: currentUserId },
-      select: { id: true, referredBy: true, status: true, isVerified: true },
-    });
-    if (!user || !user.referredBy) break;
-    const uplineId = user.referredBy;
-    if (visited.has(uplineId)) break;
-    visited.add(uplineId);
+  // ★ v2.4 FIX: Use the Referral model (like cron-service.ts does).
+  //   The OLD code used user.referredBy + user.status — but the User model
+  //   has NO `status` field (only isSuspended/isVerified), so Prisma threw
+  //   a validation error and the whole transaction crashed → no profit
+  //   credited at all. Switching to the Referral model fixes this.
+  const uplineRefs = await tx.referral.findMany({
+    where: { referredId: earningUserId },
+    orderBy: { level: 'asc' },
+  });
+  if (uplineRefs.length === 0) return 0;
 
-    const upline = await tx.user.findUnique({
-      where: { id: uplineId },
-      select: { id: true, status: true, isVerified: true },
-    });
-    if (!upline || upline.status !== 'active') {
-      // Disconnected — stop matching chain
-      break;
-    }
+  const earningUser = await tx.user.findUnique({
+    where: { id: earningUserId },
+    select: { name: true, userId: true },
+  });
+  const earningUserName = earningUser?.name || earningUser?.userId || 'User';
 
+  for (const ref of uplineRefs) {
+    const level = ref.level;
+    if (level > MAX_MATCHING_LEVEL) continue;
     const rate = matchingRates[level] || 0;
-    if (rate <= 0) {
-      currentUserId = uplineId;
-      continue;
-    }
+    if (rate <= 0) continue;
     const matchAmount = Math.floor(profitAmount * (rate / 100));
-    if (matchAmount > 0) {
-      await tx.user.update({
-        where: { id: uplineId },
-        data: {
-          mainBalance: { increment: matchAmount },
-          totalProfit: { increment: matchAmount },
-        },
-      });
-      await tx.bonusLog.create({
-        data: {
-          userId: uplineId,
-          fromUserId: earningUserId,
-          type: 'matching',
-          level,
-          amount: matchAmount,
-          description: `Matching bonus level ${level} (${rate}%) dari profit ${formatRupiahSimple(profitAmount)}`,
-        },
-      });
-      totalMatchCredited += matchAmount;
-    }
-    currentUserId = uplineId;
+    if (matchAmount <= 0) continue;
+
+    await tx.user.update({
+      where: { id: ref.referrerId },
+      data: {
+        mainBalance: { increment: matchAmount },
+        totalProfit: { increment: matchAmount },
+      },
+    });
+    await tx.bonusLog.create({
+      data: {
+        userId: ref.referrerId,
+        fromUserId: earningUserId,
+        type: 'matching',
+        level,
+        amount: matchAmount,
+        description: `Matching bonus level ${level} (${rate}%) dari profit ${earningUserName} — ${formatRupiahSimple(profitAmount)} × ${rate}% = ${formatRupiahSimple(matchAmount)}`,
+      },
+    });
+    totalMatchCredited += matchAmount;
   }
   return totalMatchCredited;
 }
@@ -369,13 +364,30 @@ async function main() {
     }
   }
 
-  // ─── Process Purchases (update stats only, no balance change) ───
+  // ═══════════════════════════════════════════════════════════
+  //  PURCHASE (PRODUCT) PROFIT — v2.4 FIX ★★★
+  //  OLD BUG: only updated tracking stats, never credited balance.
+  //  FIX: standalone purchases (no linked Investment) get full credit
+  //  (balance + BonusLog + ProfitLog + LiveActivity + matching).
+  //  Purchases WITH a linked Investment stay sync-only.
+  // ═══════════════════════════════════════════════════════════
   const purchases = await db.purchase.findMany({
     where: { status: 'active' },
-    include: { product: true },
+    include: { product: true, user: true },
   });
   console.log(`\n📊 Active purchases: ${purchases.length}`);
+
+  // Pre-fetch linked investment purchaseIds
+  const linkedPurchaseIds = new Set<string>(
+    (await db.investment.findMany({
+      where: { purchaseId: { not: null } },
+      select: { purchaseId: true },
+      distinct: ['purchaseId'],
+    })).map(i => i.purchaseId!).filter(Boolean)
+  );
+
   let purchaseUpdated = 0;
+  let purchaseProfitCredited = 0;
   for (const purchase of purchases) {
     try {
       if (purchase.lastProfitDate) {
@@ -388,16 +400,69 @@ async function main() {
 
       const productProfitRate = purchase.product?.profitRate || 0;
       const dailyProfit = Math.floor(purchase.totalPrice * (productProfitRate / 100));
-      if (dailyProfit <= 0) continue;
+      if (dailyProfit <= 0) {
+        console.log(`   ⚠️  Purchase ${purchase.id}: dailyProfit=0 (total=${purchase.totalPrice}, rate=${productProfitRate})`);
+        continue;
+      }
 
       let lastCreditDateStr = purchase.lastProfitDate ? getWibDateString(new Date(purchase.lastProfitDate)) : createdWIB;
       const missedDays = countWeekdaysMissed(lastCreditDateStr, todayWIB);
       const totalDays = Math.min(missedDays + (isTodayWeekday ? 1 : 0), 30);
       if (totalDays <= 0) continue;
       const totalCredit = dailyProfit * totalDays;
+      const isBackfill = missedDays > 0;
+      const productName = purchase.product?.name || 'Produk';
 
-      if (!DRY_RUN) {
-        await db.purchase.update({
+      // ★ If linked Investment exists, the investment loop above already credited.
+      //   Only sync tracking stats here.
+      if (linkedPurchaseIds.has(purchase.id)) {
+        if (!DRY_RUN) {
+          await db.purchase.update({
+            where: { id: purchase.id },
+            data: {
+              profitEarned: { increment: totalCredit },
+              dailyProfit: dailyProfit,
+              lastProfitDate: new Date(),
+            },
+          });
+        }
+        purchaseUpdated++;
+        console.log(`   📦 ${purchase.userId} (${productName}) [linked-inv, sync-only]: ${totalDays}d × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}${DRY_RUN ? ' (DRY-RUN)' : ''}`);
+        continue;
+      }
+
+      // ★★★ STANDALONE PURCHASE — CREDIT PROFIT HERE ★★★
+      console.log(
+        `   💰 ${purchase.userId} (${productName}) [standalone, CREDIT]: ${totalDays}d × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}` +
+        (isBackfill ? ` [BACKFILL: ${missedDays} missed]` : '') +
+        (DRY_RUN ? ' (DRY-RUN)' : '')
+      );
+
+      if (DRY_RUN) {
+        purchaseUpdated++;
+        purchaseProfitCredited += totalCredit;
+        continue;
+      }
+
+      const matchCredited = await db.$transaction(async (tx) => {
+        // Re-check inside transaction
+        const currentPurchase = await tx.purchase.findUnique({ where: { id: purchase.id } });
+        if (currentPurchase?.lastProfitDate) {
+          const lastWIB = getWibDateString(new Date(currentPurchase.lastProfitDate));
+          if (lastWIB === todayWIB) return 0;
+        }
+
+        // 1. Credit user balance
+        await tx.user.update({
+          where: { id: purchase.userId },
+          data: {
+            mainBalance: { increment: totalCredit },
+            totalProfit: { increment: totalCredit },
+          },
+        });
+
+        // 2. Update purchase tracking
+        await tx.purchase.update({
           where: { id: purchase.id },
           data: {
             profitEarned: { increment: totalCredit },
@@ -405,13 +470,57 @@ async function main() {
             lastProfitDate: new Date(),
           },
         });
-      }
+
+        // 3. ProfitLog
+        await tx.profitLog.create({
+          data: {
+            purchaseId: purchase.id,
+            userId: purchase.userId,
+            amount: totalCredit,
+          },
+        });
+
+        // 4. BonusLog(type='profit') — for Riwayat page
+        const desc = totalDays === 1
+          ? `Profit harian ${productName} — ${formatRupiahSimple(purchase.totalPrice)} × ${productProfitRate.toFixed(2)}% = ${formatRupiahSimple(dailyProfit)}`
+          : `Profit ${totalDays} hari (${isBackfill ? `${missedDays} tertinggal + ${isTodayWeekday ? 'hari ini' : '0'}` : 'semua hari ini'}) — ${productName}: ${formatRupiahSimple(dailyProfit)} × ${totalDays} = ${formatRupiahSimple(totalCredit)}`;
+        await tx.bonusLog.create({
+          data: {
+            userId: purchase.userId,
+            fromUserId: purchase.userId,
+            type: 'profit',
+            level: 0,
+            amount: totalCredit,
+            description: desc,
+          },
+        });
+
+        // 5. LiveActivity
+        await tx.liveActivity.create({
+          data: {
+            type: 'profit',
+            userName: purchase.user?.name || purchase.user?.userId || 'User',
+            amount: totalCredit,
+            productName,
+            isFake: false,
+          },
+        });
+
+        // 6. Matching bonus
+        const match = await creditMatchingOnProfit(tx, purchase.userId, totalCredit, matchingRates);
+        return match;
+      });
+
       purchaseUpdated++;
-      console.log(`   📦 ${purchase.userId} (${purchase.product?.name || 'produk'}): ${totalDays} day(s) × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}${DRY_RUN ? ' (DRY-RUN)' : ''}`);
+      purchaseProfitCredited += totalCredit;
+      totalMatchingCredited += matchCredited;
+      if (isBackfill) totalBackfillDays += missedDays;
     } catch (e: any) {
+      errors++;
       console.error(`   ❌ Purchase ${purchase.id}: ${e.message}`);
     }
   }
+  totalProfitCredited += purchaseProfitCredited;
 
   // ─── Summary ───
   console.log('\n═══════════════════════════════════════════════════════');

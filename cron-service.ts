@@ -1,29 +1,29 @@
 /**
- * NEXVO Cron Service v8
+ * NEXVO Cron Service v2.4 ★★★ CRITICAL PROFIT FIX ★★★
  *
- * ★ v8: Version marker for deploy verification.
- *   Check: curl http://localhost:3032/  →  should show version: 'CRON-V8-20250629'
- *   If shows old version → VPS cron not restarted → run: pm2 restart nexvo-cron --update-env
- *
- * ★ v2.3 FIX: hasProfitBeenCreditedToday() now only skips if ALL active
- *   investments are credited today (was: skipped if ANY was credited,
- *   which caused manual admin credit of 1 user to block cron for all
- *   other users the entire day).
- * ★ v2.3: DB path now reads .env DATABASE_URL first (more reliable on VPS).
+ * ★ v2.4 FIX (THE REAL FIX for "profit 00:00 gak masuk"):
+ *   The Purchase loop previously ONLY updated tracking stats
+ *   (profitEarned/dailyProfit/lastProfitDate) but NEVER credited the
+ *   user's mainBalance/totalProfit and NEVER created BonusLog(type='profit').
+ *   So for users whose assets are Purchases (not Investments), the 00:00
+ *   cron silently did nothing — no money, no Riwayat entry.
+ *   NOW: standalone purchases (no linked Investment) get full profit credit
+ *   (balance + BonusLog + ProfitLog + LiveActivity + matching bonus),
+ *   mirroring the admin manual add-profit route. Purchases WITH a linked
+ *   Investment stay sync-only (investment loop already credited).
+ * ★ v2.4: hasProfitBeenCreditedToday() now counts Purchases too.
+ * ★ v2.3: per-investment dedup (manual credit of 1 user no longer blocks cron).
+ * ★ v2.3: DB path reads .env DATABASE_URL first.
  *
  * Runs scheduled tasks automatically:
- * - Daily Investment Profit: Every day at 00:00 WIB (weekday only, weekend libur)
+ * - Daily Investment + Purchase Profit: Every weekday at 00:00 WIB (continuous catchup every 10s)
  * - Weekly Salary Bonus: Every Monday at 00:00 WIB
- * - Quota Simulation: Every 1-3 hours - incremental quota fills (nav.live style)
- * - Live Activity Generation: Every 15-30 minutes - fake activity for live feed
+ * - Quota Simulation: Every 2 hours - incremental quota fills (nav.live style)
  *
  * Uses Prisma directly to access the database.
  * Port: 3032
+ * Version marker: CRON-PURCHASE-FIX-V9-20250629
  */
-
-// ★★★ v8 VERSION MARKER — ubah ini setiap update. ★★★
-//   Kalau curl http://localhost:3032/ shows version LAMA → pm2 restart nexvo-cron --update-env
-const CRON_VERSION = 'CRON-V8-20250629';
 
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
@@ -637,19 +637,12 @@ async function processDailyInvestmentProfitsCore(): Promise<{
   const todayDow = wibNow.getDay(); // 0=Sun, 6=Sat
   const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
-  // ★★★ v2.4 BULLETPROOF: NO status filter — fetch ALL investments, use endDate
-  //   as source of truth. v2.3 still filtered `status: 'active'` which returned 0
-  //   if VPS had any status variation (Active/ACTIVE/ongoing/completed/stopped).
-  //   Now we fetch everything and filter by endDate > now (contract still active).
-  const allInvestments = await db.investment.findMany({
+  const investments = await db.investment.findMany({
+    where: { status: 'active' },
     include: { package: true },
   });
-  const investments = allInvestments.filter((inv) => {
-    if (!inv.endDate) return true; // no endDate = treat as active
-    return new Date(inv.endDate) > wibNow;
-  });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments (total=${allInvestments.length}, today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
 
   for (const inv of investments) {
     try {
@@ -777,43 +770,46 @@ async function processDailyInvestmentProfitsCore(): Promise<{
     }
   }
 
-  // ─── Purchase tracking (product purchases, no balance change — just stats) ───
+  // ═══════════════════════════════════════════════════════════
+  //  PURCHASE (PRODUCT) PROFIT PROCESSING — v2.4 FIX ★★★
+  //
+  //  ROOT CAUSE OF "profit 00:00 gak masuk":
+  //  Previously this loop ONLY updated tracking stats (profitEarned,
+  //  dailyProfit, lastProfitDate) but NEVER credited the user's
+  //  mainBalance / totalProfit and NEVER created a BonusLog(type='profit').
+  //  Result: the 00:00 WIB cron silently did nothing for product
+  //  purchases — users saw no profit credited and no Riwayat entry.
+  //
+  //  FIX:
+  //  - Purchases WITHOUT a linked Investment → credit profit here
+  //    (user balance + BonusLog + ProfitLog + LiveActivity + matching
+  //    bonus). Mirrors the Investment loop + admin add-profit route.
+  //  - Purchases WITH a linked Investment → the Investment loop above
+  //    already credited profit; only sync tracking stats here.
+  // ═══════════════════════════════════════════════════════════
 
-  // Purchase tracking — ★★★ v2.4 BULLETPROOF: NO status filter
-  const allPurchases = await db.purchase.findMany({
-    include: { product: true },
-  });
-  const purchases = allPurchases.filter((pur) => {
-    // Use product duration + createdAt to determine if still active
-    const createdAt = new Date(pur.createdAt);
-    const duration = pur.product?.duration || 90;
-    const endDate = new Date(createdAt);
-    endDate.setDate(endDate.getDate() + duration);
-    return endDate > wibNow;
+  const purchases = await db.purchase.findMany({
+    where: { status: 'active' },
+    include: { product: true, user: { select: { userId: true, name: true } } },
   });
 
-  // ★★★ v7 FIX: Identify purchases that have linked Investment records.
-  //   These were already credited via the Investment path above (with BonusLog).
-  //   For those, we only update Purchase tracking fields — do NOT double-credit.
-  //   For LEGACY purchases (no linked Investment), we MUST:
-  //     - update User.mainBalance + User.totalProfit
-  //     - create BonusLog type='profit' (so Riwayat page shows it)
-  //     - create LiveActivity (dashboard real-time update)
-  //   Previously: only Purchase.profitEarned was updated → Riwayat empty + saldo utama kosong!
-  const allInvestmentsForPurchaseMap = await db.investment.findMany({
-    where: { purchaseId: { not: null } },
-    select: { purchaseId: true },
-  });
-  const purchaseIdsWithInvestments = new Set(
-    allInvestmentsForPurchaseMap
-      .map((inv) => inv.purchaseId)
-      .filter((id): id is string => id !== null)
+  // Pre-fetch all purchaseIds that have a linked Investment (single query, O(1) lookup)
+  const linkedPurchaseIds = new Set<string>(
+    (await db.investment.findMany({
+      where: { purchaseId: { not: null } },
+      select: { purchaseId: true },
+      distinct: ['purchaseId'],
+    }))
+      .map((i) => i.purchaseId!)
+      .filter(Boolean)
   );
 
-  console.log(`[Profit Cron] Updating ${purchases.length} active product purchases (${purchaseIdsWithInvestments.size} have linked investments)...`);
+  const standaloneCount = purchases.length - linkedPurchaseIds.size;
+  console.log(`[Profit Cron] Processing ${purchases.length} active product purchases (${linkedPurchaseIds.size} linked-investment, ${standaloneCount} standalone-will-credit)...`);
 
   for (const purchase of purchases) {
     try {
+      // ─── Skip if already credited today ───
       if (purchase.lastProfitDate) {
         const lastProfitWIB = getWibDateString(new Date(purchase.lastProfitDate));
         if (lastProfitWIB === todayWIB) {
@@ -821,9 +817,11 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         }
       }
 
+      // ─── Skip if bought today (profit starts tomorrow) ───
       const purchaseCreatedDate = purchase.createdAt ? new Date(purchase.createdAt) : null;
+      let createdWIB: string | null = null;
       if (purchaseCreatedDate) {
-        const createdWIB = getWibDateString(purchaseCreatedDate);
+        createdWIB = getWibDateString(purchaseCreatedDate);
         if (createdWIB === todayWIB) {
           continue;
         }
@@ -832,12 +830,14 @@ async function processDailyInvestmentProfitsCore(): Promise<{
       const productProfitRate = purchase.product?.profitRate || 0;
       const dailyProfit = Math.floor(purchase.totalPrice * (productProfitRate / 100));
 
-      if (dailyProfit <= 0) continue;
+      if (dailyProfit <= 0) {
+        console.log(`[Profit Cron] ⚠️ Purchase ${purchase.id} has dailyProfit=0 (totalPrice=${purchase.totalPrice}, rate=${productProfitRate}) — skipping`);
+        continue;
+      }
 
-      if (purchaseIdsWithInvestments.has(purchase.id)) {
-        // ★ This purchase has linked Investment records — profit was already credited
-        //   via the Investment path (BonusLog + User balance update done there).
-        //   Only update the Purchase tracking fields for display purposes.
+      // ★ If this purchase has a linked Investment, the Investment loop above
+      //   already credited profit to the user. Only sync tracking stats here.
+      if (linkedPurchaseIds.has(purchase.id)) {
         await db.purchase.update({
           where: { id: purchase.id },
           data: {
@@ -849,94 +849,108 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         continue;
       }
 
-      // ★★★ v7 FIX: LEGACY purchase (NO linked Investment) — credit profit here.
-      //   This handles old purchases created before Investment record linking was added.
-      //   Previously: only Purchase.profitEarned was updated → user's saldo & riwayat KOSONG!
+      // ★★★ STANDALONE PURCHASE (no linked Investment) — CREDIT PROFIT HERE ★★★
+      // Backfill logic: calculate missed weekdays (mirrors Investment loop)
+      let lastCreditDateStr: string;
+      if (purchase.lastProfitDate) {
+        lastCreditDateStr = getWibDateString(new Date(purchase.lastProfitDate));
+      } else {
+        lastCreditDateStr = createdWIB || todayWIB;
+      }
+
+      const missedDays = countWeekdaysMissed(lastCreditDateStr, todayWIB);
+      const totalDays = Math.min(missedDays + (isTodayWeekday ? 1 : 0), 30);
+      if (totalDays <= 0) {
+        continue;
+      }
+
+      const totalCredit = dailyProfit * totalDays;
+      const isBackfill = missedDays > 0;
+      const productName = purchase.product?.name || 'Produk';
+
       await db.$transaction(async (tx) => {
-        // Re-check inside transaction (race safety)
+        // Re-check inside transaction to prevent race-condition double credit
         const currentPurchase = await tx.purchase.findUnique({ where: { id: purchase.id } });
-        if (!currentPurchase) return;
-        if (currentPurchase.lastProfitDate) {
-          const lastDateUTC = new Date(currentPurchase.lastProfitDate);
-          const lastDateMs = lastDateUTC.getTime() + lastDateUTC.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000;
-          const lastDateWIB = new Date(lastDateMs);
-          if (lastDateWIB.getFullYear() === wibNow.getFullYear() &&
-              lastDateWIB.getMonth() === wibNow.getMonth() &&
-              lastDateWIB.getDate() === wibNow.getDate()) {
+        if (currentPurchase?.lastProfitDate) {
+          const lastProfitWIB = getWibDateString(new Date(currentPurchase.lastProfitDate));
+          if (lastProfitWIB === todayWIB) {
             return;
           }
         }
 
-        // 1. Credit daily profit to user's mainBalance + totalProfit
+        // 1. Credit user balance (mainBalance + totalProfit)
         await tx.user.update({
           where: { id: purchase.userId },
           data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
+            mainBalance: { increment: totalCredit },
+            totalProfit: { increment: totalCredit },
           },
         });
 
-        // 2. Update purchase record
+        // 2. Update purchase tracking
         await tx.purchase.update({
           where: { id: purchase.id },
           data: {
-            profitEarned: { increment: dailyProfit },
+            profitEarned: { increment: totalCredit },
             dailyProfit: dailyProfit,
             lastProfitDate: new Date(),
           },
         });
 
-        // 3. Create ProfitLog (audit log)
+        // 3. Create ProfitLog (for profit history tracking)
         await tx.profitLog.create({
           data: {
             purchaseId: purchase.id,
             userId: purchase.userId,
-            amount: dailyProfit,
+            amount: totalCredit,
           },
         });
 
-        // 4. ★★★ v7 FIX: Create BonusLog type='profit' — so Riwayat page shows it!
-        //   Previously: ONLY ProfitLog was created → Riwayat empty → user confused.
-        const productName = purchase.product?.name || 'Produk';
+        // 4. ★ Create BonusLog(type='profit') — REQUIRED for Riwayat page to show the entry
+        const desc = totalDays === 1
+          ? `Profit harian ${productName} — ${formatRupiahSimple(purchase.totalPrice)} x ${productProfitRate.toFixed(2)}% = ${formatRupiahSimple(dailyProfit)}`
+          : `Profit ${totalDays} hari (${isBackfill ? `${missedDays} tertinggal + ${isTodayWeekday ? 'hari ini' : '0'}` : 'semua hari ini'}) — ${productName}: ${formatRupiahSimple(dailyProfit)} x ${totalDays} = ${formatRupiahSimple(totalCredit)}`;
         await tx.bonusLog.create({
           data: {
             userId: purchase.userId,
             fromUserId: purchase.userId,
             type: 'profit',
             level: 0,
-            amount: dailyProfit,
-            description: `Profit harian produk ${productName} (${purchase.quantity}x) — ${formatRupiahSimple(dailyProfit)}`,
+            amount: totalCredit,
+            description: desc,
           },
         });
 
-        // 5. Create LiveActivity (dashboard real-time update)
-        const purchaseUser = await tx.user.findUnique({
-          where: { id: purchase.userId },
-          select: { name: true, userId: true },
-        });
+        // 5. Create LiveActivity (real, not fake)
         await tx.liveActivity.create({
           data: {
             type: 'profit',
-            userName: purchaseUser?.name || purchaseUser?.userId || 'User',
-            amount: dailyProfit,
+            userName: purchase.user?.name || purchase.user?.userId || 'User',
+            amount: totalCredit,
             productName,
             isFake: false,
           },
         });
 
-        // 6. Event-driven matching bonus
-        const matchResult = await creditMatchingOnProfit(tx, purchase.userId, dailyProfit);
+        // 6. Event-driven matching bonus to upline (Level 1-5)
+        const matchResult = await creditMatchingOnProfit(tx, purchase.userId, totalCredit);
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
       });
 
       result.processed++;
-      result.totalProfit += dailyProfit;
-      console.log(`[Profit Cron] 💰 LEGACY Purchase ${purchase.id} (user ${purchase.userId}) credited: ${formatRupiahSimple(dailyProfit)} (no linked Investment — full credit applied)`);
+      result.totalProfit += totalCredit;
+      if (isBackfill) {
+        result.backfilledInvestments++;
+        result.backfilledDays += missedDays;
+        console.log(`[Profit Cron] 📦 BACKFILL Purchase ${purchase.id} (user ${purchase.user?.userId}) — ${missedDays} missed + ${isTodayWeekday ? 'today' : '0'} = ${totalDays} days × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}`);
+      } else {
+        console.log(`[Profit Cron] ✅ Purchase ${purchase.id} (user ${purchase.user?.userId}) — 1 day × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(dailyProfit)}`);
+      }
     } catch (error: any) {
       result.errors++;
-      console.error(`[Profit Cron] ❌ Purchase ${purchase.id} update: ${error.message}`);
+      console.error(`[Profit Cron] ❌ Purchase ${purchase.id}: ${error.message}`);
     }
   }
 
@@ -1142,24 +1156,26 @@ let startupCatchupDone = false;
 async function hasProfitBeenCreditedToday(): Promise<{ credited: boolean; sampleCount: number; uncreditedCount: number; totalCount: number }> {
   const todayWIB = getTodayWibDateString();
   const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
-  const wibNow = getWibNow();
-  // ★★★ v2.4 BULLETPROOF: NO status filter — count by endDate (contract active)
-  const allCount = await db.investment.count();
-  if (allCount === 0) return { credited: false, sampleCount: 0, uncreditedCount: 0, totalCount: 0 };
-  const allInvestments = await db.investment.findMany({ select: { id: true, endDate: true, lastProfitDate: true } });
-  const activeInvestments = allInvestments.filter((inv) => {
-    if (!inv.endDate) return true;
-    return new Date(inv.endDate) > wibNow;
-  });
-  const totalCount = activeInvestments.length;
+
+  // ★ v2.4: Count BOTH active Investments AND active Purchases.
+  //   Previously only counted Investments — if all assets were Purchases,
+  //   this returned totalCount=0 → cron kept re-running uselessly and the
+  //   status endpoint showed misleading numbers.
+  const [activeInvCount, creditedInvCount, activePurCount, creditedPurCount] = await Promise.all([
+    db.investment.count({ where: { status: 'active' } }),
+    db.investment.count({ where: { status: 'active', lastProfitDate: { gte: startOfDayWIB } } }),
+    db.purchase.count({ where: { status: 'active' } }),
+    db.purchase.count({ where: { status: 'active', lastProfitDate: { gte: startOfDayWIB } } }),
+  ]);
+
+  const totalCount = activeInvCount + activePurCount;
   if (totalCount === 0) return { credited: false, sampleCount: 0, uncreditedCount: 0, totalCount: 0 };
-  const creditedToday = activeInvestments.filter((inv) => {
-    if (!inv.lastProfitDate) return false;
-    return new Date(inv.lastProfitDate) >= startOfDayWIB;
-  }).length;
-  const uncreditedCount = totalCount - creditedToday;
-  // ★ Only skip if ALL active investments are credited today (no more work to do)
-  return { credited: uncreditedCount === 0, sampleCount: creditedToday, uncreditedCount, totalCount };
+
+  const sampleCount = creditedInvCount + creditedPurCount;
+  const uncreditedCount = totalCount - sampleCount;
+
+  // ★ Only skip if ALL active investments AND purchases are credited today
+  return { credited: uncreditedCount === 0, sampleCount, uncreditedCount, totalCount };
 }
 
 async function runProfitCronIfDue(reason: string): Promise<void> {
@@ -1269,8 +1285,8 @@ const server = Bun.serve({
 
     if (url.pathname === '/') {
       return Response.json({
-        service: 'NEXVO Cron Service',
-        version: CRON_VERSION,
+        service: 'NEXVO Cron Service v2.4',
+        versionMarker: 'CRON-PURCHASE-FIX-V9-20250629',
         status: 'running',
         wibTime: getWibNow().toISOString(),
         lastSalaryRun: lastSalaryRunDate || 'never',
@@ -1378,17 +1394,27 @@ const server = Bun.serve({
       const todayWIB = getTodayWibDateString();
       const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
 
-      // ★★★ v2.4 BULLETPROOF: NO status filter — use endDate
-      const allDebugInvestments = await db.investment.findMany({
-        include: { package: true, user: true },
-        take: 50,
-      });
-      const activeInvestments = allDebugInvestments.filter((inv) => {
-        if (!inv.endDate) return true;
-        return new Date(inv.endDate) > wibNow;
-      });
+      const [activeInvestments, activePurchases, linkedInvPurchaseIds] = await Promise.all([
+        db.investment.findMany({
+          where: { status: 'active' },
+          include: { package: true, user: true },
+          take: 50,
+        }),
+        db.purchase.findMany({
+          where: { status: 'active' },
+          include: { product: true, user: true },
+          take: 50,
+        }),
+        db.investment.findMany({
+          where: { purchaseId: { not: null } },
+          select: { purchaseId: true },
+          distinct: ['purchaseId'],
+        }),
+      ]);
+      const linkedSet = new Set(linkedInvPurchaseIds.map(i => i.purchaseId).filter(Boolean) as string[]);
 
       const debugInfo = {
+        versionMarker: 'CRON-PURCHASE-FIX-V9-20250629',
         wibTime: wibNow.toISOString(),
         wibWallTime: `${wibNow.getFullYear()}-${String(wibNow.getMonth()+1).padStart(2,'0')}-${String(wibNow.getDate()).padStart(2,'0')} ${String(wibNow.getHours()).padStart(2,'0')}:${String(wibNow.getMinutes()).padStart(2,'0')}`,
         dayOfWeek: wibNow.getDay(),
@@ -1399,6 +1425,9 @@ const server = Bun.serve({
         lastProfitRunDate,
         lastSalaryRunDate,
         activeInvestmentsCount: activeInvestments.length,
+        activePurchasesCount: activePurchases.length,
+        purchasesWithLinkedInvestment: activePurchases.filter(p => linkedSet.has(p.id)).length,
+        purchasesStandalone: activePurchases.filter(p => !linkedSet.has(p.id)).length,
         investments: activeInvestments.map(inv => ({
           id: inv.id,
           userId: inv.userId,
@@ -1419,6 +1448,31 @@ const server = Bun.serve({
           totalProfitEarned: inv.totalProfitEarned,
           createdAt: inv.createdAt,
         })),
+        purchases: activePurchases.map(p => {
+          const hasLinkedInv = linkedSet.has(p.id);
+          const productProfitRate = p.product?.profitRate || 0;
+          const computedDaily = Math.floor(p.totalPrice * (productProfitRate / 100));
+          return {
+            id: p.id,
+            userId: p.userId,
+            userUserId: p.user?.userId,
+            userName: p.user?.name,
+            productName: p.product?.name,
+            totalPrice: p.totalPrice,
+            quantity: p.quantity,
+            productProfitRate,
+            storedDailyProfit: p.dailyProfit,
+            computedDailyProfit: computedDaily,
+            hasLinkedInvestment: hasLinkedInv,
+            creditPath: hasLinkedInv ? 'via-investment-loop' : 'via-purchase-loop-v2.4',
+            status: p.status,
+            lastProfitDate: p.lastProfitDate,
+            lastProfitDateWIB: p.lastProfitDate ? getWibDateString(new Date(p.lastProfitDate)) : null,
+            alreadyCreditedToday: p.lastProfitDate ? (getWibDateString(new Date(p.lastProfitDate)) === todayWIB) : false,
+            profitEarned: p.profitEarned,
+            createdAt: p.createdAt,
+          };
+        }),
       };
 
       return Response.json(debugInfo, { headers: corsHeaders });
@@ -1430,25 +1484,8 @@ const server = Bun.serve({
 
 // ──────────── Start ────────────
 
-console.log('');
-console.log('╔══════════════════════════════════════════════════╗');
-console.log(`║  NEXVO Cron Service — ${CRON_VERSION}                ║`);
-console.log('╠══════════════════════════════════════════════════╣');
-console.log(`║  🚀 Running on port ${PORT}                          ║`);
-console.log(`║  🕐 WIB Time: ${getWibNow().toISOString()}`);
-console.log('║  📋 Schedules:                                    ║');
-console.log('║    • Daily Profit: 00:00 WIB every weekday        ║');
-console.log('║    • Weekend Libur: Sabtu & Minggu (profit off)   ║');
-console.log('║    • Startup Catch-up: fires within 10s of start  ║');
-console.log('║    • AUTO BACKFILL: missed weekdays auto-credited ║');
-console.log('║    • Weekly Salary: Monday 00:00 WIB              ║');
-console.log('║    • Quota Simulation: every 2h at :30            ║');
-console.log('╚══════════════════════════════════════════════════╝');
-console.log('');
-console.log(`[Cron Service] ★ VERSION: ${CRON_VERSION}`);
-console.log(`[Cron Service] ★ Verify: curl http://localhost:${PORT}/  →  version should be ${CRON_VERSION}`);
-console.log(`[Cron Service] ★ If version LAMA → pm2 restart nexvo-cron --update-env`);
-console.log('');
+console.log(`[Cron Service v2.4] 🚀 Running on port ${PORT} — marker: CRON-PURCHASE-FIX-V9-20250629`);
+console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
 console.log(`  - Weekend Libur: Sabtu & Minggu (profit & WD off — deposit & salary tetap jalan)`);
