@@ -439,13 +439,18 @@ async function processDailyInvestmentProfits(): Promise<{
   const now = wibNow;
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Get all active investments
-  const investments = await db.investment.findMany({
-    where: { status: 'active' },
+  // ★★★ v2.4 BULLETPROOF: NO status filter — fetch ALL investments, use endDate
+  //   as source of truth. v2.3 still filtered `status: 'active'` which returned 0
+  //   if VPS had any status variation (Active/ACTIVE/ongoing/completed/stopped).
+  const allInvestments = await db.investment.findMany({
     include: { package: true },
   });
+  const investments = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true; // no endDate = treat as active
+    return new Date(inv.endDate) > wibNow;
+  });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (total=${allInvestments.length})...`);
 
   for (const inv of investments) {
     try {
@@ -718,6 +723,7 @@ async function bumpProductQuotas(): Promise<{
 let lastSalaryRunDate = '';
 let lastProfitRunDate = '';
 let lastQuotaBumpDateStr = '';
+let startupCatchupDone = false;
 
 function checkAndRunCrons() {
   const wibNow = getWibNow();
@@ -726,19 +732,39 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // ★ Daily profit + matching bonus: Every day at 00:00 WIB ★
-  // ★ WEEKEND LIBUR: Skip on Saturday (6) & Sunday (0) — profit & WD libur (deposit & salary tetap jalan) ★
-  if (hour === 0 && minute <= 2 && lastProfitRunDate !== dateStr) {
-    lastProfitRunDate = dateStr;
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
-      console.log(`\n[CRON] ⏸️ Profit cron SKIPPED — today is ${dayName} (weekend libur, profit & WD libur di akhir pekan).`);
-    } else {
-      console.log(`\n[CRON] 🌅 Running daily investment profit + matching bonus distribution at ${wibNow.toISOString()} (weekday only, with auto-catchup + hard cap)...`);
+  // ★★★ v2.4 STARTUP CATCH-UP: On first run, check profit immediately.
+  //   This handles the case where cron was down at 00:00 — fires within 10s of start.
+  if (!startupCatchupDone) {
+    startupCatchupDone = true;
+    console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, day=${dayOfWeek}, hour=${hour}:${minute}`);
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      // Weekday — run profit check immediately on startup
+      lastProfitRunDate = dateStr;
+      console.log(`\n[CRON] 🌅 Startup catch-up: Running profit cron immediately...`);
       processDailyInvestmentProfits().then((result) => {
-        console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
-      }).catch(console.error);
+        console.log(`[CRON] 🌅 Startup profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${result.errors} errors`);
+      }).catch((err) => {
+        console.error(`[CRON] ❌ Startup profit failed:`, err);
+        lastProfitRunDate = ''; // reset so it retries
+      });
     }
+  }
+
+  // ★★★ v2.4 CONTINUOUS CATCHUP — PROFIT WAJIB MASUK ★★★
+  // Fire EVERY 10 seconds on weekdays if profit hasn't been credited today.
+  // DB dedup (lastProfitDate >= today 00:00 WIB) prevents double-credit.
+  // This means: even if cron was down at 00:00, it fires within 10s of starting.
+  // Even if it's 23:59 and profit hasn't run, it fires NOW.
+  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) ★
+  if (dayOfWeek !== 0 && dayOfWeek !== 6 && lastProfitRunDate !== dateStr) {
+    lastProfitRunDate = dateStr;
+    console.log(`\n[CRON] 🌅 Running daily profit (continuous-catchup) at ${wibNow.toISOString()}...`);
+    processDailyInvestmentProfits().then((result) => {
+      console.log(`[CRON] 🌅 Profit done: ${result.processed} investments, ${formatRupiahSimple(result.totalProfit)} profit, ${formatRupiahSimple(result.totalMatching)} matching, ${result.errors} errors`);
+    }).catch((err) => {
+      console.error(`[CRON] ❌ Profit cron FAILED:`, err);
+      lastProfitRunDate = ''; // reset so it retries on next tick
+    });
   }
 
   // Weekly salary: Every Monday at 00:00 WIB (check minute 0 with 2-min window)

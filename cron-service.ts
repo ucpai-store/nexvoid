@@ -629,12 +629,19 @@ async function processDailyInvestmentProfitsCore(): Promise<{
   const todayDow = wibNow.getDay(); // 0=Sun, 6=Sat
   const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
-  const investments = await db.investment.findMany({
-    where: { status: 'active' },
+  // ★★★ v2.4 BULLETPROOF: NO status filter — fetch ALL investments, use endDate
+  //   as source of truth. v2.3 still filtered `status: 'active'` which returned 0
+  //   if VPS had any status variation (Active/ACTIVE/ongoing/completed/stopped).
+  //   Now we fetch everything and filter by endDate > now (contract still active).
+  const allInvestments = await db.investment.findMany({
     include: { package: true },
   });
+  const investments = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true; // no endDate = treat as active
+    return new Date(inv.endDate) > wibNow;
+  });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments (today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (total=${allInvestments.length}, today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
 
   for (const inv of investments) {
     try {
@@ -764,13 +771,20 @@ async function processDailyInvestmentProfitsCore(): Promise<{
 
   // ─── Purchase tracking (product purchases, no balance change — just stats) ───
 
-  // Purchase tracking
-  const purchases = await db.purchase.findMany({
-    where: { status: 'active' },
+  // Purchase tracking — ★★★ v2.4 BULLETPROOF: NO status filter
+  const allPurchases = await db.purchase.findMany({
     include: { product: true },
   });
+  const purchases = allPurchases.filter((pur) => {
+    // Use product duration + createdAt to determine if still active
+    const createdAt = new Date(pur.createdAt);
+    const duration = pur.product?.duration || 90;
+    const endDate = new Date(createdAt);
+    endDate.setDate(endDate.getDate() + duration);
+    return endDate > wibNow;
+  });
 
-  console.log(`[Profit Cron] Updating ${purchases.length} active product purchases...`);
+  console.log(`[Profit Cron] Updating ${purchases.length} active product purchases (total=${allPurchases.length})...`);
 
   for (const purchase of purchases) {
     try {
@@ -1009,17 +1023,24 @@ let startupCatchupDone = false;
 async function hasProfitBeenCreditedToday(): Promise<{ credited: boolean; sampleCount: number; uncreditedCount: number; totalCount: number }> {
   const todayWIB = getTodayWibDateString();
   const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
-  const activeCount = await db.investment.count({ where: { status: 'active' } });
-  if (activeCount === 0) return { credited: false, sampleCount: 0, uncreditedCount: 0, totalCount: 0 };
-  const creditedToday = await db.investment.count({
-    where: {
-      status: 'active',
-      lastProfitDate: { gte: startOfDayWIB },
-    },
+  const wibNow = getWibNow();
+  // ★★★ v2.4 BULLETPROOF: NO status filter — count by endDate (contract active)
+  const allCount = await db.investment.count();
+  if (allCount === 0) return { credited: false, sampleCount: 0, uncreditedCount: 0, totalCount: 0 };
+  const allInvestments = await db.investment.findMany({ select: { id: true, endDate: true, lastProfitDate: true } });
+  const activeInvestments = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true;
+    return new Date(inv.endDate) > wibNow;
   });
-  const uncreditedCount = activeCount - creditedToday;
+  const totalCount = activeInvestments.length;
+  if (totalCount === 0) return { credited: false, sampleCount: 0, uncreditedCount: 0, totalCount: 0 };
+  const creditedToday = activeInvestments.filter((inv) => {
+    if (!inv.lastProfitDate) return false;
+    return new Date(inv.lastProfitDate) >= startOfDayWIB;
+  }).length;
+  const uncreditedCount = totalCount - creditedToday;
   // ★ Only skip if ALL active investments are credited today (no more work to do)
-  return { credited: uncreditedCount === 0, sampleCount: creditedToday, uncreditedCount, totalCount: activeCount };
+  return { credited: uncreditedCount === 0, sampleCount: creditedToday, uncreditedCount, totalCount };
 }
 
 async function runProfitCronIfDue(reason: string): Promise<void> {
@@ -1237,10 +1258,14 @@ const server = Bun.serve({
       const todayWIB = getTodayWibDateString();
       const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
 
-      const activeInvestments = await db.investment.findMany({
-        where: { status: 'active' },
+      // ★★★ v2.4 BULLETPROOF: NO status filter — use endDate
+      const allDebugInvestments = await db.investment.findMany({
         include: { package: true, user: true },
         take: 50,
+      });
+      const activeInvestments = allDebugInvestments.filter((inv) => {
+        if (!inv.endDate) return true;
+        return new Date(inv.endDate) > wibNow;
       });
 
       const debugInfo = {
