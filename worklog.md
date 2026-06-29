@@ -4058,3 +4058,101 @@ Stage Summary:
   • Profit otomatis cron → jalan setiap 10 detik di weekday (gak tunggu 00:00 WIB)
   • Cron dedup via DB (lastProfitDate >= today) → gak akan double-credit
   • Akun user TETAP AMAN (gak ada perintah delete apapun)
+
+---
+Task ID: profit-fix-v65-deploy-safety
+Agent: main (Z.ai Code)
+Task: User minta "cek lagi detaill sekali aku deploy tidak boleh ada kendala" — verifikasi semua fix siap deploy tanpa error.
+
+Work Log:
+- Audit lengkap semua file yang akan di-deploy:
+  1. fix-profit-v6.sh — bash -n: syntax OK
+  2. diag-db.sh — bash -n: syntax OK
+  3. cron-service.ts — bun run: jalan tanpa error
+  4. mini-services/cron-service/index.ts — bun run: jalan tanpa error
+  5. src/app/api/admin/asset/route.ts — TypeScript check: clean
+  6. src/app/api/admin/users/route.ts — DITEMUKAN BUG
+  7. src/app/api/admin/investments/route.ts — TypeScript check: clean
+
+- BUG #1 DITEMUKAN & DIPERBAIKI (src/app/api/admin/users/route.ts line 79,97):
+  Problem:
+    - Line 97 pakai variable 'profitBalance' tapi line 79 gak destructure dari body
+    - TypeScript error: TS2552 Cannot find name 'profitBalance'
+    - Next.js production build akan FAIL di VPS!
+  Fix (commit 2360b48): tambah 'profitBalance' ke destructure body
+  Verifikasi: bunx tsc check 3 admin routes — CLEAN (no errors)
+
+- BUG #2 DITEMUKAN & DIPERBAIKI (fix-profit-v6.sh line 463, 535-540, 553, 571):
+  Problem:
+    - Single quote di dalam bun -e '...' block memutus shell quoting
+    - Bun parse error: "Unterminated string literal at line 402:15"
+    - fix-profit-v6.sh LANGSUNG EXIT tanpa jalanin phase apapun!
+    - User akan lihat output "SELESAI" tapi sebenarnya gak ada fix yang jalan
+  Affected lines:
+    - Line 463: console.log("...PHASE 5... (fix 'total profit gk ada')")
+    - Line 535-540: PHASE 6 comments type='reward' / type='profit'
+    - Line 553: console.log("Found 'reward' entries with 'Profit' description:")
+    - Line 571: console.log("dirubah jadi 'profit' supaya...")
+  Fix (commit 2360b48): hapus semua single quote di dalam bun -e '...' block
+  Verifikasi: bash -n syntax OK + bun parse OK + E2E test PASS
+
+- BUG #3 DITEMUKAN & DIPERBAIKI (diag-db.sh line 60, 132):
+  Problem:
+    - Line 60 declare 'profitLogs' via Promise.all (table count)
+    - Line 132 declare 'profitLogs' lagi (find last 30 days)
+    - Bun error: "profitLogs has already been declared"
+    - diag-db.sh LANGSUNG EXIT tanpa nampilin diagnostic info!
+    - User gak akan bisa lihat state DB sebelum run fix-profit-v6.sh
+  Fix (commit 0f869ef): rename line 132 variable ke 'recentProfitLogs'
+  Verifikasi: bash -n syntax OK + bun run diag-db.sh output normal
+
+- E2E TEST dengan fixtures (3 skenario simulasi kondisi VPS):
+  Setup:
+    - 1 user (mainBalance=100000, totalProfit=0)
+    - 3 purchases (status: active, Active, ongoing)
+    - 2 investments (status: completed wrongly, ongoing)
+    - 1 ProfitLog (untuk purchase ongoing, tanpa BonusLog)
+    - 1 BonusLog type='reward' (desc: "Profit harian..." — BUG cron lama)
+  Run fix-profit-v6.sh with DATABASE_URL pointing to test DB:
+  Results:
+    - PHASE 2: Created 1 (Purchase Active tanpa Investment), Reactivated 2 (Investment completed+ongoing → active), Fixed dailyProfit 1 (0→5000) ✅
+    - PHASE 3: Synced 1 BonusLog untuk ProfitLog yang belum punya BonusLog ✅
+    - PHASE 4: 0 credited (anti double — semua 3 sudah di-set lastProfitDate oleh PHASE 3) ✅
+    - PHASE 5: Synced Investment.totalProfitEarned Rp5.000 → Rp10.000 ✅
+    - PHASE 6: Converted 1 type='reward' → 'profit' ✅
+  SEMUA 6 PHASE RUN CLEAN. NO ERRORS.
+
+- SIMULASI DEPLOY VPS FULL END-TO-END:
+  Step 1: git fetch + reset (skip di simulasi, commit terbaru 0f869ef)
+  Step 2: diag-db.sh — jalan normal, output table counts + status breakdowns ✅
+  Step 3: fix-profit-v6.sh — 6 phase selesai tanpa error ✅
+  Step 4: cron-service.ts start — bun run jalan, output "[Cron Service v2.3] 🚀 Running on port 3032" ✅
+  (TypeScript linting errors di cron-service.ts cuma muncul saat standalone tsc
+   tanpa project tsconfig — saat di-run via PM2/bun run, jalan normal)
+
+- VERIFIKASI KEAMANAN DATA (sekali lagi):
+  - fix-profit-v6.sh: TIDAK ada perintah delete apapun
+  - diag-db.sh: PURE READ-ONLY (gak rubah/hapus apapun)
+  - Backup DB otomatis sebelum fix-profit-v6.sh jalan
+  - Idempoten (aman di-run berkali-kali)
+
+- Browser test: page render http://localhost:3000/ — no errors, HTTP 200 ✅
+
+- Committed (2360b48 + 0f869ef) + pushed to GitHub main
+
+Stage Summary:
+- 3 critical bug ditemukan & diperbaiki yang bisa bikin deploy gagal:
+  1. /api/admin/users/route.ts: profitBalance undefined → Next.js build FAIL
+  2. fix-profit-v6.sh: single quote di bun -e block → script exit tanpa jalan
+  3. diag-db.sh: profitLogs redeclare → script crash sebelum nampilin diagnostic
+
+- SEMUA fix sudah di-push ke GitHub main (3 commit: 1085ed3 → 2360b48 → 0f869ef)
+
+- VPS deploy command (ONE LINE - SIAP DIJALANKAN):
+  cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash diag-db.sh && bash fix-profit-v6.sh && pm2 restart nexvo-cron
+
+- SETelah deploy:
+  • User balik ke aplikasi → langsung lihat riwayat profit (BonusLog muncul)
+  • Aset page → total profit updated (Investment.totalProfitEarned synced)
+  • Cron auto jalan tiap 10 detik di weekday → profit wajib masuk
+  • Akun user TETAP AMAN (no delete, backup DB otomatis)
