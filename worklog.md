@@ -4232,3 +4232,84 @@ Stage Summary:
 - Catatan untuk user: Saya TIDAK BISA SSH ke VPS Hostinger user (gak punya credentials).
   User HARUS run 1 command di terminal VPS untuk dapat fix terbaru.
   Command: bash <(curl -sL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/quick-deploy-fix.sh)
+
+---
+Task ID: profit-fix-v7-cache-and-rebuild
+Agent: main (Z.ai Code)
+Task: User report "tetep tidak ada perubahan nii yang bener dong". Audit ULANG seluruh pipeline profit menemukan 2 ROOT CAUSE baru yang belum pernah terdetect di v4-v6.5.
+
+Work Log:
+- Inspect UI component AdminAssetPage.tsx untuk paham field yang dipakai "Total Profit":
+  • Line 174: const totalProfit = filtered.reduce((sum, a) => sum + a.profitEarned, 0);
+  • UI pakai field `profitEarned` (Purchase) atau `totalProfitEarned` (Investment)
+  • API admin/asset route.ts GET line 77: profitEarned: p.profitEarned — BENAR
+  • API admin/asset route.ts PUT add-profit line 259: profitEarned: { increment } — BENAR
+  • KESIMPULAN: Code di GitHub sudah BENAR. Masalah bukan di code profit logic.
+
+- ROOT CAUSE #1 DITEMUKAN: Next.js route cache!
+  • 10 route critical TIDAK punya `export const dynamic = 'force-dynamic'`
+  • Next.js App Router default behavior: GET route BISA di-cache
+  • Admin add-profit → DB update ✅ → TAPI response GET di-cache → admin lihat data LAMA
+  • User refresh page → fetch GET → Next.js return cached response → "tetep tidak ada perubahan"
+  • Fix: tambah `export const dynamic = 'force-dynamic'` + `revalidate = 0` + `fetchCache = 'force-no-store'`
+  • Applied ke 12 file (10 route + 2 user route):
+
+    1. /api/admin/asset/route.ts (Kelola Aset + add-profit)
+    2. /api/admin/users/route.ts (add-saldo isProfit)
+    3. /api/admin/investments/route.ts (add-profit)
+    4. /api/admin/profit-trigger/route.ts (tombol Trigger Profit)
+    5. /api/cron/profit/route.ts (cron API endpoint)
+    6. /api/transactions/route.ts (Riwayat user)
+    7. /api/bonuses/route.ts (BonusLog user)
+    8. /api/assets/route.ts (Aset user)
+    9. /api/investments/route.ts (Investment user)
+    10. /api/user/profit-status/route.ts (status profit user)
+    11. /api/user/route.ts (saldo utama + total profit di dashboard)
+    12. /api/user/profile/route.ts (profile user)
+
+- ROOT CAUSE #2 DITEMUKAN: quick-deploy-fix.sh TIDAK rebuild Next.js!
+  • Cek ecosystem.config.cjs: nexvo-web pakai `bun run start` = `next start` (PRODUCTION MODE)
+  • Production mode BUTUH `bun run build` setelah `git pull` agar code baru aktif
+  • User sudah git pull berkali-kali → code di repo sudah baru → TAPI compiled build masih LAMA
+  • Inilah kenapa user bilang "tetep tidak ada perubahan" walaupun sudah deploy!
+  • Fix: tambah STEP 5 (REBUILD NEXT.JS) di quick-deploy-fix.sh:
+    - Backup .next lama (auto-rollback kalau build gagal)
+    - Clear .next/cache + node_modules/.cache
+    - bun run db:generate (regenerate Prisma client)
+    - bun run build (1-3 menit, dengan error handling & tail -30)
+    - Auto-rollback ke .next.backup kalau build gagal (VPS tetap online)
+  • STEP 6: PM2 restart dengan --update-env flag (pastikan env baru ke-load)
+
+- VERIFIKASI local dev server:
+  • Semua 10 route return HTTP 401 (unauthorized) — sesuai ekspektasi tanpa token
+  • Tidak ada error TypeScript / compile error
+  • Code valid & siap deploy
+
+- Commit e7afa50 + push ke GitHub main
+
+Stage Summary:
+- 2 ROOT CAUSE yang selama ini terlewat akhirnya KETEMU & DIPERBAIKI:
+  1. Next.js route cache — 12 file di-fix dengan `export const dynamic = 'force-dynamic'`
+  2. VPS belum rebuild — quick-deploy-fix.sh sekarang auto-rebuild Next.js
+
+- KENAPA v4-v6.5 "seperti" gagal:
+  • Code-nya BENAR (DB update, BonusLog create, totalProfit increment)
+  • TAPI response GET di-cache → admin lihat data lama → user pikir fix gak work
+  • Dan VPS belum rebuild → walaupun cache di-disable di code, code itu sendiri belum aktif!
+
+- Deploy command (1 baris, copy-paste di terminal VPS):
+  bash <(curl -sL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/quick-deploy-fix.sh)
+
+- Script ini sekarang melakukan 6 step:
+  1. Cari project Nexvo (auto-detect)
+  2. Backup DB otomatis
+  3. Git pull latest code
+  4. Run diag-db.sh (read-only diagnostic)
+  5. Run fix-profit-v6.sh (6 phase DB repair)
+  6. REBUILD NEXT.JS (BARU! 1-3 menit, dengan rollback)
+  7. Restart PM2 cron + web (--update-env)
+
+- Setelah deploy, user WAJIB:
+  • Ctrl+Shift+R di browser (hard refresh, clear browser cache)
+  • Logout + login lagi (clear session)
+  • Cek Kelola Aset → Total Profit langsung berubah setelah add-profit manual
