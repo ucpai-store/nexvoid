@@ -3926,3 +3926,49 @@ Stage Summary:
   and credit profit automatically. Even if cron restarts mid-day, it fires within 10s.
 - VPS deploy command:
   cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash diag-db.sh && bash fix-profit-v5.sh && pm2 restart nexvo-cron
+
+---
+Task ID: profit-fix-v6-all-admin-paths
+Agent: main (Z.ai Code)
+Task: User reports "tadi malam dah aku masukin manual tapi di total profit gk ada riwayat nya" — manual profit entries don't show in total profit OR riwayat. Check ALL admin paths to the root.
+
+Work Log:
+- Investigated ALL 3 admin paths for manual profit entry:
+  1. /api/admin/asset PUT action=add-profit (AdminAssetPage "Profit" button) — FIXED in v4
+  2. /api/admin/users PUT action=add-saldo isProfit=true (AdminUsersPage "Tambah Profit Manual") — STILL BUGGY
+  3. /api/admin/investments PUT action=add-profit — STILL BUGGY
+- BUG #1 (/api/admin/users/route.ts line 124):
+  - Used `findFirst where: { status: 'active' }` to find user's investment
+  - If VPS has status variation (Active/ongoing/completed/stopped), returns null
+  - Investment.totalProfitEarned NEVER updated → aset page shows 0 total profit
+  - FIX: fetch ALL investments, filter by endDate > now (endDate-based)
+- BUG #2 (/api/admin/investments/route.ts line 92-132):
+  - Updated Investment.totalProfitEarned ✅
+  - Updated User.mainBalance + totalProfit ✅
+  - Created LiveActivity ✅
+  - BUT: NO BonusLog created → riwayat gak muncul!
+  - BUT: NO lastProfitDate update → cron double-credits!
+  - FIX: Added BonusLog creation + lastProfitDate update
+- Created fix-profit-v6.sh with new PHASE 5: SYNC TOTAL PROFIT from BonusLog
+  - For users already manually credited via buggy paths (before fix deployed)
+  - Sum all BonusLog type=profit per user
+  - Ensure Investment.totalProfitEarned matches (increment if lower)
+  - Ensure User.totalProfit matches (increment if lower)
+  - Does NOT touch mainBalance (already credited manually)
+  - Reactivates Investment if wrongly completed/stopped
+- Integration test: All 3 paths tested with investment status='stopped' (NOT active):
+  - PATH 1 (admin/users): ✅ finds investment despite status='stopped', updates all fields
+  - PATH 2 (admin/investments): ✅ creates BonusLog + updates lastProfitDate
+  - PATH 3 (admin/asset Purchase): ✅ creates BonusLog + updates Investment + reactivates
+  - ALL 3 PASSED — profit wajib masuk!
+- Committed (6d63d49) + pushed to GitHub main
+
+Stage Summary:
+- ALL 3 admin profit entry paths now fixed (bulletproof, endDate-based):
+  1. /api/admin/asset add-profit (Purchase + Investment) — v4 fix
+  2. /api/admin/users add-saldo isProfit=true — v6 fix (endDate lookup)
+  3. /api/admin/investments add-profit — v6 fix (BonusLog + lastProfitDate)
+- fix-profit-v6.sh PHASE 5 syncs old manual entries (Investment.totalProfitEarned + User.totalProfit)
+- After deploy: every manual profit entry will correctly create BonusLog (riwayat) + update Investment (total profit) + set lastProfitDate (anti cron double-credit)
+- VPS deploy command:
+  cd /var/www/nexvo && git fetch origin && git reset --hard origin/main && bash diag-db.sh && bash fix-profit-v6.sh && pm2 restart nexvo-cron
