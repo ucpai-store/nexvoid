@@ -142,12 +142,18 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
     return { ...result, errorDetails: [`Weekend (${dayName}) — skipped. Use ?force=true to override.`] };
   }
 
-  const investments = await db.investment.findMany({
-    where: { status: 'active' },
+  // ★★★ v2.5 BULLETPROOF: NO status filter — fetch ALL investments, use endDate
+  //   as source of truth. Old code filtered status='active' which returned 0
+  //   if VPS had any status variation (Active/ACTIVE/ongoing/completed/stopped).
+  const allInvestments = await db.investment.findMany({
     include: { package: true },
   });
+  const investments = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true; // no endDate = treat as active
+    return new Date(inv.endDate) > wibNow;
+  });
 
-  console.log(`[Admin Profit Trigger] Processing ${investments.length} active investments...`);
+  console.log(`[Admin Profit Trigger] Processing ${investments.length} active investments (total=${allInvestments.length})...`);
 
   for (const inv of investments) {
     try {
@@ -329,9 +335,13 @@ export async function POST(request: NextRequest) {
       const dayOfWeek = wibNow.getDay();
       const todayWIB = getWibDateString(new Date());
 
-      const investments = await db.investment.findMany({
-        where: { status: 'active' },
+      // ★★★ v2.5 BULLETPROOF: NO status filter — use endDate as source of truth
+      const allInvestments = await db.investment.findMany({
         include: { package: true, user: { select: { userId: true, name: true } } },
+      });
+      const investments = allInvestments.filter((inv) => {
+        if (!inv.endDate) return true;
+        return new Date(inv.endDate) > wibNow;
       });
 
       const diagnosticData = investments.map((inv) => {
@@ -408,9 +418,13 @@ export async function GET(request: NextRequest) {
     const dayOfWeek = wibNow.getDay();
     const todayWIB = getWibDateString(new Date());
 
-    const investments = await db.investment.findMany({
-      where: { status: 'active' },
+    // ★★★ v2.5 BULLETPROOF: NO status filter — use endDate as source of truth
+    const allInvestments = await db.investment.findMany({
       include: { package: true, user: { select: { userId: true, name: true } } },
+    });
+    const investments = allInvestments.filter((inv) => {
+      if (!inv.endDate) return true;
+      return new Date(inv.endDate) > wibNow;
     });
 
     const diagnosticData = investments.map((inv) => {

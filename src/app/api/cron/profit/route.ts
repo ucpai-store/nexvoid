@@ -202,13 +202,18 @@ async function processDailyInvestmentProfits(): Promise<{
   // Create WIB "today" date for comparison (just the date part)
   const todayWIB = { year: now.getFullYear(), month: now.getMonth(), date: now.getDate() };
 
-  // Get all active investments
-  const investments = await db.investment.findMany({
-    where: { status: 'active' },
+  // ★★★ v2.5 BULLETPROOF: NO status filter — fetch ALL investments, use endDate
+  //   as source of truth. Old code filtered status='active' which returned 0
+  //   if VPS had any status variation (Active/ACTIVE/ongoing/completed/stopped).
+  const allInvestments = await db.investment.findMany({
     include: { package: true },
   });
+  const investments = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true; // no endDate = treat as active
+    return new Date(inv.endDate) > now;
+  });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (total=${allInvestments.length})...`);
 
   for (const inv of investments) {
     try {
@@ -336,9 +341,15 @@ async function processDailyInvestmentProfits(): Promise<{
   // We only update the Purchase tracking fields (profitEarned, lastProfitDate) for display.
   // We do NOT credit profit again — that would be DOUBLE COUNTING.
   // Purchases WITHOUT linked investments (legacy) still need profit credited here.
-  const purchases = await db.purchase.findMany({
-    where: { status: 'active' },
+  // ★★★ v2.5 BULLETPROOF: NO status filter — use product duration + createdAt
+  const allPurchases = await db.purchase.findMany({
     include: { product: true },
+  });
+  const purchases = allPurchases.filter((pur) => {
+    const contractDays = pur.product?.duration || 90;
+    const endDate = new Date(pur.createdAt);
+    endDate.setDate(endDate.getDate() + contractDays);
+    return endDate > now;
   });
 
   // Check which purchases already have linked investment records
