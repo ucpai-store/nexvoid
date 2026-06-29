@@ -4313,3 +4313,34 @@ Stage Summary:
   • Ctrl+Shift+R di browser (hard refresh, clear browser cache)
   • Logout + login lagi (clear session)
   • Cek Kelola Aset → Total Profit langsung berubah setelah add-profit manual
+
+---
+Task ID: profit-fix-v7-verify-screenshot
+Agent: main (Z.ai Code)
+Task: User upload screenshot terminal VPS Hostinger. Verifikasi apakah deploy script terbaru sudah jalan.
+
+Work Log:
+- Analyze screenshot /home/z/my-project/upload/pasted_image_1782707504611.png via VLM
+- Finding CRITICAL:
+  • Output terminal: "QUICK DEPLOY FIX SELESAI" + "nexvo-cron restarted" + "nexvo-web restarted"
+  • TIDAK ADA output "STEP 5: REBUILD NEXT.JS" di screenshot
+  • TIDAK ADA output "bun run build"
+  • TIDAK ADA output "diag-db.sh" atau "fix-profit-v6.sh"
+  • Error di akhir: `bash: /dev/fd/63: line 1: 400:: command not found`
+- Artinya: User masih pakai VERSI LAMA quick-deploy-fix.sh (sebelum commit e7afa50)!
+- Root cause: GitHub raw cache (cache-control: max-age=300 = 5 menit)
+  • User jalankan script sebelum cache GitHub expire
+  • Atau browser/CDN cache masih simpan versi lama
+- Verify: curl ke raw URL sekarang return HTTP 200 + script terbaru (STEP 5 ada)
+- Verify: git log confirm commit e7afa50 sudah di-push ke GitHub main
+
+Stage Summary:
+- Code fix sudah 100% di GitHub (commit e7afa50)
+- Tapi user deploy pakai versi LAMA karena cache GitHub raw
+- Solusi: User harus RE-RUN dengan cache busting atau git pull manual
+- Instruksi ke user:
+  1. Cari folder project: `cd /var/www/nexvo` (atau folder nexvo di VPS)
+  2. Git pull manual: `git fetch origin && git reset --hard origin/main`
+  3. Jalankan script LOKAL (bukan dari URL): `bash quick-deploy-fix.sh`
+  4. Atau pakai cache busting: `bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/quick-deploy-fix.sh?t=$(date +%s)")`
+- Setelah deploy, WAJIB Ctrl+Shift+R + logout/login di browser
