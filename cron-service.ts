@@ -784,7 +784,25 @@ async function processDailyInvestmentProfitsCore(): Promise<{
     return endDate > wibNow;
   });
 
-  console.log(`[Profit Cron] Updating ${purchases.length} active product purchases (total=${allPurchases.length})...`);
+  // ★★★ v7 FIX: Identify purchases that have linked Investment records.
+  //   These were already credited via the Investment path above (with BonusLog).
+  //   For those, we only update Purchase tracking fields — do NOT double-credit.
+  //   For LEGACY purchases (no linked Investment), we MUST:
+  //     - update User.mainBalance + User.totalProfit
+  //     - create BonusLog type='profit' (so Riwayat page shows it)
+  //     - create LiveActivity (dashboard real-time update)
+  //   Previously: only Purchase.profitEarned was updated → Riwayat empty + saldo utama kosong!
+  const allInvestmentsForPurchaseMap = await db.investment.findMany({
+    where: { purchaseId: { not: null } },
+    select: { purchaseId: true },
+  });
+  const purchaseIdsWithInvestments = new Set(
+    allInvestmentsForPurchaseMap
+      .map((inv) => inv.purchaseId)
+      .filter((id): id is string => id !== null)
+  );
+
+  console.log(`[Profit Cron] Updating ${purchases.length} active product purchases (${purchaseIdsWithInvestments.size} have linked investments)...`);
 
   for (const purchase of purchases) {
     try {
@@ -808,15 +826,108 @@ async function processDailyInvestmentProfitsCore(): Promise<{
 
       if (dailyProfit <= 0) continue;
 
-      await db.purchase.update({
-        where: { id: purchase.id },
-        data: {
-          profitEarned: { increment: dailyProfit },
-          dailyProfit: dailyProfit,
-          lastProfitDate: new Date(),
-        },
+      if (purchaseIdsWithInvestments.has(purchase.id)) {
+        // ★ This purchase has linked Investment records — profit was already credited
+        //   via the Investment path (BonusLog + User balance update done there).
+        //   Only update the Purchase tracking fields for display purposes.
+        await db.purchase.update({
+          where: { id: purchase.id },
+          data: {
+            profitEarned: { increment: dailyProfit },
+            dailyProfit: dailyProfit,
+            lastProfitDate: new Date(),
+          },
+        });
+        continue;
+      }
+
+      // ★★★ v7 FIX: LEGACY purchase (NO linked Investment) — credit profit here.
+      //   This handles old purchases created before Investment record linking was added.
+      //   Previously: only Purchase.profitEarned was updated → user's saldo & riwayat KOSONG!
+      await db.$transaction(async (tx) => {
+        // Re-check inside transaction (race safety)
+        const currentPurchase = await tx.purchase.findUnique({ where: { id: purchase.id } });
+        if (!currentPurchase) return;
+        if (currentPurchase.lastProfitDate) {
+          const lastDateUTC = new Date(currentPurchase.lastProfitDate);
+          const lastDateMs = lastDateUTC.getTime() + lastDateUTC.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000;
+          const lastDateWIB = new Date(lastDateMs);
+          if (lastDateWIB.getFullYear() === wibNow.getFullYear() &&
+              lastDateWIB.getMonth() === wibNow.getMonth() &&
+              lastDateWIB.getDate() === wibNow.getDate()) {
+            return;
+          }
+        }
+
+        // 1. Credit daily profit to user's mainBalance + totalProfit
+        await tx.user.update({
+          where: { id: purchase.userId },
+          data: {
+            mainBalance: { increment: dailyProfit },
+            totalProfit: { increment: dailyProfit },
+          },
+        });
+
+        // 2. Update purchase record
+        await tx.purchase.update({
+          where: { id: purchase.id },
+          data: {
+            profitEarned: { increment: dailyProfit },
+            dailyProfit: dailyProfit,
+            lastProfitDate: new Date(),
+          },
+        });
+
+        // 3. Create ProfitLog (audit log)
+        await tx.profitLog.create({
+          data: {
+            purchaseId: purchase.id,
+            userId: purchase.userId,
+            amount: dailyProfit,
+          },
+        });
+
+        // 4. ★★★ v7 FIX: Create BonusLog type='profit' — so Riwayat page shows it!
+        //   Previously: ONLY ProfitLog was created → Riwayat empty → user confused.
+        const productName = purchase.product?.name || 'Produk';
+        await tx.bonusLog.create({
+          data: {
+            userId: purchase.userId,
+            fromUserId: purchase.userId,
+            type: 'profit',
+            level: 0,
+            amount: dailyProfit,
+            description: `Profit harian produk ${productName} (${purchase.quantity}x) — ${formatRupiahSimple(dailyProfit)}`,
+          },
+        });
+
+        // 5. Create LiveActivity (dashboard real-time update)
+        const purchaseUser = await tx.user.findUnique({
+          where: { id: purchase.userId },
+          select: { name: true, userId: true },
+        });
+        await tx.liveActivity.create({
+          data: {
+            type: 'profit',
+            userName: purchaseUser?.name || purchaseUser?.userId || 'User',
+            amount: dailyProfit,
+            productName,
+            isFake: false,
+          },
+        });
+
+        // 6. Event-driven matching bonus
+        const matchResult = await creditMatchingOnProfit(tx, purchase.userId, dailyProfit);
+        if (matchResult.totalMatchCredited > 0) {
+          result.totalMatching += matchResult.totalMatchCredited;
+        }
       });
+
+      result.processed++;
+      result.totalProfit += dailyProfit;
+      console.log(`[Profit Cron] 💰 LEGACY Purchase ${purchase.id} (user ${purchase.userId}) credited: ${formatRupiahSimple(dailyProfit)} (no linked Investment — full credit applied)`);
     } catch (error: any) {
+      result.errors++;
       console.error(`[Profit Cron] ❌ Purchase ${purchase.id} update: ${error.message}`);
     }
   }
