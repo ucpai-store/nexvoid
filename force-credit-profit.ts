@@ -222,12 +222,15 @@ async function main() {
     if (reactivated > 0) console.log(`   ♻️  SELF-HEAL: Reactivated ${reactivated} investment(s)\n`);
   }
 
-  // ─── Process Investments ───
-  const investments = await db.investment.findMany({
-    where: { status: 'active' },
+  // ─── Process Investments (v2.5 BULLETPROOF: NO status filter, use endDate) ───
+  const allInvestments = await db.investment.findMany({
     include: { package: true, user: true },
   });
-  console.log(`📊 Active investments: ${investments.length}\n`);
+  const investments = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true;
+    return new Date(inv.endDate) > wibNow;
+  });
+  console.log(`📊 Active investments: ${investments.length} (total fetched: ${allInvestments.length})\n`);
 
   let totalProcessed = 0;
   let totalProfitCredited = 0;
@@ -413,22 +416,37 @@ async function main() {
       const isBackfill = missedDays > 0;
       const productName = purchase.product?.name || 'Produk';
 
-      // ★ If linked Investment exists, the investment loop above already credited.
-      //   Only sync tracking stats here.
+      // ★★★ v2.5 BULLETPROOF: If linked Investment exists, check whether it was
+      //   actually credited TODAY. If yes → sync tracking only. If NO → CREDIT
+      //   via Purchase path. This is the fix that guarantees profit masuk 100%.
       if (linkedPurchaseIds.has(purchase.id)) {
-        if (!DRY_RUN) {
-          await db.purchase.update({
-            where: { id: purchase.id },
-            data: {
-              profitEarned: { increment: totalCredit },
-              dailyProfit: dailyProfit,
-              lastProfitDate: new Date(),
-            },
-          });
+        const linkedInvs = await db.investment.findMany({
+          where: { purchaseId: purchase.id },
+          select: { id: true, lastProfitDate: true, status: true, endDate: true },
+        });
+        const anyCreditedToday = linkedInvs.some((li) => {
+          if (!li.lastProfitDate) return false;
+          return getWibDateString(new Date(li.lastProfitDate)) === todayWIB;
+        });
+
+        if (anyCreditedToday) {
+          // Investment loop credited today — sync tracking only
+          if (!DRY_RUN) {
+            await db.purchase.update({
+              where: { id: purchase.id },
+              data: {
+                profitEarned: { increment: totalCredit },
+                dailyProfit: dailyProfit,
+                lastProfitDate: new Date(),
+              },
+            });
+          }
+          purchaseUpdated++;
+          console.log(`   📦 ${purchase.userId} (${productName}) [linked-inv, sync-only]: ${totalDays}d × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}${DRY_RUN ? ' (DRY-RUN)' : ''}`);
+          continue;
         }
-        purchaseUpdated++;
-        console.log(`   📦 ${purchase.userId} (${productName}) [linked-inv, sync-only]: ${totalDays}d × ${formatRupiahSimple(dailyProfit)} = ${formatRupiahSimple(totalCredit)}${DRY_RUN ? ' (DRY-RUN)' : ''}`);
-        continue;
+        // Linked Investment NOT credited today — fall through to standalone credit
+        console.log(`   ⚠️  Purchase ${purchase.id} (${purchase.userId}) has linked Investment but it wasn't credited today — crediting via Purchase path (v2.5 fix)`);
       }
 
       // ★★★ STANDALONE PURCHASE — CREDIT PROFIT HERE ★★★

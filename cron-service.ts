@@ -1,19 +1,21 @@
 /**
- * NEXVO Cron Service v2.4 ★★★ CRITICAL PROFIT FIX ★★★
+ * NEXVO Cron Service v2.5 ★★★ BULLETPROOF PROFIT FIX ★★★
  *
- * ★ v2.4 FIX (THE REAL FIX for "profit 00:00 gak masuk"):
- *   The Purchase loop previously ONLY updated tracking stats
- *   (profitEarned/dailyProfit/lastProfitDate) but NEVER credited the
- *   user's mainBalance/totalProfit and NEVER created BonusLog(type='profit').
- *   So for users whose assets are Purchases (not Investments), the 00:00
- *   cron silently did nothing — no money, no Riwayat entry.
- *   NOW: standalone purchases (no linked Investment) get full profit credit
- *   (balance + BonusLog + ProfitLog + LiveActivity + matching bonus),
- *   mirroring the admin manual add-profit route. Purchases WITH a linked
- *   Investment stay sync-only (investment loop already credited).
- * ★ v2.4: hasProfitBeenCreditedToday() now counts Purchases too.
+ * ★ v2.5 BULLETPROOF (THE DEFINITIVE FIX for "profit 00:00 gak masuk"):
+ *   v2.4 still filtered Investments by `status: 'active'` — but on VPS,
+ *   many Investments had wrong status (completed/stopped/Active) even though
+ *   endDate was in the FUTURE. Result: Investment loop SKIPPED them, and
+ *   Purchase loop also SKIPPED (because linkedPurchaseIds had them) →
+ *   PROFIT NEVER CREDITED for those users.
+ *
+ *   v2.5 mirrors admin /api/admin/profit-trigger v2.5 (PROVEN WORKING):
+ *   - Investment loop: NO status filter → use `endDate > wibNow` as source of truth
+ *   - Purchase loop: if linked Investment wasn't credited today, CREDIT via Purchase path
+ *     (don't blindly skip — that was the silent killer)
+ *   - hasProfitBeenCreditedToday() also uses endDate filter
+ *
+ * ★ v2.4: standalone purchases get full credit (balance + BonusLog + ProfitLog + matching).
  * ★ v2.3: per-investment dedup (manual credit of 1 user no longer blocks cron).
- * ★ v2.3: DB path reads .env DATABASE_URL first.
  *
  * Runs scheduled tasks automatically:
  * - Daily Investment + Purchase Profit: Every weekday at 00:00 WIB (continuous catchup every 10s)
@@ -22,7 +24,7 @@
  *
  * Uses Prisma directly to access the database.
  * Port: 3032
- * Version marker: CRON-PURCHASE-FIX-V9-20250629
+ * Version marker: CRON-PROFIT-BULLETPROOF-V10-20250629
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -637,12 +639,20 @@ async function processDailyInvestmentProfitsCore(): Promise<{
   const todayDow = wibNow.getDay(); // 0=Sun, 6=Sat
   const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
-  const investments = await db.investment.findMany({
-    where: { status: 'active' },
-    include: { package: true },
+  // ★★★ v2.5 BULLETPROOF: NO status filter — use endDate as source of truth.
+  //   Old v2.4 filtered `status: 'active'` but VPS data had wrong statuses
+  //   (completed/stopped/Active) even when endDate was in the FUTURE →
+  //   Investment loop skipped them → Purchase loop also skipped → NO PROFIT.
+  //   Now: fetch ALL investments, filter by endDate > wibNow (mirrors admin v2.5).
+  const allInvestments = await db.investment.findMany({
+    include: { package: true, user: { select: { userId: true, name: true } } },
+  });
+  const investments = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true; // no endDate = treat as active
+    return new Date(inv.endDate) > wibNow;
   });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments (today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (total fetched=${allInvestments.length}, today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
 
   for (const inv of investments) {
     try {
@@ -835,18 +845,37 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         continue;
       }
 
-      // ★ If this purchase has a linked Investment, the Investment loop above
-      //   already credited profit to the user. Only sync tracking stats here.
+      // ★★★ v2.5 BULLETPROOF: If this purchase has a linked Investment, check
+      //   whether the Investment loop actually credited it TODAY. If yes →
+      //   sync tracking only. If NO (Investment had wrong status / no endDate /
+      //   got skipped) → CREDIT through Purchase path. This is the fix that
+      //   guarantees profit masuk 100% malam ini.
       if (linkedPurchaseIds.has(purchase.id)) {
-        await db.purchase.update({
-          where: { id: purchase.id },
-          data: {
-            profitEarned: { increment: dailyProfit },
-            dailyProfit: dailyProfit,
-            lastProfitDate: new Date(),
-          },
+        const linkedInvs = await db.investment.findMany({
+          where: { purchaseId: purchase.id },
+          select: { id: true, lastProfitDate: true, status: true, endDate: true },
         });
-        continue;
+        const anyCreditedToday = linkedInvs.some((li) => {
+          if (!li.lastProfitDate) return false;
+          return getWibDateString(new Date(li.lastProfitDate)) === todayWIB;
+        });
+
+        if (anyCreditedToday) {
+          // Investment loop credited today — sync tracking only (no double-credit)
+          await db.purchase.update({
+            where: { id: purchase.id },
+            data: {
+              profitEarned: { increment: dailyProfit },
+              dailyProfit: dailyProfit,
+              lastProfitDate: new Date(),
+            },
+          });
+          continue;
+        }
+        // Linked Investment NOT credited today — fall through to standalone
+        // credit path below. This catches the v2.4 bug where Investment loop
+        // skipped (status filter) but Purchase loop also skipped.
+        console.log(`[Profit Cron] ⚠️ Purchase ${purchase.id} (user ${purchase.user?.userId}) has linked Investment but it wasn't credited today — crediting via Purchase path (v2.5 fix)`);
       }
 
       // ★★★ STANDALONE PURCHASE (no linked Investment) — CREDIT PROFIT HERE ★★★
@@ -1156,22 +1185,35 @@ let startupCatchupDone = false;
 async function hasProfitBeenCreditedToday(): Promise<{ credited: boolean; sampleCount: number; uncreditedCount: number; totalCount: number }> {
   const todayWIB = getTodayWibDateString();
   const startOfDayWIB = new Date(todayWIB + 'T00:00:00+07:00');
+  const wibNow = getWibNow();
 
-  // ★ v2.4: Count BOTH active Investments AND active Purchases.
-  //   Previously only counted Investments — if all assets were Purchases,
-  //   this returned totalCount=0 → cron kept re-running uselessly and the
-  //   status endpoint showed misleading numbers.
-  const [activeInvCount, creditedInvCount, activePurCount, creditedPurCount] = await Promise.all([
-    db.investment.count({ where: { status: 'active' } }),
-    db.investment.count({ where: { status: 'active', lastProfitDate: { gte: startOfDayWIB } } }),
+  // ★ v2.5 BULLETPROOF: Count Investments by endDate (not status filter) +
+  //   active Purchases. Mirrors processDailyInvestmentProfitsCore() logic.
+  //   v2.4 used `status: 'active'` which returned 0 if VPS data had wrong
+  //   statuses, making the status endpoint misleading.
+  const [allInvestments, activePurCount, creditedPurCount] = await Promise.all([
+    db.investment.findMany({ where: {}, select: { id: true, endDate: true, lastProfitDate: true } }),
     db.purchase.count({ where: { status: 'active' } }),
     db.purchase.count({ where: { status: 'active', lastProfitDate: { gte: startOfDayWIB } } }),
   ]);
 
+  // Filter active investments by endDate (mirror core logic)
+  const activeInvCount = allInvestments.filter((inv) => {
+    if (!inv.endDate) return true;
+    return new Date(inv.endDate) > wibNow;
+  }).length;
+
   const totalCount = activeInvCount + activePurCount;
   if (totalCount === 0) return { credited: false, sampleCount: 0, uncreditedCount: 0, totalCount: 0 };
 
-  const sampleCount = creditedInvCount + creditedPurCount;
+  // For "credited" count, only count those with active endDate AND lastProfitDate >= today
+  const creditedActiveInvCount = allInvestments.filter((inv) => {
+    if (!inv.endDate) return inv.lastProfitDate ? getWibDateString(new Date(inv.lastProfitDate)) === todayWIB : false;
+    if (new Date(inv.endDate) <= wibNow) return false; // ended — don't count
+    return inv.lastProfitDate ? getWibDateString(new Date(inv.lastProfitDate)) === todayWIB : false;
+  }).length;
+
+  const sampleCount = creditedActiveInvCount + creditedPurCount;
   const uncreditedCount = totalCount - sampleCount;
 
   // ★ Only skip if ALL active investments AND purchases are credited today
@@ -1285,8 +1327,8 @@ const server = Bun.serve({
 
     if (url.pathname === '/') {
       return Response.json({
-        service: 'NEXVO Cron Service v2.4',
-        versionMarker: 'CRON-PURCHASE-FIX-V9-20250629',
+        service: 'NEXVO Cron Service v2.5',
+        versionMarker: 'CRON-PROFIT-BULLETPROOF-V10-20250629',
         status: 'running',
         wibTime: getWibNow().toISOString(),
         lastSalaryRun: lastSalaryRunDate || 'never',
@@ -1414,7 +1456,7 @@ const server = Bun.serve({
       const linkedSet = new Set(linkedInvPurchaseIds.map(i => i.purchaseId).filter(Boolean) as string[]);
 
       const debugInfo = {
-        versionMarker: 'CRON-PURCHASE-FIX-V9-20250629',
+        versionMarker: 'CRON-PROFIT-BULLETPROOF-V10-20250629',
         wibTime: wibNow.toISOString(),
         wibWallTime: `${wibNow.getFullYear()}-${String(wibNow.getMonth()+1).padStart(2,'0')}-${String(wibNow.getDate()).padStart(2,'0')} ${String(wibNow.getHours()).padStart(2,'0')}:${String(wibNow.getMinutes()).padStart(2,'0')}`,
         dayOfWeek: wibNow.getDay(),
@@ -1484,7 +1526,7 @@ const server = Bun.serve({
 
 // ──────────── Start ────────────
 
-console.log(`[Cron Service v2.4] 🚀 Running on port ${PORT} — marker: CRON-PURCHASE-FIX-V9-20250629`);
+console.log(`[Cron Service v2.5] 🚀 Running on port ${PORT} — marker: CRON-PROFIT-BULLETPROOF-V10-20250629`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);

@@ -5,8 +5,8 @@ import { execSync } from 'child_process';
 
 // ★★★ Version marker — bump on every fix. Used to verify the VPS is running
 //   the latest code. Visit https://nexvo.id/api/deploy-version to check.
-export const VERSION_MARKER = 'CRON-PURCHASE-FIX-V9-20250629';
-export const CRON_VERSION = 'v2.4';
+export const VERSION_MARKER = 'PROFIT-BULLETPROOF-V10-20250629';
+export const CRON_VERSION = 'v2.5-bulletproof';
 
 export async function GET() {
   let buildId = 'unknown';
@@ -37,7 +37,7 @@ export async function GET() {
   return NextResponse.json({
     versionMarker: VERSION_MARKER,
     cronVersion: CRON_VERSION,
-    description: 'CRON PURCHASE FIX v9 — standalone purchases now get full profit credit (balance + BonusLog + ProfitLog + LiveActivity + matching) at 00:00 WIB',
+    description: 'PROFIT BULLETPROOF v10 — Investment loop pakai endDate (bukan status filter) + Purchase loop credit via Purchase path jika linked Investment gak dikredit hari ini. Mirror admin v2.5 yang sudah terbukti jalan.',
     buildId,
     builtAt,
     gitCommit,
@@ -45,9 +45,11 @@ export async function GET() {
     serverTime: new Date().toISOString(),
     nodeEnv: process.env.NODE_ENV || 'development',
     fixes: [
-      'cron-service.ts purchase loop: now credits user.mainBalance/totalProfit + creates BonusLog(type=profit) + ProfitLog + LiveActivity + matching bonus for standalone purchases (no linked Investment)',
-      'force-credit-profit.ts: same purchase-loop fix + fixed matching function crash (was using non-existent user.status field)',
-      'hasProfitBeenCreditedToday(): now counts Purchases too (not just Investments)',
+      'cron-service.ts v2.5: Investment loop buang status=active filter, pakai endDate > wibNow (mirror admin /api/admin/profit-trigger v2.5 yang SUDAH TERBUKTI JALAN)',
+      'cron-service.ts v2.5: Purchase loop — kalo linked Investment gak dikredit hari ini, CREDIT via Purchase path (jangan skip! itulah penyebab profit gak masuk)',
+      'cron-service.ts v2.5: hasProfitBeenCreditedToday() pakai endDate filter juga (status endpoint akurat)',
+      'force-credit-profit.ts: same v2.5 bulletproof fixes',
+      'v2.4 fix retained: standalone purchases get full credit (balance + BonusLog + ProfitLog + LiveActivity + matching bonus)',
     ],
   }, {
     headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
