@@ -149,6 +149,9 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { purchaseId, assetType, profitEarned, action } = body;
 
+    // ★ V8 LOGGING: biar keliatan di pm2 logs nexvo-web apa yg terjadi
+    console.log('[ADD-PROFIT-V8] admin=' + (admin.username || admin.id) + ' action=' + action + ' assetType=' + assetType + ' purchaseId=' + purchaseId + ' profitEarned=' + profitEarned);
+
     if (!purchaseId || !action) {
       return NextResponse.json({ success: false, error: 'purchaseId dan action wajib diisi' }, { status: 400 });
     }
@@ -172,10 +175,9 @@ export async function PUT(request: NextRequest) {
           return NextResponse.json({ success: false, error: 'Jumlah profit harus lebih dari 0' }, { status: 400 });
         }
 
+        console.log('[ADD-PROFIT-V8] INVESTMENT path: userId=' + investment.userId + ' amount=' + profitAmount);
+
         const updated = await db.$transaction(async (tx) => {
-          // ★★★ v2.5 FIX: Update lastProfitDate (anti cron double-credit) + reactivate
-          //   if wrongly completed/stopped (manual profit means contract is active).
-          //   Also include package so description has correct name.
           const upd = await tx.investment.update({
             where: { id: purchaseId },
             data: {
@@ -215,6 +217,7 @@ export async function PUT(request: NextRequest) {
             },
           });
 
+          console.log('[ADD-PROFIT-V8] INVESTMENT DONE: BonusLog+User+Investment updated');
           return upd;
         });
 
@@ -259,6 +262,8 @@ export async function PUT(request: NextRequest) {
           return NextResponse.json({ success: false, error: 'Jumlah profit harus lebih dari 0' }, { status: 400 });
         }
 
+        console.log('[ADD-PROFIT-V8] PURCHASE path: userId=' + purchase.userId + ' amount=' + profitAmount);
+
         const updatedPurchase = await db.$transaction(async (tx) => {
           const updated = await tx.purchase.update({
             where: { id: purchaseId },
@@ -273,9 +278,7 @@ export async function PUT(request: NextRequest) {
             },
           });
 
-          // ★ FIX: Also update the linked Investment record so:
-          //   1. Aset page shows correct totalProfitEarned
-          //   2. Cron does NOT double-credit (lastProfitDate = today)
+          // ★ FIX: Update linked Investment record (anti cron double-credit)
           const linkedInvestments = await tx.investment.findMany({
             where: { purchaseId },
             select: { id: true, status: true },
@@ -287,14 +290,12 @@ export async function PUT(request: NextRequest) {
               data: {
                 totalProfitEarned: { increment: profitAmount },
                 lastProfitDate: nowDate,
-                // Reactivate if wrongly completed/stopped (manual profit means it should be active)
                 ...(inv.status !== 'active' ? { status: 'active' as const } : {}),
               },
             });
           }
 
-          // ★ FIX: Create BonusLog (type='profit') so Riwayat page shows the entry.
-          //   Previously only ProfitLog was created → riwayat was empty.
+          // ★ FIX: Create BonusLog (type='profit') so Riwayat shows the entry.
           const productName = (await tx.product.findUnique({ where: { id: purchase.productId } }))?.name || 'Produk';
           await tx.bonusLog.create({
             data: {
@@ -325,6 +326,7 @@ export async function PUT(request: NextRequest) {
             },
           });
 
+          console.log('[ADD-PROFIT-V8] PURCHASE DONE: BonusLog+ProfitLog+User+Purchase updated');
           return updated;
         });
 
@@ -356,7 +358,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: false, error: 'Action tidak valid' }, { status: 400 });
   } catch (error) {
-    console.error('Update admin asset error:', error);
-    return NextResponse.json({ success: false, error: 'Terjadi kesalahan server' }, { status: 500 });
+    // ★ V8 LOGGING: log full error biar keliatan di pm2 logs
+    console.error('[ADD-PROFIT-V8] ERROR:', error?.message || error);
+    if (error?.stack) console.error('[ADD-PROFIT-V8] STACK:', error.stack);
+    return NextResponse.json({ success: false, error: 'Terjadi kesalahan server: ' + (error?.message || 'unknown') }, { status: 500 });
   }
 }
