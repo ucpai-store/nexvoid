@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
+// ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 /**
  * Unified transaction history API
  * Returns all transaction types for the authenticated user, sorted by date.
  * Supports filtering by type: deposit, withdraw, purchase, investment, bonus, profit
- * 
+ *
  * IMPORTANT: Profit entries come ONLY from BonusLog (type='profit').
  * ProfitLog is NOT used for display to avoid double-counting.
  */

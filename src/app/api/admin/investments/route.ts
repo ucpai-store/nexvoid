@@ -8,6 +8,11 @@ import { creditMatchingBonusOnProfit } from '@/lib/matching-bonus';
  * Manage user investments (Investment model) — separate from product purchases (Purchase model).
  */
 
+// ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 // GET: List all investments with user + package info
 export async function GET(request: NextRequest) {
   try {

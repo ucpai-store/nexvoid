@@ -3,6 +3,11 @@ import { db } from '@/lib/db';
 import { getAdminFromRequest, logAdminAction, generateUserId, generateReferralCode } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
+// ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 // Helper format rupiah untuk logging
 function formatRupiahAdmin(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');

@@ -3,6 +3,11 @@ import { db } from '@/lib/db';
 import { creditDailyReferralBonuses } from '@/lib/referral-bonus';
 import { sendPushNotification } from '@/lib/push-notification';
 
+// ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 // ──────────── Constants ────────────
 
 const WIB_OFFSET = 7; // UTC+7 for Asia/Jakarta

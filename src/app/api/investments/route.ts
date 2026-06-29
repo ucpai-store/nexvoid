@@ -4,6 +4,11 @@ import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
 import { validateSequentialPurchase, getUserTierAvailability } from '@/lib/tier-system';
 
+// ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 // GET: List user's investments
 export async function GET(request: NextRequest) {
   try {

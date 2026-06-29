@@ -3,6 +3,11 @@ import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
+// ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 const USER_SELECT = {
   id: true,
   userId: true,

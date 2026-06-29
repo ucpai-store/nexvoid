@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAdminFromRequest } from '@/lib/auth';
 
+// ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
+//   Tanpa ini, response GET bisa di-cache & admin lihat data LAMA setelah add-profit.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 export async function GET(request: NextRequest) {
   try {
     const admin = await getAdminFromRequest(request);
