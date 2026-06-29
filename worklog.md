@@ -4425,3 +4425,65 @@ Stage Summary:
   git fetch origin
   git reset --hard origin/main
   bash quick-deploy-fix.sh
+
+---
+Task ID: super-deploy-script
+Agent: main (Z.ai Code)
+Task: User jalankan diag-and-repair.sh, screenshot menunjukkan code v7 TIDAK ADA di VPS. Buat script deploy yang SIMPLE & RELIABLE.
+
+Work Log:
+- Analyze screenshot /home/z/my-project/upload/pasted_image_1782710094510.png via VLM
+- KEY FINDING:
+  • PHASE 1: code v7 TIDAK ADA di VPS!
+  • PHASE 2: BonusLog dibuat: 0 (repair script gak nemu data untuk di-repair)
+  • Cron response: {"success":true,"data":{"processed":0,"totalProfit":0,...}}
+  • Cron JALAN (port 3032 respond), tapi 0 processed
+- Artinya: VPS masih pakai code LAMA!
+  • quick-deploy-fix.sh sebelumnya mungkin:
+    - Gagal di STEP 5 (REBUILD) — user gak sadar
+    - Atau belum dijalankan sama sekali
+  • Cron-service.ts yang lama (sebelum v7) tidak handle LEGACY purchase BonusLog
+  • Next.js route yang lama (sebelum v7) tidak punya force-dynamic → response di-cache
+
+- Buat super-deploy.sh — script deploy yang SIMPLE & RELIABLE:
+  STEP 1: git fetch + git reset --hard origin/main (AMBIL CODE TERBARU)
+  STEP 2: bun install (pastikan deps terinstall)
+  STEP 3: bun run db:generate (regenerate Prisma client)
+  STEP 4: Clear .next cache + bun run build (CRITICAL!)
+          - Backup .next lama dulu
+          - Auto-rollback kalau build gagal
+          - Show build output (10 lines sukses / 30 lines gagal)
+  STEP 5: pm2 restart nexvo-cron + nexvo-web (--update-env)
+  STEP 6: Verify .next folder ADA + PM2 status
+
+- Tested locally:
+  • Build sukses, .next folder terbentuk
+  • Build output menunjukkan semua route compiled
+  • Code v7 (force-dynamic) aktif di .next
+
+- Commit 9db74b8 + push ke GitHub main
+
+Stage Summary:
+- super-deploy.sh siap dipakai user
+- Script ini berbeda dari quick-deploy-fix.sh:
+  • LEBIH SIMPLE (6 step vs 7 step)
+  • LEBIH FOKUS (deploy only, no DB repair)
+  • VERIFY di akhir (cek .next folder ADA)
+  • Build output di-show (user bisa lihat sukses/gagal)
+
+- Deploy command (1 baris, copy-paste di terminal VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/super-deploy.sh?t=$(date +%s)")
+
+- Setelah super-deploy.sh sukses:
+  • Code v7 AKTIF di VPS (force-dynamic di 10 route)
+  • cron-service.ts v7 AKTIF (LEGACY purchase bikin BonusLog)
+  • Next.js build sukses → response tidak di-cache lagi
+  • PM2 restart → service jalan dengan code baru
+
+- SETELAH super-deploy.sh, jalankan:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/diag-and-repair.sh?t=$(date +%s)")
+  Untuk sync data profit yang missing ke BonusLog + User balance.
+
+- 2 LANGKAH WAJIB:
+  1. bash super-deploy.sh (deploy code v7 ke VPS)
+  2. bash diag-and-repair.sh (sync data profit yang missing)
