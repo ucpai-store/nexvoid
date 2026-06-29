@@ -96,11 +96,13 @@ export async function PUT(request: NextRequest) {
       }
 
       const updatedInvestment = await db.$transaction(async (tx) => {
-        // Update investment totalProfitEarned
+        // Update investment totalProfitEarned + lastProfitDate
+        // ★★★ v2.4 FIX: Also update lastProfitDate (anti cron double-credit)
         const updated = await tx.investment.update({
           where: { id: investmentId },
           data: {
             totalProfitEarned: { increment: profitAmount },
+            lastProfitDate: new Date(),
           },
         });
 
@@ -113,19 +115,32 @@ export async function PUT(request: NextRequest) {
           },
         });
 
+        // ★★★ v2.4 FIX: Create BonusLog (type='profit') so riwayat shows the entry.
+        //   Previously only LiveActivity was created → riwayat was empty.
+        const pkgName = (await tx.investmentPackage.findUnique({ where: { id: investment.packageId } }))?.name || '';
+        await tx.bonusLog.create({
+          data: {
+            userId: investment.userId,
+            fromUserId: investment.userId,
+            type: 'profit',
+            level: 0,
+            amount: profitAmount,
+            description: `Profit manual dari admin untuk ${pkgName} [ADMIN-MANUAL]`,
+          },
+        });
+
         // Create live activity
         await tx.liveActivity.create({
           data: {
             type: 'profit',
             userName: investment.user.name || investment.user.userId,
             amount: profitAmount,
-            productName: (await tx.investmentPackage.findUnique({ where: { id: investment.packageId } }))?.name || '',
+            productName: pkgName,
             isFake: false,
           },
         });
 
         // Credit matching bonuses to upline users
-        const pkgName = (await tx.investmentPackage.findUnique({ where: { id: investment.packageId } }))?.name || '';
         await creditMatchingBonusOnProfit(tx, investment.userId, profitAmount, 'investment');
 
         return updated;

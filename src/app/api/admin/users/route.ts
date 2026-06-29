@@ -120,10 +120,18 @@ export async function PUT(request: NextRequest) {
             });
 
             // 2. Cari active investment user — update totalProfitEarned + lastProfitDate
-            const activeInv = await tx.investment.findFirst({
-              where: { userId: id, status: 'active' },
+            // ★★★ v2.4 BULLETPROOF: NO status filter — use endDate as source of truth.
+            //   v2.3 filtered `status: 'active'` → if VPS had status variation, findFirst
+            //   returned null → totalProfitEarned NEVER updated → aset page shows 0.
+            const wibNow = new Date();
+            const allUserInvestments = await tx.investment.findMany({
+              where: { userId: id },
               include: { package: true },
               orderBy: { createdAt: 'desc' },
+            });
+            const activeInv = allUserInvestments.find((inv) => {
+              if (!inv.endDate) return true; // no endDate = treat as active
+              return new Date(inv.endDate) > wibNow;
             });
 
             let invDesc = 'Profit manual oleh admin';
