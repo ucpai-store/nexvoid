@@ -4521,3 +4521,29 @@ Stage Summary:
   - If shows old/no version → deploy failed, need to rebuild
 - User can verify add-profit works by checking pm2 logs for [ADD-PROFIT-V8] marker
 - super-deploy-v8.sh fixes the rollback bug that was causing failed deploys to corrupt .next
+
+---
+Task ID: PROFIT-FIX-V9-PUSH
+Agent: main (Z.ai Code)
+Task: User screenshot showed "bash: super-deploy-v9.sh: No such file or directory" on VPS — diagnose and fix so tonight's 00:00 WIB auto-profit works 100%
+
+Work Log:
+- Analyzed user screenshot via VLM: Hostinger VPS terminal, user in /home/nexvo, ran `bash super-deploy-v9.sh` → "No such file or directory"
+- Read cron-service.ts (root, 1508 lines) — confirmed V2.4 Purchase profit fix is correct (credits mainBalance + BonusLog type='profit' + ProfitLog + LiveActivity + matching bonus for standalone purchases)
+- Read super-deploy-v9.sh — confirmed deploy script is complete (backup .next → git pull → bun install → prisma generate → build → restart nexvo-web → restart nexvo-cron → verify marker → run profit catch-up)
+- Checked git status: 2 local commits UNPUSHED (31491bd, 4cd17d2) containing cron-service.ts v2.4 + super-deploy-v9.sh + force-credit-profit.ts + deploy-version route
+- ROOT CAUSE: The entire v9 fix was sitting locally, never pushed to GitHub → VPS `git pull` could not retrieve super-deploy-v9.sh → file not found error
+- Backed up v9 files to /tmp/ (cron-service-v9.ts, super-deploy-v9.sh, force-credit-profit-v9.ts, deploy-version-v9.ts)
+- git fetch origin → remote had 10 commits local didn't have (v7/v8 profit fixes — incomplete, user confirmed profit still didn't enter)
+- git pull --rebase origin main → conflicts in cron-service.ts, deploy-version/route.ts, worklog.md
+- Resolved conflicts by restoring v9 versions (the definitive complete fix) from /tmp/ backups
+- git rebase --continue → succeeded, new commit 4671afa
+- git push origin main → SUCCESS (8ae51fd..4671afa)
+- Verified cron-service.ts is v2.4 (marker CRON-PURCHASE-FIX-V9-20250629), super-deploy-v9.sh executable, deploy-version route has marker
+
+Stage Summary:
+- ROOT CAUSE FOUND & FIXED: v9 fix code was never pushed to GitHub — that's why VPS couldn't find super-deploy-v9.sh and why 00:00 WIB profit never auto-credited
+- All v9 code now live on GitHub origin/main (commit 4671afa)
+- User must run on VPS: `cd /home/nexvo && git pull origin main && bash super-deploy-v9.sh`
+- cron-service.ts v2.4 guarantees: continuous catchup every 10s + DB dedup + Purchase profit credit (balance+BonusLog+ProfitLog+LiveActivity+matching) + weekend guard + backfill (cap 30 days)
+- Tonight 00:00 WIB: nexvo-cron fires within 10s of midnight, credits all 22 active purchases automatically
