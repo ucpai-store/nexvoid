@@ -129,12 +129,12 @@ const p = new PrismaClient({ datasources: { db: { url: DB_URL } } });
   console.log("═══════════════════════════════════════════════════");
   console.log("  PROFITLOG (last 30 days)");
   console.log("═══════════════════════════════════════════════════");
-  const profitLogs = await p.profitLog.findMany({
+  const recentProfitLogs = await p.profitLog.findMany({
     where: { createdAt: { gte: thirtyDaysAgo } },
     orderBy: { createdAt: "desc" },
     take: 20,
   });
-  for (const pl of profitLogs) {
+  for (const pl of recentProfitLogs) {
     console.log("  • " + new Date(pl.createdAt).toISOString() + " — user=" + pl.userId.slice(-8) + " — amount=" + pl.amount);
   }
   console.log("");
