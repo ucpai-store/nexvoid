@@ -1,5 +1,9 @@
 /**
- * NEXVO Cron Service v2.3
+ * NEXVO Cron Service v8
+ *
+ * ★ v8: Version marker for deploy verification.
+ *   Check: curl http://localhost:3032/  →  should show version: 'CRON-V8-20250629'
+ *   If shows old version → VPS cron not restarted → run: pm2 restart nexvo-cron --update-env
  *
  * ★ v2.3 FIX: hasProfitBeenCreditedToday() now only skips if ALL active
  *   investments are credited today (was: skipped if ANY was credited,
@@ -8,7 +12,7 @@
  * ★ v2.3: DB path now reads .env DATABASE_URL first (more reliable on VPS).
  *
  * Runs scheduled tasks automatically:
- * - Daily Investment Profit: Every day at 00:00 WIB
+ * - Daily Investment Profit: Every day at 00:00 WIB (weekday only, weekend libur)
  * - Weekly Salary Bonus: Every Monday at 00:00 WIB
  * - Quota Simulation: Every 1-3 hours - incremental quota fills (nav.live style)
  * - Live Activity Generation: Every 15-30 minutes - fake activity for live feed
@@ -16,6 +20,10 @@
  * Uses Prisma directly to access the database.
  * Port: 3032
  */
+
+// ★★★ v8 VERSION MARKER — ubah ini setiap update. ★★★
+//   Kalau curl http://localhost:3032/ shows version LAMA → pm2 restart nexvo-cron --update-env
+const CRON_VERSION = 'CRON-V8-20250629';
 
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
@@ -1261,7 +1269,8 @@ const server = Bun.serve({
 
     if (url.pathname === '/') {
       return Response.json({
-        service: 'NEXVO Cron Service v2.3',
+        service: 'NEXVO Cron Service',
+        version: CRON_VERSION,
         status: 'running',
         wibTime: getWibNow().toISOString(),
         lastSalaryRun: lastSalaryRunDate || 'never',
@@ -1421,8 +1430,25 @@ const server = Bun.serve({
 
 // ──────────── Start ────────────
 
-console.log(`[Cron Service v2.3] 🚀 Running on port ${PORT}`);
-console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
+console.log('');
+console.log('╔══════════════════════════════════════════════════╗');
+console.log(`║  NEXVO Cron Service — ${CRON_VERSION}                ║`);
+console.log('╠══════════════════════════════════════════════════╣');
+console.log(`║  🚀 Running on port ${PORT}                          ║`);
+console.log(`║  🕐 WIB Time: ${getWibNow().toISOString()}`);
+console.log('║  📋 Schedules:                                    ║');
+console.log('║    • Daily Profit: 00:00 WIB every weekday        ║');
+console.log('║    • Weekend Libur: Sabtu & Minggu (profit off)   ║');
+console.log('║    • Startup Catch-up: fires within 10s of start  ║');
+console.log('║    • AUTO BACKFILL: missed weekdays auto-credited ║');
+console.log('║    • Weekly Salary: Monday 00:00 WIB              ║');
+console.log('║    • Quota Simulation: every 2h at :30            ║');
+console.log('╚══════════════════════════════════════════════════╝');
+console.log('');
+console.log(`[Cron Service] ★ VERSION: ${CRON_VERSION}`);
+console.log(`[Cron Service] ★ Verify: curl http://localhost:${PORT}/  →  version should be ${CRON_VERSION}`);
+console.log(`[Cron Service] ★ If version LAMA → pm2 restart nexvo-cron --update-env`);
+console.log('');
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
 console.log(`  - Weekend Libur: Sabtu & Minggu (profit & WD off — deposit & salary tetap jalan)`);
