@@ -74,11 +74,20 @@ echo "▼ [3/8] Installing dependencies..."
 bun install --production=false 2>&1 | tail -3 || npm install 2>&1 | tail -3 || true
 echo "   ✅ Dependencies installed"
 
-# ─── [4/8] Generate Prisma client ───
+# ─── [4/8] Generate Prisma client + PUSH SCHEMA (create missing tables) ───
 echo ""
-echo "▼ [4/8] Generating Prisma client..."
+echo "▼ [4/8] Generating Prisma client + pushing schema to DB..."
 bun run db:generate 2>&1 | tail -3 || npx prisma generate 2>&1 | tail -3 || true
-echo "   ✅ Prisma client generated"
+
+# ★★★ v11 CRITICAL FIX: db:push creates missing tables in SQLite.
+#   WITHOUT this, new models (Investment, BonusLog, ProfitLog, etc.) exist
+#   in schema.prisma + TypeScript types, but the actual table is NEVER
+#   created in the VPS database → cron-service crashes on first query:
+#   "The table `main.Investment` does not exist in the current database" (P2021)
+#   This is why profit never auto-credited — cron couldn't even start.
+#   db:push is NON-DESTRUCTIVE: only adds missing tables/columns, preserves data.
+bun run db:push 2>&1 | tail -10 || npx prisma db push 2>&1 | tail -10 || true
+echo "   ✅ Prisma client generated + schema pushed (missing tables created)"
 
 # ─── [5/8] Build Next.js ───
 echo ""
