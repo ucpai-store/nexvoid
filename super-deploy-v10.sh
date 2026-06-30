@@ -89,6 +89,20 @@ bun run db:generate 2>&1 | tail -3 || npx prisma generate 2>&1 | tail -3 || true
 bun run db:push 2>&1 | tail -10 || npx prisma db push 2>&1 | tail -10 || true
 echo "   ✅ Prisma client generated + schema pushed (missing tables created)"
 
+# ─── [4.5/8] ★★★ v12.1 CRITICAL: CLEAN .next + node_modules/.cache BEFORE BUILD ★★★
+#   This is THE fix for the "teks-only" bug (nexvo.id shows only SEO text, no UI).
+#   Without this, stale .next/cache + .next/standalone from previous broken deploys
+#   can survive `next build` and produce JS chunks that load as 0-byte / broken
+#   responses in the browser → React never hydrates → only the SSR'd sr-only
+#   SEO div is visible.
+echo ""
+echo "▼ [4.5/8] ★★★ v12.1 CLEAN REBUILD: hapus .next + cache lama (fix teks-only) ★★★"
+echo "   Old: bun run build dengan .next lama masih ada → chunks corrupt → teks-only"
+echo "   New: rm -rf .next + node_modules/.cache → fresh build → chunks bersih"
+rm -rf .next
+rm -rf node_modules/.cache 2>/dev/null || true
+echo "   ✅ .next + node_modules/.cache dihapus — siap fresh build"
+
 # ─── [5/8] Build Next.js ───
 echo ""
 echo "▼ [5/8] Building Next.js (this takes 1-3 min)..."
@@ -284,6 +298,60 @@ fi
 echo ""
 echo "   Full deploy-version response:"
 echo "$VERSION_RESP" | python3 -m json.tool 2>/dev/null | head -15 || echo "$VERSION_RESP" | head -c 400
+
+# ─── ★★★ v12.1 CRITICAL: Verify JS chunks are actually served by running server ★★★
+#   This is THE fix for "teks-only" bug — even if build succeeds, the running
+#   standalone server might not serve _next/static/ correctly. We MUST verify
+#   by fetching a real chunk URL and checking HTTP 200 + content-type.
+echo ""
+echo "─── ★★★ v12.1 JS CHUNK VERIFICATION (teks-only bug check) ★★★ ───"
+HOMEPAGE_HTML=$(curl -s --max-time 10 "http://localhost:${WEB_PORT}/" 2>/dev/null || echo "")
+if [ -z "$HOMEPAGE_HTML" ]; then
+  echo "   ❌ FATAL: Homepage returns empty response! nexvo-web might be crashed."
+  echo "      Check: pm2 logs nexvo-web --lines 50"
+  exit 1
+fi
+
+# Extract first _next/static/chunks/*.js URL from the HTML
+FIRST_CHUNK=$(echo "$HOMEPAGE_HTML" | grep -oE '/_next/static/chunks/[^"]+\.js' | head -1)
+if [ -z "$FIRST_CHUNK" ]; then
+  echo "   ❌ FATAL: No _next/static/chunks/*.js URLs found in homepage HTML!"
+  echo "      This means build did NOT produce client JS chunks."
+  echo "      Browser will show only SEO text (sr-only div) — React never hydrates."
+  echo "      Check build log: tail -100 $PROJECT_DIR/.next/build-output.log"
+  exit 1
+fi
+
+echo "   Testing chunk: $FIRST_CHUNK"
+CHUNK_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://localhost:${WEB_PORT}${FIRST_CHUNK}" 2>/dev/null)
+CHUNK_SIZE=$(curl -s -o /dev/null -w "%{size_download}" --max-time 10 "http://localhost:${WEB_PORT}${FIRST_CHUNK}" 2>/dev/null)
+echo "   HTTP status: $CHUNK_STATUS | Size: ${CHUNK_SIZE} bytes"
+
+if [ "$CHUNK_STATUS" != "200" ]; then
+  echo "   ❌ FATAL: JS chunk returned HTTP $CHUNK_STATUS (expected 200)!"
+  echo "      This is the ROOT CAUSE of teks-only bug."
+  echo "      Browser can't load JS → React never hydrates → only SEO text visible."
+  echo ""
+  echo "      DEBUG:"
+  echo "        - Check .next/standalone/.next/static/ has files:"
+  echo "          ls -la $PROJECT_DIR/.next/standalone/.next/static/chunks/ | head -10"
+  echo "        - Check pm2 logs: pm2 logs nexvo-web --lines 30"
+  echo "        - Verify standalone server is running: pm2 list | grep nexvo-web"
+  exit 1
+fi
+
+if [ "$CHUNK_SIZE" -lt 1000 ]; then
+  echo "   ⚠️  WARNING: JS chunk is suspiciously small (${CHUNK_SIZE} bytes) — might be an error page!"
+else
+  echo "   ✅ JS chunks served correctly (HTTP 200, ${CHUNK_SIZE} bytes) — UI akan render!"
+fi
+
+# Verify the homepage HTML actually contains the AppShell container (not just SEO text)
+if echo "$HOMEPAGE_HTML" | grep -q "BAILOUT_TO_CLIENT_SIDE_RENDERING\|next/dynamic"; then
+  echo "   ✅ Homepage HTML has dynamic loading marker (AppShell will hydrate client-side)"
+else
+  echo "   ⚠️  WARNING: Homepage HTML missing dynamic loading marker"
+fi
 
 # ─── Verify cron service is responding ───
 echo ""
