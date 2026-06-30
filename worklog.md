@@ -5853,3 +5853,77 @@ Stage Summary:
   3. Cek: pm2 logs nexvo-cron --lines 50 | grep "v3.0"
      harus muncul "v3.0 Profit Cleanup done: removed X duplicate entries"
   4. Profit sekarang SESUAI progres paket aktif (2 hari kerja = 38400, bukan 57600)
+
+---
+Task ID: profit-cleanup-v3.1
+Agent: main (Z.ai Code)
+Task: Final audit "cek yang bener tidak boleh ada penyakit profit juga wajib masuk" — detail audit semua profit code, cari semua bug, fix, pastikan profit wajib masuk 00:00 WIB.
+
+Work Log:
+- Detail audit profit-cleanup.ts v3.0 → found 2 CRITICAL bugs:
+  * BUG #1 (CRITICAL): STEP 1 dedup HAPUS entry legitimate user multi-paket
+    - STEP 1 grouped by (userId, WIB day), kept only LARGEST entry
+    - User dengan VIP1 (19200) + VIP2 (38400) credited same day:
+      STEP 1 sees 2 entries → keeps 38400, DELETES 19200 (VIP1 legit!)
+      User kehilangan 19200 dari BonusLog history
+    - Selain itu, STEP 1 TIDAK refund balance → inconsistent
+  * BUG #2 (CRITICAL): STEP 4 expected tidak include standalone Purchase
+    - STEP 4 expected hanya sum(Investment.totalProfitEarned)
+    - User dengan standalone Purchase (no linked Investment):
+      cron creates BonusLog(type=profit) untuk Purchase profit
+      STEP 4 sees BonusLog sum > expected (Purchase profit nggak dihitung)
+      STEP 4 WRONGLY TRIM Purchase profit logs!
+- Verifikasi cron atomic claim (cron-service.ts lines 890-940):
+  * updateMany WHERE lastProfitDate IS NULL OR lastProfitDate < startOfDayWIB
+  * SQLite executes atomically → only 1 process wins → no race condition ✓
+- Verifikasi cron continuous catchup (lines 1508-1516):
+  * Fire EVERY 10 seconds on weekdays if profit hasn't been credited today
+  * hasProfitBeenCreditedToday() checks ALL active investments + purchases
+  * Profit WAJIB MASUK 00:00 WIB ✓
+- Verifikasi cleanupDone flag (line 1497):
+  * Cron waits for cleanup to finish before processing profit
+  * No race condition between cleanup and cron ✓
+- Verifikasi /api/cron/profit & /api/admin/profit-trigger:
+  * Both use atomic claim updateMany (v18 fix) ✓
+- FIX v3.1:
+  (a) STEP 1: HAPUS dedup logic. Hanya count bonusLogBefore untuk report.
+      STEP 4 handle semua excess detection + deletion + balance correction.
+  (b) STEP 4: expected = sum(Investment.totalProfitEarned) + sum(standalone Purchase.profitEarned).
+      Standalone = Purchase tanpa linked Investment.
+  (c) STEP 4 safeguard: skip hanya jika NO investments AND NO standalone purchases.
+- Verifikasi edge cases (all traced & verified):
+  * Normal case (no bug): lastProfitDate=today → expected includes today → no change ✓
+  * Excess from purchase-day bug: lastProfitDate=yesterday → trim excess ✓
+  * Multi-paket user (VIP1+VIP2): STEP 4 sums both → no wrong trim ✓
+  * 2x same package (VIP1+VIP1): STEP 4 sums both → no wrong trim ✓
+  * Standalone Purchase: STEP 4 includes Purchase.profitEarned → no wrong trim ✓
+  * lastProfitDate=null with excess: expected=0 → trim all (safeguard: has profit source) ✓
+  * Race condition same-day: STEP 4 trims excess ✓
+  * Race condition cross-day: STEP 4 trims excess ✓
+- Update marker: PROFIT-CLEANUP-V3.1-20250630
+- API /api/deploy-version returns new marker ✓
+- Agent Browser render login page perfect ✓
+- Commit 840bc07 + push to GitHub
+
+Stage Summary:
+- ✅ 2 BUG KRITIS FIXED:
+  (1) STEP 1 dedup removed — no more wrong deletion of multi-paket entries
+  (2) STEP 4 expected includes standalone Purchase.profitEarned — no more wrong trim
+- ✅ Profit WAJIB MASUK 00:00 WIB terverifikasi:
+  - cron-service.ts atomic claim (updateMany WHERE lastProfitDate < today)
+  - continuous catchup fires every 10s on weekdays
+  - hasProfitBeenCreditedToday() checks ALL active investments + purchases
+- ✅ No race condition:
+  - cron atomic claim (SQLite atomic execution)
+  - cleanupDone flag (cron waits for cleanup)
+  - PID lock (only 1 cron instance)
+- ✅ All edge cases traced & verified
+- ✅ Committed + pushed (840bc07)
+- USER ACTION: run bootstrap-deploy.sh di VPS:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- Setelah deploy:
+  1. https://nexvo.id/api/deploy-version → marker PROFIT-CLEANUP-V3.1-20250630
+  2. Cron restart → cleanup v3.1 auto-run → hapus excess profit dengan BENAR
+  3. Profit malam 00:00 WIB → masuk 1x per investment (atomic claim)
+  4. Multi-paket user → semua entry legitimate dipertahankan
+  5. Standalone Purchase user → profit nggak ke-trim salah
