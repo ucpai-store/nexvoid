@@ -122,15 +122,23 @@ if [ ! -f "$STANDALONE_SERVER" ]; then
 fi
 echo "   ✅ Standalone server.js verified: $STANDALONE_SERVER"
 
-# Copy static assets to standalone (Next.js doesn't do this automatically)
-# These are needed for CSS, JS, and public assets to load correctly
-if [ -d "$PROJECT_DIR/.next/static" ] && [ ! -d "$PROJECT_DIR/.next/standalone/.next/static" ]; then
-  echo "   Copying .next/static → .next/standalone/.next/static..."
+# ★★★ v12 CRITICAL: Copy static assets to standalone (Next.js doesn't do this automatically)
+#   WITHOUT this, JS chunks return 404 → page loads HTML but 0 interactive elements
+#   → "hasilnya sama" after deploy (web looks same but nothing works)
+#   ALWAYS copy fresh (rm + cp) — don't skip if folder exists, content may have changed.
+echo "   Copying .next/static → .next/standalone/.next/static (fresh)..."
+rm -rf "$PROJECT_DIR/.next/standalone/.next/static" 2>/dev/null || true
+if [ -d "$PROJECT_DIR/.next/static" ]; then
   cp -a "$PROJECT_DIR/.next/static" "$PROJECT_DIR/.next/standalone/.next/static"
+  echo "   ✅ static copied ($(find "$PROJECT_DIR/.next/standalone/.next/static" -type f | wc -l) files)"
+else
+  echo "   ⚠️ WARNING: .next/static not found — JS chunks will 404!"
 fi
-if [ -d "$PROJECT_DIR/public" ] && [ ! -d "$PROJECT_DIR/.next/standalone/public" ]; then
-  echo "   Copying public → .next/standalone/public..."
+echo "   Copying public → .next/standalone/public (fresh)..."
+rm -rf "$PROJECT_DIR/.next/standalone/public" 2>/dev/null || true
+if [ -d "$PROJECT_DIR/public" ]; then
   cp -a "$PROJECT_DIR/public" "$PROJECT_DIR/.next/standalone/public"
+  echo "   ✅ public copied"
 fi
 
 # ─── [6/8] Restart nexvo-web (★ v12: use standalone server, NOT next start) ───
