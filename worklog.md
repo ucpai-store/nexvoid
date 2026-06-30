@@ -4712,3 +4712,77 @@ Stage Summary:
 - User MUST run on VPS (1 line):
     bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
 - After deploy: visit nexvo.id/api/deploy-version → must show DEPOSIT-UPLOAD-FIX-V11-20250630
+
+---
+Task ID: CRITICAL-DB-PUSH-FIX-V12
+Agent: main (Z.ai Code)
+Task: User screenshot shows cron-service on VPS crashing: "The table `main.Investment` does not exist in the current database" (P2021) — find the REAL root cause of profit never entering
+
+Work Log:
+- Analyzed screenshot /home/z/my-project/upload/pasted_image_1782788051156.png via VLM
+- CRITICAL FINDING in screenshot output:
+    PrismaClientKnownRequestError:
+    Invalid `prisma.investment.findMany()` invocation:
+    The table `main.Investment` does not exist in the current database.
+    meta: { modelName: 'Investment', table: 'main.Investment' }
+    clientVersion: '6.19.3'
+    code: 'P2021'
+    at handleRequestError (/home/nexvo/node_modules/@prisma/client/runtime/library.js:121:7268)
+
+- THIS IS THE ROOT CAUSE OF "PROFIT GAK MASUK" — FINALLY FOUND:
+  * cron-service.ts v2.5 code is CORRECT (verified multiple times)
+  * But when it runs on VPS, the FIRST query `db.investment.findMany()` crashes
+  * Because the `Investment` table doesn't exist in the VPS SQLite database
+  * cron-service crashes on startup → NEVER runs → profit NEVER auto-credited
+  * User had to manually enter profit 2x because cron couldn't even start
+
+- WHY THE TABLE IS MISSING:
+  * super-deploy-v10.sh STEP 4 only ran `bun run db:generate`
+  * db:generate ONLY regenerates TypeScript types from schema.prisma
+  * db:generate does NOT create tables in the actual SQLite database
+  * The command that creates tables is `bun run db:push` (prisma db push)
+  * db:push was NEVER run in any deploy script (v7/v8/v9/v10)
+  * Every deploy: new code pulled, TypeScript compiled fine, but DB never updated
+  * Result: code references `db.investment.*` but table doesn't exist → P2021 crash
+
+- All previous fixes (v7 force-dynamic, v8 logging, v9 purchase BonusLog, v10 endDate filter) had CORRECT code but couldn't work because the table didn't exist. The cron service couldn't even start.
+
+- FIX: Added `bun run db:push` to super-deploy-v10.sh STEP 4 (right after db:generate):
+  * db:push is NON-DESTRUCTIVE — only ADDS missing tables/columns, preserves all existing data
+  * Verified locally: ran `bun run db:push` → "The database is already in sync with the Prisma schema"
+  * Verified all cron queries work after push:
+    - db.investment.findMany() ✅ (0 rows but no crash)
+    - db.purchase.findMany() ✅
+    - db.bonusLog.count() ✅
+    - db.profitLog.count() ✅
+
+- Committed (8477aa1) + pushed to GitHub origin/main — SUCCESS
+
+Stage Summary:
+- ROOT CAUSE OF "PROFIT GAK MASUK" FINALLY FOUND & FIXED:
+  VPS database missing `Investment` table → cron-service crashes on startup
+  (P2021: The table `main.Investment` does not exist in the current database)
+  Fix: add `bun run db:push` to deploy script (was only running db:generate)
+
+- This explains the entire 2-week saga:
+  * v7 force-dynamic: correct but irrelevant (cron crashed before HTTP)
+  * v8 logging: correct but invisible (cron crashed before logging)
+  * v9 purchase BonusLog: correct but unreachable (cron crashed before purchase loop)
+  * v10 endDate filter: correct but unreachable (cron crashed before investment loop)
+  * User's 2x manual profit entry: necessary because cron couldn't run
+
+- User MUST re-run deploy on VPS (1 line):
+    bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+
+  bootstrap-deploy.sh calls super-deploy-v10.sh which now runs db:push.
+  After deploy:
+  1. Investment table created in VPS SQLite (non-destructive)
+  2. cron-service starts successfully (no more P2021 crash)
+  3. Tonight 00:00 WIB: cron fires, queries Investments + Purchases, credits profit
+  4. User Saldo Utama + Total Profit + Riwayat all update automatically
+
+- VERIFY after deploy:
+  * pm2 logs nexvo-cron --lines 30 → should show "[Cron Service v2.5] 🚀 Running on port 3032"
+    (NO P2021 error)
+  * Visit nexvo.id/api/deploy-version → DEPOSIT-UPLOAD-FIX-V11-20250630
+  * Tonight 00:00 WIB: check user dashboard — profit auto-credited
