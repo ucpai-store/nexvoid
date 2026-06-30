@@ -5,27 +5,25 @@ import { execSync } from 'child_process';
 
 // ★★★ Version marker — bump on every fix. Used to verify the VPS is running
 //   the latest code. Visit https://nexvo.id/api/deploy-version to check.
+//   v20 (20250630): PROFIT CLEANUP v3.1 — remove dangerous STEP 1 dedup + add standalone Purchase to expected.
+//     ROOT CAUSE of "profit masih salah" untuk user multi-paket:
+//       STEP 1 dedup grouped by (userId, WIB day) and kept only LARGEST entry.
+//       User dengan VIP1 (19200) + VIP2 (38400) credited same day → STEP 1
+//       HAPUS entry VIP1 (keeps 38400) → user kehilangan 19200 dari history!
+//       Selain itu, STEP 1 TIDAK refund balance → inconsistent.
+//     ROOT CAUSE untuk user dengan standalone Purchase:
+//       STEP 4 expected hanya sum(Investment.totalProfitEarned).
+//       User dengan standalone Purchase (no linked Investment) → profit-nya
+//       di-BonusLog tapi nggak dihitung di expected → STEP 4 wrongly trim!
+//     v3.1 FIX:
+//     (a) STEP 1: HAPUS dedup logic. Hanya count bonusLogBefore untuk report.
+//         STEP 4 handle semua excess detection + deletion + balance correction.
+//     (b) STEP 4: expected = sum(Investment.totalProfitEarned) + sum(standalone Purchase.profitEarned).
+//         Standalone = Purchase tanpa linked Investment.
+//     (c) STEP 4 safeguard: skip hanya jika user has NO investments AND NO standalone purchases.
 //   v19 (20250630): PROFIT CLEANUP v3.0 — use lastProfitDate as ground truth.
-//     ROOT CAUSE of "profit masih lebih" setelah v2.9.1:
-//       STEP 2 cleanup pakai `today` sebagai end date untuk hitung expected profit.
-//       Tapi kalo `lastProfitDate` = KEMARIN (hari ini belum di-credit), expected
-//       INCLUDES today → excess entry dari bug (e.g. purchase-day credit) nggak
-//       ke-detect karena expected inflated oleh today's (uncredited) day.
-//     Contoh: Beli Senin. Hari ini Rabu. lastProfitDate = Selasa.
-//       v2.9.1: expected = countCreditedDays(Sen, Rabu) × dp = 2 × 19200 = 38400
-//               BonusLog = 38400 (entry Sen bug + entry Sel) → NO excess detected!
-//       v3.0:   expected = countCreditedDays(Sen, Selasa) × dp = 1 × 19200 = 19200
-//               BonusLog = 38400 → excess = 19200 → TRIM entry Sen! ✓
-//     v3.0 FIX:
-//     (a) STEP 2: endWIB = lastProfitDate (bukan today). Kalo lastProfitDate=null,
-//         expected = 0 (never credited → any totalProfitEarned > 0 is a bug).
-//     (b) STEP 3: Purchase standalone juga pakai lastProfitDate (bukan today).
-//     (c) STEP 4: safeguard update — skip hanya jika user NGGAK punya investment
-//         sama sekali (bukan expected=0). Kalo user punya investment tapi
-//         expected=0 (lastProfitDate=null), profit logs adalah bug → TRIM.
-//   v18 (20250630): UNIFIED PROFIT CREDIT — fix "2 hari kerja masuk 3" root cause.
-export const VERSION_MARKER = 'PROFIT-CLEANUP-V3.0-20250630';
-export const CRON_VERSION = 'v3.0-lastProfitDate-ground-truth';
+export const VERSION_MARKER = 'PROFIT-CLEANUP-V3.1-20250630';
+export const CRON_VERSION = 'v3.1-no-step1-dedup+standalone-purchase';
 
 export async function GET() {
   let buildId = 'unknown';
@@ -56,7 +54,7 @@ export async function GET() {
   return NextResponse.json({
     versionMarker: VERSION_MARKER,
     cronVersion: CRON_VERSION,
-    description: 'v19 PROFIT CLEANUP v3.0 (lastProfitDate ground truth — fix excess profit nggak ke-detect). v18 UNIFIED PROFIT CREDIT. v17 DOUBLE-PROFIT FIX.',
+    description: 'v20 PROFIT CLEANUP v3.1 (remove STEP 1 dedup + standalone Purchase in expected). v19 lastProfitDate ground truth. v18 UNIFIED PROFIT CREDIT.',
     buildId,
     builtAt,
     gitCommit,
@@ -64,6 +62,9 @@ export async function GET() {
     serverTime: new Date().toISOString(),
     nodeEnv: process.env.NODE_ENV || 'development',
     fixes: [
+      'v20: profit-cleanup.ts STEP 1 HAPUS dedup (BUG: hapus entry legitimate user multi-paket) — STEP 4 handle semua',
+      'v20: profit-cleanup.ts STEP 4 expected += sum(standalone Purchase.profitEarned) — fix user dengan standalone Purchase',
+      'v20: profit-cleanup.ts STEP 4 safeguard: skip hanya jika NO investments AND NO standalone purchases',
       'v19: profit-cleanup.ts STEP 2 endWIB = lastProfitDate (bukan today) — expected = ACTUAL credited days',
       'v19: profit-cleanup.ts STEP 3 Purchase standalone juga pakai lastProfitDate (bukan today)',
       'v19: profit-cleanup.ts STEP 4 safeguard: skip hanya jika user NGGAK punya investment (bukan expected=0)',

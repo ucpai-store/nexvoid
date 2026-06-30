@@ -158,83 +158,40 @@ function newReport(): CleanupReport {
   };
 }
 
-// ──────────── STEP 1: Dedup BonusLog(type='profit') ────────────
+// ──────────── STEP 1: Count BonusLog(type='profit') — NO LONGER DEDUP ────────────
+//
+// ★★★ v3.1 CRITICAL FIX: REMOVE STEP 1 DEDUP LOGIC ★★★
+//
+// v3.0 BUG: STEP 1 grouped by (userId, WIB day) and kept only the LARGEST entry,
+// deleting the rest. This WRONGLY DELETED LEGITIMATE entries for users with
+// MULTIPLE PACKAGES (e.g., VIP1 + VIP2 both credit on the same day with
+// different amounts). It also didn't refund User balance — only deleted logs.
+//
+// v3.1 FIX: STEP 1 now ONLY counts bonusLogBefore for the report.
+//   - All excess detection + deletion + balance correction is done by STEP 4.
+//   - STEP 4 uses Investment.totalProfitEarned as ground truth (sum per user).
+//   - STEP 4 correctly handles multi-paket users (sums all investments).
+//   - STEP 4 correctly handles 2x same package (sums both investments).
+//   - STEP 4 correctly handles race-condition duplicates (excess → trim smallest).
+//   - STEP 4 correctly refunds User balance (actualExcess = deleted amount).
+//
+// Why STEP 4 is sufficient (no need for STEP 1 dedup):
+//   - Race-condition duplicate (same investment, 2 entries same day):
+//     STEP 2 reduces Investment.totalProfitEarned to expected (1 day).
+//     STEP 4 sees BonusLog sum (2 entries) > expected (1 entry) → trim 1. ✓
+//   - Cross-day excess (bug entry on different day):
+//     STEP 2 uses lastProfitDate as end → expected = actual credited days.
+//     STEP 4 sees BonusLog sum > expected → trim excess. ✓
+//   - Multi-paket (VIP1 + VIP2, 2 entries same day, different amounts):
+//     STEP 2 sums both investments. STEP 4 expected = VIP1 + VIP2.
+//     BonusLog sum = VIP1 + VIP2. No excess. No trim. ✓ Correct!
 
-async function dedupProfitBonusLogs(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 1: Dedup BonusLog(type=profit) per (userId, WIB day)');
+async function countProfitBonusLogs(report: CleanupReport): Promise<void> {
+  console.log('[Profit Cleanup] 🧹 STEP 1 (v3.1): Count BonusLog(type=profit) — no dedup (STEP 4 handles all excess)');
 
-  const allProfitLogs = await db.bonusLog.findMany({
-    where: { type: 'profit' },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true, userId: true, amount: true, description: true, createdAt: true },
-  });
-  report.bonusLogBefore = allProfitLogs.length;
-  console.log(`[Profit Cleanup]   Found ${allProfitLogs.length} profit BonusLog entries`);
-
-  // Group by (userId, WIB day)
-  const groups = new Map<string, typeof allProfitLogs>();
-  for (const log of allProfitLogs) {
-    const wibDay = getWibDateString(new Date(log.createdAt));
-    const key = `${log.userId}::${wibDay}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(log);
-  }
-
-  let totalRemoved = 0;
-  let totalRefund = 0;
-  const idsToDelete: string[] = [];
-
-  for (const [key, entries] of groups) {
-    if (entries.length <= 1) continue; // no duplicate
-
-    const [userId, wibDay] = key.split('::');
-    // Keep the entry with the LARGEST amount (backfill entries are larger
-    // because they cover multiple days — we want to preserve the most
-    // complete record). If tied, keep the latest.
-    entries.sort((a, b) => {
-      if (b.amount !== a.amount) return b.amount - a.amount;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    const keep = entries[0];
-    const remove = entries.slice(1);
-
-    let groupRefund = 0;
-    for (const r of remove) {
-      idsToDelete.push(r.id);
-      groupRefund += r.amount;
-    }
-    totalRemoved += remove.length;
-    totalRefund += groupRefund;
-
-    report.details.duplicateGroups.push({
-      userId,
-      wibDay,
-      entriesBefore: entries.length,
-      entriesAfter: 1,
-      removed: remove.length,
-      amountRefunded: groupRefund,
-    });
-
-    console.log(
-      `[Profit Cleanup]   👉 ${userId} @ ${wibDay}: ${entries.length} → 1 (removed ${remove.length}, refund ${formatRupiahSimple(groupRefund)}, kept amount=${formatRupiahSimple(keep.amount)})`,
-    );
-  }
-
-  // Batch delete duplicates
-  if (idsToDelete.length > 0) {
-    // Delete in chunks of 500 to avoid SQLite param limits
-    for (let i = 0; i < idsToDelete.length; i += 500) {
-      const chunk = idsToDelete.slice(i, i + 500);
-      await db.bonusLog.deleteMany({ where: { id: { in: chunk } } });
-    }
-  }
-
-  report.duplicateEntriesRemoved = totalRemoved;
-  report.duplicateAmountRefunded = totalRefund;
-  report.bonusLogAfter = allProfitLogs.length - totalRemoved;
-  console.log(
-    `[Profit Cleanup]   ✅ Removed ${totalRemoved} duplicate entries, total refund amount = ${formatRupiahSimple(totalRefund)}`,
-  );
+  const count = await db.bonusLog.count({ where: { type: 'profit' } });
+  report.bonusLogBefore = count;
+  console.log(`[Profit Cleanup]   Found ${count} profit BonusLog entries (will be checked by STEP 4)`);
 }
 
 // ──────────── STEP 2: Recalculate Investment.totalProfitEarned (ONLY REDUCE) ────────────
@@ -428,9 +385,9 @@ async function recalculatePurchases(report: CleanupReport): Promise<void> {
 //   as the source of truth, NOT BonusLog sum. ★★★
 
 async function recalculateUserBalances(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 4 (v3.0): Trim excess BonusLog + correct User balance from Investment ground truth');
+  console.log('[Profit Cleanup] 🧹 STEP 4 (v3.1): Trim excess BonusLog + correct User balance from Investment + Purchase ground truth');
 
-  // ── 4a. Compute expected investment profit per user from Investment.totalProfitEarned ──
+  // ── 4a. Compute expected profit per user from Investment.totalProfitEarned ──
   //   (STEP 2 already recalculated totalProfitEarned using lastProfitDate as end date)
   const investmentAgg = await db.investment.groupBy({
     by: ['userId'],
@@ -443,6 +400,40 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
     usersWithInvestments.add(a.userId);
   }
   console.log(`[Profit Cleanup]   Found ${expectedByUser.size} users with investment records`);
+
+  // ── 4a.2 ★★★ v3.1 FIX: Also add standalone Purchase.profitEarned to expected ★★★
+  //   Standalone Purchases (no linked Investment) get BonusLog(type='profit') from cron.
+  //   Without this, STEP 4 would wrongly trim their profit logs.
+  //   We need to find Purchases WITHOUT a linked Investment and add their profitEarned.
+  const allPurchases = await db.purchase.findMany({
+    where: { status: 'active' },
+    select: { id: true, userId: true, profitEarned: true },
+  });
+  const linkedPurchaseIds = new Set<string>(
+    (await db.investment.findMany({
+      where: { purchaseId: { not: null } },
+      select: { purchaseId: true },
+      distinct: ['purchaseId'],
+    }))
+      .map((i) => i.purchaseId!)
+      .filter(Boolean)
+  );
+  let standaloneCount = 0;
+  for (const p of allPurchases) {
+    if (linkedPurchaseIds.has(p.id)) continue; // has linked Investment — already counted
+    standaloneCount++;
+    const current = expectedByUser.get(p.userId) || 0;
+    expectedByUser.set(p.userId, current + (p.profitEarned || 0));
+  }
+  if (standaloneCount > 0) {
+    console.log(`[Profit Cleanup]   Added standalone Purchase profit for ${standaloneCount} purchase(s) to expected`);
+  }
+  const usersWithProfitSource = new Set<string>([...usersWithInvestments]);
+  for (const p of allPurchases) {
+    if (!linkedPurchaseIds.has(p.id) && (p.profitEarned || 0) > 0) {
+      usersWithProfitSource.add(p.userId);
+    }
+  }
 
   // ── 4b. Get all profit BonusLog entries, grouped by user, sorted by amount ASC ──
   //   (sort ASC so we delete smallest/excess entries first, preserving larger backfill entries)
@@ -471,7 +462,7 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
   for (const u of users) {
     try {
       const expected = expectedByUser.get(u.id) || 0;
-      const hasInvestments = usersWithInvestments.has(u.id);
+      const hasProfitSource = usersWithProfitSource.has(u.id);
       const logs = logsByUser.get(u.id) || [];
       const currentLogSum = logSumByUser.get(u.id) || 0;
 
@@ -479,12 +470,12 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
       const excess = currentLogSum - expected;
       if (excess <= 1) continue;
 
-      // ★★★ v3.0 SAFEGUARD: Skip only if user has NO investments at all ★★★
-      //   (If user HAS investments but expected=0 because lastProfitDate=null,
+      // ★★★ v3.1 SAFEGUARD: Skip only if user has NO investments AND NO standalone purchases ★★★
+      //   (If user HAS profit source but expected=0 because lastProfitDate=null,
       //    the profit logs are bugs — trim them.)
-      //   (If user has NO investments, logs might be from deleted investments —
+      //   (If user has NO profit source, logs might be from deleted records —
       //    admin should review manually.)
-      if (!hasInvestments && logs.length > 0) {
+      if (!hasProfitSource && logs.length > 0) {
         console.log(
           `[Profit Cleanup]   ⚠️ User ${u.userId} has ${logs.length} profit logs (sum ${formatRupiahSimple(currentLogSum)}) but NO investments — skipping (manual review needed)`,
         );
@@ -569,11 +560,11 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
 // ──────────── Main Entry ────────────
 
 export async function cleanupDuplicateProfits(): Promise<CleanupReport> {
-  console.log('[Profit Cleanup] 🚀 Starting cleanupDuplicateProfits()');
+  console.log('[Profit Cleanup] 🚀 Starting cleanupDuplicateProfits() (v3.1)');
   const report = newReport();
 
   try {
-    await dedupProfitBonusLogs(report);
+    await countProfitBonusLogs(report);
   } catch (e: any) {
     report.errors.push(`STEP 1 failed: ${e.message}`);
     console.error('[Profit Cleanup] ❌ STEP 1 failed:', e.message);
@@ -606,7 +597,7 @@ export async function cleanupDuplicateProfits(): Promise<CleanupReport> {
   // ★★★ v2.9.1: Recalculate bonusLogAfter = before - total removed (STEP 1 + STEP 4) ★★★
   report.bonusLogAfter = report.bonusLogBefore - report.duplicateEntriesRemoved;
 
-  console.log('[Profit Cleanup] 🎉 Cleanup complete! (v3.0 — lastProfitDate ground truth)');
+  console.log('[Profit Cleanup] 🎉 Cleanup complete! (v3.1 — no STEP 1 dedup, STEP 4 handles all excess)');
   console.log(`[Profit Cleanup]   BonusLog: ${report.bonusLogBefore} → ${report.bonusLogAfter} (removed ${report.duplicateEntriesRemoved})`);
   console.log(`[Profit Cleanup]   Investments recalculated: ${report.investmentsRecalculated} (drift fixed: ${report.investmentsDriftFixed})`);
   console.log(`[Profit Cleanup]   Purchases recalculated: ${report.purchasesRecalculated}`);
