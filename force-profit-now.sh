@@ -19,7 +19,13 @@
 #  Run on VPS:
 #    bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/force-profit-now.sh?t=$(date +%s)")
 # ═══════════════════════════════════════════════════════════════
-set -uo pipefail
+# NOTE: jangan pakai `set -u` karena SUDO_USER mungkin unset saat run sebagai root langsung
+set -o pipefail
+
+# Default unset env vars to empty string (avoid unbound variable error)
+: "${SUDO_USER:=}"
+: "${USER:=}"
+: "${HOME:=}"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "  NEXVO Force Profit NOW (v3.2.1)"

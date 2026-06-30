@@ -10,7 +10,13 @@
 #    - Fallback: find / -name 'custom.db'
 # ════════════════════════════════════════════════════════════════
 set +e
-TARGET_USERID="$1"
+
+# Default unset env vars to empty string (avoid unbound variable error)
+: "${SUDO_USER:=}"
+: "${USER:=}"
+: "${HOME:=}"
+
+TARGET_USERID="${1:-}"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "  NEXVO v3.2 DEEP DIAGNOSTIC — SUMBER 68800"

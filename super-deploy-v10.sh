@@ -16,7 +16,13 @@
 #  Run on the VPS as the nexvo user:
 #    bash super-deploy-v10.sh
 # ═══════════════════════════════════════════════════════════════
-set -euo pipefail
+# NOTE: jangan pakai `set -u` karena SUDO_USER mungkin unset saat run sebagai root langsung
+set -eo pipefail
+
+# Default unset env vars to empty string (avoid unbound variable error)
+: "${SUDO_USER:=}"
+: "${USER:=}"
+: "${HOME:=}"
 
 # ─── AUTO-DETECT PROJECT DIR (v3.2.1) ───
 #   Old: hardcoded /home/nexvo → failed on VPS with non-standard path
