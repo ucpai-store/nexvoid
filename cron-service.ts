@@ -1491,21 +1491,29 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // ★ STARTUP CATCH-UP: On first run, run profit check immediately.
-  if (!startupCatchupDone) {
-    startupCatchupDone = true;
-    console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, day=${dayOfWeek}, hour=${hour}:${minute}`);
-    runProfitCronIfDue('startup-catchup').catch(console.error);
-  }
+  // ★★★ v2.9.1 RACE CONDITION FIX: Wait for cleanup to finish before processing profit ★★★
+  //   If cleanup is still running, DON'T process profit — could cause off-by-one in balance.
+  //   Salary and quota sim can still run (they don't touch profit BonusLog).
+  if (!cleanupDone) {
+    console.log('[CRON] ⏳ Waiting for profit cleanup to finish before processing profit...');
+    // Still allow salary + quota sim to run (they don't conflict with cleanup)
+  } else {
+    // ★ STARTUP CATCH-UP: On first run (after cleanup), run profit check immediately.
+    if (!startupCatchupDone) {
+      startupCatchupDone = true;
+      console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, day=${dayOfWeek}, hour=${hour}:${minute}`);
+      runProfitCronIfDue('startup-catchup').catch(console.error);
+    }
 
-  // ★★★ CONTINUOUS CATCHUP — PROFIT WAJIB MASUK ★★★
-  // Fire EVERY 10 seconds on weekdays if profit hasn't been credited today.
-  // DB dedup (lastProfitDate >= today 00:00 WIB) prevents double-credit.
-  // This means: even if cron was down at 00:00, it fires within 10s of starting.
-  // Even if it's 23:59 and profit hasn't run, it fires NOW.
-  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) ★
-  if (dayOfWeek !== 0 && dayOfWeek !== 6 && lastProfitRunDate !== dateStr) {
-    runProfitCronIfDue('continuous-catchup').catch(console.error);
+    // ★★★ CONTINUOUS CATCHUP — PROFIT WAJIB MASUK ★★★
+    // Fire EVERY 10 seconds on weekdays if profit hasn't been credited today.
+    // DB dedup (lastProfitDate >= today 00:00 WIB) prevents double-credit.
+    // This means: even if cron was down at 00:00, it fires within 10s of starting.
+    // Even if it's 23:59 and profit hasn't run, it fires NOW.
+    // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) ★
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && lastProfitRunDate !== dateStr) {
+      runProfitCronIfDue('continuous-catchup').catch(console.error);
+    }
   }
 
   // Weekly salary: Every Monday — CONTINUOUS CATCHUP (fire any hour on Monday if not yet run)
@@ -1784,10 +1792,21 @@ console.log(`  - ★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned ↔ sum(Inv
 //     3. Recalculate Purchase.profitEarned = sum(linked Investment.totalProfitEarned)
 //     4. Recalculate User.mainBalance & totalProfit (refund over-credit)
 //   Idempotent: safe to run multiple times.
+// ★★★ v2.9.1 RACE CONDITION FIX: cleanup must finish BEFORE cron starts processing ★★★
+//   Old code ran cleanup as non-blocking Promise + immediately started cron interval.
+//   This caused RACE CONDITION: cron could credit profit WHILE cleanup was reading/deleting
+//   BonusLog → off-by-one in User balance (cron adds entry, cleanup deletes it, but User
+//   balance was already incremented by cron AND decremented by cleanup).
+//   Fix: use cleanupDone flag — cron's checkAndRunCrons() waits until cleanup is done.
+let cleanupDone = false;
+
 cleanupDuplicateProfits().then((report) => {
-  console.log(`[Cron Service] 🧹 v2.8 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
+  console.log(`[Cron Service] 🧹 v2.9.1 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
 }).catch((e) => {
-  console.error('[Cron Service] v2.8 Profit Cleanup failed (non-fatal):', e.message);
+  console.error('[Cron Service] v2.9.1 Profit Cleanup failed (non-fatal):', e.message);
+}).finally(() => {
+  cleanupDone = true; // let cron proceed even if cleanup failed
+  console.log('[Cron Service] ✅ Cleanup phase done — cron profit processing enabled');
 });
 
 // ★★★ v2.6 SELF-HEAL: Sync Purchase.profitEarned with sum(Investment.totalProfitEarned)
