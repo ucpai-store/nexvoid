@@ -6074,3 +6074,49 @@ Stage Summary:
   3. Cek saldo user → HARUS 38.400 (bukan 68.800)
   4. User refresh browser (Ctrl+Shift+R) → saldo 38.400
   5. Profit harian tetap masuk 00:00 WIB setiap weekday
+
+---
+Task ID: profit-cleanup-v3.2-asset-page
+Agent: main (Z.ai Code)
+Task: User klarifikasi "saldo utama 19200 di aset total 68800 kan seharusnya 38400" — masalahnya di Asset page display, bukan User.mainBalance.
+
+Work Log:
+- User klarifikasi: mainBalance=19200 (benar), Asset page total=68800 (SALAH, harusnya 38400)
+- Baca /api/assets/route.ts line 115-121 → TEMUKAN ROOT CAUSE:
+  * Math.max(invProfitSum, purchaseProfit) — AMBIL YANG LEBIH BESAR
+  * Skenario user:
+    - 1 aset lama: invProfitSum=38400, purchaseProfit=38400 → max=38400 ✓
+    - 2 aset baru BUG credit same-day: invProfitSum=15200, purchaseProfit=0 → max=15200 ❌
+    - Total = 38400 + 15200 + 15200 = 68800 ❌
+  * Seharusnya: Math.min → 38400 + 0 + 0 = 38400 ✓
+- FIX 1: /api/assets/route.ts Math.max → Math.min
+  * Math.min displays SMALLER (correct) value
+  * Investment.totalProfitEarned recalculated by STEP 2 (lastProfitDate ground truth)
+  * Purchase.profitEarned synced by cron v2.6
+  * Math.min ensures NEVER display inflated profit
+- FIX 2: STEP 2 hapus status filter — process SEMUA investments
+  * Old: status in ['active','Active','ACTIVE','completed','Completed']
+  * BUG: kalau status='ongoing'/'stopped'/'pending', STEP 2 skip → tidak trim
+  * New: process ALL statuses (cleanup ONLY REDUCE, aman)
+- FIX 3: STEP 2 dailyProfit=0 + totalProfitEarned>0 → trim to 0 (BUG)
+  * cron nggak credit kalau dailyProfit=0
+  * Jadi totalProfitEarned>0 dengan dailyProfit=0 = pasti bug → trim
+- Verify compile: profit-cleanup.ts + assets/route.ts bundle clean ✓
+- Verify marker: PROFIT-CLEANUP-V3.2-20250630 ✓
+- Commit 2f7589c + push to GitHub ✓
+
+Stage Summary:
+- ✅ ROOT CAUSE "aset total 68800": Asset page Math.max(invProfitSum, purchaseProfit)
+- ✅ FIX: Math.min — display smaller (correct) value
+- ✅ STEP 2 lebih aggressive: process ALL statuses + trim dailyProfit=0 with totalProfitEarned>0
+- ✅ Setelah deploy v3.2:
+  (1) Asset page: Math.min(0, 0)=0 untuk 2 aset baru → total 38400 ✓
+  (2) STEP 2 trim Investment.totalProfitEarned untuk 2 aset baru ke 0 (jika belum)
+  (3) Profit tetap wajib masuk 00:00 WIB
+- USER ACTION: deploy v3.2 di VPS:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- POST-DEPLOY VERIFY:
+  1. https://nexvo.id/api/deploy-version → marker PROFIT-CLEANUP-V3.2-20250630
+  2. Buka Asset page → total HARUS 38400 (bukan 68800)
+  3. Saldo utama tetap 19200 (tidak berubah, sudah benar)
+  4. 2 aset baru: profitEarned=0, profit pertama besok 00:00 WIB
