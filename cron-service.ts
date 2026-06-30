@@ -1765,7 +1765,7 @@ const server = Bun.serve({
 // ──────────── Start ────────────
 
 // (PID lock already acquired at top of file, before Bun.serve)
-console.log(`[Cron Service v2.7] 🚀 Running on port ${PORT} — marker: PROFIT-CLEANUP-V3.1-20250630`);
+console.log(`[Cron Service v2.7] 🚀 Running on port ${PORT} — marker: PROFIT-CLEANUP-V3.2-20250630`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
@@ -1801,9 +1801,9 @@ console.log(`  - ★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned ↔ sum(Inv
 let cleanupDone = false;
 
 cleanupDuplicateProfits().then((report) => {
-  console.log(`[Cron Service] 🧹 v3.1 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
+  console.log(`[Cron Service] 🧹 v3.2 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
 }).catch((e) => {
-  console.error('[Cron Service] v3.1 Profit Cleanup failed (non-fatal):', e.message);
+  console.error('[Cron Service] v3.2 Profit Cleanup failed (non-fatal):', e.message);
 }).finally(() => {
   cleanupDone = true; // let cron proceed even if cleanup failed
   console.log('[Cron Service] ✅ Cleanup phase done — cron profit processing enabled');

@@ -5,6 +5,15 @@ import { execSync } from 'child_process';
 
 // ★★★ Version marker — bump on every fix. Used to verify the VPS is running
 //   the latest code. Visit https://nexvo.id/api/deploy-version to check.
+//   v21 (20250630): PROFIT CLEANUP v3.2 — STEP 5: Direct User balance correction.
+//     ROOT CAUSE of "saldo masih 68800 padahal cleanup v3.1 jalan":
+//       STEP 4 compares BonusLog sum vs Investment.totalProfitEarned.
+//       Kalau keduanya match (38400 = 38400) → STEP 4 skip → User.mainBalance drift TIDAK ke-detect!
+//       Drift terjadi karena cleanup v2.9 lama HAPUS BonusLog tapi TIDAK refund User.mainBalance.
+//       Hasil: Investment=38400, BonusLog=38400 (match), TAPI User.mainBalance=68800 (drift +30400).
+//     v3.2 FIX: STEP 5 — compare User.totalProfit langsung dengan sum(BonusLog type='profit').
+//       If User.totalProfit > sum(BonusLog) → drift → reduce BOTH User.totalProfit AND User.mainBalance.
+//       ONLY REDUCE — never increase.
 //   v20 (20250630): PROFIT CLEANUP v3.1 — remove dangerous STEP 1 dedup + add standalone Purchase to expected.
 //     ROOT CAUSE of "profit masih salah" untuk user multi-paket:
 //       STEP 1 dedup grouped by (userId, WIB day) and kept only LARGEST entry.
@@ -22,8 +31,8 @@ import { execSync } from 'child_process';
 //         Standalone = Purchase tanpa linked Investment.
 //     (c) STEP 4 safeguard: skip hanya jika user has NO investments AND NO standalone purchases.
 //   v19 (20250630): PROFIT CLEANUP v3.0 — use lastProfitDate as ground truth.
-export const VERSION_MARKER = 'PROFIT-CLEANUP-V3.1-20250630';
-export const CRON_VERSION = 'v3.1-no-step1-dedup+standalone-purchase';
+export const VERSION_MARKER = 'PROFIT-CLEANUP-V3.2-20250630';
+export const CRON_VERSION = 'v3.2-step5-direct-user-balance-correction';
 
 export async function GET() {
   let buildId = 'unknown';
@@ -54,7 +63,7 @@ export async function GET() {
   return NextResponse.json({
     versionMarker: VERSION_MARKER,
     cronVersion: CRON_VERSION,
-    description: 'v20 PROFIT CLEANUP v3.1 (remove STEP 1 dedup + standalone Purchase in expected). v19 lastProfitDate ground truth. v18 UNIFIED PROFIT CREDIT.',
+    description: 'v21 PROFIT CLEANUP v3.2 (STEP 5 direct User balance correction — fix drift User.mainBalance). v20 v3.1 (remove STEP 1 dedup + standalone Purchase). v19 lastProfitDate ground truth.',
     buildId,
     builtAt,
     gitCommit,
@@ -62,6 +71,8 @@ export async function GET() {
     serverTime: new Date().toISOString(),
     nodeEnv: process.env.NODE_ENV || 'development',
     fixes: [
+      'v21: profit-cleanup.ts STEP 5 NEW — direct User balance correction from BonusLog ground truth',
+      'v21: fix User.mainBalance drift (68800→38400) yang nggak ke-detect STEP 4 karena BonusLog==Investment match',
       'v20: profit-cleanup.ts STEP 1 HAPUS dedup (BUG: hapus entry legitimate user multi-paket) — STEP 4 handle semua',
       'v20: profit-cleanup.ts STEP 4 expected += sum(standalone Purchase.profitEarned) — fix user dengan standalone Purchase',
       'v20: profit-cleanup.ts STEP 4 safeguard: skip hanya jika NO investments AND NO standalone purchases',

@@ -557,10 +557,100 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
   );
 }
 
+// ──────────── STEP 5: Direct User balance correction from BonusLog ground truth (v3.2) ────────────
+//
+// ★★★ v3.2 CRITICAL FIX: Catch User.mainBalance drift that STEP 4 misses ★★★
+//
+// PROBLEM:
+//   STEP 4 compares BonusLog sum vs Investment.totalProfitEarned. If they match → skip.
+//   BUT User.mainBalance / User.totalProfit can STILL be inflated if:
+//   - Old cleanup (v2.9) deleted BonusLog entries but didn't refund User balance
+//   - Cron bug credited User.mainBalance without creating BonusLog
+//   - Manual DB edit added balance without log
+//   Result: Investment.totalProfitEarned = 38400, BonusLog sum = 38400 (match ✓),
+//   but User.mainBalance = 68800 (drift +30400 from old bug).
+//
+// FIX:
+//   For each user: expected_totalProfit = sum(BonusLog.amount WHERE type='profit')
+//   If User.totalProfit > expected_totalProfit → drift → reduce BOTH:
+//     - User.totalProfit -= diff
+//     - User.mainBalance -= diff (because the inflated profit was added to mainBalance too)
+//   ONLY REDUCE — never increase.
+
+async function correctUserBalanceDrift(report: CleanupReport): Promise<void> {
+  console.log('[Profit Cleanup] 🧹 STEP 5 (v3.2): Direct User balance correction from BonusLog ground truth — catch drift STEP 4 misses');
+
+  // ── 5a. Sum all profit BonusLog per user (ground truth) ──
+  const profitLogAgg = await db.bonusLog.groupBy({
+    by: ['userId'],
+    where: { type: 'profit' },
+    _sum: { amount: true },
+  });
+  const expectedProfitByUser = new Map<string, number>();
+  for (const a of profitLogAgg) {
+    expectedProfitByUser.set(a.userId, a._sum.amount || 0);
+  }
+  console.log(`[Profit Cleanup]   Found ${expectedProfitByUser.size} users with profit BonusLog entries`);
+
+  // ── 5b. Check each user's totalProfit vs expected ──
+  const users = await db.user.findMany({
+    select: { id: true, userId: true, name: true, mainBalance: true, totalProfit: true },
+  });
+  console.log(`[Profit Cleanup]   Checking ${users.length} users for balance drift`);
+
+  for (const u of users) {
+    try {
+      const expectedProfit = expectedProfitByUser.get(u.id) || 0;
+      const drift = u.totalProfit - expectedProfit;
+
+      // Skip if no drift (within 1 rupiah tolerance)
+      if (drift <= 1) continue;
+
+      // Drift detected: User.totalProfit > sum(BonusLog profit)
+      // Reduce BOTH totalProfit and mainBalance by drift amount
+      const newTotalProfit = Math.max(0, u.totalProfit - drift);
+      const newMain = Math.max(0, u.mainBalance - drift);
+
+      await db.user.update({
+        where: { id: u.id },
+        data: {
+          mainBalance: newMain,
+          totalProfit: newTotalProfit,
+        },
+      });
+
+      report.usersBalanceCorrected++;
+      report.totalBalanceCorrected += drift;
+      report.details.userBalance.push({
+        userId: u.id,
+        beforeMain: u.mainBalance,
+        afterMain: newMain,
+        beforeTotalProfit: u.totalProfit,
+        afterTotalProfit: newTotalProfit,
+        corrected: drift,
+      });
+
+      console.log(
+        `[Profit Cleanup]   👉 User ${u.userId} (${u.name}): DRIFT detected — totalProfit ${formatRupiahSimple(u.totalProfit)} > expected ${formatRupiahSimple(expectedProfit)} (drift ${formatRupiahSimple(drift)})`,
+      );
+      console.log(
+        `[Profit Cleanup]     ✅ Corrected: mainBalance ${formatRupiahSimple(u.mainBalance)} → ${formatRupiahSimple(newMain)} | totalProfit ${formatRupiahSimple(u.totalProfit)} → ${formatRupiahSimple(newTotalProfit)}`,
+      );
+    } catch (e: any) {
+      const msg = `User ${u.id} (STEP 5): ${e.message}`;
+      report.errors.push(msg);
+      console.error(`[Profit Cleanup]   ❌ ${msg}`);
+    }
+  }
+  console.log(
+    `[Profit Cleanup]   ✅ STEP 5 done: corrected ${report.usersBalanceCorrected} users (cumulative), drift removed ${formatRupiahSimple(report.totalBalanceCorrected)}`,
+  );
+}
+
 // ──────────── Main Entry ────────────
 
 export async function cleanupDuplicateProfits(): Promise<CleanupReport> {
-  console.log('[Profit Cleanup] 🚀 Starting cleanupDuplicateProfits() (v3.1)');
+  console.log('[Profit Cleanup] 🚀 Starting cleanupDuplicateProfits() (v3.2)');
   const report = newReport();
 
   try {
@@ -591,13 +681,21 @@ export async function cleanupDuplicateProfits(): Promise<CleanupReport> {
     console.error('[Profit Cleanup] ❌ STEP 4 failed:', e.message);
   }
 
+  // ★★★ v3.2: STEP 5 — Direct User balance correction (catch drift STEP 4 misses) ★★★
+  try {
+    await correctUserBalanceDrift(report);
+  } catch (e: any) {
+    report.errors.push(`STEP 5 failed: ${e.message}`);
+    console.error('[Profit Cleanup] ❌ STEP 5 failed:', e.message);
+  }
+
   report.finishedAt = new Date();
   report.durationMs = report.finishedAt.getTime() - report.startedAt.getTime();
 
   // ★★★ v2.9.1: Recalculate bonusLogAfter = before - total removed (STEP 1 + STEP 4) ★★★
   report.bonusLogAfter = report.bonusLogBefore - report.duplicateEntriesRemoved;
 
-  console.log('[Profit Cleanup] 🎉 Cleanup complete! (v3.1 — no STEP 1 dedup, STEP 4 handles all excess)');
+  console.log('[Profit Cleanup] 🎉 Cleanup complete! (v3.2 — STEP 5 direct User balance correction added)');
   console.log(`[Profit Cleanup]   BonusLog: ${report.bonusLogBefore} → ${report.bonusLogAfter} (removed ${report.duplicateEntriesRemoved})`);
   console.log(`[Profit Cleanup]   Investments recalculated: ${report.investmentsRecalculated} (drift fixed: ${report.investmentsDriftFixed})`);
   console.log(`[Profit Cleanup]   Purchases recalculated: ${report.purchasesRecalculated}`);
