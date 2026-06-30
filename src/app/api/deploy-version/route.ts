@@ -5,7 +5,8 @@ import { execSync } from 'child_process';
 
 // ★★★ Version marker — bump on every fix. Used to verify the VPS is running
 //   the latest code. Visit https://nexvo.id/api/deploy-version to check.
-export const VERSION_MARKER = 'PROFIT-BULLETPROOF-V10-20250629';
+//   v11 (20250630): add /api/deposit/upload route (was missing → bukti tf error).
+export const VERSION_MARKER = 'DEPOSIT-UPLOAD-FIX-V11-20250630';
 export const CRON_VERSION = 'v2.5-bulletproof';
 
 export async function GET() {
