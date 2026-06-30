@@ -5078,3 +5078,79 @@ Stage Summary:
   3. Test upload bukti tf di halaman Deposit → "Deposit Diterima!"
   4. Klik "📎 Lihat Bukti" → modal gambar muncul
   5. pm2 logs nexvo-cron --lines 30 → "[Cron Service v2.5] 🚀 Running" (NO P2021)
+
+---
+Task ID: PROFIT-CONSISTENCY-FIX-V13
+Agent: main (serious mode)
+Task: User complaint "total profit di Aset ≠ Riwayat" — Asset page total profit gak match dengan Riwayat. Kontrak ada progress, paket aktif udah brp hari, pendapatan user harus sesuai.
+
+Work Log:
+- Baca AssetPage.tsx: pakai `getDaysElapsed` (CALENDAR days) untuk progress, `asset.dailyProfit * asset.contractDays` untuk estimasi total
+- Baca /api/assets: untuk product purchase, pakai `group.reduce((sum, inv) => sum + inv.totalProfitEarned, 0)` — sum of linked Investment.totalProfitEarned
+- Baca /api/transactions: History page pakai `db.bonusLog.aggregate({type: {in: ['profit', 'reward']}})` untuk totalProfit summary
+- Baca cron-service.ts v2.5: 2 silent bugs causing drift:
+  - Bug 1: Purchase sync (Investment loop credited) only `increment: dailyProfit` (1 day) — Investment loop bisa credit multi-day backfill → Purchase.profitEarned < sum(Investment.totalProfitEarned)
+  - Bug 2: Purchase path credit (Investment loop skipped) updated Purchase.profitEarned + BonusLog but NOT Investment.totalProfitEarned → Asset (uses Investment.totalProfitEarned) < History (uses BonusLog sum)
+- Baca prisma schema: Investment punya totalProfitEarned, Purchase punya profitEarned, BonusLog type='profit'
+
+IDENTIFIED INCONSISTENCIES:
+1. Asset page (Investment.totalProfitEarned) ≠ History page (BonusLog sum) — karena Bug 2
+2. Asset page (sum Investment.totalProfitEarned for product) ≠ Purchase.profitEarned — karena Bug 1
+3. Progress display pakai calendar days (10/30) tapi cron credit weekdays only (8 × dailyProfit) → user lihat "10 hari progress" tapi hanya 8 hari profit
+
+FIXES APPLIED:
+1. cron-service.ts v2.6 — Purchase sync: SET Purchase.profitEarned = sum(linked Investment.totalProfitEarned) (always in sync, regardless of backfill)
+2. cron-service.ts v2.6 — Purchase path credit: ALSO update each linked Investment.totalProfitEarned (distribute totalCredit evenly across linked investments)
+3. cron-service.ts v2.6 — Startup self-heal `reconcilePurchaseAndInvestmentProfits()`:
+   - if Purchase.profitEarned < sum(Investment.totalProfitEarned): SET Purchase = sum(Inv)
+   - if Purchase.profitEarned > sum(Investment.totalProfitEarned): distribute excess to linked Investments
+   - runs ONCE on boot, fixes historical drift in both directions
+4. /api/assets route: Math.max(Purchase.profitEarned, sum(Inv.totalProfitEarned)) sebagai defensive untuk old data
+5. AssetPage.tsx: progress pakai WEEKDAYS (Mon-Fri) — `getWeekdaysElapsed()` dan `getWeekdaysInContract()` match cron weekday-only crediting
+6. AssetPage.tsx: tampilkan "Profit Seharusnya" = weekdays_elapsed × dailyProfit, dengan warning amber kalau actual < expected (cron miss), blue info kalau actual > expected (manual/backfill)
+7. AssetPage.tsx: "Estimasi Total Profit Akhir Kontrak" pakai weekdays in contract (bukan contractDays calendar)
+8. Version marker bumped: PROFIT-CONSISTENCY-FIX-V13-20250630
+9. CRON_VERSION: v2.6-profit-consistency
+10. bootstrap-deploy.sh + super-deploy-v10.sh: expected marker updated to V13
+
+TESTED:
+- Profit consistency test (inline simulation):
+  - Create test user + package + investment (startDate 6 days ago = 4 weekdays elapsed)
+  - Simulate cron credit 4 days × 20000 = 80000
+  - Verify: Investment.totalProfitEarned (80000) = BonusLog sum (80000) = User.totalProfit (80000) — drift=0 ✓
+- Self-heal test (drift simulation):
+  - Create Purchase (profitEarned=30000) + 2 Investments (totalProfitEarned=45000 each, sum=90000)
+  - Drift = -60000 (Purchase < sum(Inv))
+  - Run reconcile logic: SET Purchase.profitEarned = 90000
+  - After: drift=0 ✓
+- Cron-service v2.6 boot: "🔧 SELF-HEAL: All purchases already in sync with Investments ✓" (clean DB)
+- HTTP /api/status: versionMarker=PROFIT-CONSISTENCY-FIX-V13-20250630, service=NEXVO Cron Service v2.6
+
+Commit: e67a74f
+Pushed to: origin/main
+
+Stage Summary:
+- ROOT CAUSE "total profit di Aset ≠ Riwayat": cron v2.5 had 2 silent bugs
+  causing Purchase.profitEarned to drift from sum(Investment.totalProfitEarned).
+  Asset page used Investment.totalProfitEarned; History page used BonusLog sum.
+  When Purchase path credited (Investment loop skipped), Investment.totalProfitEarned
+  was NEVER updated → Asset showed LESS than History.
+
+- FIX v2.6 (3 layers):
+  1. Purchase sync: SET Purchase.profitEarned = sum(linked Investment.totalProfitEarned)
+  2. Purchase path credit: ALSO update linked Investment.totalProfitEarned
+  3. Startup self-heal: reconcile historical drift in both directions
+
+- BONUS: Asset page progress pakai WEEKDAYS (matches cron weekday-only crediting)
+  + tampilkan "Profit Seharusnya" = weekdays_elapsed × dailyProfit
+  + warning kalau actual < expected (cron miss, auto-backfill ≤10s)
+
+- USER HARUS DEPLOY 1x lagi untuk dapat V13:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+
+- VERIFIKASI setelah deploy:
+  1. https://nexvo.id/api/deploy-version → marker PROFIT-CONSISTENCY-FIX-V13-20250630
+  2. Buka halaman Aset → "Profit Seharusnya" muncul, progress pakai "hari kerja"
+  3. Bandingkan Total Profit di Aset vs Riwayat → HARUS sama
+  4. pm2 logs nexvo-cron --lines 30 → "🔧 SELF-HEAL: ..." (fix drift) + "[Cron Service v2.6]"
+  5. Tunggu 00:00 WIB → profit masuk → Asset & Riwayat update bareng
