@@ -5310,3 +5310,38 @@ Stage Summary:
   3. Kontrak yang sudah berjalan 3 hari (kalender) → tampil "X hari kerja" yang match cron (bukan 1 lagi)
   4. Total Profit di Aset = Riwayat (sudah fix V13, tetap jalan)
   5. Paket 4/5/6 yang inactive TETAP tampil dengan badge (sudah fix V14, tetap jalan)
+
+---
+Task ID: WEEKDAY-UX-SIMPLIFY-V15.1
+Agent: main (serious mode)
+Task: User konfirmasi V15 logic sudah benar (2 hari kerja = Senin + Selasa match cron), tapi info row "X hari kalender berjalan → Y hari kerja dikredit profit" bikin bingung. Simplify.
+
+Work Log:
+- User message clarify: "UDAH BENAR TAPI MKSD 3 HARI 2 HARI TU GIMANA YA SEHARUSNYA KAN 2 HARI KERJA MALAM SENIN SAMA MALAM SELASA"
+  → User confirm V15 logic BENAR (weekend libur, profit masuk 00:00 WIB Senin-Jumat, 2 hari kerja = Senin+Selasa)
+  → Tapi user bingung kenapa UI tampil "3 hari kalender → 2 hari kerja" kalau yang benar cuma 2 hari
+- Root cause: info row V15 ada 2 angka (3 kalender, 2 kerja) → user pikir "mana yang benar?"
+- Fix: buang "X hari kalender berjalan →" bagian, ganti jadi info KAPAN profit masuk
+- AssetPage.tsx info row:
+  - SEBELUM: "⊘ Libur Sabtu-Minggu | 3 hari kalender berjalan → 2 hari kerja dikredit profit"
+  - SESUDAH: "⊘ Libur Sabtu-Minggu | Profit masuk jam 00:00 WIB (Senin-Jumat)"
+- Buang variable calendarElapsed (gak dipakai lagi)
+
+TESTED via Agent Browser (fresh login, 3 investment cards):
+- Card "3 hari kalender lalu" (beli Sabtu): "⊘ Libur Sabtu-Minggu | Profit masuk jam 00:00 WIB (Senin-Jumat)" + Profit Seharusnya Rp40.000 (2 hari × Rp20.000) ✅
+- Card "1 hari kalender lalu": same info row + Rp20.000 (1 hari × Rp20.000) ✅
+- Card "same-day": same info row + Rp0 (0 hari × Rp20.000) ✅
+- Progress bar atas tetap tampil "X/Y hari kerja • Z hari tersisa" (angka hari kerja tetap kelihatan)
+- Dev log: semua API 200, no errors
+
+Commit: <pending>
+Pushed to: <pending>
+
+Stage Summary:
+- V15.1 = UI simplification dari V15. Logic weekday (match cron) TETAP SAMA, gak diubah.
+- User sekarang lihat:
+  * Progress bar: "2/22 hari kerja • 30 hari tersisa" (angka hari kerja saja)
+  * Info row: "⊘ Libur Sabtu-Minggu | Profit masuk jam 00:00 WIB (Senin-Jumat)" (jelas kapan profit masuk)
+  * Profit Seharusnya: "Rp40.000 (2 hari × Rp20.000)" (breakdown jelas)
+- Tidak ada lagi "3 hari kalender berjalan" yang bikin bingung.
+- User deploy V15.1 untuk dapat UI yang clean ini (logic V12-V15 tetap jalan).

@@ -299,7 +299,6 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
   const daysRemaining = getDaysRemaining(asset.endDate);
   const weekdaysElapsed = getWeekdaysElapsed(asset.startDate);
   const weekdaysInContract = getWeekdaysInContract(asset.startDate, asset.contractDays);
-  const calendarElapsed = getDaysElapsed(asset.startDate);
   const isInvestment = asset.type === 'investment';
 
   // ★ v2.6: Expected profit = weekdays elapsed × dailyProfit
@@ -407,15 +406,17 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
               className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
             />
           </div>
-          {/* ★ v15: Clarification row — explain weekday vs calendar so user understands
-              why "1 hari kerja" when calendar already shows "3 hari berjalan" */}
+          {/* ★ v15.1: Simplified info row — jelasin KAPAN profit masuk.
+              User confirm: 2 hari kerja = Senin + Selasa (weekend libur).
+              Buang "X hari kalender" yang bikin bingung — cukup tampilin
+              {weekdaysElapsed} di progress bar atas + info kapan profit dikredit. */}
           <div className="flex items-center justify-between text-[9px] mt-1 text-muted-foreground/70">
             <span className="flex items-center gap-1">
               <span className="text-amber-400/80">⊘</span>
               Libur Sabtu-Minggu
             </span>
             <span>
-              {calendarElapsed} hari kalender berjalan → {weekdaysElapsed} hari kerja dikredit profit
+              Profit masuk jam 00:00 WIB (Senin-Jumat)
             </span>
           </div>
         </div>
