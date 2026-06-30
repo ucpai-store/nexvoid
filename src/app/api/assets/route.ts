@@ -157,6 +157,13 @@ export async function GET(request: NextRequest) {
     const totalDailyProfit = activeAssets.reduce((sum, a) => sum + a.dailyProfit, 0);
     const totalProfitEarned = allAssets.reduce((sum, a) => sum + a.totalProfitEarned, 0);
 
+    // ★★★ v3.2 DEBUG LOG: log exact per-asset breakdown so pm2 logs show from where total comes ★★★
+    console.log(`[ASSETS API v3.2] user=${user.id} userId=${user.userId} assetCount=${allAssets.length}`);
+    for (const a of allAssets) {
+      console.log(`[ASSETS API v3.2]   asset id=${a.id} type=${a.type} name="${a.name}" status=${a.status} totalProfitEarned=${a.totalProfitEarned} dailyProfit=${a.dailyProfit} amount=${a.amount} qty=${a.quantity}`);
+    }
+    console.log(`[ASSETS API v3.2]   SUMMARY: totalProfitEarned=${totalProfitEarned} totalActiveAmount=${totalActiveAmount} totalDailyProfit=${totalDailyProfit}`);
+
     return NextResponse.json({
       success: true,
       data: allAssets,
