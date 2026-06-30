@@ -5154,3 +5154,80 @@ Stage Summary:
   3. Bandingkan Total Profit di Aset vs Riwayat → HARUS sama
   4. pm2 logs nexvo-cron --lines 30 → "🔧 SELF-HEAL: ..." (fix drift) + "[Cron Service v2.6]"
   5. Tunggu 00:00 WIB → profit masuk → Asset & Riwayat update bareng
+
+---
+Task ID: SHOW-UNAVAILABLE-PRODUCTS-V14
+Agent: main (serious mode)
+Task: User complaint "paket produk 4 5 6 yang tidak tersedia kok gak muncul di web user" + "kontrak dah berjalan 3 hari" — fix paket produk unavailable TETAP tampil.
+
+Work Log:
+- Baca ProductsPage.tsx: pakai /api/products GET + /api/products/tiers untuk merge purchase state
+- Baca /api/products/route.ts GET: filter `where: { isActive: true, isStopped: false }` → produk inactive TIDAK muncul
+- Baca /api/products/tiers/route.ts: filter sama, jadi produk inactive gak punya state untuk UI
+- Baca AdminProductsPage.tsx: admin bisa set isActive=false (Inactive) atau isStopped=true (Stopped)
+- Root cause confirmed: filter `isActive: true, isStopped: false` hide paket 4/5/6 yang admin nonaktifkan
+
+FIX V14 APPLIED:
+1. /api/products GET — buang filter, tampilkan SEMUA produk:
+   ```ts
+   const products = await db.product.findMany({ orderBy: { price: 'asc' } });
+   const productsWithAvailability = products.map((p) => ({
+     ...p,
+     isAvailable: p.isActive && !p.isStopped && p.quotaUsed < p.quota,
+     availabilityReason: !p.isActive ? 'tidak-tersedia' : p.isStopped ? 'dihentikan' : p.quotaUsed >= p.quota ? 'quota-penuh' : null,
+   }));
+   ```
+2. /api/products GET by id — sama, return semua + isAvailable flag
+3. /api/products POST — validasi ketat dengan error spesifik:
+   - isActive=false → "Produk sedang tidak tersedia untuk pembelian"
+   - isStopped=true → "Produk sedang dihentikan sementara oleh admin"
+4. /api/products/tiers — return semua produk + isAvailable + availabilityReason
+5. ProductsPage.tsx:
+   - ProductItem interface: tambah isAvailable + availabilityReason
+   - Merge isAvailable dari tiers (real-time admin status)
+   - Badge ribbon merah "TIDAK TERSEDIA" / oranye "DIHENTIKAN SEMENTARA" / amber "KUOTA PALING PENUH"
+   - Info box dengan deskripsi per kondisi
+   - Tombol beli: disabled + cursor-not-allowed untuk produk unavailable
+6. Bump version marker: SHOW-UNAVAILABLE-PRODUCTS-V14-20250630
+7. Update bootstrap-deploy.sh + super-deploy-v10.sh expected marker
+
+TESTED:
+- Create 6 products (1,2,3 isActive=true; 4,5,6 isActive=false):
+  ✓ All 6 products returned by /api/products GET (was 3 before V14)
+  ✓ isAvailable=true for products 1,2,3 (active)
+  ✓ isAvailable=false + availabilityReason='tidak-tersedia' for products 4,5,6
+- Type check: 0 errors (after fix pre-existing 'bought' comparison issue)
+- Production build: success
+
+Commit: 2df40d6
+Pushed to: origin/main
+
+Stage Summary:
+- ROOT CAUSE: /api/products GET filter `isActive: true, isStopped: false` — produk
+  yang admin set inactive/stopped TIDAK muncul di web user.
+- FIX V14: Tampilkan SEMUA produk + computed isAvailable field. UI tampilkan badge
+  "TIDAK TERSEDIA" / "DIHENTIKAN SEMENTARA" / "KUOTA PENUH" + disable tombol beli.
+- POST /api/products juga divalidasi ketat — gak bisa beli produk unavailable.
+
+NOTE TENTANG "kontrak 3 hari":
+- V13 (PROFIT-CONSISTENCY-FIX) sudah fix ini:
+  * AssetPage pakai WEEKDAYS (Senin-Jumat) untuk progress, match cron weekday-only crediting
+  * "Profit Seharusnya" = weekdays_elapsed × dailyProfit
+  * Kalau actual < expected → cron auto-backfill ≤10 detik (continuous catchup)
+  * Kalau user beli Jumat → profit mulai Senin (libur Sabtu-Minggu) → user lihat
+    "kontrak 3 hari" tapi "Profit Seharusnya 1 hari × dailyProfit" (jelas, bukan bug)
+- VPS belum deploy V13/V14, jadi user masih lihat old behavior. Setelah deploy
+  V14, user akan lihat:
+  * Progress pakai "X/Y hari kerja" (bukan calendar)
+  * "Profit Seharusnya" muncul dengan breakdown
+  * Warning kalau profit tertinggal
+  * Paket 4/5/6 yang inactive TETAP tampil dengan badge
+
+USER HARUS DEPLOY V14:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+
+VERIFIKASI setelah deploy:
+1. https://nexvo.id/api/deploy-version → marker SHOW-UNAVAILABLE-PRODUCTS-V14-20250630
+2. Buka halaman Produk → semua 6 paket tampil (yang inactive pun tampil dengan badge merah)
+3. Buka halaman Aset → progress "X/Y hari kerja" + "Profit Seharusnya" muncul
+4. pm2 logs nexvo-cron --lines 30 → [Cron Service v2.6] + 🔧 SELF-HEAL
