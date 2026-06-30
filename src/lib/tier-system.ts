@@ -36,6 +36,10 @@ export interface TierInfo {
   reason?: string;
   /** true when user has at least one COMPLETED (expired) investment for this tier */
   hasExpiredPurchase?: boolean;
+  /** ★ v17: mirror V16 packages API — isAvailable flag for inactive packages */
+  isActive?: boolean;
+  isAvailable?: boolean;
+  availabilityReason?: 'tidak-tersedia' | null;
 }
 
 export interface TierAvailability {
@@ -53,11 +57,19 @@ export interface TierAvailability {
 }
 
 /**
- * Load all active tiers ordered ascending by amount (VIP 1 → VIP n).
+ * Load all tiers ordered ascending by amount (VIP 1 → VIP n).
+ *
+ * ★★★ v17 FIX: Previously filtered `isActive: true` → paket 4/5/6 that admin
+ *   set isActive=false were EXCLUDED from tiers list. When PaketPage merged
+ *   tier state into the package list, those packages kept their default
+ *   state ('available') and the isAvailable flag from /api/packages was
+ *   the only thing showing them as unavailable. BUT if the merge somehow
+ *   overwrote isAvailable (e.g., from cache), the badge disappeared.
+ *   Now: return ALL packages (mirror V16 /api/packages) + isAvailable flag
+ *   so the tier system is consistent with the packages API.
  */
 export async function loadOrderedTiers() {
   const packages = await db.investmentPackage.findMany({
-    where: { isActive: true },
     orderBy: [{ amount: 'asc' }, { order: 'asc' }],
   });
   return packages.map((pkg, idx) => ({
@@ -70,6 +82,9 @@ export async function loadOrderedTiers() {
     dailyProfit: pkg.amount * (pkg.profitRate / 100),
     totalProfit: pkg.amount * (pkg.profitRate / 100) * pkg.contractDays,
     tierIndex: idx,
+    isActive: pkg.isActive,
+    isAvailable: pkg.isActive,
+    availabilityReason: !pkg.isActive ? 'tidak-tersedia' : null,
   }));
 }
 

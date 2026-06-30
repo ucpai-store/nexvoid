@@ -21,7 +21,7 @@ set -euo pipefail
 PROJECT_DIR="/home/nexvo"
 CRON_PORT=3032
 WEB_PORT=3000
-EXPECTED_MARKER="WEEKDAY-OFFBYONE-FIX-V15-20250630"
+EXPECTED_MARKER="DOUBLE-PROFIT-FIX-V17-20250630"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="/home/nexvo/.next-backup-${TIMESTAMP}"
 
@@ -171,6 +171,16 @@ echo "▼ [7/8] ★★★ Restarting nexvo-cron (CRITICAL — ships the profit f
 # Delete + re-create to guarantee fresh process with new cron-service.ts code
 # ★ v12: NO 2>/dev/null — show errors if start fails
 pm2 delete nexvo-cron 2>/dev/null || true
+
+# ★★★ v17 DOUBLE-PROFIT FIX: Kill ANY stale cron-service processes that PM2 doesn't know about.
+#   If pm2 was started multiple times, there could be orphan `bun cron-service.ts`
+#   processes still running → they'd double-credit profit. Kill them all before restart.
+echo "   Killing any stale cron-service processes (prevent double-profit from duplicate instances)..."
+pkill -f "cron-service.ts" 2>/dev/null && echo "   ✅ Killed stale cron-service processes" || echo "   (no stale processes found)"
+# Also remove stale PID file (cron v2.7 uses .cron-service.pid as single-instance lock)
+rm -f "$PROJECT_DIR/.cron-service.pid" 2>/dev/null && echo "   ✅ Removed stale PID file" || true
+sleep 1
+
 pm2 start "bun run cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR"
 CRON_PM2_EXIT=$?
 if [ "$CRON_PM2_EXIT" != "0" ]; then
@@ -184,8 +194,20 @@ if [ "$CRON_PM2_EXIT" != "0" ]; then
 fi
 pm2 save 2>/dev/null || true
 sleep 5
-echo "   ✅ nexvo-cron restarted with v2.5 code"
+echo "   ✅ nexvo-cron restarted with v2.7 code (atomic claim + PID lock)"
 pm2 list 2>/dev/null | grep -E "nexvo|name" | head -5
+
+# ★★★ v17: Verify only 1 cron-service process is running (no duplicates) ★★★
+CRON_PROC_COUNT=$(pgrep -f "cron-service.ts" 2>/dev/null | wc -l || echo "0")
+echo "   Cron-service process count: $CRON_PROC_COUNT (should be 1)"
+if [ "$CRON_PROC_COUNT" -gt 1 ]; then
+  echo "   ⚠️ WARNING: Multiple cron-service processes detected! Killing extras..."
+  # Keep the newest (started by pm2 just now), kill the rest
+  pgrep -f "cron-service.ts" 2>/dev/null | sort -n | head -n -1 | xargs -r kill 2>/dev/null || true
+  sleep 1
+  CRON_PROC_COUNT_AFTER=$(pgrep -f "cron-service.ts" 2>/dev/null | wc -l || echo "0")
+  echo "   After cleanup: $CRON_PROC_COUNT_AFTER process(es)"
+fi
 
 # ─── [8/8] ★★★ STRICT Verify deploy (v12: check marker AND git commit) ★★★ ───
 echo ""

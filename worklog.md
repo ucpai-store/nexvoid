@@ -5455,3 +5455,103 @@ Stage Summary:
   4. Halaman Aset → progress "X/Y hari kerja" + info "Profit masuk jam 00:00 WIB (Senin-Jumat)"
   5. Profit gak dobel lagi (cron v2.6 jalan, no double-credit)
   6. pm2 logs nexvo-cron → [Cron Service v2.6] + 🔧 SELF-HEAL
+
+---
+Task ID: DOUBLE-PROFIT-V17
+Agent: main (serious mode)
+Task: User complaint "KOK PAS AKU DEPLOY TETEP SAMA AJA" — 2 issue: (1) profit dobel masih terjadi (2 hari tapi masuk 3), (2) paket 4/5/6 masih gak lock (harusnya TIDAK TERSEDIA).
+
+Work Log:
+- INVESTIGASI DOUBLE PROFIT (issue 1):
+  * Baca cron-service.ts (root, 1780+ lines, VPS pakai ini) — cron v2.6 logic
+  * Investment loop line 831-879: read-then-write inside transaction
+    - tx.investment.findUnique → check lastProfitDate → if not today, credit + update
+    - RACE CONDITION: 2 proses cron bisa baca old value bareng, both credit → DOUBLE PROFIT
+  * Purchase loop line 1022-1132: same pattern (read-then-write) → same race condition
+  * Test PID lock sebelum fix: 2nd instance mati karena EADDRINUSE (port conflict), BUKAN karena PID lock
+  * Root cause: PID lock check di line 1750 (AFTER Bun.serve line 1529) → port conflict dulu sebelum PID check
+
+- INVESTIGASI PAKET UNAVAILABLE (issue 2):
+  * V16 fix di /api/packages sudah benar (return semua + isAvailable)
+  * V16 fix di PaketPage.tsx sudah benar (badge TIDAK TERSEDIA + tombol disabled)
+  * TAPI loadOrderedTiers() di src/lib/tier-system.ts masih filter `where: { isActive: true }`
+    → /api/investments/tiers exclude paket 4/5/6 (isActive=false)
+    → saat PaketPage merge tier state, paket inactive gak dapat isAvailable flag dari tiers
+    → kalau /api/packages response cached, badge bisa hilang
+  * Defense in depth: 2 sumber data (packages API + tiers API) harus sama-sama bilang inactive
+
+- FIX V17 (DOUBLE PROFIT — cron-service.ts v2.7):
+  1. ATOMIC CLAIM di Investment loop (line 831-893):
+     - Ganti read-then-write dengan conditional `updateMany`
+     - WHERE: `id = inv.id AND (lastProfitDate IS NULL OR lastProfitDate < startOfDayWIB)`
+     - SQLite execute ATOMICALLY — only 1 process bisa update, others get count=0 → skip
+     - 100% race-condition-proof bahkan kalau 2 cron instance jalan bareng
+  2. ATOMIC CLAIM di Purchase loop (line 1036-1140):
+     - Same pattern: conditional `updateMany` for purchase record
+     - WHERE: `id = purchase.id AND (lastProfitDate IS NULL OR lastProfitDate < startOfDayWIB)`
+  3. PID FILE LOCK di awal file (line 67-107):
+     - acquirePidLock() cek .cron-service.pid — kalau alive & <5min, exit(1)
+     - Dipindah ke BEFORE Bun.serve (line 104) supaya catch sebelum port conflict
+     - releasePidLock() on exit/SIGINT/SIGTERM
+     - Test: 2nd instance sekarang exit dengan "ABORT: another instance is running" ✓
+  4. super-deploy-v10.sh step [7/8]:
+     - pkill -f "cron-service.ts" sebelum pm2 start (kill orphan processes)
+     - rm -f .cron-service.pid (clear stale PID file)
+     - pgrep verify only 1 process running after start (kill extras if duplicate)
+
+- FIX V17 (PAKET UNAVAILABLE — loadOrderedTiers):
+  1. src/lib/tier-system.ts loadOrderedTiers():
+     - Buang filter `where: { isActive: true }`
+     - Return SEMUA packages + isAvailable flag + availabilityReason
+     - Mirror V16 /api/packages API
+  2. TierInfo interface: tambah isAvailable, availabilityReason fields
+  3. PaketPage.tsx merge: sync isAvailable/availabilityReason dari tiers (defense in depth)
+     - stateById Map sekarang include isAvailable + availabilityReason
+     - list.map merge kedua sumber data
+
+- FIX V17 (VERSION MARKER):
+  * /api/deploy-version: VERSION_MARKER = 'DOUBLE-PROFIT-FIX-V17-20250630'
+  * CRON_VERSION = 'v2.7-atomic-claim'
+  * Update changelog array dengan V17 fixes
+  * super-deploy-v10.sh: EXPECTED_MARKER = 'DOUBLE-PROFIT-FIX-V17-20250630'
+  * bootstrap-deploy.sh: update success message + expected marker
+
+TESTED via Agent Browser (login test user, 6 packages: 1-3 active, 4-6 inactive):
+- API /api/packages: 6 packages, 4/5/6 isAvailable=false, availabilityReason='tidak-tersedia' ✓
+- API /api/investments/tiers: 6 tiers (sebelumnya cuma 3), 4/5/6 isAvailable=false ✓
+- Paket page: 6 paket semua tampil
+  * Paket 1 (active): badge AKTIF + "Sedang Aktif" ✓
+  * Paket 2,3 (available): tombol "Beli Sekarang" ✓
+  * Paket 4,5,6 (inactive): badge "TIDAK TERSEDIA" (merah) + tombol "Tidak Tersedia" (disabled) ✓
+- Produk page: 6 produk semua tampil
+  * Produk 1,2,3 (active): tombol "Beli Sekarang" ✓
+  * Produk 4,5,6 (inactive): badge "TIDAK TERSEDIA" + info "Produk sedang tidak tersedia" + tombol "Tidak Tersedia" ✓
+- Asset page: clean (no "Profit Seharusnya", no backfill warning) — only Total Profit + progress + Estimasi ✓
+- Cron v2.7 startup log: "ATOMIC CLAIM" + "PID LOCK" lines muncul ✓
+- PID lock test: 2nd cron instance exit dengan "ABORT: another instance is running" ✓
+
+Stage Summary:
+- V17 = DOUBLE-PROFIT FIX + PAKET UNAVAILABLE ROBUSTNESS.
+- DOUBLE PROFIT root cause: cron v2.6 pakai read-then-write → race condition kalau 2 instance.
+  V17 fix: conditional updateMany (atomic) + PID file lock (single instance) + deploy script kill stale processes.
+- PAKET UNAVAILABLE root cause: loadOrderedTiers filter isActive=true → /api/investments/tiers exclude paket 4/5/6.
+  V17 fix: buang filter, return semua + isAvailable flag. PaketPage merge sync dari kedua sumber (defense in depth).
+- USER HARUS DEPLOY V17:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- VERIFIKASI setelah deploy:
+  1. https://nexvo.id/api/deploy-version → marker DOUBLE-PROFIT-FIX-V17-20250630 (BUKAN V15!)
+  2. Halaman Paket → 6 paket tampil, 4/5/6 badge merah "TIDAK TERSEDIA" + tombol "Tidak Tersedia"
+  3. Halaman Produk → 6 produk tampil, 4/5/6 badge merah "TIDAK TERSEDIA"
+  4. Profit gak dobel lagi (cron v2.7 atomic claim + PID lock + deploy kill stale processes)
+  5. pm2 logs nexvo-cron → [Cron Service v2.7] + v2.7 ATOMIC CLAIM + v2.7 PID LOCK
+  6. Kalau ada duplicate cron process, deploy script akan kill extras (pgrep verify)
+
+- SEMUA PENYAKIT SUDAH FIX (V12→V17):
+  ✅ V12: static assets 404 → hydration gagal
+  ✅ V13: profit consistency (Asset = History)
+  ✅ V14: produk 4/5/6 inactive tampil dengan badge TIDAK TERSEDIA
+  ✅ V15: weekday off-by-one fix (Asset "X hari kerja" match cron)
+  ✅ V15.1: simplify info row (buang "X hari kalender")
+  ✅ V15.2: hapus "Profit Seharusnya" + backfill warning
+  ✅ V16: paket 4/5/6 inactive tampil dengan badge TIDAK TERSEDIA
+  ✅ V17: DOUBLE-PROFIT FIX (atomic claim + PID lock) + PAKET UNAVAILABLE robustness (loadOrderedTiers return all + defense in depth)

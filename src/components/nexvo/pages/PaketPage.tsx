@@ -319,15 +319,25 @@ export default function PaketPage() {
             const tierData = await tierRes.json();
             if (tierData.success && tierData.data) {
               const avail = tierData.data;
-              const stateById = new Map<string, { state: TierState; reason?: string }>(
-                (avail.tiers || []).map((t: { id: string; state: TierState; reason?: string }) => [
+              const stateById = new Map<string, { state: TierState; reason?: string; isAvailable?: boolean; availabilityReason?: 'tidak-tersedia' | null }>(
+                (avail.tiers || []).map((t: { id: string; state: TierState; reason?: string; isAvailable?: boolean; availabilityReason?: 'tidak-tersedia' | null }) => [
                   t.id,
-                  { state: t.state, reason: t.reason },
+                  { state: t.state, reason: t.reason, isAvailable: t.isAvailable, availabilityReason: t.availabilityReason },
                 ])
               );
               list = list.map((p) => {
                 const s = stateById.get(p.id);
-                return s ? { ...p, state: s.state, reason: s.reason } : p;
+                // ★ v17: also sync isAvailable from tiers (defense in depth —
+                //   in case /api/packages response is cached/stale, tiers data
+                //   provides the latest isAvailable flag from DB).
+                if (!s) return p;
+                return {
+                  ...p,
+                  state: s.state,
+                  reason: s.reason,
+                  isAvailable: s.isAvailable !== undefined ? s.isAvailable : p.isAvailable,
+                  availabilityReason: s.availabilityReason !== undefined ? s.availabilityReason : p.availabilityReason,
+                };
               });
               setTierInfo({
                 currentTierName: avail.currentTierName,

@@ -100,13 +100,14 @@ echo "Deploy version response:"
 echo "$VERSION_RESP" | head -c 500
 echo ""
 
-if echo "$VERSION_RESP" | grep -q "WEEKDAY-OFFBYONE-FIX-V15-20250630"; then
+if echo "$VERSION_RESP" | grep -q "DOUBLE-PROFIT-FIX-V17-20250630"; then
   echo ""
   echo "✅✅✅ DEPLOY SUCCESS ✅✅✅"
-  echo "   VPS is running WEEKDAY-OFFBYONE-FIX-V15-20250630"
-  echo "   → Upload bukti tf akan jalan (base64, no upload route needed)"
-  echo "   → Profit cron v2.5 bulletproof aktif untuk malam ini 00:00 WIB"
-  echo "   → Lihat Bukti modal fix aktif (no more blank tab)"
+  echo "   VPS is running DOUBLE-PROFIT-FIX-V17-20250630"
+  echo "   → cron v2.7 ATOMIC CLAIM aktif (no more double-profit — 2 hari = 2 entry, bukan 3)"
+  echo "   → cron v2.7 PID LOCK aktif (no duplicate cron instances)"
+  echo "   → Paket 4/5/6 inactive TETAP tampil dengan badge TIDAK TERSEDIA (defense in depth)"
+  echo "   → Profit masuk jam 00:00 WIB (Senin-Jumat), Sabtu-Minggu libur"
 else
   echo ""
   echo "⚠️  Version marker belum terlihat. Kemungkinan:"
@@ -114,7 +115,7 @@ else
   echo "   - PM2 belum restart dengan code baru (jalankan: pm2 restart nexvo-web --update-env)"
   echo "   - Cek pm2 logs: pm2 logs nexvo-web --lines 30"
   echo ""
-  echo "   Expected marker: WEEKDAY-OFFBYONE-FIX-V15-20250630"
+  echo "   Expected marker: DOUBLE-PROFIT-FIX-V17-20250630"
   echo "   Got response:"
   echo "$VERSION_RESP" | head -c 300
 fi

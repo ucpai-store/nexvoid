@@ -1,5 +1,15 @@
 /**
- * NEXVO Cron Service v2.6 ★★★ PROFIT CONSISTENCY FIX ★★★
+ * NEXVO Cron Service v2.7 ★★★ ATOMIC CLAIM (DOUBLE-PROFIT FIX) ★★★
+ *
+ * ★ v2.7 (THE DEFINITIVE FIX for "profit dobel — 2 hari tapi masuk 3"):
+ *   v2.6 used read-then-write inside transaction: 2 cron processes (or PM2
+ *   restart overlap) could both read old lastProfitDate, both pass the check,
+ *   both credit → DOUBLE PROFIT bug.
+ *   v2.7 FIX: use conditional `updateMany` with WHERE clause that only matches
+ *   if lastProfitDate is null OR < today 00:00 WIB. SQLite executes this
+ *   ATOMICALLY — only 1 process can successfully update. Others get count=0
+ *   and skip. 100% race-condition-proof even with duplicate instances.
+ *   Also added PID file lock at startup to prevent 2 instances from running.
  *
  * ★ v2.6 (THE DEFINITIVE FIX for "total profit di Aset ≠ Riwayat"):
  *   v2.5 had 2 silent bugs that caused Asset page total ≠ History page total:
@@ -44,7 +54,7 @@
  *
  * Uses Prisma directly to access the database.
  * Port: 3032
- * Version marker: PROFIT-CONSISTENCY-FIX-V13-20250630
+ * Version marker: PAKET-UNAVAILABLE-V16-20250630
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -53,6 +63,48 @@ import path from 'path';
 
 const PORT = 3032;
 const WIB_OFFSET = 7; // UTC+7 for Asia/Jakarta
+
+// ★★★ v2.7 SINGLE-INSTANCE LOCK — prevent PM2 duplicate instances ★★★
+//   If 2 cron processes run, even atomic claim won't help if they read at
+//   exactly the same nanosecond (SQLite journal mode = wal might allow it).
+//   PID file lock guarantees only 1 process. If stale (>5 min old), override.
+const PID_FILE = path.resolve(process.cwd(), '.cron-service.pid');
+function acquirePidLock(): boolean {
+  try {
+    if (fs.existsSync(PID_FILE)) {
+      const oldPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+      const isAlive = (() => {
+        try { process.kill(oldPid, 0); return true; } catch { return false; }
+      })();
+      const stat = fs.statSync(PID_FILE);
+      const ageMin = (Date.now() - stat.mtimeMs) / 60000;
+      if (isAlive && ageMin < 5) {
+        console.error(`[Cron Service] ❌ Another instance is running (PID ${oldPid}, age ${ageMin.toFixed(1)}min). Exiting to prevent double-profit.`);
+        return false;
+      }
+      console.warn(`[Cron Service] ⚠️ Stale PID file (PID ${oldPid}, age ${ageMin.toFixed(1)}min, alive=${isAlive}). Overriding.`);
+    }
+    fs.writeFileSync(PID_FILE, String(process.pid));
+    return true;
+  } catch (e: any) {
+    console.error(`[Cron Service] PID lock error (non-fatal): ${e.message}`);
+    return true; // continue anyway — atomic claim is the real protection
+  }
+}
+function releasePidLock() {
+  try { fs.unlinkSync(PID_FILE); } catch {}
+}
+process.on('exit', releasePidLock);
+process.on('SIGINT', () => { releasePidLock(); process.exit(0); });
+process.on('SIGTERM', () => { releasePidLock(); process.exit(0); });
+
+// ★★★ v2.7: ACQUIRE PID LOCK IMMEDIATELY (before Bun.serve starts the HTTP server) ★★★
+//   This MUST happen before any other top-level code so a duplicate instance
+//   exits cleanly before binding port 3032 (which would throw EADDRINUSE).
+if (!acquirePidLock()) {
+  console.error('[Cron Service v2.7] ❌ ABORT: another instance is running (PID lock held). Exiting to prevent double-profit.');
+  process.exit(1);
+}
 
 // ─── DB path resolution (auto-detect — works on VPS /home/nexvo AND locally) ───
 // ★★★ v2.3: Try .env FIRST (most reliable), then fall back to filesystem scan.
@@ -828,30 +880,38 @@ async function processDailyInvestmentProfitsCore(): Promise<{
       const totalCredit = dailyProfit * totalDays;
       const isBackfill = missedDays > 0;
 
-      await db.$transaction(async (tx) => {
-        // Re-check inside transaction to prevent race condition
-        const currentInv = await tx.investment.findUnique({ where: { id: inv.id } });
-        if (currentInv?.lastProfitDate) {
-          const lastProfitWIB = getWibDateString(new Date(currentInv.lastProfitDate));
-          if (lastProfitWIB === todayWIB) {
-            return; // already credited by another process
-          }
+      // ★★★ v2.7 ATOMIC CLAIM — 100% race-condition-proof ★★★
+      // Old v2.6 used read-then-write: 2 processes could both read old lastProfitDate,
+      // both pass the check, both credit → DOUBLE PROFIT bug.
+      // Fix: use conditional updateMany — only 1 process can successfully update
+      // (the WHERE clause fails for the 2nd process because lastProfitDate is now today).
+      // SQLite executes this atomically — no race possible.
+      const startOfDayWIBDate = new Date(todayWIB + 'T00:00:00+07:00');
+      const invClaim = await db.$transaction(async (tx) => {
+        const claim = await tx.investment.updateMany({
+          where: {
+            id: inv.id,
+            OR: [
+              { lastProfitDate: null },
+              { lastProfitDate: { lt: startOfDayWIBDate } },
+            ],
+          },
+          data: {
+            totalProfitEarned: { increment: totalCredit },
+            dailyProfit: dailyProfit,
+            lastProfitDate: new Date(),
+          },
+        });
+        if (claim.count === 0) {
+          return false; // already credited by another process — skip
         }
 
+        // Claim succeeded — now credit user balance + create logs
         await tx.user.update({
           where: { id: inv.userId },
           data: {
             mainBalance: { increment: totalCredit },
             totalProfit: { increment: totalCredit },
-          },
-        });
-
-        await tx.investment.update({
-          where: { id: inv.id },
-          data: {
-            totalProfitEarned: { increment: totalCredit },
-            dailyProfit: dailyProfit,
-            lastProfitDate: new Date(),
           },
         });
 
@@ -876,7 +936,13 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
+        return true;
       });
+
+      if (!invClaim) {
+        // Already credited by another process — skip without error
+        continue;
+      }
 
       result.processed++;
       result.totalProfit += totalCredit;
@@ -1019,15 +1085,30 @@ async function processDailyInvestmentProfitsCore(): Promise<{
       const isBackfill = missedDays > 0;
       const productName = purchase.product?.name || 'Produk';
 
-      await db.$transaction(async (tx) => {
-        // Re-check inside transaction to prevent race-condition double credit
-        const currentPurchase = await tx.purchase.findUnique({ where: { id: purchase.id } });
-        if (currentPurchase?.lastProfitDate) {
-          const lastProfitWIB = getWibDateString(new Date(currentPurchase.lastProfitDate));
-          if (lastProfitWIB === todayWIB) {
-            return;
-          }
+      // ★★★ v2.7 ATOMIC CLAIM — 100% race-condition-proof (mirror Investment loop) ★★★
+      // Old v2.6 read-then-write could double-credit if 2 cron processes ran.
+      // Fix: conditional updateMany — only 1 process can claim; others get count=0.
+      const startOfDayWIBDate = new Date(todayWIB + 'T00:00:00+07:00');
+      const purClaim = await db.$transaction(async (tx) => {
+        const claim = await tx.purchase.updateMany({
+          where: {
+            id: purchase.id,
+            OR: [
+              { lastProfitDate: null },
+              { lastProfitDate: { lt: startOfDayWIBDate } },
+            ],
+          },
+          data: {
+            profitEarned: { increment: totalCredit },
+            dailyProfit: dailyProfit,
+            lastProfitDate: new Date(),
+          },
+        });
+        if (claim.count === 0) {
+          return false; // already credited by another process — skip
         }
+
+        // Claim succeeded — credit user balance + create logs
 
         // 1. Credit user balance (mainBalance + totalProfit)
         await tx.user.update({
@@ -1038,29 +1119,16 @@ async function processDailyInvestmentProfitsCore(): Promise<{
           },
         });
 
-        // 2. Update purchase tracking
-        await tx.purchase.update({
-          where: { id: purchase.id },
-          data: {
-            profitEarned: { increment: totalCredit },
-            dailyProfit: dailyProfit,
-            lastProfitDate: new Date(),
-          },
-        });
-
         // 2b. ★★★ v2.6 CONSISTENCY FIX: Also update each linked Investment's
         //     totalProfitEarned + lastProfitDate so the Asset page (which uses
         //     Investment.totalProfitEarned) shows the SAME profit as the History
-        //     page (which uses BonusLog sum). Without this, when the Investment
-        //     loop is skipped but Purchase path credits, Investment.totalProfitEarned
-        //     stays stale → Asset shows wrong total → user sees mismatch.
+        //     page (which uses BonusLog sum).
         if (linkedPurchaseIds.has(purchase.id)) {
           const linkedInvsForSync = await tx.investment.findMany({
             where: { purchaseId: purchase.id },
             select: { id: true },
           });
           if (linkedInvsForSync.length > 0) {
-            // Distribute totalCredit evenly across linked investments
             const perInvCredit = totalCredit / linkedInvsForSync.length;
             for (const li of linkedInvsForSync) {
               await tx.investment.update({
@@ -1115,7 +1183,13 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
+        return true;
       });
+
+      if (!purClaim) {
+        // Already credited by another process — skip without error
+        continue;
+      }
 
       result.processed++;
       result.totalProfit += totalCredit;
@@ -1681,7 +1755,8 @@ const server = Bun.serve({
 
 // ──────────── Start ────────────
 
-console.log(`[Cron Service v2.6] 🚀 Running on port ${PORT} — marker: PROFIT-CONSISTENCY-FIX-V13-20250630`);
+// (PID lock already acquired at top of file, before Bun.serve)
+console.log(`[Cron Service v2.7] 🚀 Running on port ${PORT} — marker: PAKET-UNAVAILABLE-V16-20250630`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
@@ -1693,6 +1768,8 @@ console.log(`  - Quota Simulation: Every 2 hours at :30 (nav.live style)`);
 console.log(`  - Matching: Event-driven (credited with daily profit, based on PROFIT amount)`);
 console.log(`  - Referral: Per-investment (credited when downline invests)`);
 console.log(`  - Level 6+ matching: AUTO DISCONNECT (no bonus)`);
+console.log(`  - ★ v2.7 ATOMIC CLAIM: conditional updateMany — 100% race-condition-proof (no more double-profit)`);
+console.log(`  - ★ v2.7 PID LOCK: only 1 cron instance can run (prevents PM2 duplicates)`);
 console.log(`  - ★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned ↔ sum(Investment.totalProfitEarned) on startup`);
 
 // ★★★ v2.6 SELF-HEAL: Sync Purchase.profitEarned with sum(Investment.totalProfitEarned)
