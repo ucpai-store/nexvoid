@@ -53,6 +53,17 @@ fi
 echo ""
 echo "▼ [2/8] Pulling latest code from origin/main..."
 git fetch --all 2>/dev/null || true
+
+# ★ v11 fix: pre-clean untracked files in known-conflict dirs before reset.
+#   The `public/images/payment/*.png` files are committed in the repo but
+#   often exist locally as untracked (created by deploy-payment-qr.sh) →
+#   git reset --hard refuses to overwrite → deploy fails silently.
+#   Scope: ONLY remove untracked files in these specific dirs (safe).
+git clean -fd public/images/payment/ 2>/dev/null || true
+git clean -fd public/images/products/ 2>/dev/null || true
+git clean -fd public/images/banners/ 2>/dev/null || true
+
+# Reset tracked files + try pull as fallback
 git reset --hard origin/main 2>/dev/null || git pull origin main 2>/dev/null || true
 git log --oneline -1
 echo "   ✅ Code updated"
