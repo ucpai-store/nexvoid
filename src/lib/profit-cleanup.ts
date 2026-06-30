@@ -239,31 +239,36 @@ async function dedupProfitBonusLogs(report: CleanupReport): Promise<void> {
 
 // ──────────── STEP 2: Recalculate Investment.totalProfitEarned (ONLY REDUCE) ────────────
 //
-// ★★★ v2.9.1 CRITICAL FIXES (4 bugs fixed) ★★★
+// ★★★ v3.0 CRITICAL FIX: Use lastProfitDate as end date, NOT today ★★★
 //
-// Bug #1 (fixed): countWeekdaysBetween included purchase day. Cron credits
-//   starting day AFTER purchase. Now uses countCreditedDays (start+1 to end).
+// v2.9.1 bug: STEP 2 used `today` as end date → expected = countCreditedDays(start, today).
+// If lastProfitDate = YESTERDAY (today not yet credited), expected INCLUDED today.
+// So if there was an excess entry from a bug (e.g. purchase-day credit), the cleanup
+// couldn't detect it because expected was inflated by today's (uncredited) day.
 //
-// Bug #2 (fixed): STEP 2 used to set lastProfitDate = today even if today's
-//   profit wasn't credited yet → cron saw "already credited today" → SKIP
-//   → user lost a day of profit. Now: DON'T touch lastProfitDate at all.
-//   The cron's atomic claim manages lastProfitDate correctly.
+// v3.0 fix: Use `lastProfitDate` as end date instead of today.
+//   - lastProfitDate = the LAST day ACTUALLY credited by the cron
+//   - expected = countCreditedDays(start, lastProfitDate) × dailyProfit
+//   - This is the EXACT amount that should have been credited up to the last credit
+//   - If BonusLog has MORE than this → excess → trim
+//   - If lastProfitDate = null → never credited → expected = 0 (trim all excess)
 //
-// Bug #3 (fixed): STEP 2 used to set totalProfitEarned = expectedTotalProfit
-//   (both increase AND decrease). If today wasn't credited yet, expected
-//   included today → cron later credited today → totalProfitEarned += dp
-//   → DOUBLE COUNT! Now: ONLY REDUCE (use MIN(current, expected)). Never
-//   increase — let the cron credit normally.
+// This fix handles the scenario:
+//   - Bought Monday. Today = Wednesday.
+//   - BUG: entry on Monday (purchase day) + entry on Tuesday = 38400. lastProfitDate = Tuesday.
+//   - v2.9.1: expected = countCreditedDays(Mon, Wed) × dp = 2 × 19200 = 38400 → NO excess detected!
+//   - v3.0:   expected = countCreditedDays(Mon, Tue) × dp = 1 × 19200 = 19200 → excess = 19200 → TRIM! ✓
 //
-// Bug #4 (fixed): No dailyProfit fallback. If inv.dailyProfit = 0 (VIP
-//   purchase with _internal_default package), cleanup computed expected = 0
-//   → trimmed ALL entries! Now: same fallback as cron
-//   (inv.dailyProfit || amount × package.profitRate / 100).
+// ★★★ Previous fixes (kept from v2.9.1) ★★★
+//
+// Bug #1: countCreditedDays starts from day AFTER purchase (profit starts H+1).
+// Bug #2: DON'T touch lastProfitDate (cron's atomic claim manages it).
+// Bug #3: ONLY REDUCE — use MIN(current, expected). Never increase.
+// Bug #4: dailyProfit fallback for VIP purchases (inv.dailyProfit || amount × rate).
 
 async function recalculateInvestments(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 2 (v2.9.1): Recalculate Investment.totalProfitEarned — ONLY REDUCE, never increase');
+  console.log('[Profit Cleanup] 🧹 STEP 2 (v3.0): Recalculate Investment.totalProfitEarned — use lastProfitDate as end date, ONLY REDUCE');
 
-  const todayWIB = getWibDateString(getWibNow());
   const investments = await db.investment.findMany({
     where: { status: { in: ['active', 'Active', 'ACTIVE', 'completed', 'Completed'] } },
     include: { package: true },
@@ -282,13 +287,22 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
       }
 
       const startWIB = getWibDateString(new Date(inv.startDate));
-      // End date: min(today, inv.endDate) — if no endDate, use today
+
+      // ── v3.0 FIX: Use lastProfitDate as end date (NOT today) ──
+      // lastProfitDate = the last day ACTUALLY credited by the cron.
+      // This is the accurate "up to" date for expected profit calculation.
       let endWIB: string;
-      if (inv.endDate) {
-        const endStr = getWibDateString(new Date(inv.endDate));
-        endWIB = endStr < todayWIB ? endStr : todayWIB;
+      if (inv.lastProfitDate) {
+        endWIB = getWibDateString(new Date(inv.lastProfitDate));
+        // Cap at endDate if investment has ended
+        if (inv.endDate) {
+          const endStr = getWibDateString(new Date(inv.endDate));
+          if (endStr < endWIB) endWIB = endStr;
+        }
       } else {
-        endWIB = todayWIB;
+        // Never credited — expected = 0 (any totalProfitEarned > 0 is a bug)
+        // Set endWIB = startWIB so countCreditedDays returns 0
+        endWIB = startWIB;
       }
 
       // ── Bug #1 fix: countCreditedDays starts from day AFTER purchase ──
@@ -302,7 +316,6 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
 
       // ── Bug #3 fix: ONLY REDUCE — use MIN(current, expected) ──
       // Never increase totalProfitEarned (let cron credit normally).
-      // This prevents double-count if today hasn't been credited yet.
       const newTotalProfitEarned = Math.min(before, expectedTotalProfit);
       const diff = newTotalProfitEarned - before; // always <= 0
 
@@ -312,8 +325,6 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
       }
 
       // ── Bug #2 fix: DON'T set lastProfitDate ──
-      // The cron's atomic claim manages lastProfitDate correctly.
-      // Setting it here could block today's credit or cause double-credit.
       await db.investment.update({
         where: { id: inv.id },
         data: {
@@ -332,7 +343,7 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
       });
 
       console.log(
-        `[Profit Cleanup]   👉 Investment ${inv.id} (user ${inv.userId}): ${formatRupiahSimple(before)} → ${formatRupiahSimple(newTotalProfitEarned)} (diff ${diff >= 0 ? '+' : ''}${formatRupiahSimple(diff)}, ${creditedDays} credited days × ${formatRupiahSimple(dailyProfit)})`,
+        `[Profit Cleanup]   👉 Investment ${inv.id} (user ${inv.userId}): ${formatRupiahSimple(before)} → ${formatRupiahSimple(newTotalProfitEarned)} (diff ${diff >= 0 ? '+' : ''}${formatRupiahSimple(diff)}, ${creditedDays} credited days × ${formatRupiahSimple(dailyProfit)}, end=${endWIB})`,
       );
     } catch (e: any) {
       const msg = `Investment ${inv.id}: ${e.message}`;
@@ -348,11 +359,11 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
 // ──────────── STEP 3: Recalculate Purchase.profitEarned (ONLY REDUCE) ────────────
 
 async function recalculatePurchases(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 3 (v2.9.1): Recalculate Purchase.profitEarned — ONLY REDUCE');
+  console.log('[Profit Cleanup] 🧹 STEP 3 (v3.0): Recalculate Purchase.profitEarned — ONLY REDUCE');
 
   const purchases = await db.purchase.findMany({
     where: { status: 'active' },
-    include: { investments: { select: { id: true, totalProfitEarned: true } }, product: true },
+    include: { investments: { select: { id: true, totalProfitEarned: true, lastProfitDate: true } }, product: true },
   });
   console.log(`[Profit Cleanup]   Processing ${purchases.length} active purchases`);
 
@@ -363,13 +374,20 @@ async function recalculatePurchases(report: CleanupReport): Promise<void> {
         // = sum(linked Investment.totalProfitEarned) — already reduced by STEP 2 if over-credited
         expected = p.investments.reduce((s, i) => s + (i.totalProfitEarned || 0), 0);
       } else {
-        // Standalone — compute from progress (same fix as STEP 2: day after purchase)
+        // Standalone — compute from progress (v3.0: use lastProfitDate, not today)
         const startWIB = getWibDateString(new Date(p.createdAt));
-        const todayWIB = getWibDateString(getWibNow());
         const productRate = p.product?.profitRate || 0;
         const dailyProfit = Math.floor(p.totalPrice * (productRate / 100));
         if (dailyProfit <= 0) continue; // skip broken data
-        const creditedDays = countCreditedDays(startWIB, todayWIB);
+
+        // v3.0: use lastProfitDate as end date (same fix as STEP 2)
+        let endWIB: string;
+        if (p.lastProfitDate) {
+          endWIB = getWibDateString(new Date(p.lastProfitDate));
+        } else {
+          endWIB = startWIB; // never credited → expected = 0
+        }
+        const creditedDays = countCreditedDays(startWIB, endWIB);
         expected = creditedDays * dailyProfit;
       }
 
@@ -399,38 +417,32 @@ async function recalculatePurchases(report: CleanupReport): Promise<void> {
 
 // ──────────── STEP 4: Trim excess BonusLog + correct User balance ────────────
 //
+// ★★★ v3.0: Safeguard updated — skip only if user has NO investments at all.
+//   Old v2.9 safeguard skipped when expected=0. But v3.0 STEP 2 can produce
+//   expected=0 when investments exist but lastProfitDate=null (never credited).
+//   In that case, profit logs ARE bugs and SHOULD be trimmed.
+//   New safeguard: skip only if user has NO investments (logs might be from
+//   deleted investments — admin should review manually).
+//
 // ★★★ v2.9 FIX: Use Investment.totalProfitEarned (after STEP 2 recalculation)
 //   as the source of truth, NOT BonusLog sum. ★★★
-//
-// Old v2.8 STEP 4 compared User.totalProfit to BonusLog sum. But if BonusLog
-// itself had 3 entries on 3 different days (no same-day duplicate), STEP 1
-// dedup did nothing, and STEP 4 saw BonusLog sum == User.totalProfit → no
-// correction. User kept 57,600 instead of 38,400.
-//
-// New v2.9 STEP 4:
-//   1. expectedInvestmentProfit = sum(Investment.totalProfitEarned) per user
-//      (STEP 2 already recalculated this from weekday progress)
-//   2. For each user's profit BonusLog entries:
-//      - If sum(entries) > expectedInvestmentProfit → excess exists
-//      - Delete excess entries (smallest first) until sum ≈ expected
-//   3. Correct User.totalProfit: reduce by excess (only the investment profit
-//      portion — salary/matching/referral are untouched)
-//   4. Correct User.mainBalance: reduce by excess (refund the over-credit)
 
 async function recalculateUserBalances(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 4 (v2.9): Trim excess BonusLog + correct User balance from Investment ground truth');
+  console.log('[Profit Cleanup] 🧹 STEP 4 (v3.0): Trim excess BonusLog + correct User balance from Investment ground truth');
 
   // ── 4a. Compute expected investment profit per user from Investment.totalProfitEarned ──
-  //   (STEP 2 already recalculated totalProfitEarned = elapsedWeekdays × dailyProfit)
+  //   (STEP 2 already recalculated totalProfitEarned using lastProfitDate as end date)
   const investmentAgg = await db.investment.groupBy({
     by: ['userId'],
     _sum: { totalProfitEarned: true },
   });
   const expectedByUser = new Map<string, number>();
+  const usersWithInvestments = new Set<string>();
   for (const a of investmentAgg) {
     expectedByUser.set(a.userId, a._sum.totalProfitEarned || 0);
+    usersWithInvestments.add(a.userId);
   }
-  console.log(`[Profit Cleanup]   Found ${expectedByUser.size} users with investment profit records`);
+  console.log(`[Profit Cleanup]   Found ${expectedByUser.size} users with investment records`);
 
   // ── 4b. Get all profit BonusLog entries, grouped by user, sorted by amount ASC ──
   //   (sort ASC so we delete smallest/excess entries first, preserving larger backfill entries)
@@ -459,6 +471,7 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
   for (const u of users) {
     try {
       const expected = expectedByUser.get(u.id) || 0;
+      const hasInvestments = usersWithInvestments.has(u.id);
       const logs = logsByUser.get(u.id) || [];
       const currentLogSum = logSumByUser.get(u.id) || 0;
 
@@ -466,13 +479,16 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
       const excess = currentLogSum - expected;
       if (excess <= 1) continue;
 
-      // Skip if user has NO investments but has profit logs — suspicious, don't auto-delete
-      // (could be from a deleted investment; admin should review manually)
-      if (expected === 0 && logs.length > 0) {
+      // ★★★ v3.0 SAFEGUARD: Skip only if user has NO investments at all ★★★
+      //   (If user HAS investments but expected=0 because lastProfitDate=null,
+      //    the profit logs are bugs — trim them.)
+      //   (If user has NO investments, logs might be from deleted investments —
+      //    admin should review manually.)
+      if (!hasInvestments && logs.length > 0) {
         console.log(
-          `[Profit Cleanup]   ⚠️ User ${u.userId} has ${logs.length} profit logs (sum ${formatRupiahSimple(currentLogSum)}) but 0 expected from investments — skipping (manual review needed)`,
+          `[Profit Cleanup]   ⚠️ User ${u.userId} has ${logs.length} profit logs (sum ${formatRupiahSimple(currentLogSum)}) but NO investments — skipping (manual review needed)`,
         );
-        report.errors.push(`User ${u.userId}: ${logs.length} profit logs but 0 expected — skipped for safety`);
+        report.errors.push(`User ${u.userId}: ${logs.length} profit logs but no investments — skipped for safety`);
         continue;
       }
 
@@ -590,7 +606,7 @@ export async function cleanupDuplicateProfits(): Promise<CleanupReport> {
   // ★★★ v2.9.1: Recalculate bonusLogAfter = before - total removed (STEP 1 + STEP 4) ★★★
   report.bonusLogAfter = report.bonusLogBefore - report.duplicateEntriesRemoved;
 
-  console.log('[Profit Cleanup] 🎉 Cleanup complete! (v2.9.1)');
+  console.log('[Profit Cleanup] 🎉 Cleanup complete! (v3.0 — lastProfitDate ground truth)');
   console.log(`[Profit Cleanup]   BonusLog: ${report.bonusLogBefore} → ${report.bonusLogAfter} (removed ${report.duplicateEntriesRemoved})`);
   console.log(`[Profit Cleanup]   Investments recalculated: ${report.investmentsRecalculated} (drift fixed: ${report.investmentsDriftFixed})`);
   console.log(`[Profit Cleanup]   Purchases recalculated: ${report.purchasesRecalculated}`);
