@@ -4620,3 +4620,51 @@ Stage Summary:
   Then verify by visiting nexvo.id/api/deploy-version — must show:
     "versionMarker":"DEPOSIT-UPLOAD-FIX-V11-20250630"
 - After deploy: Ctrl+Shift+R + logout/login, then test upload bukti tf di halaman Deposit
+
+---
+Task ID: BOOTSTRAP-DEPLOY-FIX
+Agent: main (Z.ai Code)
+Task: User screenshot shows deploy failed — "bash super-deploy-v10.sh: No such file or directory" + "git pull" failed with 16 untracked PNG conflicts in public/images/payment/
+
+Work Log:
+- Analyzed screenshot /home/z/my-project/upload/pasted_image_1782786396025.png via VLM (z-ai vision)
+- Output transcription:
+    root@srv1656887:~# cd /home/nexvo
+    bash super-deploy-v10.sh        ← ERROR: No such file or directory
+    git pull origin main            ← ERROR: 16 untracked PNGs would be overwritten
+    Aborting
+- ROOT CAUSE: chicken-and-egg problem
+  * super-deploy-v10.sh doesn't exist on VPS yet (not pulled)
+  * git pull fails because 16 payment PNGs (bca/bni/bri/btn/cimb/dana/doku/gopay/jenius/mandiri/maybank/panin/permata/shopeepay/sinarmas/uob) exist as untracked locally but are committed in repo → git refuses to overwrite
+  * User ran script BEFORE pulling → file not found
+  * When user tried pull → untracked conflict aborted the merge
+- Created bootstrap-deploy.sh (NEW 1-command bootstrap):
+  * STEP 1: cd /home/nexvo + git status
+  * STEP 2: git fetch --all
+  * STEP 3: git clean -fd public/images/{payment,products,banners}/  (SCOPED — uploads/ + DB safe)
+  * STEP 4: git reset --hard origin/main  (now safe, no conflicts)
+  * STEP 5: bash super-deploy-v10.sh  (now exists on disk)
+  * FINAL: verify /api/deploy-version returns DEPOSIT-UPLOAD-FIX-V11-20250630
+- Updated super-deploy-v10.sh STEP 2 (line 52-69):
+  * Added pre-clean of public/images/{payment,products,banners}/ BEFORE git reset --hard
+  * Future deploys won't hit the same conflict
+  * Scope narrow (only those 3 image subdirs) — uploads/ proofs + DB files untouched
+- Verified bash syntax: bash -n bootstrap-deploy.sh → OK
+- Committed (eaf8027) + pushed to GitHub origin/main — SUCCESS
+
+Stage Summary:
+- ROOT CAUSE "deploy gak jalan": user ran script before pull + git pull blocked by untracked PNGs
+- 2 FIXES SHIPPED:
+  1. bootstrap-deploy.sh — 1-command resolves all conflicts + pulls + deploys + verifies
+  2. super-deploy-v10.sh STEP 2 hardened with pre-clean (future-proof)
+- User must run on VPS (1 line, copy-paste):
+    bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- Or manual 3-line:
+    cd /home/nexvo
+    rm -f public/images/payment/*.png
+    git pull origin main
+    bash super-deploy-v10.sh
+- After deploy succeeds:
+  * /api/deploy-version shows DEPOSIT-UPLOAD-FIX-V11-20250630
+  * Upload bukti tf works (route /api/deposit/upload live)
+  * Profit cron v2.5 bulletproof ready for 00:00 WIB tonight
