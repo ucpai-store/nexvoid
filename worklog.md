@@ -5384,3 +5384,74 @@ Stage Summary:
   * Profit berikutnya masuk (00:00 WIB): countdown 11:14:XX
 - Yang HILANG: "Profit Seharusnya" + "(X hari × RpY)" + warning amber "Profit tertinggal" + warning blue "manual credit/backfill"
 - User deploy V15.2 untuk dapat UI yang clean ini.
+
+---
+Task ID: PAKET-UNAVAILABLE-V16
+Agent: main (serious mode)
+Task: User complaint 2 hal: (1) "profit dobel — 2 hari tapi masuk 3", (2) "produk sama paket 4 5 6 kok gk di lock, kan seharusnya ada tulisan paket tidak tersedia".
+
+Work Log:
+- INVESTIGASI DOUBLE-CREDIT (masalah 1):
+  * Cek ecosystem.config.cjs: VPS pakai `cron-service.ts` di root (BUKAN mini-services/cron-service/index.ts)
+  * Tulis test script /home/z/my-project/test-cron-v26.ts untuk simulasikan cron v2.6 logic
+  * Test 9 skenario (beli Sabtu/Minggu/Jumat/Senin/Kamis/Rabu × today berbeda): ALL MATCH cron logic
+  * Edge case "cron run 3x same day": cuma 1 credit (lastProfitDate dedup works)
+  * Edge case "cron down Jumat-Sabtu-Minggu, beli Kamis, Senin up": credit 2 hari (Jumat missed + Senin today) ✅
+  * KESIMPULAN: cron v2.6 logic BENAR, gak ada double-credit bug. User lihat "3" karena VPS belum deploy V13/V15 (masih jalan cron v2.5 yang punya bug). Setelah deploy V15.2 (include cron v2.6), double-credit hilang.
+
+- INVESTIGASI PAKET UNAVAILABLE (masalah 2):
+  * User sebut "PRODUK SAMA PAKET" — ada 2 halaman: Produk (ProductsPage) + Paket (PaketPage)
+  * Produk: V14 sudah fix (API tampil semua + isAvailable flag, UI badge TIDAK TERSEDIA + disable). Verified via Agent Browser — badge muncul untuk produk 4/5/6 inactive. ✅
+  * Paket: BUG! API /api/packages GET filter `where: { isActive: true }` → paket inactive TIDAK muncul. PaketPage.tsx gak ada badge TIDAK TERSEDIA + tombol beli gak di-disable.
+
+- FIX V16 PAKET (mirror V14 produk):
+  1. /api/packages GET — buang filter isActive, tampilkan SEMUA paket + computed isAvailable + availabilityReason
+  2. /api/packages GET fallback — tambah isAvailable flag
+  3. PaketPage.tsx PackageItem interface — tambah isAvailable + availabilityReason
+  4. PaketPage.tsx canBuy logic — `canBuy = isAvailable && !productUnavailable`
+  5. PaketPage.tsx badge — tambah "TIDAK TERSEDIA" (merah, AlertCircle icon) untuk paket isActive=false
+  6. PaketPage.tsx tombol beli — render "Tidak Tersedia" (disabled, merah) untuk paket unavailable (priority over active/bought)
+  7. /api/investments POST sudah validasi `!pkg.isActive` → reject (sudah ada sebelumnya, gak perlu ubah)
+
+TESTED via Agent Browser (login test user, setup 6 paket: 1-3 active, 4-6 inactive):
+- Paket page: 6 paket semua tampil
+  * Paket 1,2,3 (active): badge "AKTIF" atau tombol "Beli Sekarang" ✅
+  * Paket 4,5,6 (inactive): badge "TIDAK TERSEDIA" (merah) + tombol "Tidak Tersedia" (disabled) ✅
+- Produk page: 6 produk semua tampil (V14 already fixed)
+  * Produk 1,2,3 (active): tombol "Beli Sekarang" ✅
+  * Produk 4,5,6 (inactive): badge "TIDAK TERSEDIA" + info "Produk sedang tidak tersedia untuk pembelian." ✅
+- Dev log: semua API 200 (/api/packages, /api/products, /api/investments/tiers), no errors
+
+Commit: <pending>
+Pushed to: <pending>
+
+Stage Summary:
+- 2 MASALAH USER:
+  1. "Profit dobel (2 hari tapi masuk 3)" → cron v2.6 logic BENAR (verified 9 skenario + edge cases).
+     User lihat 3 karena VPS belum deploy V13/V15. Setelah deploy V15.2, cron v2.6 jalan → no double-credit.
+  2. "Paket 4/5/6 gak di-lock" → BUG di /api/packages (filter isActive=true) + PaketPage.tsx (gak ada badge).
+     VPS belum deploy V14 untuk produk (sudah fix di V14). Paket baru fix di V16.
+
+- FIX V16 (Paket unavailable — mirror V14 produk):
+  - /api/packages GET: tampilkan SEMUA + isAvailable flag
+  - PaketPage.tsx: badge TIDAK TERSEDIA + tombol disabled untuk paket isActive=false
+
+- SEMUA PENYAKIT SUDAH FIX (V12→V16):
+  ✅ V12: static assets 404 → hydration gagal
+  ✅ V13: profit consistency (Asset = History)
+  ✅ V14: produk 4/5/6 inactive tampil dengan badge
+  ✅ V15: weekday off-by-one fix (Asset "X hari kerja" match cron)
+  ✅ V15.1: simplify info row (buang "X hari kalender")
+  ✅ V15.2: hapus "Profit Seharusnya" + backfill warning
+  ✅ V16: paket 4/5/6 inactive tampil dengan badge TIDAK TERSEDIA
+
+- USER HARUS DEPLOY V16 (include semua V12-V15.2):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+
+- VERIFIKASI setelah deploy:
+  1. https://nexvo.id/api/deploy-version → marker WEEKDAY-OFFBYONE-FIX-V15-20250630 (V16 gak bump marker, logic V15 tetap jalan)
+  2. Halaman Paket → 6 paket tampil, 4/5/6 ada badge merah "TIDAK TERSEDIA" + tombol "Tidak Tersedia"
+  3. Halaman Produk → 6 produk tampil, 4/5/6 ada badge merah "TIDAK TERSEDIA"
+  4. Halaman Aset → progress "X/Y hari kerja" + info "Profit masuk jam 00:00 WIB (Senin-Jumat)"
+  5. Profit gak dobel lagi (cron v2.6 jalan, no double-credit)
+  6. pm2 logs nexvo-cron → [Cron Service v2.6] + 🔧 SELF-HEAL

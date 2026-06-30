@@ -42,6 +42,9 @@ interface PackageItem {
   /** no-duplicates purchase state for the current user */
   state?: TierState;
   reason?: string;
+  /** ★ v16: isAvailable flag dari API (mirror V14 products) */
+  isAvailable?: boolean;
+  availabilityReason?: 'tidak-tersedia' | null;
 }
 
 /* ───────── Tier styling based on package order ───────── */
@@ -114,7 +117,21 @@ function PackageCard({
   // Re-activation: available AND has a "Kontrak sebelumnya sudah berakhir" reason
   const isReactivation = isAvailable && !!(pkg.reason || '').toLowerCase().includes('berakhir');
 
-  const canBuy = isAvailable;
+  // ★ v16: Cek isAvailable dari API (admin set isActive=false → TIDAK TERSEDIA)
+  const productUnavailable = pkg.isAvailable === false;
+  const unavailableReason = pkg.availabilityReason;
+  const unavailableConfig = (() => {
+    if (!unavailableReason) return null;
+    switch (unavailableReason) {
+      case 'tidak-tersedia':
+        return { label: 'TIDAK TERSEDIA', color: 'bg-red-500/80', icon: AlertCircle };
+      default:
+        return null;
+    }
+  })();
+
+  // canBuy = available (no-duplicates state) AND isAvailable (admin status)
+  const canBuy = isAvailable && !productUnavailable;
 
   return (
     <motion.div
@@ -131,7 +148,7 @@ function PackageCard({
         </div>
       )}
 
-      {/* State ribbon (Aktif / Selesai / Re-aktivasi) */}
+      {/* State ribbon (Aktif / Selesai / Re-aktivasi / TIDAK TERSEDIA) */}
       {isActive && (
         <div className="absolute top-0 left-0 bg-emerald-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
           <CheckCircle2 className="w-3 h-3" /> AKTIF
@@ -145,6 +162,12 @@ function PackageCard({
       {isReactivation && (
         <div className="absolute top-0 left-0 bg-amber-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
           <RefreshCw className="w-3 h-3" /> RE-AKTIVASI
+        </div>
+      )}
+      {/* ★ v16: Badge TIDAK TERSEDIA untuk paket isActive=false */}
+      {unavailableConfig && (
+        <div className={`absolute top-0 left-0 ${unavailableConfig.color} text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1`}>
+          <unavailableConfig.icon className="w-3 h-3" /> {unavailableConfig.label}
         </div>
       )}
 
@@ -232,7 +255,12 @@ function PackageCard({
         )}
 
         {/* Invest button — any available tier is purchasable (incl. re-activation after contract end) */}
-        {isActive ? (
+        {/* ★ v16: TIDAK TERSEDIA render paling awal (priority over active/bought) */}
+        {productUnavailable ? (
+          <div className="w-full h-11 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 font-semibold text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+            <AlertCircle className="w-4 h-4" /> Tidak Tersedia
+          </div>
+        ) : isActive ? (
           <div className="w-full h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Sedang Aktif
           </div>

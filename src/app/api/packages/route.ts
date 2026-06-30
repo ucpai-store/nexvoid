@@ -14,11 +14,14 @@ const FALLBACK_PACKAGES = [
   { id: 'fb-6', name: 'Gold Premium Aset 6', amount: 17280000,  profitRate: 5,   contractDays: CONTRACT_DAYS, isActive: true, order: 6, totalInvestments: 0, dailyProfit: 864000,  totalProfit: 155520000 },
 ];
 
-// GET: List all active packages (ordered by amount ascending: 100K → 500K → 1JT → 2.5JT → 5JT → 10JT)
+// GET: List ALL packages (including isActive=false) — V16 fix (mirror V14 products).
+//   Sebelumnya filter `isActive: true` → paket 4/5/6 yang admin set inactive
+//   TIDAK muncul di web user. User complaint "kok gak muncul".
+//   Sekarang: semua paket tampil, UI yang tentukan bisa beli atau tidak
+//   berdasarkan field `isAvailable` (computed = isActive).
 export async function GET() {
   try {
     const packages_ = await db.investmentPackage.findMany({
-      where: { isActive: true },
       orderBy: { amount: 'asc' },
       include: {
         _count: {
@@ -27,25 +30,37 @@ export async function GET() {
       },
     });
 
+    // ★ v16: Tambah isAvailable + availabilityReason (mirror V14 products)
+    //   InvestmentPackage cuma punya isActive (gak ada isStopped/quota).
+    //   Jadi isAvailable = isActive saja.
+    const packagesWithAvailability = packages_.map((pkg) => ({
+      id: pkg.id,
+      name: pkg.name,
+      amount: pkg.amount,
+      profitRate: pkg.profitRate,
+      contractDays: pkg.contractDays,
+      isActive: pkg.isActive,
+      order: pkg.order,
+      totalInvestments: pkg._count.investments,
+      dailyProfit: pkg.amount * (pkg.profitRate / 100),
+      totalProfit: pkg.amount * (pkg.profitRate / 100) * pkg.contractDays,
+      isAvailable: pkg.isActive,
+      availabilityReason: !pkg.isActive ? 'tidak-tersedia' : null,
+    }));
+
     return NextResponse.json({
       success: true,
-      data: packages_.map((pkg) => ({
-        id: pkg.id,
-        name: pkg.name,
-        amount: pkg.amount,
-        profitRate: pkg.profitRate,
-        contractDays: pkg.contractDays,
-        isActive: pkg.isActive,
-        order: pkg.order,
-        totalInvestments: pkg._count.investments,
-        dailyProfit: pkg.amount * (pkg.profitRate / 100),
-        totalProfit: pkg.amount * (pkg.profitRate / 100) * pkg.contractDays,
-      })),
+      data: packagesWithAvailability,
     });
   } catch (error) {
     console.error('Get packages error:', error);
     // Return fallback data when database is not available
-    return NextResponse.json({ success: true, data: FALLBACK_PACKAGES });
+    const fallbackWithAvailability = FALLBACK_PACKAGES.map((p) => ({
+      ...p,
+      isAvailable: p.isActive,
+      availabilityReason: null,
+    }));
+    return NextResponse.json({ success: true, data: fallbackWithAvailability });
   }
 }
 
