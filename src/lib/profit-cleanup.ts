@@ -224,13 +224,17 @@ async function countProfitBonusLogs(report: CleanupReport): Promise<void> {
 // Bug #4: dailyProfit fallback for VIP purchases (inv.dailyProfit || amount × rate).
 
 async function recalculateInvestments(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 2 (v3.0): Recalculate Investment.totalProfitEarned — use lastProfitDate as end date, ONLY REDUCE');
+  console.log('[Profit Cleanup] 🧹 STEP 2 (v3.2): Recalculate Investment.totalProfitEarned — process ALL statuses, ONLY REDUCE');
 
+  // ★★★ v3.2 FIX: HAPUS status filter — process SEMUA investments.
+  //   Old v3.0 filter: status in ['active','Active','ACTIVE','completed','Completed'].
+  //   BUG: kalau investment status = 'ongoing' / 'stopped' / 'pending' / capitalization drift,
+  //   STEP 2 SKIP → Investment.totalProfitEarned tidak di-trim → Asset page (Math.max) display inflated.
+  //   Fix: process SEMUA statuses. Cleanup ONLY REDUCE (Math.min), jadi aman untuk status apapun.
   const investments = await db.investment.findMany({
-    where: { status: { in: ['active', 'Active', 'ACTIVE', 'completed', 'Completed'] } },
     include: { package: true },
   });
-  console.log(`[Profit Cleanup]   Processing ${investments.length} investments`);
+  console.log(`[Profit Cleanup]   Processing ${investments.length} investments (all statuses)`);
 
   for (const inv of investments) {
     try {
@@ -239,7 +243,24 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
         ? inv.dailyProfit
         : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
       if (dailyProfit <= 0) {
-        // VIP purchase or broken data — skip (don't trim anything)
+        // ★★★ v3.2: dailyProfit=0 TAPI totalProfitEarned > 0 = BUG (cron nggak credit kalau dp=0).
+        //   Trim ke 0 (it's definitely a bug from old code path).
+        if (inv.totalProfitEarned > 0) {
+          console.log(`[Profit Cleanup]   ⚠️ Investment ${inv.id} (user ${inv.userId}): dailyProfit=0 TAPI totalProfitEarned=${formatRupiahSimple(inv.totalProfitEarned)} → trim to 0 (bug)`);
+          await db.investment.update({
+            where: { id: inv.id },
+            data: { totalProfitEarned: 0 },
+          });
+          report.investmentsRecalculated++;
+          report.investmentsDriftFixed++;
+          report.details.investmentDrift.push({
+            investmentId: inv.id,
+            userId: inv.userId,
+            before: inv.totalProfitEarned,
+            after: 0,
+            diff: -inv.totalProfitEarned,
+          });
+        }
         continue;
       }
 
