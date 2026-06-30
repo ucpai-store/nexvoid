@@ -100,16 +100,21 @@ echo "Deploy version response:"
 echo "$VERSION_RESP" | head -c 500
 echo ""
 
-if echo "$VERSION_RESP" | grep -q "DEPOSIT-UPLOAD-FIX-V11-20250630"; then
+if echo "$VERSION_RESP" | grep -q "STANDALONE-SERVER-FIX-V12-20250630"; then
   echo ""
   echo "✅✅✅ DEPLOY SUCCESS ✅✅✅"
-  echo "   VPS is running DEPOSIT-UPLOAD-FIX-V11-20250630"
-  echo "   → Upload bukti tf akan jalan"
+  echo "   VPS is running STANDALONE-SERVER-FIX-V12-20250630"
+  echo "   → Upload bukti tf akan jalan (base64, no upload route needed)"
   echo "   → Profit cron v2.5 bulletproof aktif untuk malam ini 00:00 WIB"
+  echo "   → Lihat Bukti modal fix aktif (no more blank tab)"
 else
   echo ""
   echo "⚠️  Version marker belum terlihat. Kemungkinan:"
   echo "   - Next.js masih building (tunggu 1 menit, lalu refresh /api/deploy-version)"
   echo "   - PM2 belum restart dengan code baru (jalankan: pm2 restart nexvo-web --update-env)"
   echo "   - Cek pm2 logs: pm2 logs nexvo-web --lines 30"
+  echo ""
+  echo "   Expected marker: STANDALONE-SERVER-FIX-V12-20250630"
+  echo "   Got response:"
+  echo "$VERSION_RESP" | head -c 300
 fi

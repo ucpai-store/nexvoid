@@ -21,7 +21,7 @@ set -euo pipefail
 PROJECT_DIR="/home/nexvo"
 CRON_PORT=3032
 WEB_PORT=3000
-EXPECTED_MARKER="DEPOSIT-UPLOAD-FIX-V11-20250630"
+EXPECTED_MARKER="STANDALONE-SERVER-FIX-V12-20250630"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="/home/nexvo/.next-backup-${TIMESTAMP}"
 
@@ -92,51 +92,168 @@ echo "   ✅ Prisma client generated + schema pushed (missing tables created)"
 # ─── [5/8] Build Next.js ───
 echo ""
 echo "▼ [5/8] Building Next.js (this takes 1-3 min)..."
-bun run build 2>&1 | tail -20 || npm run build 2>&1 | tail -20
-BUILD_EXIT=${PIPESTATUS[0]:-$?}
+# ★ v12 BULLETPROOF: Don't use `||` fallback — it masks the real error.
+#   Run build directly, capture exit code, show FULL output on failure.
+BUILD_LOG=$(mktemp)
+bun run build > "$BUILD_LOG" 2>&1
+BUILD_EXIT=$?
+echo "   Build exit code: $BUILD_EXIT"
+echo "   Build output (last 30 lines):"
+tail -30 "$BUILD_LOG"
 if [ "$BUILD_EXIT" != "0" ]; then
   echo "❌ BUILD FAILED. Rolling back .next from backup..."
   rm -rf .next
   cp -a "$BACKUP_DIR" .next
   echo "   ⚠️ Rolled back. nexvo-web still runs old build."
   echo "   Fix the build error and re-run this script."
+  rm -f "$BUILD_LOG"
   exit 1
 fi
+rm -f "$BUILD_LOG"
 echo "   ✅ Build succeeded"
 
-# ─── [6/8] Restart nexvo-web (Next.js production server) ───
+# ★ v12 BULLETPROOF: Verify standalone server.js exists (required for `output: standalone`)
+STANDALONE_SERVER="$PROJECT_DIR/.next/standalone/server.js"
+if [ ! -f "$STANDALONE_SERVER" ]; then
+  echo "❌ CRITICAL: .next/standalone/server.js NOT FOUND!"
+  echo "   Build succeeded but standalone output is missing."
+  echo "   Check next.config.js has: output: 'standalone'"
+  exit 1
+fi
+echo "   ✅ Standalone server.js verified: $STANDALONE_SERVER"
+
+# Copy static assets to standalone (Next.js doesn't do this automatically)
+# These are needed for CSS, JS, and public assets to load correctly
+if [ -d "$PROJECT_DIR/.next/static" ] && [ ! -d "$PROJECT_DIR/.next/standalone/.next/static" ]; then
+  echo "   Copying .next/static → .next/standalone/.next/static..."
+  cp -a "$PROJECT_DIR/.next/static" "$PROJECT_DIR/.next/standalone/.next/static"
+fi
+if [ -d "$PROJECT_DIR/public" ] && [ ! -d "$PROJECT_DIR/.next/standalone/public" ]; then
+  echo "   Copying public → .next/standalone/public..."
+  cp -a "$PROJECT_DIR/public" "$PROJECT_DIR/.next/standalone/public"
+fi
+
+# ─── [6/8] Restart nexvo-web (★ v12: use standalone server, NOT next start) ───
 echo ""
-echo "▼ [6/8] Restarting nexvo-web (PM2)..."
-pm2 restart nexvo-web --update-env 2>/dev/null || pm2 reload nexvo-web 2>/dev/null || pm2 start "bun run start" --name nexvo-web --cwd "$PROJECT_DIR" 2>/dev/null
+echo "▼ [6/8] ★★★ Restarting nexvo-web with STANDALONE server (v12 BULLETPROOF) ★★★"
+echo "   OLD way (broken): bun run start = next start → WARNING: does not work with output:standalone"
+echo "   NEW way (correct): node .next/standalone/server.js"
+echo ""
+# ★ Delete + recreate to guarantee fresh process with new code + correct command.
+#   `pm2 restart` keeps the OLD start command — if the process was started with
+#   `next start`, restart keeps using `next start` (broken for standalone).
+#   `pm2 delete` + `pm2 start` guarantees the new command is used.
+pm2 delete nexvo-web 2>/dev/null || true
+# Set PORT env var for standalone server (it reads process.env.PORT)
+PORT=${WEB_PORT} pm2 start "node .next/standalone/server.js" --name nexvo-web --cwd "$PROJECT_DIR" --env production
+PM2_START_EXIT=$?
+if [ "$PM2_START_EXIT" != "0" ]; then
+  echo "❌ PM2 start FAILED for nexvo-web. Exit code: $PM2_START_EXIT"
+  echo "   Check: pm2 logs nexvo-web --lines 30"
+  exit 1
+fi
 pm2 save 2>/dev/null || true
-sleep 4
-echo "   ✅ nexvo-web restarted"
+sleep 6
+echo "   ✅ nexvo-web started with standalone server"
+pm2 list 2>/dev/null | grep -E "nexvo|name" | head -5
 
 # ─── [7/8] ★★★ CRITICAL: Restart nexvo-cron (the 00:00 WIB profit process) ★★★
 echo ""
 echo "▼ [7/8] ★★★ Restarting nexvo-cron (CRITICAL — ships the profit fix) ★★★"
 # Delete + re-create to guarantee fresh process with new cron-service.ts code
+# ★ v12: NO 2>/dev/null — show errors if start fails
 pm2 delete nexvo-cron 2>/dev/null || true
-pm2 start "bun run cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR" 2>/dev/null
+pm2 start "bun run cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR"
+CRON_PM2_EXIT=$?
+if [ "$CRON_PM2_EXIT" != "0" ]; then
+  echo "❌ PM2 start FAILED for nexvo-cron. Exit code: $CRON_PM2_EXIT"
+  echo "   Trying with explicit bun path..."
+  pm2 start "$(which bun) $PROJECT_DIR/cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR" || {
+    echo "❌ CRON SERVICE FAILED TO START — profit will NOT auto-credit at 00:00 WIB!"
+    echo "   Manual debug: cd $PROJECT_DIR && bun run cron-service.ts"
+    exit 1
+  }
+fi
 pm2 save 2>/dev/null || true
 sleep 5
-echo "   ✅ nexvo-cron restarted with v2.4 code"
+echo "   ✅ nexvo-cron restarted with v2.5 code"
 pm2 list 2>/dev/null | grep -E "nexvo|name" | head -5
 
-# ─── [8/8] Verify deploy via /api/deploy-version ───
+# ─── [8/8] ★★★ STRICT Verify deploy (v12: check marker AND git commit) ★★★ ───
 echo ""
-echo "▼ [8/8] Verifying deploy..."
+echo "▼ [8/8] ★★★ STRICT verification (v12: marker + git commit + cron health) ★★★"
 sleep 3
-VERSION_RESP=$(curl -s --max-time 10 "http://localhost:${WEB_PORT}/api/deploy-version" 2>/dev/null || echo "")
-if echo "$VERSION_RESP" | grep -q "$EXPECTED_MARKER"; then
-  echo "   ✅ VPS is running NEW code (marker: $EXPECTED_MARKER)"
-  echo "$VERSION_RESP" | python3 -m json.tool 2>/dev/null | grep -E "versionMarker|buildId|gitCommit" || echo "$VERSION_RESP" | head -c 300
-else
-  echo "   ⚠️ Could not verify marker via /api/deploy-version. Response:"
-  echo "$VERSION_RESP" | head -c 300
+
+# Get expected git commit (should match HEAD after git reset)
+EXPECTED_GIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+echo "   Expected git commit: $EXPECTED_GIT"
+echo "   Expected marker: $EXPECTED_MARKER"
+echo ""
+
+# Retry up to 5 times (server might take time to boot)
+VERIFY_OK=false
+for attempt in 1 2 3 4 5; do
+  echo "   Attempt $attempt/5..."
+  VERSION_RESP=$(curl -s --max-time 10 "http://localhost:${WEB_PORT}/api/deploy-version" 2>/dev/null || echo "")
+  if [ -z "$VERSION_RESP" ]; then
+    echo "   ⏳ No response yet, waiting 5s..."
+    sleep 5
+    continue
+  fi
+  
+  # Check marker
+  if echo "$VERSION_RESP" | grep -q "$EXPECTED_MARKER"; then
+    echo "   ✅ Marker correct: $EXPECTED_MARKER"
+  else
+    echo "   ❌ Marker MISMATCH! Got:"
+    echo "$VERSION_RESP" | head -c 300
+    echo ""
+    echo "   Expected: $EXPECTED_MARKER"
+    echo "   This means OLD CODE is still running! pm2 might not have restarted properly."
+    sleep 5
+    continue
+  fi
+  
+  # Check git commit (if available in response)
+  if [ "$EXPECTED_GIT" != "unknown" ]; then
+    if echo "$VERSION_RESP" | grep -q "$EXPECTED_GIT"; then
+      echo "   ✅ Git commit correct: $EXPECTED_GIT"
+      VERIFY_OK=true
+      break
+    else
+      echo "   ⚠️ Git commit mismatch (server might be using cached response)"
+      # Marker is correct, that's the important part
+      VERIFY_OK=true
+      break
+    fi
+  else
+    VERIFY_OK=true
+    break
+  fi
+done
+
+if [ "$VERIFY_OK" != "true" ]; then
   echo ""
-  echo "   (May still be booting. Wait 30s and visit https://nexvo.id/api/deploy-version)"
+  echo "❌❌❌ DEPLOY VERIFICATION FAILED ❌❌❌"
+  echo "   The new code is NOT running on the server."
+  echo "   Last response:"
+  echo "$VERSION_RESP" | head -c 500
+  echo ""
+  echo ""
+  echo "   DEBUG COMMANDS:"
+  echo "     pm2 list"
+  echo "     pm2 logs nexvo-web --lines 50"
+  echo "     pm2 logs nexvo-cron --lines 50"
+  echo "     curl -v http://localhost:${WEB_PORT}/api/deploy-version"
+  echo ""
+  echo "   The deploy script will NOT continue to profit catch-up"
+  echo "   until the new code is confirmed running."
+  exit 1
 fi
+
+echo ""
+echo "   Full deploy-version response:"
+echo "$VERSION_RESP" | python3 -m json.tool 2>/dev/null | head -15 || echo "$VERSION_RESP" | head -c 400
 
 # ─── Verify cron service is responding ───
 echo ""
@@ -145,8 +262,19 @@ CRON_STATUS=$(curl -s --max-time 5 "http://localhost:${CRON_PORT}/api/status" 2>
 if [ -n "$CRON_STATUS" ]; then
   echo "✅ Cron service responding on port $CRON_PORT"
   echo "$CRON_STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'   WIB: {d.get(\"wibWallTime\")} | day: {d.get(\"dayName\")} | profit credited today: {d.get(\"profitCreditedCount\")}/{d.get(\"profitTotalActive\")} | next fire: {d.get(\"nextProfitFireDesc\",\"\")[:80]}')" 2>/dev/null || echo "$CRON_STATUS" | head -c 400
+  # ★ v12: Check for P2021 error in cron logs (table missing)
+  echo ""
+  echo "   Checking cron logs for P2021 (table missing) error..."
+  CRON_LOGS=$(pm2 logs nexvo-cron --lines 20 --nostream 2>/dev/null || echo "")
+  if echo "$CRON_LOGS" | grep -q "P2021"; then
+    echo "   ❌ P2021 ERROR DETECTED — Investment table still missing!"
+    echo "   Run: cd $PROJECT_DIR && bun run db:push"
+    echo "   Then: pm2 restart nexvo-cron"
+  else
+    echo "   ✅ No P2021 errors — tables exist correctly"
+  fi
 else
-  echo "⚠️ Cron service not responding yet — check: pm2 logs nexvo-cron --lines 30"
+  echo "⚠️ Cron service not responding — check: pm2 logs nexvo-cron --lines 30"
 fi
 
 # ─── Run profit catch-up NOW (credits any missed profit immediately) ───

@@ -5,8 +5,13 @@ import { execSync } from 'child_process';
 
 // ★★★ Version marker — bump on every fix. Used to verify the VPS is running
 //   the latest code. Visit https://nexvo.id/api/deploy-version to check.
-//   v11 (20250630): add /api/deposit/upload route (was missing → bukti tf error).
-export const VERSION_MARKER = 'DEPOSIT-UPLOAD-FIX-V11-20250630';
+//   v12 (20250630): STANDALONE server fix — deploy script now uses
+//     `node .next/standalone/server.js` instead of `next start` (which
+//     Next.js explicitly warns "does not work with output: standalone").
+//     This was the ROOT CAUSE of "hasilnya sama" after deploy — old code
+//     kept running because `next start` doesn't properly serve standalone builds.
+//   v11 (20250630): add /api/deposit/upload route + base64 proof storage.
+export const VERSION_MARKER = 'STANDALONE-SERVER-FIX-V12-20250630';
 export const CRON_VERSION = 'v2.5-bulletproof';
 
 export async function GET() {
