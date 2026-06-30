@@ -60,6 +60,7 @@
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import { cleanupDuplicateProfits } from './src/lib/profit-cleanup';
 
 const PORT = 3032;
 const WIB_OFFSET = 7; // UTC+7 for Asia/Jakarta
@@ -1771,6 +1772,23 @@ console.log(`  - Level 6+ matching: AUTO DISCONNECT (no bonus)`);
 console.log(`  - ★ v2.7 ATOMIC CLAIM: conditional updateMany — 100% race-condition-proof (no more double-profit)`);
 console.log(`  - ★ v2.7 PID LOCK: only 1 cron instance can run (prevents PM2 duplicates)`);
 console.log(`  - ★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned ↔ sum(Investment.totalProfitEarned) on startup`);
+
+// ★★★ v2.8 PROFIT DEDUP CLEANUP — remove duplicate profit entries from old cron versions ★★★
+//   Old v2.5 and earlier had a race condition: 2 cron instances could both credit
+//   profit on the same day → BonusLog got 2-3 entries for the SAME (user, day),
+//   Investment.totalProfitEarned and User.balance were inflated.
+//   v2.7 atomic claim prevents NEW duplicates, but doesn't clean up OLD ones.
+//   This cleanup runs ONCE at startup to:
+//     1. Dedup BonusLog(type='profit') per (userId, WIB day)
+//     2. Recalculate Investment.totalProfitEarned from weekday progress
+//     3. Recalculate Purchase.profitEarned = sum(linked Investment.totalProfitEarned)
+//     4. Recalculate User.mainBalance & totalProfit (refund over-credit)
+//   Idempotent: safe to run multiple times.
+cleanupDuplicateProfits().then((report) => {
+  console.log(`[Cron Service] 🧹 v2.8 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
+}).catch((e) => {
+  console.error('[Cron Service] v2.8 Profit Cleanup failed (non-fatal):', e.message);
+});
 
 // ★★★ v2.6 SELF-HEAL: Sync Purchase.profitEarned with sum(Investment.totalProfitEarned)
 //   This guarantees Asset page total = History page total going forward.
