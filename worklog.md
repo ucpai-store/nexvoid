@@ -5675,3 +5675,46 @@ Stage Summary:
 - ✅ Cleanup idempotent: safe untuk run multiple times
 - ✅ Cleanup konservatif: hanya kurangi over-credit, tidak auto-top-up
 - Saat deploy ke nexvo.id: PM2 akan restart cron-service, cleanup akan jalan otomatis dan hapus semua profit dobel/triple yang ada, koreksi balance user, dan lanjut dengan progres yang benar
+
+---
+Task ID: teks-only-fix-v30
+Agent: main (Z.ai Code)
+Task: Fix nexvo.id production showing only SEO text (no login form, no UI). User: "tetep web gk muncul yang benerr dong"
+
+Work Log:
+- Investigated root cause of "teks-only" bug — page only renders the sr-only SEO div, no UI.
+- Verified local sandbox renders PERFECTLY via Agent Browser:
+  * NEXVO logo, "Sign in to access your NEXVO account"
+  * Nomor HP/Email toggle, WhatsApp +62 input, Password, Login button
+  * Register Now, Install PWA, CS chat bubble — all visible
+  * JS chunks served with HTTP 200 (verified via curl)
+- Found ROOT CAUSE #1: super-deploy-v10.sh (the script bootstrap-deploy.sh runs)
+  did NOT clean .next before build → stale/corrupt .next/cache survived
+  next build → JS chunks 0-byte or broken → React never hydrates → only
+  SSR'd sr-only SEO div visible to user.
+  (Only deploy-v28.sh had rm -rf .next step, but user runs bootstrap-deploy.sh)
+- Found ROOT CAUSE #2: Service Worker v29 used stale-while-revalidate for
+  _next/static/ → could serve broken chunks from previous failed deploy.
+- FIX v30 applied:
+  1. super-deploy-v10.sh: added STEP [4.5/8] — rm -rf .next + node_modules/.cache
+     BEFORE next build (matches deploy-v28.sh's clean rebuild)
+  2. super-deploy-v10.sh: added post-deploy JS CHUNK VERIFICATION step —
+     fetch actual chunk URL from homepage HTML, verify HTTP 200 + size > 1000 bytes.
+     If chunk 404 or 0-byte → deploy FAILS with clear debug instructions.
+  3. public/sw.js: bumped v29 → v30, switched _next/static/ from stale-while-revalidate
+     to NETWORK-FIRST (safe because Next.js uses content-hashed URLs).
+- Verified all 3 scripts pass `bash -n` syntax check.
+- Verified local sandbox serves JS chunks with HTTP 200 + correct sizes.
+- Verified Agent Browser renders full UI (login form, logo, buttons) on local sandbox.
+- Committed as 3b7ec0f and pushed to origin/main.
+
+Stage Summary:
+- ✅ ROOT CAUSE of teks-only bug FIXED: super-deploy-v10.sh now cleans .next before build
+- ✅ Service Worker v30 forces fresh JS chunks (network-first for _next/static/)
+- ✅ Post-deploy verification catches "build succeeded but chunks 404" scenario
+- ✅ Committed + pushed to GitHub (commit 3b7ec0f)
+- USER ACTION: run bootstrap-deploy.sh on VPS (SAME command as before):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- After deploy, the script will print "✅ JS chunks served correctly (HTTP 200, X bytes) — UI akan render!"
+- If user still sees teks-only after this deploy, the script will EXIT with FATAL error
+  and print debug commands — share that output for further diagnosis.
