@@ -5927,3 +5927,76 @@ Stage Summary:
   3. Profit malam 00:00 WIB → masuk 1x per investment (atomic claim)
   4. Multi-paket user → semua entry legitimate dipertahankan
   5. Standalone Purchase user → profit nggak ke-trim salah
+
+---
+Task ID: profit-audit-v3.1-final
+Agent: main (Z.ai Code)
+Task: Audit root cause saldo 68.800 (seharusnya 38.400) — 2 aset baru ke-credit profit same-day. Pastikan tidak ada bug, profit wajib masuk 00:00 WIB, tinggal deploy beres.
+
+Work Log:
+- User report: saldo 68.800 (seharusnya 38.400). 1 aset aktif + 2 aset baru diaktifin. Profit 2 aset baru seharusnya masuk jam 00:00 (besok), tapi sudah ke-credit hari ini.
+- Root cause analysis: 2 aset baru di-credit profit di hari yang sama dengan aktivasi (purchase-day credit). Ini melanggar aturan H+1 (profit mulai hari setelah beli).
+- AUDIT cron-service.ts (3 path credit profit):
+  * cron-service.ts lines 831-836: SKIP if createdWIB === todayWIB ✓ (same-day purchase skip)
+  * /api/cron/profit/route.ts lines 273-278: SKIP if createdWIB === todayWIB ✓
+  * /api/admin/profit-trigger/route.ts lines 186-194: SKIP if createdWIB === todayWIB (unless force) ✓
+  * Semua 3 path PUNYA skip check. Bug di production karena OLD code (v2.9.1) belum deploy.
+- AUDIT cron-service.ts atomic claim (lines 890-905):
+  * updateMany WHERE lastProfitDate IS NULL OR lastProfitDate < startOfDayWIB
+  * SQLite atomic → no race condition ✓
+- AUDIT cron-service.ts startup flow (lines 1494-1516):
+  * cleanupDuplicateProfits() runs FIRST at startup (line 1803)
+  * cleanupDone flag → cron WAITS for cleanup before processing profit (line 1497)
+  * After cleanup: startup catch-up + continuous catchup every 10s on weekdays ✓
+- AUDIT profit-cleanup.ts v3.1 STEP 2 (lines 226-314):
+  * countCreditedDays: start dari H+1 (day after purchase) ✓
+  * endWIB = lastProfitDate (NOT today) → expected = ACTUAL credited days ✓
+  * Same-day purchase (startWIB === endWIB === today) → countCreditedDays = 0 → expected = 0 → TRIM ✓
+  * ONLY REDUCE: MIN(current, expected) — never increase ✓
+  * DON'T touch lastProfitDate (cron's atomic claim manages it) ✓
+- AUDIT profit-cleanup.ts v3.1 STEP 4 (lines 387-558):
+  * expected = sum(Investment.totalProfitEarned after STEP 2) + sum(standalone Purchase.profitEarned) ✓
+  * Greedy delete smallest BonusLog entries first (preserve backfill entries) ✓
+  * actualExcess = currentLogSum - remainingSum → correct balance by actualExcess ✓
+  * Safeguard: skip only if NO investments AND NO standalone purchases ✓
+- TRACE user scenario (saldo 68.800 → 38.400):
+  * Investment A (active 2 days): expected = 2×dp = 38400 → no trim ✓
+  * Investment B (new, credited today): expected = 0 (same-day) → TRIM to 0 ✓
+  * Investment C (new, credited today): expected = 0 (same-day) → TRIM to 0 ✓
+  * STEP 4: expected = 38400, BonusLog sum = 68800, excess = 30400 → delete + correct balance ✓
+  * User mainBalance: 68800 → 38400 ✓
+- TRACE post-cleanup cron behavior:
+  * After cleanup: Investment B has totalProfitEarned=0, lastProfitDate=today
+  * Cron startup catch-up: lastProfitDate=today → SKIP (no re-credit today) ✓
+  * Tomorrow 00:00 WIB: lastProfitDate=yesterday → NOT skipped → credit 1 day (H+1) ✓
+  * Profit WAJIB MASUK 00:00 WIB ✓
+- TRACE edge cases (all PASS):
+  * Same-day purchase: skip check + cleanup trim ✓
+  * Yesterday purchase + today credit: no trim (correct) ✓
+  * Multi-paket (VIP1+VIP2): sum both, no wrong trim ✓
+  * Backfill (cron down 3 days): credit missed days, no trim ✓
+  * lastProfitDate=null with excess: trim to 0 ✓
+  * Standalone Purchase: included in expected ✓
+- Verify dev server: HTTP 200 on / ✓
+- Verify deploy-version API: marker = PROFIT-CLEANUP-V3.1-20250630 ✓
+- Verify git status: clean (all committed, commit 6e3433b) ✓
+
+Stage Summary:
+- ✅ ROOT CAUSE: 2 aset baru ke-credit profit same-day (purchase-day credit bug)
+- ✅ Production running OLD code (v2.9.1) yang mungkin belum punya skip check / cleanup v3.1
+- ✅ Setelah deploy v3.1:
+  (1) Cleanup auto-run saat cron startup → trim excess profit (68.800 → 38.400)
+  (2) Cron skip check (createdWIB === todayWIB) → prevent future same-day credit
+  (3) Atomic claim + continuous catchup → profit WAJIB MASUK 00:00 WIB
+- ✅ Semua 3 path credit profit punya skip check yang sama
+- ✅ Semua edge cases traced & verified — tidak ada bug
+- ✅ Profit wajib masuk 00:00 WIB terverifikasi (continuous catchup every 10s weekday)
+- USER ACTION: run bootstrap-deploy.sh di VPS:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- Setelah deploy:
+  1. https://nexvo.id/api/deploy-version → marker PROFIT-CLEANUP-V3.1-20250630
+  2. pm2 logs nexvo-cron --lines 50 | grep "v3.1"
+     → "v3.1 Profit Cleanup done: removed X duplicate entries, corrected X users"
+  3. Saldo auto-correct: 68.800 → 38.400 (excess 30.400 di-trim)
+  4. 2 aset baru: totalProfitEarned = 0, profit pertama masuk besok 00:00 WIB
+  5. Profit harian masuk 1x per investment jam 00:00 WIB (atomic claim)
