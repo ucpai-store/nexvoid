@@ -301,11 +301,9 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
   const weekdaysInContract = getWeekdaysInContract(asset.startDate, asset.contractDays);
   const isInvestment = asset.type === 'investment';
 
-  // ★ v2.6: Expected profit = weekdays elapsed × dailyProfit
-  const expectedProfit = getExpectedProfit(asset.startDate, asset.dailyProfit, asset.contractDays, asset.status);
-  const profitDrift = expectedProfit >= 0 ? (asset.totalProfitEarned - expectedProfit) : 0;
-  const isProfitShort = expectedProfit >= 0 && profitDrift < -1; // actual < expected (cron missed)
-  const isProfitOver = expectedProfit >= 0 && profitDrift > 1;  // actual > expected (manual credit)
+  // ★ v15.2: Hapus "Profit Seharusnya" + backfill warning (user request).
+  //   Profit sudah berjalan normal — jam 00:00 WIB wajib masuk (Senin-Jumat).
+  //   Variable expectedProfit/profitDrift/isProfitShort/isProfitOver gak dipakai lagi.
 
   return (
     <motion.div
@@ -422,36 +420,10 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
         </div>
       )}
 
-      {/* ★ v2.6 Profit vs Expected (consistency check) */}
-      {asset.status === 'active' && expectedProfit >= 0 && (
-        <div className={`mt-3 pt-3 border-t border-white/5 ${isProfitShort ? 'bg-amber-500/5 -mx-4 -mb-1 px-4 pb-1 rounded-b-2xl' : ''}`}>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Profit Seharusnya</span>
-            <span className="text-emerald-400 font-semibold">
-              {formatRupiah(expectedProfit)}
-              <span className="text-muted-foreground/70 text-[9px] ml-1">
-                ({weekdaysElapsed} hari × {formatRupiah(asset.dailyProfit)})
-              </span>
-            </span>
-          </div>
-          {isProfitShort && (
-            <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-amber-400">
-              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-              <span>
-                Profit tertinggal {formatRupiah(Math.abs(profitDrift))}. Cron akan auto-backfill ≤10 detik.
-              </span>
-            </div>
-          )}
-          {isProfitOver && (
-            <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-blue-400">
-              <Zap className="w-3 h-3 shrink-0 mt-0.5" />
-              <span>
-                +{formatRupiah(profitDrift)} (manual credit / backfill)
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+      {/* ★ v15.2: HAPUS "Profit Seharusnya" + backfill warning (user request).
+          Profit sudah berjalan normal, jam 00:00 WIB wajib masuk (Senin-Jumat).
+          User gak perlu lihat "expected vs actual" / warning backfill lagi.
+          Yang tersisa: Total Profit aktual + Estimasi akhir kontrak + countdown jam 00:00 WIB. */}
 
       {/* Total Profit Preview (estimasi total profit akhir kontrak) */}
       {asset.status === 'active' && (

@@ -5345,3 +5345,42 @@ Stage Summary:
   * Profit Seharusnya: "Rp40.000 (2 hari × Rp20.000)" (breakdown jelas)
 - Tidak ada lagi "3 hari kalender berjalan" yang bikin bingung.
 - User deploy V15.1 untuk dapat UI yang clean ini (logic V12-V15 tetap jalan).
+
+---
+Task ID: REMOVE-PROFIT-SEHARUSNYA-V15.2
+Agent: main (serious mode)
+Task: User request hapus tulisan "Profit Seharusnya" + backfill warning dari AssetPage. Profit sudah berjalan normal, jam 00:00 WIB wajib masuk, user gak perlu lihat "expected vs actual" / warning backfill lagi.
+
+Work Log:
+- User message: "YANG TULISAN PROFIT SEHARUSNYA BACKFIL TU HAPUS KAN UDAH DI UPDATE JADI PROFIT BERJALAN NORMAL JADI NANTI JAM 00.00 WAJIB MASUK YA"
+- Baca AssetPage.tsx line 425-464: block "Profit Seharusnya" + warning amber "Profit tertinggal... cron auto-backfill ≤10 detik" + warning blue "+X (manual credit / backfill)"
+- Hapus SELURUH block "Profit Seharusnya" (v2.6 Profit vs Expected consistency check)
+- Hapus variable expectedProfit, profitDrift, isProfitShort, isProfitOver (gak dipakai lagi)
+- Keep: getExpectedProfit function definition (defensive, gak akan dipanggil — biar gak break import)
+- Keep: AlertTriangle import (masih dipakai di line 549 untuk error state lain)
+- Keep: weekdaysElapsed variable (masih dipakai di progress bar "X/Y hari kerja")
+- Keep: "Estimasi Total Profit Akhir Kontrak" (Rp440.000 — ini estimasi akhir kontrak, bukan "seharusnya")
+- Keep: "Profit berikutnya masuk (00:00 WIB)" countdown (ini yang user mau — jam 00:00 wajib masuk)
+- Keep: info row "⊘ Libur Sabtu-Minggu | Profit masuk jam 00:00 WIB (Senin-Jumat)"
+
+TESTED via Agent Browser (fresh login, 3 investment cards):
+- Card beli 3 hari lalu: "⊘ Libur Sabtu-Minggu | Profit masuk jam 00:00 WIB (Senin-Jumat)" + Total Profit Rp40.000 + Estimasi Rp440.000 + countdown 11:14 ✅ (NO "Profit Seharusnya")
+- Card beli 1 hari lalu: same + Rp20.000 + Rp440.000 + countdown ✅ (NO "Profit Seharusnya")
+- Card same-day: same + Rp0 + Rp440.000 + countdown ✅ (NO "Profit Seharusnya")
+- "Profit tertinggal" / "backfill" / "manual credit" — HILANG SEMUA ✅
+- Dev log: semua API 200, no errors
+
+Commit: <pending>
+Pushed to: <pending>
+
+Stage Summary:
+- V15.2 = HAPUS "Profit Seharusnya" + backfill warning (user request).
+- Profit sudah berjalan normal — jam 00:00 WIB wajib masuk (Senin-Jumat), Sabtu-Minggu libur.
+- UI Asset page sekarang lebih clean:
+  * Progress bar: "X/Y hari kerja • Z hari tersisa"
+  * Info row: "⊘ Libur Sabtu-Minggu | Profit masuk jam 00:00 WIB (Senin-Jumat)"
+  * Total Profit: RpXXX (aktual, bukan "seharusnya")
+  * Estimasi Total Profit Akhir Kontrak: Rp440.000
+  * Profit berikutnya masuk (00:00 WIB): countdown 11:14:XX
+- Yang HILANG: "Profit Seharusnya" + "(X hari × RpY)" + warning amber "Profit tertinggal" + warning blue "manual credit/backfill"
+- User deploy V15.2 untuk dapat UI yang clean ini.
