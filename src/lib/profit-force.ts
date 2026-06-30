@@ -158,6 +158,27 @@ export interface UserBalanceSnapshot {
   profitCredited: number;
 }
 
+export interface BalanceSyncEntry {
+  userId: string;
+  userName: string;
+  userCode: string;
+  beforeMain: number;
+  afterMain: number;
+  totalProfit: number;
+  totalWithdraw: number;
+  expectedFloor: number;
+  syncedAmount: number;
+}
+
+export interface BalanceSyncResult {
+  ran: boolean;
+  usersChecked: number;
+  usersSynced: number;
+  totalSynced: number;
+  entries: BalanceSyncEntry[];
+  errors: string[];
+}
+
 export interface ForceCreditResult {
   success: boolean;
   triggeredAt: string;
@@ -171,6 +192,7 @@ export interface ForceCreditResult {
     report: CleanupReport | null;
     error: string | null;
   };
+  balanceSync: BalanceSyncResult;
   investments: {
     processed: number;
     skipped: number;
@@ -189,6 +211,92 @@ export interface ForceCreditResult {
   totalMatchingCredited: number;
   totalBackfillDays: number;
   userBalances: UserBalanceSnapshot[];
+}
+
+// ──────────── STEP 6: Sync mainBalance UPWARD (fix under-credit drift) ────────────
+//
+// ★★★ CRITICAL FIX for "Saldo Utama terlalu rendah" bug ★★★
+//
+// Problem:
+//   Some users have mainBalance < totalProfit - totalWithdraw. This means
+//   profit was credited to totalProfit but NOT fully reflected in mainBalance.
+//   Root cause: old cleanup v2.9 over-refunded mainBalance when "fixing"
+//   duplicate profits — it decremented mainBalance too aggressively.
+//
+//   Example: totalProfit=68800, totalWithdraw=0, mainBalance=19200
+//   Expected floor: 68800 - 0 = 68800. Actual: 19200. Drift: -49600.
+//
+// Fix:
+//   For each user where mainBalance < (totalProfit - totalWithdraw):
+//     syncedAmount = (totalProfit - totalWithdraw) - mainBalance
+//     mainBalance += syncedAmount
+//
+// Safety:
+//   - ONLY INCREASE mainBalance (never decrease — safe direction)
+//   - Accounts for withdrawals (don't re-add withdrawn amount)
+//   - Idempotent: running twice is a no-op (second run finds no drift)
+//   - Per-user try/catch — one failure doesn't block others
+
+async function syncMainBalanceUpward(): Promise<BalanceSyncResult> {
+  const res: BalanceSyncResult = {
+    ran: true,
+    usersChecked: 0,
+    usersSynced: 0,
+    totalSynced: 0,
+    entries: [],
+    errors: [],
+  };
+
+  console.log('[Profit Force] ⬆️  STEP 6: Sync mainBalance UPWARD (fix under-credit drift)');
+
+  const users = await db.user.findMany({
+    select: {
+      id: true, name: true, userId: true,
+      mainBalance: true, totalProfit: true, totalWithdraw: true,
+    },
+  });
+  res.usersChecked = users.length;
+
+  for (const u of users) {
+    try {
+      const expectedFloor = Math.max(0, u.totalProfit - u.totalWithdraw);
+      if (u.mainBalance >= expectedFloor) continue; // already OK (or above floor)
+
+      const syncedAmount = expectedFloor - u.mainBalance;
+      if (syncedAmount <= 0) continue;
+
+      await db.user.update({
+        where: { id: u.id },
+        data: { mainBalance: { increment: syncedAmount } },
+      });
+
+      res.usersSynced++;
+      res.totalSynced += syncedAmount;
+      res.entries.push({
+        userId: u.id,
+        userName: u.name || 'User',
+        userCode: u.userId || u.id.slice(-6),
+        beforeMain: u.mainBalance,
+        afterMain: expectedFloor,
+        totalProfit: u.totalProfit,
+        totalWithdraw: u.totalWithdraw,
+        expectedFloor,
+        syncedAmount,
+      });
+
+      console.log(
+        `   ⬆️  ${u.userId} (${u.name}): mainBalance ${formatRupiahSimple(u.mainBalance)} → ${formatRupiahSimple(expectedFloor)} (synced +${formatRupiahSimple(syncedAmount)}) | totalProfit=${formatRupiahSimple(u.totalProfit)}, totalWithdraw=${formatRupiahSimple(u.totalWithdraw)}`,
+      );
+    } catch (e: any) {
+      res.errors.push(`User ${u.id}: ${e.message}`);
+      console.error(`[Profit Force] ❌ STEP 6 User ${u.id}: ${e.message}`);
+    }
+  }
+
+  console.log(
+    `[Profit Force]   ✅ STEP 6 done: checked ${res.usersChecked} users, synced ${res.usersSynced} users (total +${formatRupiahSimple(res.totalSynced)})`,
+  );
+  return res;
 }
 
 // ──────────── Main Entry ────────────
@@ -218,6 +326,7 @@ export async function forceCreditAllProfit(opts?: { skipCleanup?: boolean }): Pr
     force: true,
     durationMs: 0,
     cleanup: { ran: !opts?.skipCleanup, report: null, error: null },
+    balanceSync: { ran: true, usersChecked: 0, usersSynced: 0, totalSynced: 0, entries: [], errors: [] },
     investments: { processed: 0, skipped: 0, profitCredited: 0, matchingCredited: 0, backfillDays: 0, errors: [] },
     purchases: { processed: 0, skipped: 0, profitCredited: 0, errors: [] },
     totalProfitCredited: 0,
@@ -226,10 +335,10 @@ export async function forceCreditAllProfit(opts?: { skipCleanup?: boolean }): Pr
     userBalances: [],
   };
 
-  // ──────────── STEP 1: Cleanup (fix drift 68800 → 38400) ────────────
+  // ──────────── STEP 1: Cleanup (fix over-credit drift — only REDUCES) ────────────
   if (!opts?.skipCleanup) {
     try {
-      console.log('[Profit Force] 🧹 Running cleanupDuplicateProfits() (STEP 1-5, v3.2)...');
+      console.log('[Profit Force] 🧹 STEP 1-5: Running cleanupDuplicateProfits() (v3.2)...');
       const cleanupReport = await cleanupDuplicateProfits();
       result.cleanup.report = cleanupReport;
       console.log(`[Profit Force] 🧹 Cleanup done — users corrected: ${cleanupReport.usersBalanceCorrected}, balance removed: ${formatRupiahSimple(cleanupReport.totalBalanceCorrected)}`);
@@ -237,6 +346,18 @@ export async function forceCreditAllProfit(opts?: { skipCleanup?: boolean }): Pr
       result.cleanup.error = e.message;
       console.error('[Profit Force] ❌ Cleanup failed (continuing with profit credit):', e.message);
     }
+  }
+
+  // ──────────── STEP 6: Sync mainBalance UPWARD (fix under-credit drift) ────────────
+  // ★★★ THIS IS THE FIX FOR "Saldo Utama 19200 should be 68800" bug ★★★
+  // Runs BEFORE snapshot so the "before" reflects post-sync state for clarity
+  // in the balanceSync section, and the userBalances section shows the
+  // total change (sync + today's profit) from the user's original balance.
+  try {
+    result.balanceSync = await syncMainBalanceUpward();
+  } catch (e: any) {
+    result.balanceSync.errors.push(`STEP 6 fatal: ${e.message}`);
+    console.error('[Profit Force] ❌ STEP 6 fatal:', e.message);
   }
 
   // ──────────── STEP 2: Snapshot user balances BEFORE ────────────
@@ -581,7 +702,8 @@ export async function forceCreditAllProfit(opts?: { skipCleanup?: boolean }): Pr
   console.log('═══════════════════════════════════════════════════════');
   console.log('  [PROFIT FORCE] SUMMARY');
   console.log('═══════════════════════════════════════════════════════');
-  console.log(`  Cleanup ran: ${result.cleanup.ran} | users corrected: ${result.cleanup.report?.usersBalanceCorrected || 0}`);
+  console.log(`  Cleanup (STEP 1-5): ran=${result.cleanup.ran} | users corrected: ${result.cleanup.report?.usersBalanceCorrected || 0}`);
+  console.log(`  Balance Sync (STEP 6): ${result.balanceSync.usersSynced} users synced (+${formatRupiahSimple(result.balanceSync.totalSynced)} added to mainBalance)`);
   console.log(`  Investments: ${result.investments.processed} processed, ${result.investments.skipped} skipped, ${result.investments.errors.length} errors`);
   console.log(`  Purchases:   ${result.purchases.processed} processed, ${result.purchases.skipped} skipped, ${result.purchases.errors.length} errors`);
   console.log(`  Total profit credited: ${formatRupiahSimple(result.totalProfitCredited)}`);

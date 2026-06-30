@@ -79,9 +79,13 @@ export async function GET(request: NextRequest) {
     // ─── Build human-readable summary ───
     const cleanupLine = result.cleanup.ran
       ? (result.cleanup.report
-          ? `Cleanup ran: ${result.cleanup.report.usersBalanceCorrected} users corrected, ${formatRupiahSimple(result.cleanup.report.totalBalanceCorrected)} drift removed`
+          ? `Cleanup (STEP 1-5): ${result.cleanup.report.usersBalanceCorrected} users corrected (over-credit removed: ${formatRupiahSimple(result.cleanup.report.totalBalanceCorrected)})`
           : `Cleanup failed: ${result.cleanup.error}`)
       : 'Cleanup skipped';
+
+    const balanceSyncLine = result.balanceSync.ran
+      ? `Balance Sync (STEP 6): ${result.balanceSync.usersSynced} users synced (+${formatRupiahSimple(result.balanceSync.totalSynced)} added to mainBalance — fixes under-credit drift)`
+      : 'Balance sync skipped';
 
     const investmentLine = `Investments: ${result.investments.processed} credited (${formatRupiahSimple(result.investments.profitCredited)}), ${result.investments.skipped} skipped, ${result.investments.errors.length} errors`;
     const purchaseLine = `Purchases: ${result.purchases.processed} credited (${formatRupiahSimple(result.purchases.profitCredited)}), ${result.purchases.skipped} skipped, ${result.purchases.errors.length} errors`;
@@ -94,10 +98,20 @@ export async function GET(request: NextRequest) {
       credited: formatRupiahSimple(u.profitCredited),
     }));
 
+    // Top 5 balance sync entries (users whose mainBalance was synced up)
+    const topSyncEntries = result.balanceSync.entries.slice(0, 10).map(e => ({
+      user: `${e.userCode} (${e.userName})`,
+      beforeMain: formatRupiahSimple(e.beforeMain),
+      afterMain: formatRupiahSimple(e.afterMain),
+      synced: formatRupiahSimple(e.syncedAmount),
+      totalProfit: formatRupiahSimple(e.totalProfit),
+      totalWithdraw: formatRupiahSimple(e.totalWithdraw),
+    }));
+
     return NextResponse.json(
       {
         success: true,
-        message: `✅ Profit berhasil dikreditkan. ${investmentLine}. ${purchaseLine}. Total: ${formatRupiahSimple(result.totalProfitCredited)}.`,
+        message: `✅ Profit berhasil dikreditkan. ${investmentLine}. ${purchaseLine}. Total: ${formatRupiahSimple(result.totalProfitCredited)}. ${balanceSyncLine}.`,
         summary: {
           triggeredAt: result.triggeredAt,
           wibTime: result.wibTime,
@@ -105,6 +119,7 @@ export async function GET(request: NextRequest) {
           dayName: result.dayName,
           durationMs: result.durationMs,
           cleanupLine,
+          balanceSyncLine,
           investmentLine,
           purchaseLine,
           totalProfitCredited: result.totalProfitCredited,
@@ -112,11 +127,28 @@ export async function GET(request: NextRequest) {
           totalMatchingCredited: result.totalMatchingCredited,
           totalMatchingCreditedFormatted: formatRupiahSimple(result.totalMatchingCredited),
           totalBackfillDays: result.totalBackfillDays,
+          totalBalanceSynced: result.balanceSync.totalSynced,
+          totalBalanceSyncedFormatted: formatRupiahSimple(result.balanceSync.totalSynced),
           usersWithChange: result.userBalances.length,
+          usersBalanceSynced: result.balanceSync.usersSynced,
           topUsers,
+          topSyncEntries,
         },
         details: {
           cleanup: result.cleanup,
+          balanceSync: {
+            ...result.balanceSync,
+            totalSyncedFormatted: formatRupiahSimple(result.balanceSync.totalSynced),
+            entries: result.balanceSync.entries.map(e => ({
+              ...e,
+              beforeMainFormatted: formatRupiahSimple(e.beforeMain),
+              afterMainFormatted: formatRupiahSimple(e.afterMain),
+              syncedAmountFormatted: formatRupiahSimple(e.syncedAmount),
+              totalProfitFormatted: formatRupiahSimple(e.totalProfit),
+              totalWithdrawFormatted: formatRupiahSimple(e.totalWithdraw),
+              expectedFloorFormatted: formatRupiahSimple(e.expectedFloor),
+            })),
+          },
           investments: {
             ...result.investments,
             profitCreditedFormatted: formatRupiahSimple(result.investments.profitCredited),
