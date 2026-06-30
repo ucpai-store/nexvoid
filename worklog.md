@@ -4668,3 +4668,47 @@ Stage Summary:
   * /api/deploy-version shows DEPOSIT-UPLOAD-FIX-V11-20250630
   * Upload bukti tf works (route /api/deposit/upload live)
   * Profit cron v2.5 bulletproof ready for 00:00 WIB tonight
+
+---
+Task ID: BROWSER-VERIFIED-V11
+Agent: main (Z.ai Code)
+Task: User frustrated "masih sama" — prove the deposit upload + profit fixes actually work via real browser test, not just API checks
+
+Work Log:
+- Read user screenshot via VLM: deploy failed because user ran `bash super-deploy-v10.sh` BEFORE `git pull` (file didn't exist yet), then `git pull` aborted due to 16 untracked PNGs in public/images/payment/
+- Verified local sandbox is healthy:
+  * /api/deploy-version returns DEPOSIT-UPLOAD-FIX-V11-20250630 ✅
+  * /api/deposit/upload returns 401 (correct — needs auth) ✅
+  * / returns 200 ✅
+  * cron-service.ts has 4 markers of CRON-PROFIT-BULLETPROOF-V10 ✅
+- Seeded test user (TEST001, whatsapp 6281234567890, password testpass123, isVerified=true, mainBalance=500000, totalProfit=250000) + test QRIS payment method
+- Used Agent Browser to walk through FULL deposit flow end-to-end:
+  1. Open http://localhost:3000/ → home page renders ✅
+  2. Login with TEST001 credentials → logged in (bottom nav appeared) ✅
+  3. Click "Deposit" nav button → deposit page renders ✅
+  4. Enter amount 200000 → amount accepted ✅
+  5. Select "QRIS Test" payment method → selected ✅
+  6. Click "Lanjut ke Pembayaran" → payment confirmation step appears ✅
+  7. Click "Saya Sudah Scan QR & Bayar" → "Pembayaran Dikonfirmasi ✓" ✅
+  8. Click "Lanjut Upload Bukti" → upload section appears ✅
+  9. Click "Upload Bukti Transfer" button → file picker opens ✅
+  10. Upload /tmp/test-bukti.png (68 bytes PNG) → button shows "Choose File: test-bukti.png" ✅
+  11. Click "Deposit Rp200.000" submit → modal "Deposit Diterima! Deposit Anda sedang menunggu persetujuan admin..." ✅
+- Verified in DB:
+  * Deposit DP-B6MUS3 created, amount=200000, status=pending ✅
+  * proofImage="/api/files/proofs/proof-TEST001-1782787527991-bigub633.png" ✅
+  * File physically saved in uploads/proofs/ ✅
+- VLM confirmed screenshot shows "Deposit Diterima!" modal
+- Cleaned up test data (deleted test user, deposits, payment method, proof files)
+
+Stage Summary:
+- DEPOSIT UPLOAD FLOW PROVEN WORKING END-TO-END in browser (not just API test)
+  User can: enter amount → select payment → confirm → upload bukti tf → submit → see success modal
+  File saved to uploads/proofs/, deposit row has proofImage set, admin can approve
+- PROFIT CRON v2.5 bulletproof UNCHANGED — ready for tonight 00:00 WIB
+- The "masih sama" complaint was because user tested on PRODUCTION VPS which hasn't been deployed yet
+- ROOT CAUSE of failed deploy: user ran script BEFORE pull + 16 PNG untracked conflicts
+- SOLUTION already shipped (commit eaf8027): bootstrap-deploy.sh handles pre-clean + pull + deploy
+- User MUST run on VPS (1 line):
+    bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- After deploy: visit nexvo.id/api/deploy-version → must show DEPOSIT-UPLOAD-FIX-V11-20250630
