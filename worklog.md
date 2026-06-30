@@ -5231,3 +5231,82 @@ VERIFIKASI setelah deploy:
 2. Buka halaman Produk → semua 6 paket tampil (yang inactive pun tampil dengan badge merah)
 3. Buka halaman Aset → progress "X/Y hari kerja" + "Profit Seharusnya" muncul
 4. pm2 logs nexvo-cron --lines 30 → [Cron Service v2.6] + 🔧 SELF-HEAL
+
+---
+Task ID: WEEKDAY-OFFBYONE-FIX-V15
+Agent: main (serious mode)
+Task: User complaint "kontrak berjalan 3 hari tapi progress muncul 1 hari" — V13 (PROFIT-CONSISTENCY-FIX) pakai exclusive-end weekday counting yang bikin off-by-one untuk pembelian weekend (Sabtu/Minggu). Fix biar Asset page match EXACT dengan cron crediting.
+
+Work Log:
+- Baca worklog V12→V14: V13 sudah fix profit consistency (Asset=History), V14 sudah fix paket unavailable tampil. Tapi user masih complain "1 hari padahal 3 hari".
+- Baca AssetPage.tsx V13: countWeekdaysBetween pakai `while (cur < end)` (EXCLUSIVE end) — hari ini tidak dihitung.
+- Baca cron-service/index.ts v2.6: countWeekdaysBetween pakai `while (current <= end)` (INCLUSIVE end) — hari ini dihitung kalau weekday.
+- Baca cron profit logic: "no immediate profit on purchase" — kalau startDate == today → SKIP. Kalau weekday purchase, profit pertama besok 00:00 WIB. Kalau weekend purchase (Sabtu/Minggu), profit pertama Senin berikutnya.
+- Tulis test script /tmp/test-weekday.ts untuk simulasikan 13 skenario (kombinasi beli weekday/weekend × today weekday/weekend × same-day).
+
+IDENTIFIED ROOT CAUSE (off-by-one):
+- V13 AssetPage: exclusive-end counting → hari ini tidak dihitung sebagai weekday elapsed
+- Cron: inclusive-end counting → hari ini dihitung kalau weekday (credit di 00:00 WIB)
+- Untuk pembelian WEEKDAY (Senin-Jumat): cron skip same-day purchase → offset off-by-one → match V13 exclusive end. COINCIDENTAL MATCH, bukan benar-benar sinkron.
+- Untuk pembelian WEEKEND (Sabtu/Minggu): cron TIDAK skip same-day (karena weekend libur) → tidak ada offset → V13 undercount 1 hari vs cron.
+- Hasil test V13: 6 dari 13 skenario MISMATCH (semua pembelian weekend).
+
+FIX V15 APPLIED:
+1. AssetPage.tsx countWeekdaysBetween: ganti `cur < end` → `cur <= end` (INCLUSIVE end, match cron)
+2. AssetPage.tsx getWeekdaysElapsed: 
+   - Same-day purchase (startDate == today) → return 0 (cron skip same-day)
+   - Weekday purchase (Mon-Fri) → start counting from startDate+1 (cron skip purchase day)
+   - Weekend purchase (Sat/Sun) → start from startDate (no skip, weekend libur anyway)
+3. AssetPage.tsx getWeekdaysInContract: same skip rule (konsisten dengan getWeekdaysElapsed)
+4. AssetPage.tsx AssetCard: tambah info row di bawah progress bar:
+   - "⊘ Libur Sabtu-Minggu" (kiri, amber)
+   - "X hari kalender berjalan → Y hari kerja dikredit profit" (kanan)
+   - Supaya user paham bedanya "3 hari kalender" vs "2 hari kerja dikredit" (bukan bug, by design cron weekday-only)
+5. Bump version marker: WEEKDAY-OFFBYONE-FIX-V15-20250630
+6. Update bootstrap-deploy.sh + super-deploy-v10.sh expected marker → V15
+
+TESTED:
+- Test script V15 (15 skenario): ALL MATCH ✅
+  - Beli Jumat→Senin (3 cal): V15=1, cron=1 ✓ (V13 juga=1, tidak berubah untuk skenario ini)
+  - Beli Sabtu→Selasa (3 cal): V15=2, cron=2 ✓ (V13=1, MISMATCH dulu)
+  - Beli Minggu→Rabu (3 cal): V15=3, cron=3 ✓ (V13=2, MISMATCH dulu)
+  - Beli Senin same-day: V15=0, cron=0 ✓
+  - Beli weekday 3 cal: V15=3, cron=3 ✓
+- Agent Browser verification (login test user, buka Asset page):
+  - 3 investment cards render dengan info row baru
+  - Card "3 hari kalender lalu" (beli Sabtu): "3 hari kalender berjalan → 2 hari kerja dikredit profit" + Profit Seharusnya Rp40.000 (2 × Rp20.000) ✅
+  - Card "1 hari kalender lalu" (beli Senin): "1 hari kalender berjalan → 1 hari kerja dikredit profit" + Rp20.000 ✅
+  - Card "same-day": "0 hari kalender → 0 hari kerja dikredit" + Rp0 ✅
+  - "Libur Sabtu-Minggu" label muncul di semua card ✅
+- Dev log: semua API 200, no errors, no hydration warnings
+- TypeScript check: AssetPage.tsx 0 errors (hanya pre-existing stale .next/types untuk deploy-version, akan regenerate saat build)
+
+Commit: <pending>
+Pushed to: <pending>
+
+Stage Summary:
+- ROOT CAUSE "1 hari padahal 3 hari": V13 AssetPage pakai EXCLUSIVE-end weekday counting,
+  cron pakai INCLUSIVE-end. Untuk pembelian weekend (Sabtu/Minggu), V13 undercount 1 hari
+  vs cron. User beli Sabtu/Minggu → lihat "1 hari" padahal cron sudah kredit 2 hari.
+
+- FIX V15 (3 perubahan AssetPage + 1 UX info):
+  1. countWeekdaysBetween: INCLUSIVE end (cur <= end) — match cron
+  2. getWeekdaysElapsed: skip same-day purchase + skip weekday purchase day (mirror cron "no immediate profit")
+  3. getWeekdaysInContract: same skip rule (konsisten)
+  4. Info row "Libur Sabtu-Minggu • X hari kalender → Y hari kerja dikredit profit"
+
+- SEMUA PENYAKIT SUDAH FIX (V12→V15):
+  ✅ V12: static assets 404 → hydration gagal → "hasilnya sama" setelah deploy
+  ✅ V13: profit consistency (Asset total = History total = BonusLog sum)
+  ✅ V14: paket produk 4/5/6 yang inactive TETAP tampil dengan badge
+  ✅ V15: weekday off-by-one fix (Asset "X hari kerja" match cron exact) + UX info
+
+- USER HARUS DEPLOY 1x lagi untuk dapat V15 (include V12+V13+V14):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+
+- VERIFIKASI setelah deploy:
+  1. https://nexvo.id/api/deploy-version → marker WEEKDAY-OFFBYONE-FIX-V15-20250630
+  2. Buka halaman Aset → info row "Libur Sabtu-Minggu • X hari kalender → Y hari kerja dikredit" muncul
+  3. Kontrak yang sudah berjalan 3 hari (kalender) → tampil "X hari kerja" yang match cron (bukan 1 lagi)
+  4. Total Profit di Aset = Riwayat (sudah fix V13, tetap jalan)
+  5. Paket 4/5/6 yang inactive TETAP tampil dengan badge (sudah fix V14, tetap jalan)

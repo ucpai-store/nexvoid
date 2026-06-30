@@ -174,11 +174,14 @@ function getDaysRemaining(endDate: string | null): number {
    "10/30 hari" but only 8 × dailyProfit credited (mismatch). */
 
 function countWeekdaysBetween(start: Date, end: Date): number {
+  // ★ v15: INCLUSIVE end (cur <= end) — matches cron's profit crediting logic.
+  //   Cron credits "today" as soon as it runs at 00:00 WIB. AssetPage must do the same,
+  //   otherwise user sees "1 hari" while cron already credited 2 (off-by-one for weekend purchases).
   let count = 0;
   const cur = new Date(start);
   // Safety cap
   let safety = 400;
-  while (cur < end && safety-- > 0) {
+  while (cur <= end && safety-- > 0) {
     const day = cur.getDay(); // 0=Sun, 6=Sat
     if (day !== 0 && day !== 6) count++;
     cur.setDate(cur.getDate() + 1);
@@ -200,9 +203,15 @@ function getDaysElapsed(startDate: string): number {
 }
 
 function getWeekdaysElapsed(startDate: string): number {
-  // ★ v2.6: Count ONLY weekdays (Mon-Fri) since startDate — matches cron's profit crediting.
-  //   Profit libur di Sabtu & Minggu, jadi progress juga harus libur di weekend.
-  //   This makes "X hari kerja × dailyProfit = totalProfitEarned" hold true.
+  // ★ v15: Count weekdays CREDITED by cron (matches cron logic exactly).
+  //   Rules (mirror cron-service v2.6):
+  //   1. Same-day purchase (startDate == today) → 0 (cron skips "no immediate profit on purchase")
+  //   2. Weekday purchase (Mon-Fri) → start counting from startDate+1 (cron skips purchase day)
+  //   3. Weekend purchase (Sat/Sun) → start counting from startDate (weekend is libur anyway,
+  //      so first weekday credited is the following Monday — no off-by-one)
+  //   4. INCLUSIVE end: today is counted if it's a weekday (cron credits today at 00:00 WIB)
+  //
+  //   This fixes V13's off-by-one bug where weekend purchases showed 1 less day than cron credited.
   const startUTC = new Date(startDate);
   const nowUTC = new Date();
   const WIB_OFFSET = 7 * 3600000;
@@ -210,13 +219,27 @@ function getWeekdaysElapsed(startDate: string): number {
   const nowWIB = new Date(nowUTC.getTime() + nowUTC.getTimezoneOffset() * 60000 + WIB_OFFSET);
   const startDay = new Date(startWIB.getFullYear(), startWIB.getMonth(), startWIB.getDate());
   const todayDay = new Date(nowWIB.getFullYear(), nowWIB.getMonth(), nowWIB.getDate());
-  return countWeekdaysBetween(startDay, todayDay);
+
+  // Same-day purchase: no profit yet
+  if (startDay.getTime() === todayDay.getTime()) return 0;
+
+  // Weekday purchase: cron skips purchase day (no immediate profit), start from next day
+  const startDayOfWeek = startDay.getDay();
+  const isWeekdayPurchase = startDayOfWeek !== 0 && startDayOfWeek !== 6;
+  const countingStart = new Date(startDay);
+  if (isWeekdayPurchase) {
+    countingStart.setDate(countingStart.getDate() + 1);
+  }
+
+  return countWeekdaysBetween(countingStart, todayDay);
 }
 
 function getWeekdaysInContract(startDate: string, contractDays: number): number {
-  // ★ v2.6: Count weekdays from startDate to startDate + contractDays.
-  //   This is the actual number of profit-crediting days for this contract.
-  //   contractDays is calendar days, so we compute the weekday equivalent.
+  // ★ v15: Count weekdays CREDITABLE in the contract (matches cron's hardCap logic).
+  //   Same skip rule as getWeekdaysElapsed:
+  //   - Weekday purchase → start from startDate+1 (cron skips purchase day)
+  //   - Weekend purchase → start from startDate (weekend is libur, no skip needed)
+  //   - INCLUSIVE end: endDay is counted if weekday (cron credits on endDate if now < endDate)
   if (contractDays <= 0) return 0;
   const startUTC = new Date(startDate);
   const WIB_OFFSET = 7 * 3600000;
@@ -224,7 +247,15 @@ function getWeekdaysInContract(startDate: string, contractDays: number): number 
   const startDay = new Date(startWIB.getFullYear(), startWIB.getMonth(), startWIB.getDate());
   const endDay = new Date(startDay);
   endDay.setDate(endDay.getDate() + contractDays);
-  return countWeekdaysBetween(startDay, endDay);
+
+  const startDayOfWeek = startDay.getDay();
+  const isWeekdayPurchase = startDayOfWeek !== 0 && startDayOfWeek !== 6;
+  const countingStart = new Date(startDay);
+  if (isWeekdayPurchase) {
+    countingStart.setDate(countingStart.getDate() + 1);
+  }
+
+  return countWeekdaysBetween(countingStart, endDay);
 }
 
 function getProgress(startDate: string, contractDays: number): number {
@@ -268,6 +299,7 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
   const daysRemaining = getDaysRemaining(asset.endDate);
   const weekdaysElapsed = getWeekdaysElapsed(asset.startDate);
   const weekdaysInContract = getWeekdaysInContract(asset.startDate, asset.contractDays);
+  const calendarElapsed = getDaysElapsed(asset.startDate);
   const isInvestment = asset.type === 'investment';
 
   // ★ v2.6: Expected profit = weekdays elapsed × dailyProfit
@@ -374,6 +406,17 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
               transition={{ duration: 1, ease: 'easeOut' }}
               className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
             />
+          </div>
+          {/* ★ v15: Clarification row — explain weekday vs calendar so user understands
+              why "1 hari kerja" when calendar already shows "3 hari berjalan" */}
+          <div className="flex items-center justify-between text-[9px] mt-1 text-muted-foreground/70">
+            <span className="flex items-center gap-1">
+              <span className="text-amber-400/80">⊘</span>
+              Libur Sabtu-Minggu
+            </span>
+            <span>
+              {calendarElapsed} hari kalender berjalan → {weekdaysElapsed} hari kerja dikredit profit
+            </span>
           </div>
         </div>
       )}

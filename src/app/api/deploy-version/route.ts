@@ -5,6 +5,12 @@ import { execSync } from 'child_process';
 
 // ★★★ Version marker — bump on every fix. Used to verify the VPS is running
 //   the latest code. Visit https://nexvo.id/api/deploy-version to check.
+//   v15 (20250630): WEEKDAY OFF-BY-ONE FIX — Asset page "X hari kerja" sekarang
+//     match EXACT dengan cron crediting. V13 pakai exclusive-end counting yang
+//     bikin pembelian Sabtu/Minggu tampil 1 hari lebih sedikit dari cron kredit.
+//     Fix: inclusive-end counting + skip weekday purchase day (mirror cron logic).
+//     Bonus: tambah info row "Libur Sabtu-Minggu • X hari kalender → Y hari kerja dikredit"
+//     supaya user gak bingung kenapa "1 hari kerja" padahal calendar 3 hari.
 //   v14 (20250630): SHOW UNAVAILABLE PRODUCTS — paket 4/5/6 yang admin set
 //     isActive=false atau isStopped=true TETAP muncul di web user, dengan
 //     badge "TIDAK TERSEDIA" / "DIHENTIKAN SEMENTARA". Tombol beli di-disable.
@@ -28,7 +34,7 @@ import { execSync } from 'child_process';
 //     This was the ROOT CAUSE of "hasilnya sama" after deploy — old code
 //     kept running because `next start` doesn't properly serve standalone builds.
 //   v11 (20250630): add /api/deposit/upload route + base64 proof storage.
-export const VERSION_MARKER = 'SHOW-UNAVAILABLE-PRODUCTS-V14-20250630';
+export const VERSION_MARKER = 'WEEKDAY-OFFBYONE-FIX-V15-20250630';
 export const CRON_VERSION = 'v2.6-profit-consistency';
 
 export async function GET() {
@@ -60,7 +66,7 @@ export async function GET() {
   return NextResponse.json({
     versionMarker: VERSION_MARKER,
     cronVersion: CRON_VERSION,
-    description: 'v14 SHOW UNAVAILABLE PRODUCTS — paket isActive=false/isStopped=true tetap tampil dengan badge. v13 PROFIT CONSISTENCY: Asset = History = BonusLog sum.',
+    description: 'v15 WEEKDAY OFF-BY-ONE FIX — Asset "X hari kerja" match cron exact. v14 SHOW UNAVAILABLE PRODUCTS. v13 PROFIT CONSISTENCY.',
     buildId,
     builtAt,
     gitCommit,
@@ -68,6 +74,10 @@ export async function GET() {
     serverTime: new Date().toISOString(),
     nodeEnv: process.env.NODE_ENV || 'development',
     fixes: [
+      'v15: AssetPage countWeekdaysBetween INCLUSIVE end (cur <= end) — match cron crediting',
+      'v15: getWeekdaysElapsed skip weekday purchase day (cron no immediate profit on purchase)',
+      'v15: getWeekdaysInContract same skip rule (konsisten dengan getWeekdaysElapsed)',
+      'v15: tambah info row "Libur Sabtu-Minggu • X hari kalender → Y hari kerja dikredit"',
       'v14: /api/products GET tampilkan SEMUA produk (no filter isActive=true) + computed isAvailable field',
       'v14: /api/products POST validasi ketat — gak bisa beli isActive=false / isStopped=true (error spesifik per kondisi)',
       'v14: /api/products/tiers return semua produk + isAvailable flag',
