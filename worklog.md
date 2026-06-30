@@ -5718,3 +5718,55 @@ Stage Summary:
 - After deploy, the script will print "✅ JS chunks served correctly (HTTP 200, X bytes) — UI akan render!"
 - If user still sees teks-only after this deploy, the script will EXIT with FATAL error
   and print debug commands — share that output for further diagnosis.
+
+---
+Task ID: profit-cleanup-v2.9
+Agent: main (Z.ai Code)
+Task: Fix profit dobel/triple yang masih ada — user lihat 3 entri (57.600) padahal baru 2 hari kerja (seharusnya 38.400). Cek juga profit malam 00:00 wajib masuk & atomic claim prevent duplikat baru.
+
+Work Log:
+- Investigasi root cause kenapa cleanup v2.8 nggak hapus profit triple:
+  * STEP 4 v2.8 bandingkan User.totalProfit ke SUM(BonusLog type=profit)
+  * Kalo BonusLog punya 3 entri di 3 hari berbeda (bukan same-day duplicate),
+    STEP 1 dedup nggak ngapa-ngapain, STEP 4 nggak koreksi karena
+    BonusLog sum == User.totalProfit → user tetap 57.600
+- Verifikasi cron v2.7 atomic claim BENAR — prevent duplikat baru:
+  * updateMany WHERE lastProfitDate IS NULL OR lastProfitDate < startOfDayWIB
+  * SQLite eksekusi atomically → 2 proses nggak bisa claim same day
+  * checkAndRunCrons() fire setiap 10 detik di weekday → profit pasti masuk 00:00 WIB
+- Verifikasi User.totalProfit di-increment oleh: investment profit, salary,
+  matching bonus, admin manual add (BUKAN hanya investment profit)
+  → STEP 4 nggak boleh set totalProfit = expectedInvestmentProfit
+  → STEP 4 harus reduce totalProfit by excess saja
+- REWRITE STEP 4 (v2.9):
+  1. expectedProfit = SUM(Investment.totalProfitEarned) per user
+     (STEP 2 sudah recalculate = elapsedWeekdays × dailyProfit)
+  2. Kalo SUM(BonusLog profit) > expectedProfit → excess = selisih
+  3. Delete excess BonusLog entries (smallest first, greedy:
+     delete if remainingSum - entry.amount >= expected - 1)
+  4. Reduce User.totalProfit by excess (preserve salary/matching/referral)
+  5. Reduce User.mainBalance by excess (refund over-credit)
+  6. Skip if expected=0 but logs exist (suspicious — manual review)
+  7. Tolerance 1 rupiah (floating point safety)
+- Update super-deploy-v10.sh: tambah v2.9 Profit Cleanup Verification
+  (check cron logs for cleanup markers + DB check for same-day duplicates)
+- Verify TypeScript: no errors with project tsconfig (ES2017 target)
+- Verify bash syntax: super-deploy-v10.sh passes `bash -n`
+- Commit 0a904e6 + push to GitHub
+
+Stage Summary:
+- ✅ ROOT CAUSE v2.8 bug FIXED: STEP 4 sekarang pakai Investment.totalProfitEarned
+  sebagai ground truth, bukan BonusLog sum. Excess entries di-delete, balance
+  di-koreksi.
+- ✅ Cron v2.7 atomic claim TERVERIFIKASI benar — malam ini 00:00 WIB profit
+  masuk tepat 1x per investment (no double).
+- ✅ Cleanup auto-run di cron startup → setiap PM2 restart, cleanup v2.9 jalan
+  otomatis dan hapus excess profit.
+- ✅ Committed + pushed (0a904e6)
+- USER ACTION: run bootstrap-deploy.sh di VPS (sama seperti biasa):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- Setelah deploy:
+  1. Cron restart → cleanup v2.9 auto-run → hapus 1 entry excess (57.600 → 38.400)
+  2. Malam 00:00 WIB → profit masuk 1x (atomic claim prevent double)
+  3. Cek: pm2 logs nexvo-cron --lines 50 | grep "Profit Cleanup"
+     harus muncul "Deleted 1 excess entries" + "corrected -Rp19.200"
