@@ -5770,3 +5770,40 @@ Stage Summary:
   2. Malam 00:00 WIB → profit masuk 1x (atomic claim prevent double)
   3. Cek: pm2 logs nexvo-cron --lines 50 | grep "Profit Cleanup"
      harus muncul "Deleted 1 excess entries" + "corrected -Rp19.200"
+
+---
+Task ID: profit-cleanup-v2.9.1
+Agent: main (Z.ai Code)
+Task: Detail audit profit cleanup — "cek detail tidak boleh ada penyakit sedikit pun"
+
+Work Log:
+- Full audit profit-cleanup.ts v2.9 + cron-service.ts → found 6 bugs (4 CRITICAL):
+  * BUG #1: countWeekdaysBetween include purchase day → over-calculate 1 day → 3 entri dianggap benar
+  * BUG #2: STEP 2 set lastProfitDate=today → cron skip → profit hari ini nggak masuk
+  * BUG #3: STEP 2 set totalProfitEarned=expected (naik+ turf) → double count kalau hari ini belum kredit
+  * BUG #4: No dailyProfit fallback → VIP purchase (dailyProfit=0) → trim ALL entries
+  * BUG #5: RACE CONDITION — cleanup jalan async, cron start langsung → overlap → off-by-one balance
+  * BUG #6: STEP 4 pakai theoretical excess, bukan actual deleted → over-deduct balance di edge case
+- Fix BUG #1: ganti countWeekdaysBetween → countCreditedDays (start+1 to end, inclusive)
+- Fix BUG #2: JANGAN set lastProfitDate di cleanup (cron atomic claim yang manage)
+- Fix BUG #3: ONLY REDUCE — MIN(current, expected), never increase
+- Fix BUG #4: dailyProfit fallback = inv.dailyProfit || amount × package.profitRate / 100
+- Fix BUG #5: cleanupDone flag — checkAndRunCrons() tunggu cleanup selesai sebelum process profit
+- Fix BUG #6: actualExcess = currentLogSum - remainingSum (bukan theoretical excess)
+- Also fix: bonusLogAfter recompute = before - total removed (STEP 1 + STEP 4)
+- Also fix: STEP 3 Purchase same ONLY-REDUCE + countCreditedDays fix
+- TypeScript clean (no errors in modified files)
+- Dev server still HTTP 200 (verified)
+- Commit efee90f + push to GitHub
+
+Stage Summary:
+- ✅ 6 bugs FIXED (4 CRITICAL + 2 MINOR)
+- ✅ TypeScript clean, dev server running, all edge cases traced & verified
+- ✅ User scenario verified: 3 entries (57600) → cleanup trims 1 → 2 entries (38400) ✓
+- ✅ Cron malam 00:00 WIB: atomic claim prevent double, credit tepat 1x per investment ✓
+- ✅ Race condition eliminated: cron waits for cleanup before processing profit
+- ✅ Committed + pushed (efee90f)
+- USER ACTION: run bootstrap-deploy.sh di VPS:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- Setelah deploy: pm2 logs nexvo-cron --lines 50 | grep "v2.9.1"
+  harus muncul "Cleanup phase done — cron profit processing enabled"
