@@ -5642,3 +5642,36 @@ Stage Summary:
   ✅ V16: paket 4/5/6 inactive tampil dengan badge
   ✅ V17: cron-service V2.7 atomic claim + PID lock
   ✅ V18: UNIFIED — 3 sumber kredit profit semua atomic claim + backfill konsisten + dailyProfit stored
+
+---
+Task ID: profit-cleanup-v2.8
+Agent: main (Z.ai Code)
+Task: Fix bug triple profit — hapus profit dobel secara otomatis sesuai progres yang benar. User: "PROFIT YG DOBEL NANTI DI AMBIL YA / YG LEBIH TADI MASUK NYA DI HAPUS YA"
+
+Work Log:
+- Investigasi semua cron instance & file duplikat: ditemukan cron-service.ts (root V2.7), cron-service/index.ts, mini-services/cron-service/index.ts, test-cron-v26.ts, src/app/api/cron/profit/route.ts
+- Baca full cron-service.ts V2.7 (1810 baris) untuk pahami atomic claim logic, PID lock, self-heal, Investment & Purchase profit credit flow
+- Baca schema Prisma: BonusLog punya (id, userId, fromUserId, type, level, amount, description, createdAt) — TIDAK ada investmentId/creditType field
+- Konfirmasi cron-service.ts V2.7 sudah punya atomic claim (updateMany kondisional) yang mencegah duplikat BARU, tapi tidak membersihkan duplikat LAMA dari versi sebelumnya
+- Buat modul src/lib/profit-cleanup.ts dengan function cleanupDuplicateProfits() yang:
+  - STEP 1: Dedup BonusLog(type='profit') per (userId, WIB day) — sisakan entry amount terbesar (backfill), hapus sisanya
+  - STEP 2: Recalculate Investment.totalProfitEarned dari progres weekday (start → min(today, endDate), capped contractDays)
+  - STEP 3: Recalculate Purchase.profitEarned = sum(linked Investment.totalProfitEarned)
+  - STEP 4: Recalculate User.mainBalance & totalProfit — koreksi over-credit (jika totalProfit > sum BonusLog profit, kurangi)
+- Buat admin endpoint POST/GET /api/admin/profit-cleanup untuk trigger manual (POST = run cleanup, GET = dry-run preview)
+- Integrasikan cleanupDuplicateProfits() ke cron-service.ts startup (jalan sekali saat boot, sebelum self-heal v2.6)
+- Buat standalone script scripts/run-profit-cleanup.ts untuk run manual via CLI
+- Hapus file cron duplikat: cron-service/ folder, mini-services/cron-service/ folder, test-cron-v26.ts
+- Test cleanup di database sandbox lokal: sukses recalculate 3 investments, 0 errors, duration 43ms
+- Test build cron-service.ts: sukses (bun build, 7 modules)
+- Test admin endpoint: return 401 (Unauthorized) tanpa token — route terdaftar dengan benar
+
+Stage Summary:
+- ✅ Modul cleanup profit dobel dibuat di src/lib/profit-cleanup.ts
+- ✅ Cron service (cron-service.ts) sekarang auto-cleanup saat startup (v2.8)
+- ✅ Admin endpoint /api/admin/profit-cleanup untuk trigger manual (POST) & dry-run (GET)
+- ✅ Standalone script scripts/run-profit-cleanup.ts untuk run via CLI
+- ✅ File cron duplikat dihapus — hanya 1 cron service sekarang (cron-service.ts root)
+- ✅ Cleanup idempotent: safe untuk run multiple times
+- ✅ Cleanup konservatif: hanya kurangi over-credit, tidak auto-top-up
+- Saat deploy ke nexvo.id: PM2 akan restart cron-service, cleanup akan jalan otomatis dan hapus semua profit dobel/triple yang ada, koreksi balance user, dan lanjut dengan progres yang benar
