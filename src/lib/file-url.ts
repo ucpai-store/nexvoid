@@ -46,6 +46,13 @@ function isUploadedFilePath(path: string): boolean {
 export function getFileUrl(path: string, addCacheBuster: boolean = true): string {
   if (!path) return path;
 
+  // ★ v11: Base64 data URLs (proof images stored directly in DB) — return as-is.
+  //   This makes <img src={getFileUrl(deposit.proofImage)} /> work for both
+  //   data URLs and traditional file URLs.
+  if (path.startsWith('data:')) {
+    return path;
+  }
+
   // Vercel Blob URLs or external URLs - return as-is
   if (path.startsWith('https://') || path.startsWith('http://') || path.startsWith('/api/')) {
     return path;
