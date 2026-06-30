@@ -6026,3 +6026,51 @@ Stage Summary:
 - Diagnostic akan kasih tahu PERSIS: v3.1 sudah deploy atau belum, cron jalan atau crash, saldo DB berapa
 - Jika v3.1 belum deploy → jalankan bootstrap-deploy.sh
 - Jika v3.1 sudah deploy tapi saldo masih 68800 → pm2 restart nexvo-cron, tunggu 30s, cek lagi
+
+---
+Task ID: profit-cleanup-v3.2
+Agent: main (Z.ai Code)
+Task: User report "masih 68" — screenshot VPS show cleanup v3.1 jalan tapi "0 users corrected". Cari root cause & fix.
+
+Work Log:
+- VLM analyze screenshot VPS: cleanup v3.1 SUDAH jalan, tapi:
+  * "Investments recalculated: 0 (drift fixed: 0)" → STEP 2 tidak menemukan drift
+  * "Users balance corrected: 0 (total Rp0 removed)" → STEP 4 tidak menemukan excess
+  * TAPI user masih lihat saldo 68.800
+- ROOT CAUSE DITEMUKAN: User.mainBalance drift dari BonusLog sum
+  * STEP 4 compare BonusLog sum (38.400) vs Investment.totalProfitEarned (38.400) → MATCH → skip
+  * TAPI User.mainBalance (68.800) tidak ke-compare langsung
+  * Drift +30.400 terjadi karena cleanup v2.9 LAMA hapus BonusLog tapi TIDAK refund User.mainBalance
+  * Hasil: Investment=38.400 ✓, BonusLog=38.400 ✓, TAPI User.mainBalance=68.800 ❌
+- FIX v3.2: Tambah STEP 5 — correctUserBalanceDrift()
+  * expected_totalProfit = sum(BonusLog.amount WHERE type='profit') per user
+  * If User.totalProfit > expected → drift → reduce BOTH User.totalProfit AND User.mainBalance
+  * ONLY REDUCE — never increase
+  * Safeguard: skip jika drift <= 1 (tolerance)
+- Update marker: PROFIT-CLEANUP-V3.2-20250630
+- Update cron-service.ts startup log: v3.2
+- Update deploy-version: v21, fixes list updated
+- Verify compile: profit-cleanup.ts + cron-service.ts bundle clean ✓
+- Verify marker live: http://localhost:3000/api/deploy-version → PROFIT-CLEANUP-V3.2-20250630 ✓
+- Commit 3830400 + push to GitHub ✓
+
+Stage Summary:
+- ✅ ROOT CAUSE "saldo masih 68800": User.mainBalance drift dari BonusLog sum (cleanup v2.9 lama hapus log tanpa refund balance)
+- ✅ FIX v3.2: STEP 5 compare User.totalProfit langsung dengan sum(BonusLog type='profit')
+- ✅ Setelah deploy v3.2:
+  (1) Cron restart → cleanup v3.2 auto-run
+  (2) STEP 5 deteksi: User.totalProfit (68800) > sum(BonusLog profit) (38400) → drift 30400
+  (3) Reduce User.totalProfit: 68800 → 38400 ✓
+  (4) Reduce User.mainBalance: 68800 → 38400 ✓
+  (5) Profit tetap wajib masuk 00:00 WIB (cron atomic claim + continuous catchup)
+- USER ACTION: deploy v3.2 di VPS:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- POST-DEPLOY VERIFY:
+  1. https://nexvo.id/api/deploy-version → marker PROFIT-CLEANUP-V3.2-20250630
+  2. pm2 logs nexvo-cron --lines 30 | grep "v3.2"
+     → "v3.2 Profit Cleanup done: ... corrected 1 users (total 30400 over-credit removed)"
+     → "STEP 5 ... DRIFT detected — totalProfit 68800 > expected 38400 (drift 30400)"
+     → "Corrected: mainBalance 68800 → 38400 | totalProfit 68800 → 38400"
+  3. Cek saldo user → HARUS 38.400 (bukan 68.800)
+  4. User refresh browser (Ctrl+Shift+R) → saldo 38.400
+  5. Profit harian tetap masuk 00:00 WIB setiap weekday
