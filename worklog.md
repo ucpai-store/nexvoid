@@ -6160,3 +6160,51 @@ Stage Summary:
   3. ATAU cek pm2 logs saat user buka Asset page:
      pm2 logs nexvo-web --lines 30 | grep "ASSETS API v3.2"
 - Kirim output diagnostic ke developer untuk analisis presisi sumber 68800
+
+---
+Task ID: diag-deep-v32-fix
+Agent: main (Z.ai Code)
+Task: User jalankan diag-deep-v32.sh di VPS, output "XDB tidak ditemukan di /home/nexvo/db/custom.db". Fix diagnostic script agar auto-detect DB location.
+
+Work Log:
+- VLM analyze screenshot VPS user (srv1656887, root@srv1656887):
+  * Run: bash <<(curl -sl "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/diag-deep-v32.sh")
+  * Output: "NEXVO v3.2 DEEP DIAGNOSTIC - SUMBER 68800 / Waktu: 2026-06-30 16:17:45 WIB / XDB tidak ditemukan di /home/nexvo/db/custom.db"
+  * Script exit 1 di line 17-21 karena DB tidak ada
+- ROOT CAUSE: diag-deep-v32.sh line 8-9 hardcoded:
+    PROJECT_DIR="/home/nexvo"
+    DB="$PROJECT_DIR/db/custom.db"
+  VPS user mungkin deploy nexvo di lokasi lain (root, /var/www, /opt, dll)
+- Cek .env project: DATABASE_URL=file:/home/z/my-project/db/custom.db (sandbox path, beda lg)
+- Cek credit-now.sh line 30-33: pattern auto-detect PROJECT_DIR yang bagus
+- FIX diag-deep-v32.sh v3.2.1:
+  * Tambah section [0/7] DETEKSI PROJECT DIR & DB LOCATION
+  * Auto-detect PROJECT_DIR dari 10 candidates:
+    /home/nexvo, /root/nexvo, /var/www/nexvo, /var/www/html/nexvo,
+    /var/www/nexvoid, /home/$USER/nexvo, /opt/nexvo, $HOME/nexvo, $(pwd)
+    (each must have package.json with "nexvo" or "nexvoid" inside)
+  * Fallback via PM2 cwd: pm2 info nexvo-web | grep cwd
+  * Fallback via ps aux | grep nexvo
+  * DB detection priority:
+    1. Parse DATABASE_URL from .env (PROJECT_DIR/.env or candidates)
+    2. Multiple candidate DB paths
+    3. Last resort: find / -name 'custom.db' (auto-pick first result)
+  * Graceful exit ketika DB truly not found, dengan helpful hints:
+    - Maybe nexvo not deployed yet (run bootstrap-deploy.sh)
+    - Maybe project in non-standard location (find package.json)
+    - Maybe DB has different name (find *.db)
+- Test lokal: bash diag-deep-v32.sh → auto-detect /home/z/my-project + DB dari .env ✓
+- Test syntax: bash -n → OK ✓
+- Commit 97c2af3 + push to GitHub ✓
+
+Stage Summary:
+- ✅ ROOT CAUSE "XDB tidak ditemukan": hardcoded path /home/nexvo/db/custom.db
+- ✅ FIX v3.2.1: auto-detect DB via 3 strategies (env URL, candidate paths, find /)
+- USER ACTION: re-run diagnostic (sudah push ke GitHub):
+  bash <(curl -sl "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/diag-deep-v32.sh")
+- Jika setelah fix masih "DB TIDAK DITEMUKAN di seluruh filesystem":
+  → nexvo BELUM di-deploy di VPS user (srv1656887)
+  → jalankan dulu: bash <(curl -sL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh)
+- Jika DB ditemukan di lokasi lain (e.g. /root/nexvo):
+  → diagnostic akan jalan normal, tampilkan 7 sections
+  → kirim output ke developer untuk analisis sumber 68800
