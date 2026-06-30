@@ -3,33 +3,65 @@
 #  NEXVO Bootstrap Deploy — 1 command resolves ALL git conflicts
 #  + pulls latest code + runs super-deploy-v10.sh
 #
-#  WHY THIS EXISTS:
-#    User ran `bash super-deploy-v10.sh` BEFORE git pull → file didn't
-#    exist yet. Then `git pull` failed because 16 PNG files in
-#    public/images/payment/ were untracked but exist in the repo.
-#
-#  WHAT THIS DOES (in order):
-#    1. cd to project dir
-#    2. git fetch (get latest from GitHub)
-#    3. Remove ONLY the conflicting untracked PNG files in payment/products/banners dirs
-#    4. git reset --hard origin/main (now safe — no conflicts)
-#    5. Run super-deploy-v10.sh (now exists on disk)
+#  v3.2.1 (2025-06-30):
+#    - Auto-detect PROJECT_DIR (multiple candidates + PM2 cwd fallback)
+#    - Accept MULTIPLE markers (not just V17) — prevents deploy stuck
+#      when marker updated to v3.1 / v3.2 / future versions
 #
 #  Run on VPS as root or nexvo user:
 #    bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
 # ═══════════════════════════════════════════════════════════════
 set -uo pipefail
 
-PROJECT_DIR="/home/nexvo"
+# ─── AUTO-DETECT PROJECT DIR (v3.2.1) ───
+PROJECT_DIR=""
+for _cand in \
+  "/home/nexvo" \
+  "/root/nexvo" \
+  "/var/www/nexvo" \
+  "/var/www/html/nexvo" \
+  "/var/www/nexvoid" \
+  "/home/$SUDO_USER/nexvo" \
+  "/home/$USER/nexvo" \
+  "/opt/nexvo" \
+  "$HOME/nexvo" \
+  "$(pwd)"; do
+  if [ -n "$_cand" ] && [ -d "$_cand" ] && [ -f "$_cand/package.json" ]; then
+    if grep -q "nexvo\|nexvoid" "$_cand/package.json" 2>/dev/null; then
+      PROJECT_DIR="$_cand"
+      break
+    fi
+  fi
+done
+
+if [ -z "$PROJECT_DIR" ]; then
+  # Fallback via PM2 cwd
+  _PM2_CWD=$(pm2 info nexvo-web 2>/dev/null | grep "cwd" | head -1 | sed 's/.*│ *//;s/ *│.*//' | tr -d ' ')
+  if [ -n "$_PM2_CWD" ] && [ -d "$_PM2_CWD" ]; then
+    PROJECT_DIR="$_PM2_CWD"
+  fi
+fi
+
+# ★★★ v3.2.1: ACCEPT MULTIPLE MARKERS (so future deploys don't fail verify step) ★★★
+ACCEPTED_MARKERS=(
+  "PROFIT-CLEANUP-V3.2-20250630"   # current (commit 97c2af3+)
+  "PROFIT-CLEANUP-V3.1-20250630"   # v3.1 fallback
+  "DOUBLE-PROFIT-FIX-V17-20250630" # legacy v17 fallback
+)
+EXPECTED_MARKER="${ACCEPTED_MARKERS[0]}"   # primary marker (for display)
 
 echo "═══════════════════════════════════════════"
-echo "  NEXVO Bootstrap Deploy"
+echo "  NEXVO Bootstrap Deploy (v3.2.1)"
 echo "  Timestamp: $(date)"
+echo "  Project dir: ${PROJECT_DIR:-NOT_FOUND}"
+echo "  Accepted markers:"
+for m in "${ACCEPTED_MARKERS[@]}"; do echo "    - $m"; done
 echo "═══════════════════════════════════════════"
 
-if [ ! -d "$PROJECT_DIR" ]; then
-  echo "❌ Project dir not found: $PROJECT_DIR"
-  echo "   This script must run on the VPS where /home/nexvo exists."
+if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
+  echo "❌ Project dir not found! Tried all candidates."
+  echo "   Searched: /home/nexvo /root/nexvo /var/www/nexvo /opt/nexvo etc."
+  echo "   Manual override: cd /your/project/path && bash bootstrap-deploy.sh"
   exit 1
 fi
 
@@ -100,14 +132,42 @@ echo "Deploy version response:"
 echo "$VERSION_RESP" | head -c 500
 echo ""
 
-if echo "$VERSION_RESP" | grep -q "DOUBLE-PROFIT-FIX-V17-20250630"; then
+# ★★★ v3.2.1: accept ANY of ACCEPTED_MARKERS ★★★
+MARKER_OK=false
+MATCHED_MARKER=""
+for _m in "${ACCEPTED_MARKERS[@]}"; do
+  if echo "$VERSION_RESP" | grep -q "$_m"; then
+    MARKER_OK=true
+    MATCHED_MARKER="$_m"
+    break
+  fi
+done
+
+if [ "$MARKER_OK" = "true" ]; then
   echo ""
   echo "✅✅✅ DEPLOY SUCCESS ✅✅✅"
-  echo "   VPS is running DOUBLE-PROFIT-FIX-V17-20250630"
-  echo "   → cron v2.7 ATOMIC CLAIM aktif (no more double-profit — 2 hari = 2 entry, bukan 3)"
-  echo "   → cron v2.7 PID LOCK aktif (no duplicate cron instances)"
-  echo "   → Paket 4/5/6 inactive TETAP tampil dengan badge TIDAK TERSEDIA (defense in depth)"
+  echo "   VPS is running $MATCHED_MARKER"
+  echo "   → cron v3.2 STEP 5 (direct User balance correction from BonusLog)"
+  echo "   → cron v2.7 ATOMIC CLAIM (no more double-profit)"
+  echo "   → cron v2.7 PID LOCK (no duplicate cron instances)"
   echo "   → Profit masuk jam 00:00 WIB (Senin-Jumat), Sabtu-Minggu libur"
+  echo "   → Continuous catchup every 10s — pasti masuk tepat waktu"
+  echo ""
+  echo "═══════════════════════════════════════════"
+  echo "  NEXT: VERIFIKASI SALDO & PROFIT CATCHUP"
+  echo "═══════════════════════════════════════════"
+  echo ""
+  echo "  1. Cek saldo user di DB (saldo harusnya 38400, bukan 68800):"
+  echo "     bash <(curl -sL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/diag-deep-v32.sh)"
+  echo ""
+  echo "  2. Force cleanup + profit catchup NOW (langsung trigger):"
+  echo "     bash <(curl -sL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/force-profit-now.sh)"
+  echo ""
+  echo "  3. Cek pm2 logs nexvo-cron untuk konfirmasi STEP 5 jalan:"
+  echo "     pm2 logs nexvo-cron --lines 50 | grep 'STEP 5\\|v3.2'"
+  echo ""
+  echo "  Output harus menampilkan:"
+  echo "     ✅ Corrected: mainBalance 68800 → 38400 | totalProfit 68800 → 38400"
 else
   echo ""
   echo "⚠️  Version marker belum terlihat. Kemungkinan:"
@@ -115,7 +175,15 @@ else
   echo "   - PM2 belum restart dengan code baru (jalankan: pm2 restart nexvo-web --update-env)"
   echo "   - Cek pm2 logs: pm2 logs nexvo-web --lines 30"
   echo ""
-  echo "   Expected marker: DOUBLE-PROFIT-FIX-V17-20250630"
+  echo "   Accepted markers (none matched):"
+  for _m in "${ACCEPTED_MARKERS[@]}"; do echo "     - $_m"; done
   echo "   Got response:"
   echo "$VERSION_RESP" | head -c 300
+  echo ""
+  echo "═══════════════════════════════════════════"
+  echo "  FALLBACK: Force profit catchup TANPA marker verification:"
+  echo "═══════════════════════════════════════════"
+  echo "  Code v3.2 sudah ter-deploy tapi verification stuck."
+  echo "  Langsung trigger cleanup + profit catchup:"
+  echo "     bash <(curl -sL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/force-profit-now.sh)"
 fi

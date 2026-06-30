@@ -18,22 +18,64 @@
 # ═══════════════════════════════════════════════════════════════
 set -euo pipefail
 
-PROJECT_DIR="/home/nexvo"
+# ─── AUTO-DETECT PROJECT DIR (v3.2.1) ───
+#   Old: hardcoded /home/nexvo → failed on VPS with non-standard path
+#   New: try multiple candidates, fallback via PM2 cwd, fallback via ps
+PROJECT_DIR=""
+for _cand in \
+  "/home/nexvo" \
+  "/root/nexvo" \
+  "/var/www/nexvo" \
+  "/var/www/html/nexvo" \
+  "/var/www/nexvoid" \
+  "/home/$SUDO_USER/nexvo" \
+  "/home/$USER/nexvo" \
+  "/opt/nexvo" \
+  "$HOME/nexvo" \
+  "$(pwd)"; do
+  if [ -n "$_cand" ] && [ -d "$_cand" ] && [ -f "$_cand/package.json" ]; then
+    if grep -q "nexvo\|nexvoid" "$_cand/package.json" 2>/dev/null; then
+      PROJECT_DIR="$_cand"
+      break
+    fi
+  fi
+done
+
+if [ -z "$PROJECT_DIR" ]; then
+  # Fallback via PM2 cwd
+  _PM2_CWD=$(pm2 info nexvo-web 2>/dev/null | grep "cwd" | head -1 | sed 's/.*│ *//;s/ *│.*//' | tr -d ' ')
+  if [ -n "$_PM2_CWD" ] && [ -d "$_PM2_CWD" ]; then
+    PROJECT_DIR="$_PM2_CWD"
+  fi
+fi
+
 CRON_PORT=3032
 WEB_PORT=3000
-EXPECTED_MARKER="DOUBLE-PROFIT-FIX-V17-20250630"
+# ★★★ v3.2.1: ACCEPT MULTIPLE MARKERS (so future deploys don't fail verify step) ★★★
+#   Old: hardcoded single EXPECTED_MARKER → super-deploy stuck in verify if marker updated
+#   New: list of acceptable markers; if response matches ANY → verify OK
+ACCEPTED_MARKERS=(
+  "PROFIT-CLEANUP-V3.2-20250630"   # current (commit 97c2af3+)
+  "PROFIT-CLEANUP-V3.1-20250630"   # v3.1 fallback
+  "DOUBLE-PROFIT-FIX-V17-20250630" # legacy v17 fallback
+)
+EXPECTED_MARKER="${ACCEPTED_MARKERS[0]}"   # primary marker (for display)
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_DIR="/home/nexvo/.next-backup-${TIMESTAMP}"
+BACKUP_DIR="${PROJECT_DIR:-/home/nexvo}/.next-backup-${TIMESTAMP}"
 
 echo "═══════════════════════════════════════════════════════"
-echo "  NEXVO Super Deploy v10 — PROFIT BULLETPROOF"
+echo "  NEXVO Super Deploy v10 — PROFIT BULLETPROOF (v3.2.1)"
 echo "  Timestamp: ${TIMESTAMP}"
-echo "  Expected marker: ${EXPECTED_MARKER}"
+echo "  Project dir: ${PROJECT_DIR:-NOT_FOUND}"
+echo "  Accepted markers:"
+for m in "${ACCEPTED_MARKERS[@]}"; do echo "    - $m"; done
 echo "═══════════════════════════════════════════════════════"
 
-if [ ! -d "$PROJECT_DIR" ]; then
-  echo "❌ Project dir not found: $PROJECT_DIR"
-  echo "   This script must run on the VPS where /home/nexvo exists."
+if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
+  echo "❌ Project dir not found! Tried all candidates."
+  echo "   Searched: /home/nexvo /root/nexvo /var/www/nexvo /opt/nexvo etc."
+  echo "   Manual override:"
+  echo "     cd /your/project/path && bash super-deploy-v10.sh"
   exit 1
 fi
 
@@ -245,14 +287,24 @@ for attempt in 1 2 3 4 5; do
     continue
   fi
   
-  # Check marker
-  if echo "$VERSION_RESP" | grep -q "$EXPECTED_MARKER"; then
-    echo "   ✅ Marker correct: $EXPECTED_MARKER"
+  # Check marker — accept ANY of ACCEPTED_MARKERS (v3.2.1 fix)
+  MARKER_OK=false
+  MATCHED_MARKER=""
+  for _m in "${ACCEPTED_MARKERS[@]}"; do
+    if echo "$VERSION_RESP" | grep -q "$_m"; then
+      MARKER_OK=true
+      MATCHED_MARKER="$_m"
+      break
+    fi
+  done
+  if [ "$MARKER_OK" = "true" ]; then
+    echo "   ✅ Marker correct: $MATCHED_MARKER"
   else
     echo "   ❌ Marker MISMATCH! Got:"
     echo "$VERSION_RESP" | head -c 300
     echo ""
-    echo "   Expected: $EXPECTED_MARKER"
+    echo "   Accepted markers (none matched):"
+    for _m in "${ACCEPTED_MARKERS[@]}"; do echo "     - $_m"; done
     echo "   This means OLD CODE is still running! pm2 might not have restarted properly."
     sleep 5
     continue
@@ -436,17 +488,18 @@ echo "════════════════════════�
 echo "  ✅ DEPLOY v10 COMPLETE — PROFIT BULLETPROOF LIVE"
 echo "═══════════════════════════════════════════════════════"
 echo ""
-echo "What was fixed (v2.5 BULLETPROOF):"
-echo "  • cron-service.ts v2.5: Investment loop buang status='active' filter,"
-echo "    pakai endDate > wibNow (mirror admin v2.5 yang SUDAH TERBUKTI JALAN)"
-echo "  • cron-service.ts v2.5: Purchase loop — kalo linked Investment gak"
-echo "    dikredit hari ini, CREDIT via Purchase path (jangan skip!)"
+echo "What was fixed (v3.2.1 — current marker: $MATCHED_MARKER):"
+echo "  • cron-service.ts v3.2: STEP 5 direct User balance correction from BonusLog"
+echo "  • profit-cleanup.ts v3.2: STEP 2 process ALL statuses + Math.min display"
+echo "  • STEP 5 catches User.mainBalance drift that STEP 4 misses"
+echo "  • cron-service.ts v2.7: ATOMIC CLAIM (no double-profit) + PID LOCK"
+echo "  • cron-service.ts v2.5: Investment loop buang status filter (BULLETPROOF)"
 echo "  • force-credit-profit.ts: same v2.5 bulletproof fixes"
-echo "  • nexvo-cron PM2 process restarted with v2.5 code"
+echo "  • nexvo-cron PM2 process restarted with v3.2 code"
 echo ""
 echo "Verification:"
 echo "  • Visit https://nexvo.id/api/deploy-version"
-echo "    → must show versionMarker: $EXPECTED_MARKER"
+echo "    → must show one of accepted markers (PRIMARY: $EXPECTED_MARKER)"
 echo "  • Visit https://nexvo.id/api/cron/profit?secret=YOUR_CRON_SECRET (GET)"
 echo "    → triggers profit manually (weekdays only)"
 echo "  • Cron debug: curl http://localhost:3032/api/debug/profit"

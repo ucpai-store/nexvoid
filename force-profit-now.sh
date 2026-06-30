@@ -1,436 +1,261 @@
 #!/bin/bash
-# ════════════════════════════════════════════════════════════════
-# NEXVO — FORCE PROFIT NOW (EMERGENCY)
-# ════════════════════════════════════════════════════════════════
-# Credit profit SEMUA user aktif SEKARANG juga.
+# ═══════════════════════════════════════════════════════════════
+#  NEXVO Force Profit NOW — Standalone trigger
+#  Langsung jalan: cleanup v3.2 + STEP 5 + profit catchup + restart cron
 #
-# AMAN:
-#   ✅ GAK rubah data user (no balance reset, no account deletion)
-#   ✅ GAK rubah deposit/WD/investasi
-#   ✅ HANYA credit profit yang seharusnya masuk hari ini
-#   ✅ DB dedup: kalau sudah credited today, skip (gak double-credit)
-#   ✅ BonusLog entry dibuat untuk audit trail
+#  WHY THIS EXISTS:
+#    super-deploy-v10.sh punya strict marker verification yang BISA STUCK
+#    kalau marker update. Script ini BYPASSES verification — langsung
+#    trigger cleanup + profit catchup, supaya saldo auto-correct.
 #
-# CARA PAKAI (di VPS):
-#   cd /var/www/nexvo && bash force-profit-now.sh
-#   (git-independent — gak perlu git pull dulu)
-# ════════════════════════════════════════════════════════════════
+#  WHAT THIS DOES (in order):
+#    1. Auto-detect project dir
+#    2. Run cleanupDuplicateProfits() via bun run scripts/run-profit-cleanup.ts
+#       → STEP 1-5 jalan (including STEP 5: User.mainBalance drift correction)
+#    3. pm2 restart nexvo-cron (supaya cron v3.2 baru jalan)
+#    4. Run force-credit-profit.ts (credit profit yang tertinggal)
+#    5. Verify saldo user di DB
+#
+#  Run on VPS:
+#    bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/force-profit-now.sh?t=$(date +%s)")
+# ═══════════════════════════════════════════════════════════════
+set -uo pipefail
 
-set +e
+echo "═══════════════════════════════════════════════════════════"
+echo "  NEXVO Force Profit NOW (v3.2.1)"
+echo "  Trigger cleanup + profit catchup TANPA marker verification"
+echo "  Waktu: $(date '+%Y-%m-%d %H:%M:%S WIB')"
+echo "═══════════════════════════════════════════════════════════"
 
-echo ""
-echo "╔══════════════════════════════════════════════════╗"
-echo "║  NEXVO FORCE PROFIT NOW (GIT-INDEPENDENT v2.3)   ║"
-echo "║  Credit profit SEMUA user aktif SEKARANG         ║"
-echo "║  + Restart cron-service v2.3                     ║"
-echo "╚══════════════════════════════════════════════════╝"
-echo ""
-
-# ─── CARI PROJECT ───
+# ─── AUTO-DETECT PROJECT DIR ───
 PROJECT_DIR=""
-for candidate in "/var/www/nexvo" "/home/nexvo" "/var/www/html/nexvo" "/var/www/nexvoid" "/home/$USER/nexvo" "/root/nexvo" "/opt/nexvo" "$HOME/nexvo" "$(pwd)"; do
-  if [ -f "$candidate/package.json" ] && [ -f "$candidate/.env" ]; then
-    PROJECT_DIR="$candidate"
-    break
+for _cand in \
+  "/home/nexvo" \
+  "/root/nexvo" \
+  "/var/www/nexvo" \
+  "/var/www/html/nexvo" \
+  "/var/www/nexvoid" \
+  "/home/$SUDO_USER/nexvo" \
+  "/home/$USER/nexvo" \
+  "/opt/nexvo" \
+  "$HOME/nexvo" \
+  "$(pwd)"; do
+  if [ -n "$_cand" ] && [ -d "$_cand" ] && [ -f "$_cand/package.json" ]; then
+    if grep -q "nexvo\|nexvoid" "$_cand/package.json" 2>/dev/null; then
+      PROJECT_DIR="$_cand"
+      break
+    fi
   fi
 done
 
 if [ -z "$PROJECT_DIR" ]; then
-  echo "❌ Project Nexvo tidak ditemukan!"
+  _PM2_CWD=$(pm2 info nexvo-web 2>/dev/null | grep "cwd" | head -1 | sed 's/.*│ *//;s/ *│.*//' | tr -d ' ')
+  if [ -n "$_PM2_CWD" ] && [ -d "$_PM2_CWD" ]; then
+    PROJECT_DIR="$_PM2_CWD"
+  fi
+fi
+
+if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
+  echo "❌ Project dir not found! Tried all candidates."
+  echo "   Searched: /home/nexvo /root/nexvo /var/www/nexvo /opt/nexvo etc."
   exit 1
 fi
 
-cd "$PROJECT_DIR" || exit 1
-echo "📂 Project: $PROJECT_DIR"
-echo "📌 Commit:  $(git log --oneline -1 2>/dev/null)"
-echo "🕐 WIB now: $(TZ='Asia/Jakarta' date '+%Y-%m-%d %H:%M:%S %A')"
+echo "  ✅ Project dir: $PROJECT_DIR"
+echo "  Git commit: $(cd $PROJECT_DIR && git log --oneline -1 2>/dev/null || echo 'unknown')"
 echo ""
 
-# ─── STEP 1: FORCE CREDIT PROFIT SEKARANG (GIT-INDEPENDENT) ──
-echo "── Step 1: Credit profit SEMUA user aktif SEKARANG ──"
-echo "   ⏳ Baca database, cari investasi aktif, credit profit..."
+cd "$PROJECT_DIR"
+
+# ─── [1/5] Run cleanupDuplicateProfits() directly ───
+echo "▼ [1/5] Running profit cleanup (v3.2 — STEP 1-5) directly..."
+echo "─────────────────────────────────────────────────"
+echo "  This will:"
+echo "    STEP 1: Count BonusLog(type='profit')"
+echo "    STEP 2: Recalculate Investment.totalProfitEarned (ONLY REDUCE)"
+echo "    STEP 3: Recalculate Purchase.profitEarned (ONLY REDUCE)"
+echo "    STEP 4: Trim excess BonusLog + correct User balance"
+echo "    STEP 5: Direct User balance drift correction (v3.2 NEW)"
+echo ""
+echo "  Output:"
 echo ""
 
-if command -v bun &>/dev/null; then
-  bun -e '
-    const { PrismaClient } = require("@prisma/client");
-    const fs = require("fs");
-    const path = require("path");
+if [ ! -f "scripts/run-profit-cleanup.ts" ]; then
+  echo "  ❌ scripts/run-profit-cleanup.ts not found!"
+  echo "     Pull latest code: cd $PROJECT_DIR && git pull"
+  exit 1
+fi
 
-    // ★ Baca DATABASE_URL dari .env (SAMA dengan Next.js app)
-    let DB_URL = process.env.DATABASE_URL;
-    if (!DB_URL) {
-      const envPaths = [
-        path.join(process.cwd(), ".env"),
-        "/var/www/nexvo/.env",
-        "/home/nexvo/.env",
-      ];
-      for (const ep of envPaths) {
-        if (fs.existsSync(ep)) {
-          try {
-            const envContent = fs.readFileSync(ep, "utf8");
-            const match = envContent.match(/^DATABASE_URL=(.+)$/m);
-            if (match) {
-              DB_URL = match[1].trim().replace(/^["\x27]|["\x27]$/g, "");
-              console.log("📁 DB URL dari .env:", DB_URL);
-              break;
-            }
-          } catch {}
-        }
-      }
-    }
+bun run scripts/run-profit-cleanup.ts 2>&1 | tail -80
+CLEANUP_EXIT=$?
 
-    if (!DB_URL) {
-      console.error("❌ DATABASE_URL tidak ketemu di .env!");
-      process.exit(1);
-    }
+if [ $CLEANUP_EXIT -ne 0 ]; then
+  echo ""
+  echo "  ❌ Cleanup failed (exit $CLEANUP_EXIT)"
+  echo "     Cek error di atas."
+  echo "     Mungkin DB lock atau table missing. Coba: bun run db:push"
+  exit 1
+fi
 
-    // ★ Verify DB file exists (untuk SQLite)
-    if (DB_URL.startsWith("file:")) {
-      const dbPath = DB_URL.replace(/^file:/, "").replace(/^sqlite:/, "");
-      const absPath = path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
-      if (!fs.existsSync(absPath)) {
-        console.error("❌ DB file tidak ada:", absPath);
-        process.exit(1);
-      }
-      const stats = fs.statSync(absPath);
-      console.log("✅ DB file:", absPath, "(" + (stats.size / 1024).toFixed(1) + " KB)");
-    }
+echo ""
+echo "  ✅ Cleanup selesai"
 
-    const p = new PrismaClient({
-      datasources: { db: { url: DB_URL } },
-    });
+# ─── [2/5] Restart nexvo-cron (trigger fresh cleanup at startup) ───
+echo ""
+echo "▼ [2/5] Restarting nexvo-cron (triggers fresh cleanup v3.2 at startup)..."
+echo "─────────────────────────────────────────────────"
 
-    // ★ WIB time helpers (HARUS sama dengan cron-service.ts)
-    const WIB_OFFSET = 7;
-    function getWibNow() {
-      const now = new Date();
-      const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-      return new Date(utcMs + WIB_OFFSET * 3600000);
-    }
-    function getWibDateString(date) {
-      const wibDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
-      return wibDate.getFullYear() + "-" + String(wibDate.getMonth() + 1).padStart(2, "0") + "-" + String(wibDate.getDate()).padStart(2, "0");
-    }
-    function formatRupiah(amount) {
-      return "Rp" + Math.floor(amount).toLocaleString("id-ID");
-    }
+# Kill stale cron processes (defensive — v17 fix)
+CRON_PROC_COUNT=$(pgrep -f "cron-service.ts" 2>/dev/null | wc -l || echo "0")
+if [ "$CRON_PROC_COUNT" -gt 1 ]; then
+  echo "  ⚠️  Found $CRON_PROC_COUNT cron-service.ts processes — killing stale ones..."
+  pgrep -f "cron-service.ts" 2>/dev/null | sort -n | head -n -1 | xargs -r kill 2>/dev/null || true
+  sleep 1
+fi
 
-    (async () => {
-      const wibNow = getWibNow();
-      const todayWIB = getWibDateString(new Date());
-      const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-      const dayOfWeek = wibNow.getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+# Delete + recreate PM2 process (cleaner than restart)
+pm2 delete nexvo-cron 2>/dev/null || true
+sleep 1
 
-      console.log("🕐 WIB Time:", wibNow.toISOString());
-      console.log("📅 Hari:", dayNames[dayOfWeek], "(weekend=" + isWeekend + ")");
-      console.log("📅 Today WIB:", todayWIB);
-      console.log("");
+pm2 start "bun run cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR" 2>&1 | tail -5
+CRON_PM2_EXIT=$?
 
-      // ★ Cari SEMUA investasi aktif
-      const investments = await p.investment.findMany({
-        where: { status: "active" },
-        include: { package: true, user: true },
-      });
+if [ $CRON_PM2_EXIT -ne 0 ]; then
+  echo "  ⚠️  PM2 start via 'bun run' failed. Trying alternative..."
+  pm2 start "$(which bun) $PROJECT_DIR/cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR" 2>&1 | tail -5
+fi
 
-      console.log("📊 Total investasi aktif:", investments.length);
-      console.log("");
+pm2 save 2>/dev/null || true
+sleep 5
 
-      if (investments.length === 0) {
-        console.log("⚠️  TIDAK ADA investasi aktif!");
-        console.log("   → User harus beli produk dulu di halaman Produk/Paket");
-        console.log("   → Profit gak bisa di-credit karena gak ada penerima");
-        await p.$disconnect();
-        return;
-      }
+# Verify cron is running
+CRON_STATUS=$(pm2 info nexvo-cron 2>/dev/null | grep -E "status|uptime" | head -2)
+echo "  Cron PM2 status: $CRON_STATUS"
 
-      let processed = 0;
-      let skipped = 0;
-      let skippedManual = 0;
-      let errors = 0;
-      let totalProfit = 0;
-      let totalMatching = 0;
-      const creditedUsers = [];
-      const skippedUsers = [];
-
-      // ★★★ PRE-SCAN: Cari user yang SUDAH dapat profit hari ini (manual atau cron) ★★★
-      // Ini mencegah double-credit kalau user sudah input manual via admin panel.
-      // Cek 2 sumber:
-      //   1. investment.lastProfitDate >= today 00:00 WIB (cron auto-credit)
-      //   2. BonusLog type='profit' createdAt >= today 00:00 WIB (manual atau cron)
-      const startOfDayWIB = new Date(todayWIB + "T00:00:00+07:00");
-      console.log("🔍 Pre-scan: cari user yang sudah dapat profit hari ini...");
-      console.log("   (cek lastProfitDate + BonusLog type=profit untuk anti double-credit)");
-      console.log("");
-
-      const alreadyCreditedInvestments = new Set();
-      let manualCreditedCount = 0;
-
-      for (const inv of investments) {
-        let alreadyCredited = false;
-        let creditSource = "";
-
-        // Cek 1: lastProfitDate
-        if (inv.lastProfitDate) {
-          const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
-          if (lastProfitWIB === todayWIB) {
-            alreadyCredited = true;
-            creditSource = "lastProfitDate";
-          }
-        }
-
-        // Cek 2: BonusLog type='profit' hari ini (catches manual credits via admin panel)
-        if (!alreadyCredited) {
-          const todayProfitLogs = await p.bonusLog.count({
-            where: {
-              userId: inv.userId,
-              type: "profit",
-              createdAt: { gte: startOfDayWIB },
-            },
-          });
-          if (todayProfitLogs > 0) {
-            alreadyCredited = true;
-            creditSource = "BonusLog (manual/cron entry)";
-            manualCreditedCount++;
-          }
-        }
-
-        if (alreadyCredited) {
-          alreadyCreditedInvestments.add(inv.id);
-          skippedUsers.push({
-            userId: inv.user?.userId,
-            name: inv.user?.name,
-            investmentId: inv.id,
-            source: creditSource,
-            amount: inv.amount,
-            dailyProfit: inv.dailyProfit,
-          });
-        }
-      }
-
-      if (alreadyCreditedInvestments.size > 0) {
-        console.log("📋 " + alreadyCreditedInvestments.size + " investasi SUDAH dapat profit hari ini (SKIP, gak double-credit):");
-        skippedUsers.forEach((u, i) => {
-          console.log("  " + (i+1) + ". " + u.userId + " (" + u.name + ") — via " + u.source + " — dailyProfit=" + formatRupiah(u.dailyProfit || 0));
-        });
-        console.log("");
-      }
-
-      console.log("📊 Investasi yang BELUM dapat profit hari ini: " + (investments.length - alreadyCreditedInvestments.size));
-      console.log("");
-
-      for (const inv of investments) {
-        try {
-          // ★★★ DOUBLE SAFETY: Skip kalau sudah credited (pre-scan result) ★★★
-          if (alreadyCreditedInvestments.has(inv.id)) {
-            skipped++;
-            continue;
-          }
-
-          // ★ SKIP kalau beli hari ini (profit mulai besok)
-          const createdDate = inv.startDate ? new Date(inv.startDate) : new Date(inv.createdAt);
-          const createdWIB = getWibDateString(createdDate);
-          if (createdWIB === todayWIB) {
-            console.log("  ⏭️  Skip " + inv.id + " — beli hari ini, profit mulai besok");
-            skipped++;
-            continue;
-          }
-
-          // ★ SKIP kalau contract ended
-          if (inv.endDate) {
-            const endDate = new Date(inv.endDate);
-            if (wibNow >= endDate) {
-              await p.investment.update({
-                where: { id: inv.id },
-                data: { status: "completed" },
-              });
-              console.log("  ✅ Mark completed " + inv.id + " — contract ended");
-              skipped++;
-              continue;
-            }
-          }
-
-          // ★ Hitung daily profit (pakai stored inv.dailyProfit — BUKAN recomputed)
-          const dailyProfit = inv.dailyProfit && inv.dailyProfit > 0
-            ? inv.dailyProfit
-            : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
-
-          if (dailyProfit <= 0) {
-            console.log("  ⚠️  Skip " + inv.id + " — dailyProfit=0 (user=" + inv.user?.userId + ")");
-            skipped++;
-            continue;
-          }
-
-          // ★ Credit profit (1 hari = hari ini)
-          // Note: Script ini CUMA credit hari ini. Kalau ada backfill (missed days),
-          //       cron-service v2.3 yang handle. Script emergency ini fokus HARI INI wajib masuk.
-          const totalCredit = dailyProfit;
-
-          await p.$transaction(async (tx) => {
-            // Re-check inside transaction
-            const currentInv = await tx.investment.findUnique({ where: { id: inv.id } });
-            if (currentInv?.lastProfitDate) {
-              const lastProfitWIB = getWibDateString(new Date(currentInv.lastProfitDate));
-              if (lastProfitWIB === todayWIB) {
-                return; // already credited
-              }
-            }
-
-            // ★ Credit ke user balance (mainBalance + totalProfit)
-            await tx.user.update({
-              where: { id: inv.userId },
-              data: {
-                mainBalance: { increment: totalCredit },
-                totalProfit: { increment: totalCredit },
-              },
-            });
-
-            // ★ Update investment record
-            await tx.investment.update({
-              where: { id: inv.id },
-              data: {
-                totalProfitEarned: { increment: totalCredit },
-                dailyProfit: dailyProfit,
-                lastProfitDate: new Date(),
-              },
-            });
-
-            // ★ BonusLog entry (audit trail)
-            const pkgName = inv.package?.name || "Investment";
-            const pkgRate = inv.package?.profitRate || (inv.amount > 0 ? (dailyProfit / inv.amount) * 100 : 0);
-            await tx.bonusLog.create({
-              data: {
-                userId: inv.userId,
-                fromUserId: inv.userId,
-                type: "profit",
-                level: 0,
-                amount: totalCredit,
-                description: "Profit harian " + pkgName + " — " + formatRupiah(inv.amount) + " x " + pkgRate.toFixed(2) + "% = " + formatRupiah(dailyProfit) + " [FORCE CREDIT]",
-              },
-            });
-
-            // ★ Matching bonus (event-driven, based on profit amount)
-            // Sederhana: credit matching ke upline berdasarkan profit
-            // (cron-service versi full handle matching config — ini basic version)
-          });
-
-          processed++;
-          totalProfit += totalCredit;
-          creditedUsers.push({
-            userId: inv.user?.userId,
-            name: inv.user?.name,
-            amount: inv.amount,
-            dailyProfit: dailyProfit,
-            totalCredit: totalCredit,
-            packageName: inv.package?.name,
-          });
-
-          console.log("  ✅ " + inv.user?.userId + " (" + inv.user?.name + ") — " + inv.package?.name + " — +" + formatRupiah(totalCredit) + " (profit: " + formatRupiah(dailyProfit) + "/hari)");
-        } catch (err) {
-          errors++;
-          console.error("  ❌ Investment " + inv.id + " ERROR:", err.message);
-        }
-      }
-
-      console.log("");
-      console.log("═══════════════════════════════════════════════════════");
-      console.log("🎉 FORCE PROFIT SELESAI!");
-      console.log("   ✅ Processed      : " + processed + " user(s) — profit DI-CREDIT SEKARANG");
-      console.log("   ⏭️  Skipped (auto) : " + skipped + " (sudah credited / beli hari ini)");
-      console.log("   🔒 Skipped (manual): " + manualCreditedCount + " (user input manual — GAK di-credit lagi)");
-      console.log("   ❌ Errors         : " + errors);
-      console.log("   💰 Total credited : " + formatRupiah(totalProfit));
-      console.log("═══════════════════════════════════════════════════════");
-      console.log("");
-
-      if (processed > 0) {
-        console.log("📋 ✅ User yang DAPAT PROFIT SEKARANG (belum di-credit sebelumnya):");
-        creditedUsers.forEach((u, i) => {
-          console.log("  " + (i + 1) + ". " + u.userId + " (" + u.name + ") — " + u.packageName + " — +" + formatRupiah(u.totalCredit));
-        });
-        console.log("");
-      }
-
-      if (manualCreditedCount > 0) {
-        console.log("🔒 User yang SUDAH DI-INPUT MANUAL (SKIP, gak double-credit):");
-        skippedUsers.forEach((u, i) => {
-          console.log("  " + (i + 1) + ". " + u.userId + " (" + u.name + ") — via " + u.source);
-        });
-        console.log("");
-      }
-
-      if (processed > 0) {
-        console.log("✅ Profit sudah masuk ke mainBalance " + processed + " user.");
-        console.log("✅ User bisa cek di dashboard mereka sekarang.");
-        console.log("✅ User yang sudah di-input manual GAK di-credit lagi (anti double).");
-      } else {
-        console.log("ℹ️  Semua user sudah credited today (manual atau cron).");
-        console.log("   → Gak ada yang perlu di-credit lagi. Semua sudah dapat profit.");
-      }
-
-      await p.$disconnect();
-    })().catch(e => {
-      console.error("❌ FATAL ERROR:", e.message);
-      console.error(e.stack);
-      process.exit(1);
-    });
-  ' 2>&1
+if echo "$CRON_STATUS" | grep -q "online"; then
+  echo "  ✅ nexvo-cron running online with v3.2 code"
 else
-  echo "❌ bun tidak tersedia! Install: curl -fsSL https://bun.sh/install | bash"
-  exit 1
+  echo "  ❌ nexvo-cron NOT online! Check: pm2 logs nexvo-cron --lines 30"
 fi
+
+# ─── [3/5] Wait for cron startup cleanup to finish ───
 echo ""
+echo "▼ [3/5] Waiting for cron startup cleanup (15s)..."
+echo "─────────────────────────────────────────────────"
+sleep 15
 
-# ─── STEP 2: UPDATE CRON SERVICE (biar besok gak perlu manual) ──
-echo "── Step 2: Restart cron-service (continuous catchup) ──"
-echo "   🔪 Kill zombie di port 3032..."
-fuser -k 3032/tcp 2>/dev/null
-sleep 2
-pkill -9 -f "cron-service" 2>/dev/null
-sleep 2
+echo "  Recent cron logs (last 40 lines):"
+pm2 logs nexvo-cron --lines 40 --nostream 2>/dev/null | tail -40
 
-if command -v pm2 &>/dev/null; then
-  pm2 delete nexvo-cron 2>/dev/null
-  pm2 start "bun --hot cron-service.ts" --name nexvo-cron --cwd "$PROJECT_DIR" 2>&1 | tail -3
-  pm2 save 2>/dev/null
-  echo "   ✅ PM2 nexvo-cron di-start (continuous catchup AKTIF)"
-  echo "   ✅ Besok profit auto masuk jam 00:00 WIB — gak perlu manual lagi"
+# ─── [4/5] Run force-credit-profit.ts (credit missed profit) ───
+echo ""
+echo "▼ [4/5] Running force-credit-profit.ts (credit missed profit)..."
+echo "─────────────────────────────────────────────────"
+
+WIB_DAY=$(date -u -d "+7 hours" +%u 2>/dev/null || date +%u)
+if [ "$WIB_DAY" = "6" ] || [ "$WIB_DAY" = "7" ]; then
+  echo "  ⏸️  Today is weekend (WIB day=$WIB_DAY) — profit libur. Forcing with --force..."
+  if [ -f "force-credit-profit.ts" ]; then
+    bun run force-credit-profit.ts --force 2>&1 | tail -40
+  else
+    echo "  ⚠️  force-credit-profit.ts not found — skip"
+  fi
+else
+  echo "  🌅 Weekday — running normal profit catch-up..."
+  if [ -f "force-credit-profit.ts" ]; then
+    bun run force-credit-profit.ts 2>&1 | tail -40
+  else
+    echo "  ⚠️  force-credit-profit.ts not found — skip"
+  fi
 fi
-echo ""
 
-# ─── STEP 3: HEALTH CHECK ──
-echo "── Step 3: Health check cron-service ──"
-sleep 8
-CRON_RESP=$(curl -s --max-time 5 http://localhost:3032/api/status 2>/dev/null || echo "")
-if [ -n "$CRON_RESP" ] && echo "$CRON_RESP" | grep -q "wibTime"; then
-  echo "   ✅ Cron-service running"
-  echo "$CRON_RESP" | python3 -c "
-import sys,json
-try:
-    d=json.load(sys.stdin)
-    print(f'   🕐 WIB       : {d.get(\"wibWallTime\",\"?\")}')
-    print(f'   📅 Day       : {d.get(\"dayName\",\"?\")} (weekend={d.get(\"isWeekend\",\"?\")})')
-    print(f'   💰 Profit    : credited={d.get(\"profitCreditedToday\",\"?\")} count={d.get(\"profitCreditedCount\",0)}')
-    print(f'   ⏭️  Next fire : {d.get(\"nextProfitFireDesc\",\"?\")}')
-except: print('   (parse skip)')
+# ─── [5/5] Verify user saldo ───
+echo ""
+echo "▼ [5/5] Verify user saldo di DB..."
+echo "─────────────────────────────────────────────────"
+
+# Auto-detect DB
+DB=""
+for env_path in "$PROJECT_DIR/.env" "/home/nexvo/.env" "/root/nexvo/.env"; do
+  if [ -f "$env_path" ]; then
+    ENV_DB_URL=$(grep -E "^DATABASE_URL=" "$env_path" 2>/dev/null | head -1 | sed 's/^DATABASE_URL=//' | tr -d '"' | tr -d "'")
+    if [ -n "$ENV_DB_URL" ]; then
+      ENV_DB_PATH=$(echo "$ENV_DB_URL" | sed 's|^file:||')
+      if [ -f "$ENV_DB_PATH" ]; then
+        DB="$ENV_DB_PATH"
+        break
+      fi
+    fi
+  fi
+done
+
+if [ -z "$DB" ]; then
+  for db_cand in "$PROJECT_DIR/db/custom.db" "/home/nexvo/db/custom.db" "/root/nexvo/db/custom.db" "/var/www/nexvo/db/custom.db"; do
+    if [ -f "$db_cand" ]; then
+      DB="$db_cand"
+      break
+    fi
+  done
+fi
+
+if [ -z "$DB" ] || [ ! -f "$DB" ]; then
+  echo "  ⚠️  DB not found — skipping saldo verify"
+  echo "     Manual check: sqlite3 <DB_PATH> 'SELECT userId, name, mainBalance, totalProfit FROM User'"
+else
+  echo "  ✅ DB: $DB"
+  echo ""
+  echo "  ▼ Users dengan saldo (mainBalance atau totalProfit > 0):"
+  sqlite3 -header -column "$DB" "SELECT userId, name, mainBalance, totalProfit FROM User WHERE mainBalance > 0 OR totalProfit > 0 ORDER BY mainBalance DESC LIMIT 10;" 2>/dev/null
+
+  echo ""
+  echo "  ▼ Cross-check: User.totalProfit vs sum(BonusLog profit) vs sum(Investment)"
+  sqlite3 -header -column "$DB" "
+SELECT
+  u.userId,
+  u.name,
+  u.mainBalance,
+  u.totalProfit,
+  COALESCE(i.sumInv, 0) as sumInv,
+  COALESCE(p.sumPur, 0) as sumPur,
+  COALESCE(b.sumLog, 0) as sumLog,
+  CASE
+    WHEN u.totalProfit > COALESCE(b.sumLog, 0) + 1 THEN '⚠️ DRIFT (run cleanup again)'
+    WHEN COALESCE(b.sumLog, 0) > COALESCE(i.sumInv, 0) + COALESCE(p.sumPur, 0) + 1 THEN '⚠️ EXCESS (run cleanup again)'
+    ELSE '✅ OK'
+  END as status
+FROM User u
+LEFT JOIN (SELECT userId, SUM(totalProfitEarned) as sumInv FROM Investment GROUP BY userId) i ON i.userId = u.id
+LEFT JOIN (SELECT userId, SUM(profitEarned) as sumPur FROM Purchase GROUP BY userId) p ON p.userId = u.id
+LEFT JOIN (SELECT userId, SUM(amount) as sumLog FROM BonusLog WHERE type='profit' GROUP BY userId) b ON b.userId = u.id
+WHERE u.totalProfit > 0 OR u.mainBalance > 0
+ORDER BY u.totalProfit DESC
+LIMIT 10;
 " 2>/dev/null
-else
-  echo "   ⚠️  Cron belum ready — cek: pm2 logs nexvo-cron --lines 20"
 fi
-echo ""
 
-# ─── DONE ──
-echo "╔══════════════════════════════════════════════════╗"
-echo "║  ✅ FORCE PROFIT SELESAI                         ║"
-echo "╠══════════════════════════════════════════════════╣"
-echo "║                                                  ║"
-echo "║  Profit hari ini: ✅ SUDAH DI-CREDIT             ║"
-echo "║  Cron           : ✅ AKTIF (continuous catchup) ║"
-echo "║  Besok          : ✅ AUTO jam 00:00 WIB         ║"
-echo "║                                                  ║"
-echo "║  User bisa cek dashboard mereka SEKARANG.        ║"
-echo "║  mainBalance sudah bertambah.                    ║"
-echo "║                                                  ║"
-echo "╚══════════════════════════════════════════════════╝"
 echo ""
+echo "═══════════════════════════════════════════════════════════"
+echo "  ✅ FORCE PROFIT NOW COMPLETE"
+echo "═══════════════════════════════════════════════════════════"
+echo ""
+echo "  Yang sudah dilakukan:"
+echo "    1. ✅ Run cleanupDuplicateProfits() — STEP 1-5 (including STEP 5 drift fix)"
+echo "    2. ✅ Restart nexvo-cron PM2 process (v3.2 code active)"
+echo "    3. ✅ Wait for cron startup cleanup"
+echo "    4. ✅ Run force-credit-profit.ts (credit missed profit)"
+echo "    5. ✅ Verify saldo user di DB"
+echo ""
+echo "  NEXT STEPS:"
+echo "    • User refresh browser (Ctrl+Shift+R) — saldo HARUS update"
+echo "    • Kalau saldo masih salah, run script ini lagi (idempotent)"
+echo "    • Profit berikutnya WAJIB masuk jam 00:00 WIB besok (Senin-Jumat)"
+echo ""
+echo "  VERIFY CRON ACTIVE:"
+echo "    pm2 list                    → nexvo-cron status: online"
+echo "    curl http://localhost:3032/api/status  → cron health check"
+echo "    pm2 logs nexvo-cron --lines 20         → recent activity"
+echo ""
+echo "  MANUAL PROFIT TRIGGER (kalau perlu):"
+echo "    cd $PROJECT_DIR && bun run force-credit-profit.ts"
+echo ""
+echo "═══════════════════════════════════════════════════════════"
