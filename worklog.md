@@ -6120,3 +6120,43 @@ Stage Summary:
   2. Buka Asset page → total HARUS 38400 (bukan 68800)
   3. Saldo utama tetap 19200 (tidak berubah, sudah benar)
   4. 2 aset baru: profitEarned=0, profit pertama besok 00:00 WIB
+
+---
+Task ID: diag-deep-v32
+Agent: main (Z.ai Code)
+Task: User report "di web tetep sama gk ada perubahan" — cari SUMBER PENYAKIT 68800 dengan presisi.
+
+Work Log:
+- VLM analyze screenshot VPS: v3.2 (commit 2f7589c) sudah deploy, build 16:11
+- TAPI cron logs show: "recalculated 0 investments", "corrected 0 users" → cleanup tidak nemu drift
+- Berarti database kemungkinan SUDAH correct (Investment.totalProfitEarned=0 untuk aset baru)
+- TAPI Asset page masih 68800 → masalah di API display logic ATAU cached data
+- Add debug logging ke /api/assets/route.ts:
+  * Log per-asset breakdown (id, type, name, status, totalProfitEarned, dailyProfit, amount)
+  * Log summary total
+  * Format: [ASSETS API v3.2] user=X asset=Y totalProfitEarned=Z
+- Create diag-deep-v32.sh — query DB langsung:
+  * [1] Deploy marker (v3.2 or not)
+  * [2] Users dengan profit (mainBalance, totalProfit)
+  * [3] Semua Investment records (totalProfitEarned, status, startDate, lastProfitDate)
+  * [4] Semua Purchase records (profitEarned, status, createdAt)
+  * [5] BonusLog sum per user (type='profit')
+  * [6] BonusLog entries detail untuk user dengan profit > 30000
+  * [7] PERHITUNGAN: sumInv vs sumPur vs sumLog vs userTotalProfit + diagnosis otomatis
+    - DRIFT User.totalProfit > BonusLog → STEP 5 fix
+    - EXCESS BonusLog > Inv+Pur → STEP 4 fix
+    - OK → masalah di API Math.max/min
+- Verify compile: assets/route.ts bundle clean ✓
+- Commit c3a1216 + push to GitHub ✓
+
+Stage Summary:
+- ✅ Debug logging aktif: user buka Asset page → pm2 logs nexvo-web show breakdown
+- ✅ diag-deep-v32.sh: query DB langsung untuk cari sumber 68800
+- USER ACTION (2 langkah):
+  1. DEPLOY v3.2 (commit c3a1216):
+     bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+  2. Setelah deploy, jalankan deep diagnostic:
+     bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/diag-deep-v32.sh")
+  3. ATAU cek pm2 logs saat user buka Asset page:
+     pm2 logs nexvo-web --lines 30 | grep "ASSETS API v3.2"
+- Kirim output diagnostic ke developer untuk analisis presisi sumber 68800
