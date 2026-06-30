@@ -48,6 +48,12 @@ echo "📦 STEP 2: Install dependencies..."
 bun install --frozen-lockfile 2>/dev/null || bun install 2>/dev/null || npm install 2>/dev/null
 echo "  ✓ Dependencies ready"
 
+# ─── STEP 2.5: CLEAN .NEXT (FIX "teks-only" BUG) ───
+echo ""
+echo "🧹 STEP 2.5: Hapus .next lama (fix tampilan teks-only)..."
+rm -rf .next
+echo "  ✓ .next folder dihapus — akan rebuild dari nol"
+
 # ─── STEP 3: GENERATE PRISMA ───
 echo ""
 echo "🔧 STEP 3: Generate Prisma client..."
@@ -56,9 +62,24 @@ echo "  ✓ Prisma client ready"
 
 # ─── STEP 4: BUILD ───
 echo ""
-echo "🏗️  STEP 4: Build Next.js..."
-bun run build 2>&1 | tail -3 || { echo "❌ Build failed"; exit 1; }
+echo "🏗️  STEP 4: Build Next.js (fresh build, no cache)..."
+bun run build 2>&1 | tail -10 || { echo "❌ Build failed"; exit 1; }
 echo "  ✓ Build complete"
+
+# ─── STEP 4.5: VERIFY JS CHUNKS ADA ───
+echo ""
+echo "🔍 STEP 4.5: Verify JS chunks generated..."
+if [ -d ".next/static/chunks" ]; then
+  CHUNK_COUNT=$(ls .next/static/chunks/*.js 2>/dev/null | wc -l)
+  echo "  ✓ Found $CHUNK_COUNT JS chunks in .next/static/chunks/"
+  if [ "$CHUNK_COUNT" -lt 5 ]; then
+    echo "  ⚠️  WARNING: JS chunks terlalu sedikit — build mungkin incomplete!"
+  fi
+else
+  echo "  ❌ FATAL: .next/static/chunks/ TIDAK ADA — build gagal atau output salah lokasi!"
+  echo "     Ini penyebab tampilan teks-only. Cek build log di atas."
+  exit 1
+fi
 
 # ─── STEP 5: RESTART PM2 ───
 echo ""
