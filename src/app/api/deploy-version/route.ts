@@ -5,6 +5,31 @@ import { execSync } from 'child_process';
 
 // ★★★ Version marker — bump on every fix. Used to verify the VPS is running
 //   the latest code. Visit https://nexvo.id/api/deploy-version to check.
+//   v18 (20250630): UNIFIED PROFIT CREDIT — fix "2 hari kerja masuk 3" root cause.
+//     ROOT CAUSE: Ada 3 sumber kredit profit yang bisa bentrok:
+//       (1) cron-service.ts v2.7 (Bun, port 3032) — sudah atomic claim ✓
+//       (2) /api/cron/profit/route.ts (Next.js) — findUnique+compare (RACE)
+//       (3) /api/admin/profit-trigger/route.ts — findUnique+compare (RACE)
+//     Kalau 2 sumber jalan bareng (misal admin trigger + cron), keduanya baca
+//     lastProfitDate lama, keduanya pass check, keduanya credit → OVER-CREDIT.
+//     v18 FIX:
+//     (a) /api/cron/profit/route.ts: ganti findUnique+compare dengan ATOMIC CLAIM
+//         updateMany WHERE lastProfitDate IS NULL OR < today 00:00 WIB.
+//         SQLite executes atomically — only 1 process wins, others get count=0.
+//     (b) /api/admin/profit-trigger/route.ts: same atomic claim (non-force mode).
+//         Force mode tetap bisa re-credit (admin override).
+//     (c) Backfill logic di SEMUA 3 sumber sekarang KONSISTEN:
+//         missedDays = countWeekdaysMissed(last, today) // EXCLUDES today
+//         totalDays = missedDays + (isTodayWeekday ? 1 : 0) // ADD today
+//         Sebelumnya admin trigger pakai countWeekdaysBetween (INCLUDES today)
+//         lalu creditAmount = dailyProfit * missedDays — kalau dipanggil setelah
+//         cron credit today, akan skip (good), TAPI kalau dipanggil SEBELUM cron,
+//         akan credit today — lalu cron credit today again → DOUBLE.
+//     (d) dailyProfit pakai inv.dailyProfit (stored value), BUKAN recompute dari
+//         package.profitRate — fix VIP purchases (linked to _internal_default pkg).
+//     (e) Purchase loop: hapus double-update Purchase.profitEarned untuk linked
+//         purchases (Investment loop sudah sync). Hanya legacy standalone purchases
+//         yang di-credit di Purchase loop, dengan atomic claim juga.
 //   v17 (20250630): DOUBLE-PROFIT FIX + PAKET UNAVAILABLE ROBUSTNESS.
 //     (1) cron-service v2.7 ATOMIC CLAIM — conditional updateMany with WHERE
 //         clause `lastProfitDate IS NULL OR lastProfitDate < today 00:00 WIB`.
@@ -33,8 +58,8 @@ import { execSync } from 'child_process';
 //   v13 (20250630): PROFIT CONSISTENCY FIX — Asset total = History total.
 //   v12 (20250630): STANDALONE server fix — deploy uses node .next/standalone/server.js
 //   v11 (20250630): add /api/deposit/upload route + base64 proof storage.
-export const VERSION_MARKER = 'DOUBLE-PROFIT-FIX-V17-20250630';
-export const CRON_VERSION = 'v2.7-atomic-claim';
+export const VERSION_MARKER = 'UNIFIED-PROFIT-V18-20250630';
+export const CRON_VERSION = 'v2.8-unified-atomic-claim';
 
 export async function GET() {
   let buildId = 'unknown';
@@ -65,7 +90,7 @@ export async function GET() {
   return NextResponse.json({
     versionMarker: VERSION_MARKER,
     cronVersion: CRON_VERSION,
-    description: 'v17 DOUBLE-PROFIT FIX (atomic claim + PID lock) + PAKET UNAVAILABLE robustness. v16 PAKET UNAVAILABLE. v15 WEEKDAY OFF-BY-ONE FIX.',
+    description: 'v18 UNIFIED PROFIT CREDIT (3 sumber kredit profit semua atomic claim + backfill konsisten). v17 DOUBLE-PROFIT FIX. v16 PAKET UNAVAILABLE.',
     buildId,
     builtAt,
     gitCommit,
@@ -73,6 +98,12 @@ export async function GET() {
     serverTime: new Date().toISOString(),
     nodeEnv: process.env.NODE_ENV || 'development',
     fixes: [
+      'v18: /api/cron/profit/route.ts ATOMIC CLAIM (updateMany WHERE lastProfitDate < today) — was findUnique+compare (RACE)',
+      'v18: /api/admin/profit-trigger/route.ts ATOMIC CLAIM (non-force mode) — was findUnique+compare (RACE)',
+      'v18: Backfill logic KONSISTEN di 3 sumber: missedDays EXCLUDES today + totalDays = missedDays + (today weekday ? 1 : 0)',
+      'v18: dailyProfit pakai inv.dailyProfit stored (BUKAN recompute dari package.profitRate) — fix VIP purchases',
+      'v18: Purchase loop hapus double-update Purchase.profitEarned untuk linked purchases (Investment loop sudah sync)',
+      'v18: Purchase legacy path juga atomic claim (race-proof)',
       'v17: cron-service v2.7 ATOMIC CLAIM — conditional updateMany WHERE lastProfitDate IS NULL OR < today (100% race-proof)',
       'v17: cron-service v2.7 PID FILE LOCK — exit if another instance running (prevent PM2 duplicates)',
       'v17: loadOrderedTiers() return ALL packages + isAvailable flag (mirror V16 /api/packages)',

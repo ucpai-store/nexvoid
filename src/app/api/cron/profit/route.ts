@@ -67,6 +67,45 @@ function formatRupiahSimple(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
 }
 
+// ★ v2.7 ATOMIC CLAIM FIX (mirror cron-service.ts v2.7)
+//   Returns WIB date string "YYYY-MM-DD" for a given Date.
+function getWibDateString(date: Date): string {
+  const wibDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
+  return `${wibDate.getFullYear()}-${String(wibDate.getMonth() + 1).padStart(2, '0')}-${String(wibDate.getDate()).padStart(2, '0')}`;
+}
+
+function getTodayWibDateString(): string {
+  return getWibDateString(new Date());
+}
+
+/**
+ * Count weekdays (Mon-Fri) MISSED between lastCreditDateStr+1 and todayStr (EXCLUSIVE today).
+ * Used for backfill: e.g., if last credit was Thursday and today is Monday,
+ * missed days = Friday (1 day, since Sat/Sun are skipped).
+ *
+ * @param lastCreditDateStr  WIB date string "YYYY-MM-DD" of last successful credit
+ * @param todayStr           WIB date string "YYYY-MM-DD" of today
+ * @returns number of weekdays missed (0 if none)
+ */
+function countWeekdaysMissed(lastCreditDateStr: string, todayStr: string): number {
+  const [ly, lm, ld] = lastCreditDateStr.split('-').map(Number);
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  // Start from day AFTER last credit (the first potentially-missed day)
+  const start = new Date(Date.UTC(ly, lm - 1, ld + 1));
+  // End at today (exclusive — today is handled separately)
+  const end = new Date(Date.UTC(ty, tm - 1, td));
+
+  let count = 0;
+  const cursor = new Date(start);
+  let safety = 60;
+  while (cursor < end && safety-- > 0) {
+    const dow = cursor.getUTCDay(); // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) count++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count;
+}
+
 // ──────────── Matching Config Helper ────────────
 
 async function getMatchingRates(): Promise<Record<number, number>> {
@@ -204,8 +243,9 @@ async function processDailyInvestmentProfits(): Promise<{
   const result = { processed: 0, totalProfit: 0, totalMatching: 0, totalReferral: 0, errors: 0, errorDetails: [] as string[] };
 
   const now = getWibNow();
-  // Create WIB "today" date for comparison (just the date part)
-  const todayWIB = { year: now.getFullYear(), month: now.getMonth(), date: now.getDate() };
+  const todayWIB = getTodayWibDateString();
+  const todayDow = now.getDay(); // 0=Sun, 6=Sat
+  const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
   // ★★★ v2.5 BULLETPROOF: NO status filter — fetch ALL investments, use endDate
   //   as source of truth. Old code filtered status='active' which returned 0
@@ -218,21 +258,23 @@ async function processDailyInvestmentProfits(): Promise<{
     return new Date(inv.endDate) > now;
   });
 
-  console.log(`[Profit Cron] Processing ${investments.length} active investments (total=${allInvestments.length})...`);
+  console.log(`[Profit Cron] Processing ${investments.length} active investments (total=${allInvestments.length}, today=${todayWIB}, dow=${todayDow}, weekday=${isTodayWeekday})...`);
 
   for (const inv of investments) {
     try {
-      // Check if already credited today (compare in WIB timezone)
+      // ─── Skip if already credited today (using WIB date string) ───
       if (inv.lastProfitDate) {
-        const lastDateUTC = new Date(inv.lastProfitDate);
-        // Convert to WIB for date comparison
-        const lastDateMs = lastDateUTC.getTime() + lastDateUTC.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000;
-        const lastDateWIB = new Date(lastDateMs);
-        if (lastDateWIB.getFullYear() === todayWIB.year &&
-            lastDateWIB.getMonth() === todayWIB.month &&
-            lastDateWIB.getDate() === todayWIB.date) {
-          continue; // Already credited today
+        const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
+        if (lastProfitWIB === todayWIB) {
+          continue;
         }
+      }
+
+      // ─── Skip if bought today (profit starts next weekday) ───
+      const createdDate = inv.startDate ? new Date(inv.startDate) : new Date(inv.createdAt);
+      const createdWIB = getWibDateString(createdDate);
+      if (createdWIB === todayWIB) {
+        continue;
       }
 
       // Check if investment has ended
@@ -247,44 +289,75 @@ async function processDailyInvestmentProfits(): Promise<{
         }
       }
 
-      // Credit daily profit - ALWAYS recalculate from package profitRate for accuracy
-      // Formula: dailyProfit = investmentAmount × (profitRate / 100)
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
+      // ★ BUG FIX: Use stored inv.dailyProfit — do NOT recompute from inv.package.profitRate.
+      //   For Product (VIP) purchases, packageId is linked to `_internal_default` (profitRate=0)
+      //   which made dailyProfit=0 → profit never credited.
+      //   The stored `inv.dailyProfit` is the TRUE daily profit (set at purchase time).
+      const dailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
+      if (dailyProfit <= 0) {
+        console.log(`[Profit Cron] ⚠️ Investment ${inv.id} has dailyProfit=0 — skipping`);
+        continue;
+      }
 
-      await db.$transaction(async (tx) => {
-        // ★ RE-CHECK inside transaction to prevent double credit (race condition) ★
-        const currentInv = await tx.investment.findUnique({ where: { id: inv.id } });
-        if (currentInv?.lastProfitDate) {
-          const lastDateUTC = new Date(currentInv.lastProfitDate);
-          const lastDateMs = lastDateUTC.getTime() + lastDateUTC.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000;
-          const lastDateWIB = new Date(lastDateMs);
-          if (lastDateWIB.getFullYear() === todayWIB.year &&
-              lastDateWIB.getMonth() === todayWIB.month &&
-              lastDateWIB.getDate() === todayWIB.date) {
-            return; // Already credited today — skip
-          }
+      // ─── BACKFILL LOGIC: Calculate missed weekdays (EXCLUDING today) ───
+      let lastCreditDateStr: string;
+      if (inv.lastProfitDate) {
+        lastCreditDateStr = getWibDateString(new Date(inv.lastProfitDate));
+      } else {
+        lastCreditDateStr = createdWIB; // first profit cycle starts day after purchase
+      }
+
+      const missedDays = countWeekdaysMissed(lastCreditDateStr, todayWIB);
+      // Total days to credit = missed weekdays + today (if today is weekday)
+      // Cap at 30 days total for safety (prevents runaway credit on bad data)
+      const totalDays = Math.min(missedDays + (isTodayWeekday ? 1 : 0), 30);
+
+      if (totalDays <= 0) {
+        // Weekend with no missed days — nothing to credit
+        continue;
+      }
+
+      const totalCredit = dailyProfit * totalDays;
+      const isBackfill = missedDays > 0;
+
+      // ★★★ v2.7 ATOMIC CLAIM — 100% race-condition-proof ★★★
+      // Old code used findUnique + compare (read-then-write): 2 processes could
+      // both read old lastProfitDate, both pass check, both credit → DOUBLE PROFIT.
+      // Fix: use conditional updateMany — only 1 process can successfully update
+      // (WHERE clause fails for 2nd process because lastProfitDate is now today).
+      // SQLite executes this atomically — no race possible.
+      const startOfDayWIBDate = new Date(todayWIB + 'T00:00:00+07:00');
+      const invClaim = await db.$transaction(async (tx) => {
+        const claim = await tx.investment.updateMany({
+          where: {
+            id: inv.id,
+            OR: [
+              { lastProfitDate: null },
+              { lastProfitDate: { lt: startOfDayWIBDate } },
+            ],
+          },
+          data: {
+            totalProfitEarned: { increment: totalCredit },
+            dailyProfit: dailyProfit,
+            lastProfitDate: new Date(),
+          },
+        });
+        if (claim.count === 0) {
+          return false; // already credited by another process — skip
         }
 
-        // 1. Credit daily profit to user's mainBalance
+        // Claim succeeded — now credit user balance + create logs
         await tx.user.update({
           where: { id: inv.userId },
           data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
+            mainBalance: { increment: totalCredit },
+            totalProfit: { increment: totalCredit },
           },
         });
 
-        // 2. Update investment record (also fix stored dailyProfit if incorrect)
-        await tx.investment.update({
-          where: { id: inv.id },
-          data: {
-            totalProfitEarned: { increment: dailyProfit },
-            dailyProfit: dailyProfit, // Fix stored value if it was wrong
-            lastProfitDate: new Date(),  // Store real UTC time
-          },
-        });
-
-        // 3. Create profit log
+        // Create profit log (linked to most recent active purchase if any)
         const purchase = await tx.purchase.findFirst({
           where: { userId: inv.userId, status: 'active' },
           orderBy: { createdAt: 'desc' },
@@ -295,44 +368,63 @@ async function processDailyInvestmentProfits(): Promise<{
             data: {
               purchaseId: purchase.id,
               userId: inv.userId,
-              amount: dailyProfit,
+              amount: totalCredit,
+            },
+          });
+
+          // Sync Purchase.profitEarned to match Investment.totalProfitEarned
+          // (v2.6 fix: prevents drift between Asset page and History page)
+          await tx.purchase.update({
+            where: { id: purchase.id },
+            data: {
+              profitEarned: { increment: totalCredit },
+              dailyProfit: dailyProfit,
+              lastProfitDate: new Date(),
             },
           });
         }
 
-        // 4. Create bonus log for daily profit
+        const pkgName = inv.package?.name || 'Investment';
+        const pkgRate = inv.package?.profitRate || (inv.amount > 0 ? (dailyProfit / inv.amount) * 100 : 0);
+        const desc = totalDays === 1
+          ? `Profit harian ${pkgName} — ${formatRupiahSimple(inv.amount)} x ${pkgRate.toFixed(2)}% = ${formatRupiahSimple(dailyProfit)}`
+          : `Profit ${totalDays} hari (${isBackfill ? `${missedDays} tertinggal + ${isTodayWeekday ? 'hari ini' : '0'}` : 'semua hari ini'}) — ${pkgName}: ${formatRupiahSimple(dailyProfit)} x ${totalDays} = ${formatRupiahSimple(totalCredit)}`;
+
         await tx.bonusLog.create({
           data: {
             userId: inv.userId,
             fromUserId: inv.userId,
             type: 'profit',
             level: 0,
-            amount: dailyProfit,
-            description: `Profit harian investasi ${formatRupiahSimple(inv.amount)} — ${formatRupiahSimple(dailyProfit)}`,
+            amount: totalCredit,
+            description: desc,
           },
         });
 
-        // 5. ★ EVENT-DRIVEN MATCHING BONUS ★
-        // Credit matching bonus to all upline members immediately
-        const matchResult = await creditMatchingOnProfit(tx, inv.userId, dailyProfit);
-
+        // ★ EVENT-DRIVEN MATCHING BONUS
+        const matchResult = await creditMatchingOnProfit(tx, inv.userId, totalCredit);
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
 
-        // 6. ★ DAILY REFERRAL BONUS ★
-        // Credit referral bonus to all upline members (L1=10%, L2=5%, L3=4%, L4=3%, L5=2%)
-        const referralResult = await creditDailyReferralBonuses(tx, inv.userId, dailyProfit);
+        // ★ DAILY REFERRAL BONUS
+        const referralResult = await creditDailyReferralBonuses(tx, inv.userId, totalCredit);
         if (referralResult.totalReferralCredited > 0) {
           result.totalReferral += referralResult.totalReferralCredited;
         }
+        return true;
       });
 
+      if (!invClaim) {
+        // Already credited by another process — skip without error
+        continue;
+      }
+
       result.processed++;
-      result.totalProfit += dailyProfit;
+      result.totalProfit += totalCredit;
 
       // Push notification to user about daily profit
-      sendPushNotification(inv.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(dailyProfit).toLocaleString("id-ID")} hari ini`, { type: "daily_profit", amount: dailyProfit }).catch(() => {});
+      sendPushNotification(inv.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(totalCredit).toLocaleString("id-ID")} ${totalDays > 1 ? `(catchup ${totalDays} hari)` : 'hari ini'}`, { type: "daily_profit", amount: totalCredit }).catch(() => {});
     } catch (error: unknown) {
       result.errors++;
       const message = error instanceof Error ? error.message : String(error);
@@ -342,10 +434,10 @@ async function processDailyInvestmentProfits(): Promise<{
   }
 
   // ═══════ Purchase (Product) Profit Processing ═══════
-  // ★ FIX: Purchases that have linked Investment records are ALREADY processed above.
-  // We only update the Purchase tracking fields (profitEarned, lastProfitDate) for display.
-  // We do NOT credit profit again — that would be DOUBLE COUNTING.
-  // Purchases WITHOUT linked investments (legacy) still need profit credited here.
+  // ★ FIX: Purchases that have linked Investment records are ALREADY processed above
+  //   (Investment loop credits user balance + BonusLog + ProfitLog + syncs Purchase.profitEarned).
+  //   So for linked purchases, we DO NOTHING here — already fully handled.
+  //   Only LEGACY purchases (no linked Investment) get profit credited here.
   // ★★★ v2.5 BULLETPROOF: NO status filter — use product duration + createdAt
   const allPurchases = await db.purchase.findMany({
     include: { product: true },
@@ -364,116 +456,135 @@ async function processDailyInvestmentProfits(): Promise<{
       .map(inv => (inv as any).purchaseId!)
   );
 
-  console.log(`[Profit Cron] Updating ${purchases.length} active product purchases (${purchaseIdsWithInvestments.size} have linked investments)...`);
+  console.log(`[Profit Cron] Checking ${purchases.length} active product purchases (${purchaseIdsWithInvestments.size} have linked investments, ${purchases.length - purchaseIdsWithInvestments.size} legacy standalone)...`);
 
   for (const purchase of purchases) {
     try {
-      // Check if already credited today
+      // ─── Skip if already credited today (using WIB date string) ───
       if (purchase.lastProfitDate) {
-        const lastDateUTC = new Date(purchase.lastProfitDate);
-        const lastDateMs = lastDateUTC.getTime() + lastDateUTC.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000;
-        const lastDateWIB = new Date(lastDateMs);
-        if (lastDateWIB.getFullYear() === todayWIB.year &&
-            lastDateWIB.getMonth() === todayWIB.month &&
-            lastDateWIB.getDate() === todayWIB.date) {
+        const lastProfitWIB = getWibDateString(new Date(purchase.lastProfitDate));
+        if (lastProfitWIB === todayWIB) {
           continue; // Already credited today
         }
       }
 
-      // Calculate daily profit: totalPrice × (profitRate / 100)
-      const productProfitRate = purchase.product?.profitRate || 0;
-      const dailyProfit = Math.floor(purchase.totalPrice * (productProfitRate / 100));
-
-      if (dailyProfit <= 0) continue;
+      // ─── Skip if bought today (profit starts next weekday) ───
+      const purchaseCreatedWIB = getWibDateString(new Date(purchase.createdAt));
+      if (purchaseCreatedWIB === todayWIB) {
+        continue;
+      }
 
       if (purchaseIdsWithInvestments.has(purchase.id)) {
-        // ★ This purchase has linked Investment records — profit was already credited above.
-        // Only update the Purchase tracking fields for display purposes.
-        await db.purchase.update({
-          where: { id: purchase.id },
-          data: {
-            profitEarned: { increment: dailyProfit },
-            dailyProfit: dailyProfit,
-            lastProfitDate: new Date(),
-          },
-        });
-        continue; // Skip profit credit — already done via Investment
+        // ★ This purchase has linked Investment records — profit was ALREADY credited
+        //   by the Investment loop above (including Purchase.profitEarned sync).
+        //   DO NOTHING here — otherwise we'd double-update Purchase.profitEarned.
+        continue;
       }
 
       // ★ LEGACY: This purchase does NOT have linked investments — credit profit here.
-      // This handles old purchases created before the Investment record linking was added.
-      await db.$transaction(async (tx) => {
-        // Re-check inside transaction
-        const currentPurchase = await tx.purchase.findUnique({ where: { id: purchase.id } });
-        if (currentPurchase?.lastProfitDate) {
-          const lastDateUTC = new Date(currentPurchase.lastProfitDate);
-          const lastDateMs = lastDateUTC.getTime() + lastDateUTC.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000;
-          const lastDateWIB = new Date(lastDateMs);
-          if (lastDateWIB.getFullYear() === todayWIB.year &&
-              lastDateWIB.getMonth() === todayWIB.month &&
-              lastDateWIB.getDate() === todayWIB.date) {
-            return;
-          }
-        }
+      // Use stored purchase.dailyProfit if available, otherwise recompute from product profitRate.
+      const productProfitRate = purchase.product?.profitRate || 0;
+      const dailyProfit = purchase.dailyProfit && purchase.dailyProfit > 0
+        ? purchase.dailyProfit
+        : Math.floor(purchase.totalPrice * (productProfitRate / 100));
 
-        // 1. Credit daily profit to user's mainBalance
-        await tx.user.update({
-          where: { id: purchase.userId },
-          data: {
-            mainBalance: { increment: dailyProfit },
-            totalProfit: { increment: dailyProfit },
+      if (dailyProfit <= 0) continue;
+
+      // ─── BACKFILL LOGIC (mirror Investment loop) ───
+      let lastCreditDateStr: string;
+      if (purchase.lastProfitDate) {
+        lastCreditDateStr = getWibDateString(new Date(purchase.lastProfitDate));
+      } else {
+        lastCreditDateStr = purchaseCreatedWIB;
+      }
+
+      const missedDays = countWeekdaysMissed(lastCreditDateStr, todayWIB);
+      const totalDays = Math.min(missedDays + (isTodayWeekday ? 1 : 0), 30);
+
+      if (totalDays <= 0) {
+        continue; // Weekend with no missed days
+      }
+
+      const totalCredit = dailyProfit * totalDays;
+
+      // ★★★ v2.7 ATOMIC CLAIM for Purchase (race-condition-proof) ★★★
+      const startOfDayWIBDate = new Date(todayWIB + 'T00:00:00+07:00');
+      const purClaim = await db.$transaction(async (tx) => {
+        const claim = await tx.purchase.updateMany({
+          where: {
+            id: purchase.id,
+            OR: [
+              { lastProfitDate: null },
+              { lastProfitDate: { lt: startOfDayWIBDate } },
+            ],
           },
-        });
-
-        // 2. Update purchase record
-        await tx.purchase.update({
-          where: { id: purchase.id },
           data: {
-            profitEarned: { increment: dailyProfit },
+            profitEarned: { increment: totalCredit },
             dailyProfit: dailyProfit,
             lastProfitDate: new Date(),
           },
         });
+        if (claim.count === 0) {
+          return false; // already credited by another process
+        }
 
-        // 3. Create profit log
+        // Credit user balance
+        await tx.user.update({
+          where: { id: purchase.userId },
+          data: {
+            mainBalance: { increment: totalCredit },
+            totalProfit: { increment: totalCredit },
+          },
+        });
+
+        // Create profit log
         await tx.profitLog.create({
           data: {
             purchaseId: purchase.id,
             userId: purchase.userId,
-            amount: dailyProfit,
+            amount: totalCredit,
           },
         });
 
-        // 4. Create bonus log for daily profit
+        // Create bonus log
+        const prodName = purchase.product?.name || 'Produk';
+        const desc = totalDays === 1
+          ? `Profit harian produk ${prodName} (${purchase.quantity}x) — ${formatRupiahSimple(dailyProfit)}`
+          : `Profit ${totalDays} hari produk ${prodName} (${purchase.quantity}x) — ${formatRupiahSimple(dailyProfit)} x ${totalDays} = ${formatRupiahSimple(totalCredit)}`;
         await tx.bonusLog.create({
           data: {
             userId: purchase.userId,
             fromUserId: purchase.userId,
             type: 'profit',
             level: 0,
-            amount: dailyProfit,
-            description: `Profit harian produk ${purchase.product?.name || 'Produk'} (${purchase.quantity}x) — ${formatRupiahSimple(dailyProfit)}`,
+            amount: totalCredit,
+            description: desc,
           },
         });
 
-        // 5. Event-driven matching bonus
-        const matchResult = await creditMatchingOnProfit(tx, purchase.userId, dailyProfit);
+        // Event-driven matching bonus
+        const matchResult = await creditMatchingOnProfit(tx, purchase.userId, totalCredit);
         if (matchResult.totalMatchCredited > 0) {
           result.totalMatching += matchResult.totalMatchCredited;
         }
 
-        // 6. ★ DAILY REFERRAL BONUS ★
-        const referralResult = await creditDailyReferralBonuses(tx, purchase.userId, dailyProfit);
+        // Daily referral bonus
+        const referralResult = await creditDailyReferralBonuses(tx, purchase.userId, totalCredit);
         if (referralResult.totalReferralCredited > 0) {
           result.totalReferral += referralResult.totalReferralCredited;
         }
+        return true;
       });
 
-      result.processed++;
-      result.totalProfit += dailyProfit;
+      if (!purClaim) {
+        continue; // Already credited by another process
+      }
 
-      // Push notification to user about daily profit
-      sendPushNotification(purchase.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(dailyProfit).toLocaleString("id-ID")} hari ini`, { type: "daily_profit", amount: dailyProfit }).catch(() => {});
+      result.processed++;
+      result.totalProfit += totalCredit;
+
+      // Push notification
+      sendPushNotification(purchase.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(totalCredit).toLocaleString("id-ID")} ${totalDays > 1 ? `(catchup ${totalDays} hari)` : 'hari ini'}`, { type: "daily_profit", amount: totalCredit }).catch(() => {});
     } catch (error: unknown) {
       result.errors++;
       const message = error instanceof Error ? error.message : String(error);

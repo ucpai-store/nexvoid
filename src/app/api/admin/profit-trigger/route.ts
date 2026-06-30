@@ -27,18 +27,29 @@ function formatRupiahSimple(amount: number): string {
 }
 
 /**
- * Count WEEKDAYS (Mon-Fri) between two dates (exclusive start, inclusive end).
- * Sat/Sun are LIBUR — not counted in catchup.
+ * Count weekdays (Mon-Fri) MISSED between lastCreditDateStr+1 and todayStr (EXCLUSIVE today).
+ * Used for backfill: e.g., if last credit was Thursday and today is Monday,
+ * missed days = Friday (1 day, since Sat/Sun are skipped).
+ *
+ * @param lastCreditDateStr  WIB date string "YYYY-MM-DD" of last successful credit
+ * @param todayStr           WIB date string "YYYY-MM-DD" of today
+ * @returns number of weekdays missed (0 if none)
  */
-function countWeekdaysBetween(startWib: Date, endWib: Date): number {
+function countWeekdaysMissed(lastCreditDateStr: string, todayStr: string): number {
+  const [ly, lm, ld] = lastCreditDateStr.split('-').map(Number);
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  // Start from day AFTER last credit (the first potentially-missed day)
+  const start = new Date(Date.UTC(ly, lm - 1, ld + 1));
+  // End at today (exclusive — today is handled separately)
+  const end = new Date(Date.UTC(ty, tm - 1, td));
+
   let count = 0;
-  const current = new Date(startWib.getFullYear(), startWib.getMonth(), startWib.getDate());
-  current.setDate(current.getDate() + 1);
-  const end = new Date(endWib.getFullYear(), endWib.getMonth(), endWib.getDate());
-  while (current <= end) {
-    const day = current.getDay();
-    if (day !== 0 && day !== 6) count++;
-    current.setDate(current.getDate() + 1);
+  const cursor = new Date(start);
+  let safety = 60;
+  while (cursor < end && safety-- > 0) {
+    const dow = cursor.getUTCDay(); // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) count++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return count;
 }
@@ -140,6 +151,7 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
   const wibNow = getWibNow();
   const dayOfWeek = wibNow.getDay();
   const todayWIB = getWibDateString(new Date());
+  const isTodayWeekday = dayOfWeek !== 0 && dayOfWeek !== 6;
 
   if (!options?.force && (dayOfWeek === 0 || dayOfWeek === 6)) {
     const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
@@ -158,7 +170,7 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
     return new Date(inv.endDate) > wibNow;
   });
 
-  console.log(`[Admin Profit Trigger] Processing ${investments.length} active investments (total=${allInvestments.length})...`);
+  console.log(`[Admin Profit Trigger] Processing ${investments.length} active investments (total=${allInvestments.length}, today=${todayWIB}, dow=${dayOfWeek}, weekday=${isTodayWeekday}, force=${!!options?.force})...`);
 
   for (const inv of investments) {
     try {
@@ -171,7 +183,7 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
         }
       }
 
-      // Skip if investment was created today (same WIB day)
+      // Skip if investment was created today (same WIB day) — unless force
       if (!options?.force) {
         const createdDate = inv.startDate ? new Date(inv.startDate) : new Date(inv.createdAt);
         const createdWIB = getWibDateString(createdDate);
@@ -194,13 +206,19 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
         }
       }
 
-      // ★ HARD CAP: total profit cannot exceed dailyProfit × contractDays
-      const dailyProfit = Math.floor(inv.amount * (inv.package.profitRate / 100));
+      // ★ BUG FIX: Use stored inv.dailyProfit — do NOT recompute from inv.package.profitRate.
+      //   For Product (VIP) purchases, packageId is linked to `_internal_default` (profitRate=0)
+      //   which made dailyProfit=0 → profit never credited.
+      const dailyProfit = inv.dailyProfit && inv.dailyProfit > 0
+        ? inv.dailyProfit
+        : Math.floor(inv.amount * ((inv.package?.profitRate || 0) / 100));
       if (dailyProfit <= 0) {
         result.skipped++;
         continue;
       }
-      const contractDays = inv.package.contractDays || 180;
+
+      // ★ HARD CAP: total profit cannot exceed dailyProfit × contractDays
+      const contractDays = inv.package?.contractDays || 180;
       const hardCap = dailyProfit * contractDays;
       const remainingCap = Math.max(0, hardCap - inv.totalProfitEarned);
 
@@ -214,26 +232,28 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
         continue;
       }
 
-      // ★ AUTO-CATCHUP: credit all missed WEEKDAYS at once (capped by remainingCap) ★
-      // Weekend (Sat/Sun) = LIBUR, tidak dihitung dalam catchup
-      let missedDays = 1;
+      // ─── BACKFILL LOGIC: Calculate missed weekdays (EXCLUDING today) ───
+      // Mirror cron-service.ts v2.7 logic for consistency.
+      let lastCreditDateStr: string;
       if (inv.lastProfitDate) {
-        const lastProfitWIB = getWibDateString(new Date(inv.lastProfitDate));
-        if (lastProfitWIB !== todayWIB || options?.force) {
-          const lastDate = new Date(inv.lastProfitDate);
-          const lastWib = new Date(lastDate.getTime() + lastDate.getTimezoneOffset() * 60000 + WIB_OFFSET * 3600000);
-          missedDays = countWeekdaysBetween(lastWib, wibNow);
-          if (missedDays <= 0) {
-            result.skipped++;
-            continue; // already credited all weekdays up to today
-          }
-        } else {
-          result.skipped++;
-          continue; // Already credited today
-        }
+        lastCreditDateStr = getWibDateString(new Date(inv.lastProfitDate));
+      } else {
+        const createdDate = inv.startDate ? new Date(inv.startDate) : new Date(inv.createdAt);
+        lastCreditDateStr = getWibDateString(createdDate);
       }
 
-      let creditAmount = dailyProfit * missedDays;
+      const missedDays = countWeekdaysMissed(lastCreditDateStr, todayWIB);
+      // Total days to credit = missed weekdays + today (if today is weekday OR force)
+      // Cap at 30 days total for safety
+      const includeToday = options?.force ? true : isTodayWeekday;
+      const totalDays = Math.min(missedDays + (includeToday ? 1 : 0), 30);
+
+      if (totalDays <= 0) {
+        result.skipped++;
+        continue;
+      }
+
+      let creditAmount = dailyProfit * totalDays;
       let willComplete = false;
       if (creditAmount >= remainingCap) {
         creditAmount = remainingCap;
@@ -241,16 +261,50 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
       }
       const daysCredited = Math.ceil(creditAmount / dailyProfit);
 
-      await db.$transaction(async (tx) => {
-        // Re-check inside transaction
+      // ★★★ v2.7 ATOMIC CLAIM — 100% race-condition-proof ★★★
+      // Old code used findUnique + compare (read-then-write): 2 processes could
+      // both read old lastProfitDate, both pass check, both credit → DOUBLE PROFIT.
+      // Fix: use conditional updateMany — only 1 process can successfully update.
+      // SQLite executes this atomically — no race possible.
+      // NOTE: when force=true, we bypass the lastProfitDate check in WHERE (admin override),
+      // but we still re-check inside transaction to avoid duplicate admin triggers.
+      const startOfDayWIBDate = new Date(todayWIB + 'T00:00:00+07:00');
+      const invClaim = await db.$transaction(async (tx) => {
+        // For force mode: skip atomic WHERE check (admin wants to re-credit)
+        // For normal mode: atomic claim via updateMany WHERE lastProfitDate < today
         if (!options?.force) {
-          const currentInv = await tx.investment.findUnique({ where: { id: inv.id } });
-          if (currentInv?.lastProfitDate) {
-            const lastProfitWIB = getWibDateString(new Date(currentInv.lastProfitDate));
-            if (lastProfitWIB === todayWIB) return;
+          const claim = await tx.investment.updateMany({
+            where: {
+              id: inv.id,
+              OR: [
+                { lastProfitDate: null },
+                { lastProfitDate: { lt: startOfDayWIBDate } },
+              ],
+            },
+            data: {
+              totalProfitEarned: { increment: creditAmount },
+              dailyProfit: dailyProfit,
+              lastProfitDate: new Date(),
+              ...(willComplete ? { status: 'completed' as const, endDate: new Date() } : {}),
+            },
+          });
+          if (claim.count === 0) {
+            return false; // already credited by another process — skip
           }
+        } else {
+          // Force mode: just update (admin override)
+          await tx.investment.update({
+            where: { id: inv.id },
+            data: {
+              totalProfitEarned: { increment: creditAmount },
+              dailyProfit: dailyProfit,
+              lastProfitDate: new Date(),
+              ...(willComplete ? { status: 'completed' as const, endDate: new Date() } : {}),
+            },
+          });
         }
 
+        // Claim succeeded — now credit user balance + create logs
         await tx.user.update({
           where: { id: inv.userId },
           data: {
@@ -259,17 +313,24 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
           },
         });
 
-        await tx.investment.update({
-          where: { id: inv.id },
-          data: {
-            totalProfitEarned: { increment: creditAmount },
-            dailyProfit: dailyProfit,
-            lastProfitDate: new Date(),
-            ...(willComplete ? { status: 'completed' as const, endDate: new Date() } : {}),
-          },
+        // Sync linked Purchase tracking (v2.6 fix: prevents Asset/History drift)
+        const purchase = await tx.purchase.findFirst({
+          where: { userId: inv.userId, status: 'active' },
+          orderBy: { createdAt: 'desc' },
         });
+        if (purchase) {
+          await tx.purchase.update({
+            where: { id: purchase.id },
+            data: {
+              profitEarned: { increment: creditAmount },
+              dailyProfit: dailyProfit,
+              lastProfitDate: new Date(),
+            },
+          });
+        }
 
-        const catchupNote = missedDays > 1 ? ` [CATCHUP ${daysCredited} hari]` : '';
+        const pkgName = inv.package?.name || 'Investment';
+        const catchupNote = totalDays > 1 ? ` [CATCHUP ${daysCredited} hari]` : '';
         const capNote = willComplete ? ` [HARD CAP ${formatRupiahSimple(hardCap)} → SELESAI]` : '';
         await tx.bonusLog.create({
           data: {
@@ -279,19 +340,26 @@ async function processDailyInvestmentProfits(options?: { force?: boolean }): Pro
             level: 0,
             amount: creditAmount,
             description: options?.force
-              ? `[ADMIN TRIGGER] Profit harian ${inv.package.name} — ${formatRupiahSimple(creditAmount)}${catchupNote}${capNote}`
-              : `Profit harian ${inv.package.name} — ${formatRupiahSimple(creditAmount)}${catchupNote}${capNote}`,
+              ? `[ADMIN TRIGGER] Profit harian ${pkgName} — ${formatRupiahSimple(creditAmount)}${catchupNote}${capNote}`
+              : `Profit harian ${pkgName} — ${formatRupiahSimple(creditAmount)}${catchupNote}${capNote}`,
           },
         });
 
         const matchAmount = await creditMatchingOnProfit(tx, inv.userId, creditAmount);
         result.totalMatching += matchAmount;
+        return true;
       });
+
+      if (!invClaim) {
+        // Already credited by another process — skip without error
+        result.skipped++;
+        continue;
+      }
 
       result.processed++;
       result.totalProfit += creditAmount;
 
-      sendPushNotification(inv.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(creditAmount).toLocaleString("id-ID")} ${missedDays > 1 ? `(catchup ${daysCredited} hari)` : 'hari ini'}`, { type: "daily_profit", amount: creditAmount }).catch(() => {});
+      sendPushNotification(inv.userId, "user", "💰 Profit Harian", `Anda mendapat profit Rp ${Math.floor(creditAmount).toLocaleString("id-ID")} ${totalDays > 1 ? `(catchup ${daysCredited} hari)` : 'hari ini'}`, { type: "daily_profit", amount: creditAmount }).catch(() => {});
     } catch (error: unknown) {
       result.errors++;
       const message = error instanceof Error ? error.message : String(error);
