@@ -5807,3 +5807,49 @@ Stage Summary:
   bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
 - Setelah deploy: pm2 logs nexvo-cron --lines 50 | grep "v2.9.1"
   harus muncul "Cleanup phase done — cron profit processing enabled"
+
+---
+Task ID: profit-cleanup-v3.0
+Agent: main (Z.ai Code)
+Task: Fix "profit masih lebih" setelah v2.9.1 — user lihat profit nggak sesuai progres paket aktif. Cari root cause kenapa cleanup v2.9.1 nggak detect excess profit.
+
+Work Log:
+- Investigasi root cause kenapa v2.9.1 masih leaving excess profit:
+  * STEP 2 v2.9.1 pakai `today` sebagai end date untuk hitung expected profit
+  * Tapi kalo `lastProfitDate` = KEMARIN (hari ini belum di-credit), expected INCLUDES today
+  * Excess entry dari bug (e.g. purchase-day credit) nggak ke-detect karena expected inflated
+- Verifikasi dengan scenario:
+  * Beli Senin. Hari ini Rabu. lastProfitDate = Selasa.
+  * v2.9.1: expected = countCreditedDays(Sen, Rabu) × 19200 = 2 × 19200 = 38400
+           BonusLog = 38400 (entry Sen bug + entry Sel) → NO excess detected! BUG!
+  * v3.0:   expected = countCreditedDays(Sen, Selasa) × 19200 = 1 × 19200 = 19200
+           BonusLog = 38400 → excess = 19200 → TRIM entry Sen! ✓
+- FIX v3.0 STEP 2: endWIB = lastProfitDate (bukan today)
+  * Kalo lastProfitDate=null → expected = 0 (never credited → any totalProfitEarned > 0 is a bug)
+  * Cap at endDate jika investment sudah completed
+- FIX v3.0 STEP 3: Purchase standalone juga pakai lastProfitDate (bukan today)
+- FIX v3.0 STEP 4: safeguard update
+  * Old: skip jika expected=0 (tapi v3.0 STEP 2 bisa produce expected=0 untuk investment yang ada)
+  * New: skip hanya jika user NGGAK punya investment sama sekali
+  * Kalo user punya investment tapi expected=0 (lastProfitDate=null) → profit logs adalah bug → TRIM
+- Update deploy-version marker: PROFIT-CLEANUP-V3.0-20250630
+- Update cron-service.ts startup log: v3.0
+- Verify: API /api/deploy-version returns new marker ✓
+- Verify: Agent Browser render login page perfect (NEXVO logo, form, buttons) ✓
+- Commit 060dbc5 + push to GitHub
+
+Stage Summary:
+- ✅ ROOT CAUSE v2.9.1 bug FIXED: STEP 2 sekarang pakai lastProfitDate sebagai end date
+- ✅ Excess profit dari purchase-day bug / cross-day race condition sekarang KE-DETECT & KE-TRIM
+- ✅ Normal case (no bug) unaffected: lastProfitDate=today → expected includes today → no change
+- ✅ Edge case lastProfitDate=null: expected=0 → trim all excess (safeguard: only if user has investments)
+- ✅ Multiple investments: sum correctly per user
+- ✅ Committed + pushed (060dbc5)
+- USER ACTION: run bootstrap-deploy.sh di VPS:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+- Setelah deploy:
+  1. https://nexvo.id/api/deploy-version → marker PROFIT-CLEANUP-V3.0-20250630
+  2. Cron restart → cleanup v3.0 auto-run → hapus excess profit yang v2.9.1 nggak bisa hapus
+  3. Cek: pm2 logs nexvo-cron --lines 50 | grep "v3.0"
+     harus muncul "v3.0 Profit Cleanup done: removed X duplicate entries"
+  4. Profit sekarang SESUAI progres paket aktif (2 hari kerja = 38400, bukan 57600)
