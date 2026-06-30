@@ -112,7 +112,13 @@ export async function GET(request: NextRequest) {
         // Aggregate the group
         const totalAmount = group.reduce((sum, inv) => sum + inv.amount, 0);
         const totalDailyProfit = group.reduce((sum, inv) => sum + inv.dailyProfit, 0);
-        const totalProfitEarned = group.reduce((sum, inv) => sum + inv.totalProfitEarned, 0);
+        // ★★★ v2.6 CONSISTENCY FIX: Use Math.max of (Purchase.profitEarned, sum(Investment.totalProfitEarned))
+        //   to defend against historical drift (old v2.5 bugs). After cron-service v2.6
+        //   self-heal runs, these should be equal. Math.max is a safety net for any
+        //   edge case where they're not yet synced.
+        const invProfitSum = group.reduce((sum, inv) => sum + inv.totalProfitEarned, 0);
+        const purchaseProfit = purchase?.profitEarned || 0;
+        const totalProfitEarned = Math.max(invProfitSum, purchaseProfit);
         const quantity = purchase?.quantity || group.length;
 
         allAssets.push({

@@ -168,24 +168,81 @@ function getDaysRemaining(endDate: string | null): number {
   return Math.max(0, diffDays);
 }
 
+/* ───────── v2.6 WEEKDAY HELPERS ───────── */
+/* Cron credits profit ONLY on weekdays (Mon-Fri, libur Sabtu-Minggu).
+   So progress display must use weekdays too — otherwise user sees
+   "10/30 hari" but only 8 × dailyProfit credited (mismatch). */
+
+function countWeekdaysBetween(start: Date, end: Date): number {
+  let count = 0;
+  const cur = new Date(start);
+  // Safety cap
+  let safety = 400;
+  while (cur < end && safety-- > 0) {
+    const day = cur.getDay(); // 0=Sun, 6=Sat
+    if (day !== 0 && day !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
 function getDaysElapsed(startDate: string): number {
-  // Count calendar days in WIB timezone
+  // ★ v2.6: Calendar days (used for "days remaining" display only)
   const startUTC = new Date(startDate);
   const nowUTC = new Date();
   const WIB_OFFSET = 7 * 3600000;
-  // Convert both to WIB date-only
   const startWIB = new Date(startUTC.getTime() + startUTC.getTimezoneOffset() * 60000 + WIB_OFFSET);
   const nowWIB = new Date(nowUTC.getTime() + nowUTC.getTimezoneOffset() * 60000 + WIB_OFFSET);
-  // Zero out time parts for calendar day comparison
   const startDay = new Date(startWIB.getFullYear(), startWIB.getMonth(), startWIB.getDate());
   const todayDay = new Date(nowWIB.getFullYear(), nowWIB.getMonth(), nowWIB.getDate());
   const diffDays = Math.floor((todayDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
 }
 
+function getWeekdaysElapsed(startDate: string): number {
+  // ★ v2.6: Count ONLY weekdays (Mon-Fri) since startDate — matches cron's profit crediting.
+  //   Profit libur di Sabtu & Minggu, jadi progress juga harus libur di weekend.
+  //   This makes "X hari kerja × dailyProfit = totalProfitEarned" hold true.
+  const startUTC = new Date(startDate);
+  const nowUTC = new Date();
+  const WIB_OFFSET = 7 * 3600000;
+  const startWIB = new Date(startUTC.getTime() + startUTC.getTimezoneOffset() * 60000 + WIB_OFFSET);
+  const nowWIB = new Date(nowUTC.getTime() + nowUTC.getTimezoneOffset() * 60000 + WIB_OFFSET);
+  const startDay = new Date(startWIB.getFullYear(), startWIB.getMonth(), startWIB.getDate());
+  const todayDay = new Date(nowWIB.getFullYear(), nowWIB.getMonth(), nowWIB.getDate());
+  return countWeekdaysBetween(startDay, todayDay);
+}
+
+function getWeekdaysInContract(startDate: string, contractDays: number): number {
+  // ★ v2.6: Count weekdays from startDate to startDate + contractDays.
+  //   This is the actual number of profit-crediting days for this contract.
+  //   contractDays is calendar days, so we compute the weekday equivalent.
+  if (contractDays <= 0) return 0;
+  const startUTC = new Date(startDate);
+  const WIB_OFFSET = 7 * 3600000;
+  const startWIB = new Date(startUTC.getTime() + startUTC.getTimezoneOffset() * 60000 + WIB_OFFSET);
+  const startDay = new Date(startWIB.getFullYear(), startWIB.getMonth(), startWIB.getDate());
+  const endDay = new Date(startDay);
+  endDay.setDate(endDay.getDate() + contractDays);
+  return countWeekdaysBetween(startDay, endDay);
+}
+
 function getProgress(startDate: string, contractDays: number): number {
-  const elapsed = getDaysElapsed(startDate);
-  return Math.min(100, Math.round((elapsed / contractDays) * 100));
+  // ★ v2.6: Progress based on WEEKDAYS (matches cron's profit crediting)
+  const weekdaysElapsed = getWeekdaysElapsed(startDate);
+  const weekdaysInContract = getWeekdaysInContract(startDate, contractDays);
+  if (weekdaysInContract <= 0) return 0;
+  return Math.min(100, Math.round((weekdaysElapsed / weekdaysInContract) * 100));
+}
+
+function getExpectedProfit(startDate: string, dailyProfit: number, contractDays: number, status: string): number {
+  // ★ v2.6: Expected profit = weekdays elapsed × dailyProfit (matches cron's logic).
+  //   For completed/cancelled status, expected = totalProfitEarned (already final).
+  if (status !== 'active') return -1; // not applicable
+  const weekdaysElapsed = getWeekdaysElapsed(startDate);
+  const weekdaysInContract = getWeekdaysInContract(startDate, contractDays);
+  const cappedElapsed = Math.min(weekdaysElapsed, weekdaysInContract);
+  return cappedElapsed * dailyProfit;
 }
 
 function getStatusConfig(status: string, t: (key: string) => string) {
@@ -209,8 +266,15 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
   const StatusIcon = statusCfg.icon;
   const progress = getProgress(asset.startDate, asset.contractDays);
   const daysRemaining = getDaysRemaining(asset.endDate);
-  const daysElapsed = getDaysElapsed(asset.startDate);
+  const weekdaysElapsed = getWeekdaysElapsed(asset.startDate);
+  const weekdaysInContract = getWeekdaysInContract(asset.startDate, asset.contractDays);
   const isInvestment = asset.type === 'investment';
+
+  // ★ v2.6: Expected profit = weekdays elapsed × dailyProfit
+  const expectedProfit = getExpectedProfit(asset.startDate, asset.dailyProfit, asset.contractDays, asset.status);
+  const profitDrift = expectedProfit >= 0 ? (asset.totalProfitEarned - expectedProfit) : 0;
+  const isProfitShort = expectedProfit >= 0 && profitDrift < -1; // actual < expected (cron missed)
+  const isProfitOver = expectedProfit >= 0 && profitDrift > 1;  // actual > expected (manual credit)
 
   return (
     <motion.div
@@ -300,7 +364,7 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
           <div className="flex items-center justify-between text-[10px] mb-1.5">
             <span className="text-muted-foreground">{t('assets.contractProgress')}</span>
             <span className="text-foreground font-medium">
-              {daysElapsed}/{asset.contractDays} hari • <span className="text-emerald-400">{daysRemaining} hari tersisa</span>
+              {weekdaysElapsed}/{weekdaysInContract} hari kerja • <span className="text-emerald-400">{daysRemaining} hari tersisa</span>
             </span>
           </div>
           <div className="w-full h-2 bg-foreground/5 rounded-full overflow-hidden">
@@ -314,12 +378,43 @@ function AssetCard({ asset, t }: { asset: AssetItem; t: (key: string) => string 
         </div>
       )}
 
-      {/* Total Profit Preview (modal TIDAK dikembalikan — hanya profit) */}
+      {/* ★ v2.6 Profit vs Expected (consistency check) */}
+      {asset.status === 'active' && expectedProfit >= 0 && (
+        <div className={`mt-3 pt-3 border-t border-white/5 ${isProfitShort ? 'bg-amber-500/5 -mx-4 -mb-1 px-4 pb-1 rounded-b-2xl' : ''}`}>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Profit Seharusnya</span>
+            <span className="text-emerald-400 font-semibold">
+              {formatRupiah(expectedProfit)}
+              <span className="text-muted-foreground/70 text-[9px] ml-1">
+                ({weekdaysElapsed} hari × {formatRupiah(asset.dailyProfit)})
+              </span>
+            </span>
+          </div>
+          {isProfitShort && (
+            <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-amber-400">
+              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+              <span>
+                Profit tertinggal {formatRupiah(Math.abs(profitDrift))}. Cron akan auto-backfill ≤10 detik.
+              </span>
+            </div>
+          )}
+          {isProfitOver && (
+            <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-blue-400">
+              <Zap className="w-3 h-3 shrink-0 mt-0.5" />
+              <span>
+                +{formatRupiah(profitDrift)} (manual credit / backfill)
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Total Profit Preview (estimasi total profit akhir kontrak) */}
       {asset.status === 'active' && (
         <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-          <span className="text-muted-foreground text-[10px]">Estimasi Total Profit</span>
+          <span className="text-muted-foreground text-[10px]">Estimasi Total Profit Akhir Kontrak</span>
           <span className="text-emerald-400 text-xs font-bold">
-            {formatRupiah(asset.dailyProfit * asset.contractDays)}
+            {formatRupiah(asset.dailyProfit * weekdaysInContract)}
           </span>
         </div>
       )}

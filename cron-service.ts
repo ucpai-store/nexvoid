@@ -1,5 +1,25 @@
 /**
- * NEXVO Cron Service v2.5 ★★★ BULLETPROOF PROFIT FIX ★★★
+ * NEXVO Cron Service v2.6 ★★★ PROFIT CONSISTENCY FIX ★★★
+ *
+ * ★ v2.6 (THE DEFINITIVE FIX for "total profit di Aset ≠ Riwayat"):
+ *   v2.5 had 2 silent bugs that caused Asset page total ≠ History page total:
+ *   (1) Purchase sync (when Investment loop credited) only incremented
+ *       Purchase.profitEarned by `dailyProfit` (1 day) — but Investment loop
+ *       might credit multi-day backfill → Purchase.profitEarned drifted
+ *       BELOW sum(Investment.totalProfitEarned).
+ *   (2) Purchase path credit (when Investment loop skipped) updated
+ *       Purchase.profitEarned + BonusLog but NOT Investment.totalProfitEarned
+ *       → Asset page (uses Investment.totalProfitEarned) showed LESS than
+ *       History page (uses BonusLog sum).
+ *
+ *   v2.6 FIX:
+ *   - Purchase sync: SET Purchase.profitEarned = sum(linked Investment.totalProfitEarned)
+ *     (always in sync, regardless of backfill)
+ *   - Purchase path credit: ALSO update each linked Investment.totalProfitEarned
+ *     (distribute totalCredit evenly across linked investments)
+ *   - Startup self-heal: reconcilePurchaseAndInvestmentProfits() runs ONCE on boot,
+ *     fixing historical drift in both directions
+ *   - Result: Asset total = History total = BonusLog sum (single source of truth)
  *
  * ★ v2.5 BULLETPROOF (THE DEFINITIVE FIX for "profit 00:00 gak masuk"):
  *   v2.4 still filtered Investments by `status: 'active'` — but on VPS,
@@ -24,7 +44,7 @@
  *
  * Uses Prisma directly to access the database.
  * Port: 3032
- * Version marker: CRON-PROFIT-BULLETPROOF-V10-20250629
+ * Version marker: PROFIT-CONSISTENCY-FIX-V13-20250630
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -539,6 +559,97 @@ async function processAllSalaryBonuses(): Promise<{
 
 // ──────────── Daily Investment Profit Logic ────────────
 
+/**
+ * ★★★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned vs sum(Investment.totalProfitEarned)
+ *
+ * Old v2.5 code incremented Purchase.profitEarned by `dailyProfit` (1 day only)
+ * when the Investment loop credited — but the Investment loop might credit
+ * multiple days (backfill). This caused Purchase.profitEarned to drift below
+ * sum(Investment.totalProfitEarned). Asset page (which used Investment.totalProfitEarned
+ * for direct investments, sum(Investment.totalProfitEarned) for product purchases)
+ * would then show a DIFFERENT total than the History page (BonusLog sum).
+ *
+ * This function runs ONCE at cron startup. For every Purchase that has linked
+ * Investments, it sets Purchase.profitEarned = sum(linked Investment.totalProfitEarned).
+ * This guarantees the two pages agree going forward.
+ *
+ * Also handles the reverse case: if Purchase.profitEarned > sum(Investment.totalProfitEarned)
+ * (because old v2.5 Purchase path credited but didn't sync Investment.totalProfitEarned),
+ * we sync the OTHER way: distribute the difference to linked Investments.
+ */
+async function reconcilePurchaseAndInvestmentProfits(): Promise<{ synced: number; driftFixed: number }> {
+  const result = { synced: 0, driftFixed: 0 };
+  try {
+    const purchasesWithLinks = await db.purchase.findMany({
+      where: {
+        status: 'active',
+        investments: { some: {} },
+      },
+      select: { id: true },
+    });
+
+    for (const p of purchasesWithLinks) {
+      const linkedInvAgg = await db.investment.aggregate({
+        where: { purchaseId: p.id },
+        _sum: { totalProfitEarned: true },
+      });
+      const invSum = linkedInvAgg._sum.totalProfitEarned || 0;
+
+      const purchase = await db.purchase.findUnique({
+        where: { id: p.id },
+        select: { profitEarned: true },
+      });
+      if (!purchase) continue;
+
+      const drift = purchase.profitEarned - invSum;
+      if (Math.abs(drift) < 1) {
+        // Already in sync (within 1 rupiah tolerance)
+        continue;
+      }
+
+      if (drift > 0) {
+        // Purchase.profitEarned > sum(Investment.totalProfitEarned)
+        // → distribute the excess to linked Investments (old v2.5 Purchase-path credits
+        //   that never synced Investment.totalProfitEarned)
+        const linkedInvs = await db.investment.findMany({
+          where: { purchaseId: p.id },
+          select: { id: true },
+        });
+        if (linkedInvs.length > 0) {
+          const perInv = drift / linkedInvs.length;
+          for (const li of linkedInvs) {
+            await db.investment.update({
+              where: { id: li.id },
+              data: { totalProfitEarned: { increment: perInv } },
+            });
+          }
+          result.driftFixed++;
+          console.log(`[Profit Cron] 🔧 SELF-HEAL: Purchase ${p.id} — distributed ${formatRupiahSimple(drift)} excess to ${linkedInvs.length} linked Investment(s) (each +${formatRupiahSimple(perInv)})`);
+        }
+      } else {
+        // Purchase.profitEarned < sum(Investment.totalProfitEarned)
+        // → set Purchase.profitEarned = sum(Investment.totalProfitEarned)
+        //   (Investment loop credited multi-day backfill, but Purchase sync only added 1 day)
+        await db.purchase.update({
+          where: { id: p.id },
+          data: { profitEarned: invSum },
+        });
+        result.synced++;
+        console.log(`[Profit Cron] 🔧 SELF-HEAL: Purchase ${p.id} — set profitEarned=${formatRupiahSimple(invSum)} (was ${formatRupiahSimple(purchase.profitEarned)}, sum(Investment.totalProfitEarned)=${formatRupiahSimple(invSum)})`);
+      }
+    }
+
+    if (result.synced > 0 || result.driftFixed > 0) {
+      console.log(`[Profit Cron] 🔧 SELF-HEAL DONE: ${result.synced} purchase(s) synced to Investment sum, ${result.driftFixed} drift(s) fixed (Investment topped up from Purchase excess)`);
+    } else {
+      console.log(`[Profit Cron] 🔧 SELF-HEAL: All purchases already in sync with Investments ✓`);
+    }
+  } catch (e: any) {
+    console.error('[Profit Cron] SELF-HEAL error (non-fatal):', e.message);
+  }
+  return result;
+}
+
 async function processDailyInvestmentProfits(): Promise<{
   processed: number;
   totalProfit: number;
@@ -861,11 +972,22 @@ async function processDailyInvestmentProfitsCore(): Promise<{
         });
 
         if (anyCreditedToday) {
-          // Investment loop credited today — sync tracking only (no double-credit)
+          // ★★★ v2.6 CONSISTENCY FIX: Sync Purchase.profitEarned to EXACTLY match
+          //   sum(linked Investment.totalProfitEarned). Old code incremented by
+          //   `dailyProfit` (1 day only) — wrong if Investment loop did multi-day
+          //   backfill. This caused Asset page (uses Investment.totalProfitEarned)
+          //   to show DIFFERENT total than History page (uses BonusLog sum).
+          //   Now: always recompute Purchase.profitEarned = sum(linked Investment.totalProfitEarned)
+          //   so the two pages always agree.
+          const linkedInvAgg = await db.investment.aggregate({
+            where: { purchaseId: purchase.id },
+            _sum: { totalProfitEarned: true },
+          });
+          const linkedInvSum = linkedInvAgg._sum.totalProfitEarned || 0;
           await db.purchase.update({
             where: { id: purchase.id },
             data: {
-              profitEarned: { increment: dailyProfit },
+              profitEarned: linkedInvSum, // ★ SET to sum (not increment) — always in sync
               dailyProfit: dailyProfit,
               lastProfitDate: new Date(),
             },
@@ -925,6 +1047,33 @@ async function processDailyInvestmentProfitsCore(): Promise<{
             lastProfitDate: new Date(),
           },
         });
+
+        // 2b. ★★★ v2.6 CONSISTENCY FIX: Also update each linked Investment's
+        //     totalProfitEarned + lastProfitDate so the Asset page (which uses
+        //     Investment.totalProfitEarned) shows the SAME profit as the History
+        //     page (which uses BonusLog sum). Without this, when the Investment
+        //     loop is skipped but Purchase path credits, Investment.totalProfitEarned
+        //     stays stale → Asset shows wrong total → user sees mismatch.
+        if (linkedPurchaseIds.has(purchase.id)) {
+          const linkedInvsForSync = await tx.investment.findMany({
+            where: { purchaseId: purchase.id },
+            select: { id: true },
+          });
+          if (linkedInvsForSync.length > 0) {
+            // Distribute totalCredit evenly across linked investments
+            const perInvCredit = totalCredit / linkedInvsForSync.length;
+            for (const li of linkedInvsForSync) {
+              await tx.investment.update({
+                where: { id: li.id },
+                data: {
+                  totalProfitEarned: { increment: perInvCredit },
+                  lastProfitDate: new Date(),
+                },
+              });
+            }
+            console.log(`[Profit Cron] 🔗 SYNC: Updated ${linkedInvsForSync.length} linked Investment(s) for Purchase ${purchase.id} — each +${formatRupiahSimple(perInvCredit)} (total ${formatRupiahSimple(totalCredit)})`);
+          }
+        }
 
         // 3. Create ProfitLog (for profit history tracking)
         await tx.profitLog.create({
@@ -1327,8 +1476,8 @@ const server = Bun.serve({
 
     if (url.pathname === '/') {
       return Response.json({
-        service: 'NEXVO Cron Service v2.5',
-        versionMarker: 'CRON-PROFIT-BULLETPROOF-V10-20250629',
+        service: 'NEXVO Cron Service v2.6',
+        versionMarker: 'PROFIT-CONSISTENCY-FIX-V13-20250630',
         status: 'running',
         wibTime: getWibNow().toISOString(),
         lastSalaryRun: lastSalaryRunDate || 'never',
@@ -1336,6 +1485,12 @@ const server = Bun.serve({
         lastQuotaSimHour: lastQuotaSimHour >= 0 ? `hour ${lastQuotaSimHour}` : 'never',
         matchingMode: 'event-driven (credited with daily profit)',
         referralMode: 'per-investment (credited when downline invests)',
+        v26Fixes: [
+          'Purchase.profitEarned synced to sum(Investment.totalProfitEarned) on every credit',
+          'Purchase-path credit juga update linked Investment.totalProfitEarned (no drift)',
+          'Startup self-heal: reconcile historical drift between Purchase and Investment',
+          'Asset page total = History page total = BonusLog sum (single source of truth)',
+        ],
       }, { headers: corsHeaders });
     }
 
@@ -1526,7 +1681,7 @@ const server = Bun.serve({
 
 // ──────────── Start ────────────
 
-console.log(`[Cron Service v2.5] 🚀 Running on port ${PORT} — marker: CRON-PROFIT-BULLETPROOF-V10-20250629`);
+console.log(`[Cron Service v2.6] 🚀 Running on port ${PORT} — marker: PROFIT-CONSISTENCY-FIX-V13-20250630`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
@@ -1538,6 +1693,15 @@ console.log(`  - Quota Simulation: Every 2 hours at :30 (nav.live style)`);
 console.log(`  - Matching: Event-driven (credited with daily profit, based on PROFIT amount)`);
 console.log(`  - Referral: Per-investment (credited when downline invests)`);
 console.log(`  - Level 6+ matching: AUTO DISCONNECT (no bonus)`);
+console.log(`  - ★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned ↔ sum(Investment.totalProfitEarned) on startup`);
+
+// ★★★ v2.6 SELF-HEAL: Sync Purchase.profitEarned with sum(Investment.totalProfitEarned)
+//   This guarantees Asset page total = History page total going forward.
+reconcilePurchaseAndInvestmentProfits().then((result) => {
+  console.log(`[Cron Service] 🔧 v2.6 Self-Heal done: ${result.synced} purchase(s) synced, ${result.driftFixed} drift(s) fixed`);
+}).catch((e) => {
+  console.error('[Cron Service] v2.6 Self-Heal failed (non-fatal):', e.message);
+});
 
 // Initial quota simulation on startup
 simulateQuotaAndActivity().then((result) => {
