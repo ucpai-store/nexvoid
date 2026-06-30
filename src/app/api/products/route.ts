@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
 
     if (id) {
       const product = await db.product.findUnique({ where: { id } });
-      if (!product || !product.isActive) {
+      if (!product) {
         return NextResponse.json({ success: false, error: 'Produk tidak ditemukan' }, { status: 404 });
       }
 
@@ -151,21 +151,58 @@ export async function GET(request: NextRequest) {
         product.quotaUsed = newQuotaUsed;
       }
 
-      return NextResponse.json({ success: true, data: product });
+      // ★ v13: tambah isAvailable flag
+      const productWithAvailability = {
+        ...product,
+        isAvailable: product.isActive && !product.isStopped && product.quotaUsed < product.quota,
+        availabilityReason: !product.isActive
+          ? 'tidak-tersedia'
+          : product.isStopped
+            ? 'dihentikan'
+            : product.quotaUsed >= product.quota
+              ? 'quota-penuh'
+              : null,
+      };
+
+      return NextResponse.json({ success: true, data: productWithAvailability });
     }
 
     // Auto-reset any full quotas before returning list
     await autoResetQuotaIfFull();
 
+    // ★★★ v13 FIX: Tampilkan SEMUA produk (termasuk isActive=false & isStopped=true).
+    //   Sebelumnya filter `isActive: true, isStopped: false` — paket 4/5/6 yang
+    //   admin set "Inactive" TIDAK muncul di web user. User complaint "kok gak muncul".
+    //   Sekarang: semua produk tampil, tapi UI yang tentukan bisa beli atau tidak
+    //   berdasarkan field `isAvailable` (computed).
     const products = await db.product.findMany({
-      where: { isActive: true, isStopped: false },
       orderBy: { price: 'asc' },
     });
 
-    return NextResponse.json({ success: true, data: products });
+    // Tambah computed field `isAvailable` untuk UI
+    // isAvailable = isActive AND NOT isStopped AND quotaUsed < quota
+    const productsWithAvailability = products.map((p) => ({
+      ...p,
+      isAvailable: p.isActive && !p.isStopped && p.quotaUsed < p.quota,
+      availabilityReason: !p.isActive
+        ? 'tidak-tersedia'
+        : p.isStopped
+          ? 'dihentikan'
+          : p.quotaUsed >= p.quota
+            ? 'quota-penuh'
+            : null,
+    }));
+
+    return NextResponse.json({ success: true, data: productsWithAvailability });
   } catch (error) {
     console.error('Get products error:', error);
-    return NextResponse.json({ success: true, data: FALLBACK_PRODUCTS });
+    // ★ Fallback juga harus include isAvailable flag
+    const fallbackWithAvailability = FALLBACK_PRODUCTS.map((p) => ({
+      ...p,
+      isAvailable: p.isActive && !p.isStopped && p.quotaUsed < p.quota,
+      availabilityReason: null,
+    }));
+    return NextResponse.json({ success: true, data: fallbackWithAvailability });
   }
 }
 
@@ -201,8 +238,15 @@ export async function POST(request: NextRequest) {
     const qty = 1;
 
     const product = await db.product.findUnique({ where: { id: productId } });
-    if (!product || !product.isActive || product.isStopped) {
-      return NextResponse.json({ success: false, error: 'Produk tidak tersedia' }, { status: 404 });
+    if (!product) {
+      return NextResponse.json({ success: false, error: 'Produk tidak ditemukan' }, { status: 404 });
+    }
+    // ★ v13: Validasi produk available — gak bisa beli kalau isActive=false / isStopped=true / quota penuh
+    if (!product.isActive) {
+      return NextResponse.json({ success: false, error: `Produk '${product.name}' sedang tidak tersedia untuk pembelian.` }, { status: 400 });
+    }
+    if (product.isStopped) {
+      return NextResponse.json({ success: false, error: `Produk '${product.name}' sedang dihentikan sementara oleh admin.` }, { status: 400 });
     }
 
     // ★ Re-activation rule: reject ONLY if user has an ACTIVE purchase for this SAME product.

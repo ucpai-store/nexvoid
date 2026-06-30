@@ -100,10 +100,10 @@ echo "Deploy version response:"
 echo "$VERSION_RESP" | head -c 500
 echo ""
 
-if echo "$VERSION_RESP" | grep -q "PROFIT-CONSISTENCY-FIX-V13-20250630"; then
+if echo "$VERSION_RESP" | grep -q "SHOW-UNAVAILABLE-PRODUCTS-V14-20250630"; then
   echo ""
   echo "✅✅✅ DEPLOY SUCCESS ✅✅✅"
-  echo "   VPS is running PROFIT-CONSISTENCY-FIX-V13-20250630"
+  echo "   VPS is running SHOW-UNAVAILABLE-PRODUCTS-V14-20250630"
   echo "   → Upload bukti tf akan jalan (base64, no upload route needed)"
   echo "   → Profit cron v2.5 bulletproof aktif untuk malam ini 00:00 WIB"
   echo "   → Lihat Bukti modal fix aktif (no more blank tab)"
@@ -114,7 +114,7 @@ else
   echo "   - PM2 belum restart dengan code baru (jalankan: pm2 restart nexvo-web --update-env)"
   echo "   - Cek pm2 logs: pm2 logs nexvo-web --lines 30"
   echo ""
-  echo "   Expected marker: PROFIT-CONSISTENCY-FIX-V13-20250630"
+  echo "   Expected marker: SHOW-UNAVAILABLE-PRODUCTS-V14-20250630"
   echo "   Got response:"
   echo "$VERSION_RESP" | head -c 300
 fi

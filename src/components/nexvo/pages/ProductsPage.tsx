@@ -42,6 +42,10 @@ interface ProductItem {
   banner: string;
   isActive: boolean;
   isStopped: boolean;
+  /** computed by API: true kalau boleh dibeli */
+  isAvailable?: boolean;
+  /** computed by API: alasan tidak available */
+  availabilityReason?: 'tidak-tersedia' | 'dihentikan' | 'quota-penuh' | null;
   /** no-duplicates purchase state for the current user */
   state?: TierState;
   reason?: string;
@@ -68,7 +72,12 @@ function ProductCard({
   // Re-activation: available AND has a "Kontrak sebelumnya sudah berakhir" reason
   const isReactivation = isAvailable && !!(product.reason || '').toLowerCase().includes('berakhir');
 
-  const canBuy = isAvailable;
+  // ★ v13: Produk "tidak tersedia" — admin set isActive=false / isStopped=true / quota penuh
+  // Tetap TAMPIL tapi tidak bisa dibeli
+  const productUnavailable = !product.isAvailable;
+  const unavailableReason = product.availabilityReason;
+
+  const canBuy = isAvailable && !productUnavailable;
 
   const quotaPercent = product.quota > 0 ? Math.round((product.quotaUsed / product.quota) * 100) : 0;
   const remaining = Math.max(product.quota - product.quotaUsed, 0);
@@ -77,6 +86,21 @@ function ProductCard({
   const dailyProfit = Math.floor(product.price * ((product.profitRate || 0) / 100));
   // Total profit = dailyProfit × duration (modal TIDAK dikembalikan, hanya profit)
   const totalProfit = dailyProfit * (product.duration || 0);
+
+  // ★ v13: Badge + label untuk produk tidak tersedia
+  const unavailableConfig = (() => {
+    if (!unavailableReason) return null;
+    switch (unavailableReason) {
+      case 'tidak-tersedia':
+        return { label: 'TIDAK TERSEDIA', color: 'bg-red-500/80', textColor: 'text-red-300', icon: AlertCircle };
+      case 'dihentikan':
+        return { label: 'DIHENTIKAN SEMENTARA', color: 'bg-orange-500/80', textColor: 'text-orange-300', icon: AlertTriangle };
+      case 'quota-penuh':
+        return { label: 'KUOTA PALING PENUH', color: 'bg-amber-500/80', textColor: 'text-amber-300', icon: AlertCircle };
+      default:
+        return null;
+    }
+  })();
 
   return (
     <motion.div
@@ -110,7 +134,7 @@ function ProductCard({
           </Badge>
         </div>
 
-        {/* State ribbon (AKTIF / SELESAI / RE-AKTIVASI) */}
+        {/* State ribbon (AKTIF / SELESAI / RE-AKTIVASI / TIDAK TERSEDIA / DIHENTIKAN / KUOTA PENUH) */}
         {isActive && (
           <div className="absolute top-0 left-0 bg-emerald-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" /> AKTIF
@@ -124,6 +148,11 @@ function ProductCard({
         {isReactivation && (
           <div className="absolute top-0 left-0 bg-amber-500/90 text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1">
             <RefreshCw className="w-3 h-3" /> RE-AKTIVASI
+          </div>
+        )}
+        {unavailableConfig && (
+          <div className={`absolute top-0 left-0 ${unavailableConfig.color} text-white text-[9px] font-bold px-3 py-1 rounded-br-xl flex items-center gap-1`}>
+            <unavailableConfig.icon className="w-3 h-3" /> {unavailableConfig.label}
           </div>
         )}
       </div>
@@ -212,7 +241,19 @@ function ProductCard({
           </div>
         )}
 
-        {/* Buy button — any available product is purchasable (incl. re-activation after contract end) */}
+        {/* ★ v13: Info box untuk produk tidak tersedia */}
+        {productUnavailable && unavailableConfig && (
+          <div className="flex items-start gap-1.5 mb-3 p-2 rounded-lg bg-red-500/5 border border-red-500/20">
+            <AlertCircle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-red-400/90 text-[10px] leading-tight">
+              {unavailableReason === 'tidak-tersedia' && 'Produk sedang tidak tersedia untuk pembelian.'}
+              {unavailableReason === 'dihentikan' && 'Produk sedang dihentikan sementara oleh admin.'}
+              {unavailableReason === 'quota-penuh' && 'Kuota produk sudah penuh. Coba lagi nanti.'}
+            </p>
+          </div>
+        )}
+
+        {/* Buy button */}
         {isActive ? (
           <div className="w-full h-9 sm:h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 mt-auto">
             <CheckCircle2 className="w-4 h-4" /> Sedang Aktif
@@ -220,6 +261,13 @@ function ProductCard({
         ) : isBought ? (
           <div className="w-full h-9 sm:h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400/80 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 mt-auto">
             <CheckCircle2 className="w-4 h-4" /> Sudah Dimiliki
+          </div>
+        ) : productUnavailable ? (
+          <div className="w-full h-9 sm:h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400/80 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 mt-auto cursor-not-allowed">
+            <AlertCircle className="w-4 h-4" />
+            {unavailableReason === 'tidak-tersedia' && 'Tidak Tersedia'}
+            {unavailableReason === 'dihentikan' && 'Dihentikan Sementara'}
+            {unavailableReason === 'quota-penuh' && 'Kuota Penuh'}
           </div>
         ) : (
           <Button
@@ -266,15 +314,25 @@ export default function ProductsPage() {
             const tierData = await tierRes.json();
             if (tierData.success && tierData.data) {
               const avail = tierData.data;
-              const stateById = new Map<string, { state: TierState; reason?: string }>(
-                (avail.tiers || []).map((it: { id: string; state: TierState; reason?: string }) => [
+              const stateById = new Map<string, { state: TierState; reason?: string; isAvailable?: boolean; availabilityReason?: string | null }>(
+                (avail.tiers || []).map((it: { id: string; state: TierState; reason?: string; isAvailable?: boolean; availabilityReason?: string | null }) => [
                   it.id,
-                  { state: it.state, reason: it.reason },
+                  { state: it.state, reason: it.reason, isAvailable: it.isAvailable, availabilityReason: it.availabilityReason },
                 ])
               );
               list = list.map((p) => {
                 const s = stateById.get(p.id);
-                return s ? { ...p, state: s.state, reason: s.reason } : p;
+                // ★ v13: Merge isAvailable dari tiers juga (lebih akurat — cek status admin real-time)
+                if (s) {
+                  return {
+                    ...p,
+                    state: s.state,
+                    reason: s.reason,
+                    isAvailable: s.isAvailable ?? p.isAvailable,
+                    availabilityReason: (s.availabilityReason as ProductItem['availabilityReason']) ?? p.availabilityReason,
+                  };
+                }
+                return p;
               });
             }
           } catch {

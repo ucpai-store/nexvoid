@@ -27,11 +27,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Tidak terautentikasi' }, { status: 401 });
     }
 
-    // All active products
+    // ★ v13: SEMUA produk tampil di web user (termasuk yang isActive=false / isStopped=true).
+    //   Tiers route tetap return semua produk supaya UI bisa tampilkan badge "Tidak Tersedia"
+    //   untuk produk yang admin nonaktifkan. Pembelian tetap divalidasi di POST /api/products.
     const products = await db.product.findMany({
-      where: { isActive: true, isStopped: false },
       orderBy: { price: 'asc' },
-      select: { id: true, name: true },
+      select: { id: true, name: true, isActive: true, isStopped: true, quota: true, quotaUsed: true },
     });
 
     // All purchases for this user (any status)
@@ -66,7 +67,22 @@ export async function GET(request: NextRequest) {
         state = 'available';
         reason = 'Tersedia untuk dibeli';
       }
-      return { id: p.id, name: p.name, state, reason };
+      // ★ v13: Tambah isAvailable flag untuk UI
+      const isAvailable = p.isActive && !p.isStopped && p.quotaUsed < p.quota;
+      return {
+        id: p.id,
+        name: p.name,
+        state: state as 'available' | 'active' | 'bought',
+        reason,
+        isAvailable,
+        availabilityReason: !p.isActive
+          ? 'tidak-tersedia'
+          : p.isStopped
+            ? 'dihentikan'
+            : p.quotaUsed >= p.quota
+              ? 'quota-penuh'
+              : null,
+      };
     });
 
     const activeTier = tiers.find((t) => t.state === 'active') || null;
