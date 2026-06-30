@@ -255,8 +255,8 @@ export default function DepositPage() {
   const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast({ title: 'Error', description: 'Image must be under 8MB', variant: 'destructive' });
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Error', description: 'Image must be under 10MB', variant: 'destructive' });
       return;
     }
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
@@ -276,12 +276,60 @@ export default function DepositPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // ★ v11 COMPRESS: scale image to max 1280px + JPEG 0.7 quality.
+  //   This guarantees the upload payload stays under ~500KB, which
+  //   passes Nginx's default client_max_body_size (1MB) on Hostinger VPS.
+  //   Without compression, a 3-5MB phone photo gets 413 from Nginx.
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_W = 1280;
+          const MAX_H = 1280;
+          let { width, height } = img;
+          if (width > MAX_W) { height = (height * MAX_W) / width; width = MAX_W; }
+          if (height > MAX_H) { width = (width * MAX_H) / height; height = MAX_H; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Canvas not supported')); return; }
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) { reject(new Error('Compression failed')); return; }
+              const compressed = new File([blob], file.name.replace(/\.(png|webp|gif)$/i, '.jpg'), { type: 'image/jpeg' });
+              resolve(compressed);
+            },
+            'image/jpeg',
+            0.7
+          );
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const uploadProof = async (): Promise<string> => {
     if (!proofFile || !token) return '';
     setUploadingProof(true);
     try {
+      // ★ v11 COMPRESS before upload — avoids Nginx 413 on VPS
+      let fileToUpload = proofFile;
+      try {
+        fileToUpload = await compressImage(proofFile);
+        console.log('[Upload] Original:', proofFile.size, 'bytes → Compressed:', fileToUpload.size, 'bytes');
+      } catch (compressErr) {
+        console.warn('[Upload] Compression failed, using original:', compressErr);
+      }
+
       const formData = new FormData();
-      formData.append('file', proofFile);
+      formData.append('file', fileToUpload);
       const res = await fetch('/api/deposit/upload', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
