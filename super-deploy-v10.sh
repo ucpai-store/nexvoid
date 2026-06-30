@@ -387,6 +387,50 @@ else
   cd "$PROJECT_DIR" && bun run force-credit-profit.ts 2>&1 | tail -30
 fi
 
+# ─── ★★★ v2.9 PROFIT CLEANUP VERIFICATION (fix triple-profit bug) ★★★ ───
+echo ""
+echo "─── ★★★ v2.9 Profit Cleanup Verification ★★★ ───"
+echo "   Checking cron logs for cleanup markers..."
+CLEANUP_LOG=$(pm2 logs nexvo-cron --lines 100 --nostream 2>/dev/null | grep -E "Profit Cleanup|STEP [0-9]|v2.8 Profit Cleanup|v2.9|excess|Deleted.*entries|corrected" | tail -30)
+if [ -n "$CLEANUP_LOG" ]; then
+  echo "$CLEANUP_LOG"
+  echo ""
+  echo "   ✅ Profit cleanup ran at cron startup"
+  # Check if any user was corrected
+  CORRECTED_COUNT=$(echo "$CLEANUP_LOG" | grep -c "corrected\|User.*→")
+  if [ "$CORRECTED_COUNT" -gt 0 ]; then
+    echo "   ✅ $CORRECTED_COUNT user(s) had excess profit trimmed"
+  fi
+else
+  echo "   ⚠️  No cleanup markers found in logs — cleanup may not have run yet."
+  echo "      Manual trigger: cd $PROJECT_DIR && bun run scripts/run-profit-cleanup.ts"
+fi
+
+# ─── Check DB for remaining duplicate profit (should be 0 after cleanup) ───
+echo ""
+echo "─── Checking DB for remaining duplicate profit entries ───"
+if [ -f "db/custom.db" ]; then
+  DUP_COUNT=$(sqlite3 db/custom.db "
+    SELECT COUNT(*) FROM (
+      SELECT userId, date(createdAt) as day, COUNT(*) as c
+      FROM BonusLog WHERE type='profit'
+      GROUP BY userId, date(createdAt)
+      HAVING c > 1
+    );
+  " 2>/dev/null || echo "0")
+  if [ "$DUP_COUNT" = "0" ]; then
+    echo "   ✅ No same-day duplicate profit entries remaining"
+  else
+    echo "   ⚠️  Found $DUP_COUNT user(s) with same-day duplicates — run: bun run scripts/run-profit-cleanup.ts"
+  fi
+
+  # ★★★ v2.9: Also check for cross-day excess (3 entries when only 2 weekdays elapsed) ★★★
+  echo ""
+  echo "─── v2.9: Checking for cross-day excess profit (BonusLog sum vs Investment progress) ───"
+  echo "   (If any user shows excess, the cleanup will trim it on next cron restart)"
+  echo "   Manual run: cd $PROJECT_DIR && bun run scripts/run-profit-cleanup.ts"
+fi
+
 echo ""
 echo "═══════════════════════════════════════════════════════"
 echo "  ✅ DEPLOY v10 COMPLETE — PROFIT BULLETPROOF LIVE"

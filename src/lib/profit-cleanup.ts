@@ -366,38 +366,121 @@ async function recalculatePurchases(report: CleanupReport): Promise<void> {
   console.log(`[Profit Cleanup]   ✅ Recalculated ${report.purchasesRecalculated} purchases`);
 }
 
-// ──────────── STEP 4: Recalculate User balance from BonusLog ────────────
+// ──────────── STEP 4: Trim excess BonusLog + correct User balance ────────────
+//
+// ★★★ v2.9 FIX: Use Investment.totalProfitEarned (after STEP 2 recalculation)
+//   as the source of truth, NOT BonusLog sum. ★★★
+//
+// Old v2.8 STEP 4 compared User.totalProfit to BonusLog sum. But if BonusLog
+// itself had 3 entries on 3 different days (no same-day duplicate), STEP 1
+// dedup did nothing, and STEP 4 saw BonusLog sum == User.totalProfit → no
+// correction. User kept 57,600 instead of 38,400.
+//
+// New v2.9 STEP 4:
+//   1. expectedInvestmentProfit = sum(Investment.totalProfitEarned) per user
+//      (STEP 2 already recalculated this from weekday progress)
+//   2. For each user's profit BonusLog entries:
+//      - If sum(entries) > expectedInvestmentProfit → excess exists
+//      - Delete excess entries (smallest first) until sum ≈ expected
+//   3. Correct User.totalProfit: reduce by excess (only the investment profit
+//      portion — salary/matching/referral are untouched)
+//   4. Correct User.mainBalance: reduce by excess (refund the over-credit)
 
 async function recalculateUserBalances(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 4: Recalculate User.mainBalance & totalProfit from BonusLog');
+  console.log('[Profit Cleanup] 🧹 STEP 4 (v2.9): Trim excess BonusLog + correct User balance from Investment ground truth');
 
-  // Sum all profit BonusLog per user (after dedup)
-  const profitAgg = await db.bonusLog.groupBy({
+  // ── 4a. Compute expected investment profit per user from Investment.totalProfitEarned ──
+  //   (STEP 2 already recalculated totalProfitEarned = elapsedWeekdays × dailyProfit)
+  const investmentAgg = await db.investment.groupBy({
     by: ['userId'],
-    where: { type: 'profit' },
-    _sum: { amount: true },
+    _sum: { totalProfitEarned: true },
   });
-  const profitByUser = new Map<string, number>();
-  for (const a of profitAgg) {
-    profitByUser.set(a.userId, a._sum.amount || 0);
+  const expectedByUser = new Map<string, number>();
+  for (const a of investmentAgg) {
+    expectedByUser.set(a.userId, a._sum.totalProfitEarned || 0);
+  }
+  console.log(`[Profit Cleanup]   Found ${expectedByUser.size} users with investment profit records`);
+
+  // ── 4b. Get all profit BonusLog entries, grouped by user, sorted by amount ASC ──
+  //   (sort ASC so we delete smallest/excess entries first, preserving larger backfill entries)
+  const allProfitLogs = await db.bonusLog.findMany({
+    where: { type: 'profit' },
+    orderBy: { amount: 'asc' },
+    select: { id: true, userId: true, amount: true, description: true, createdAt: true },
+  });
+  const logsByUser = new Map<string, typeof allProfitLogs>();
+  const logSumByUser = new Map<string, number>();
+  for (const log of allProfitLogs) {
+    if (!logsByUser.has(log.userId)) {
+      logsByUser.set(log.userId, []);
+      logSumByUser.set(log.userId, 0);
+    }
+    logsByUser.get(log.userId)!.push(log);
+    logSumByUser.set(log.userId, (logSumByUser.get(log.userId) || 0) + log.amount);
   }
 
+  // ── 4c. For each user with profit logs, trim excess + correct balance ──
   const users = await db.user.findMany({
     select: { id: true, userId: true, name: true, mainBalance: true, totalProfit: true },
   });
-  console.log(`[Profit Cleanup]   Checking ${users.length} users`);
+  console.log(`[Profit Cleanup]   Checking ${users.length} users for excess profit`);
 
   for (const u of users) {
     try {
-      const expectedProfit = profitByUser.get(u.id) || 0;
-      // diff = how much the user is OVER-credited relative to BonusLog sum
-      // If positive → user has more totalProfit than BonusLog records → over-credited → subtract
-      // If negative → user has less than BonusLog → do NOT auto-top-up (could be legit deposit/withdraw)
-      const overCredit = u.totalProfit - expectedProfit;
-      if (overCredit <= 1) continue; // not over-credited (within 1 rupiah tolerance)
+      const expected = expectedByUser.get(u.id) || 0;
+      const logs = logsByUser.get(u.id) || [];
+      const currentLogSum = logSumByUser.get(u.id) || 0;
 
-      const newMain = Math.max(0, u.mainBalance - overCredit);
-      const newTotalProfit = expectedProfit; // align to BonusLog sum
+      // Skip if no excess (within 1 rupiah tolerance)
+      const excess = currentLogSum - expected;
+      if (excess <= 1) continue;
+
+      // Skip if user has NO investments but has profit logs — suspicious, don't auto-delete
+      // (could be from a deleted investment; admin should review manually)
+      if (expected === 0 && logs.length > 0) {
+        console.log(
+          `[Profit Cleanup]   ⚠️ User ${u.userId} has ${logs.length} profit logs (sum ${formatRupiahSimple(currentLogSum)}) but 0 expected from investments — skipping (manual review needed)`,
+        );
+        report.errors.push(`User ${u.userId}: ${logs.length} profit logs but 0 expected — skipped for safety`);
+        continue;
+      }
+
+      console.log(
+        `[Profit Cleanup]   👉 User ${u.userId} (${u.name}): logs sum ${formatRupiahSimple(currentLogSum)} > expected ${formatRupiahSimple(expected)} → excess ${formatRupiahSimple(excess)} (${logs.length} entries → trim)`,
+      );
+
+      // ── 4d. Delete excess BonusLog entries (smallest first) ──
+      // Greedy: delete smallest entry if deleting it doesn't bring sum below expected.
+      // This preserves backfill entries (which are larger and cover multiple days).
+      const idsToDelete: string[] = [];
+      let remainingSum = currentLogSum;
+      for (const log of logs) { // sorted ASC by amount
+        if (remainingSum - log.amount >= expected - 1) {
+          idsToDelete.push(log.id);
+          remainingSum -= log.amount;
+        }
+        if (remainingSum <= expected + 1) break;
+      }
+
+      if (idsToDelete.length > 0) {
+        // Delete in chunks to avoid SQLite param limits
+        for (let i = 0; i < idsToDelete.length; i += 500) {
+          const chunk = idsToDelete.slice(i, i + 500);
+          await db.bonusLog.deleteMany({ where: { id: { in: chunk } } });
+        }
+        report.duplicateEntriesRemoved += idsToDelete.length;
+        report.duplicateAmountRefunded += (currentLogSum - remainingSum);
+        console.log(
+          `[Profit Cleanup]     Deleted ${idsToDelete.length} excess entries (sum ${formatRupiahSimple(currentLogSum - remainingSum)}), remaining log sum = ${formatRupiahSimple(remainingSum)}`,
+        );
+      }
+
+      // ── 4e. Correct User.totalProfit and mainBalance ──
+      // User.totalProfit includes investment profit + salary + matching + referral.
+      // We only reduce by the INVESTMENT profit excess (not other bonus types).
+      // excess = how much investment profit was over-credited.
+      const newTotalProfit = Math.max(0, u.totalProfit - excess);
+      const newMain = Math.max(0, u.mainBalance - excess);
 
       await db.user.update({
         where: { id: u.id },
@@ -408,18 +491,18 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
       });
 
       report.usersBalanceCorrected++;
-      report.totalBalanceCorrected += overCredit;
+      report.totalBalanceCorrected += excess;
       report.details.userBalance.push({
         userId: u.id,
         beforeMain: u.mainBalance,
         afterMain: newMain,
         beforeTotalProfit: u.totalProfit,
         afterTotalProfit: newTotalProfit,
-        corrected: overCredit,
+        corrected: excess,
       });
 
       console.log(
-        `[Profit Cleanup]   👉 User ${u.userId} (${u.name}): mainBalance ${formatRupiahSimple(u.mainBalance)} → ${formatRupiahSimple(newMain)} | totalProfit ${formatRupiahSimple(u.totalProfit)} → ${formatRupiahSimple(newTotalProfit)} | corrected -${formatRupiahSimple(overCredit)}`,
+        `[Profit Cleanup]     ✅ User ${u.userId}: mainBalance ${formatRupiahSimple(u.mainBalance)} → ${formatRupiahSimple(newMain)} | totalProfit ${formatRupiahSimple(u.totalProfit)} → ${formatRupiahSimple(newTotalProfit)} | corrected -${formatRupiahSimple(excess)}`,
       );
     } catch (e: any) {
       const msg = `User ${u.id}: ${e.message}`;
