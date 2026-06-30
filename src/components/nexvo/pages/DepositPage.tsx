@@ -344,8 +344,18 @@ export default function DepositPage() {
         try {
           proofUrl = await uploadProof();
         } catch {
-          setSubmitting(false);
-          return;
+          // ★ v11 fix: DON'T block deposit if upload fails.
+          // Upload might fail because route is missing on VPS (pre-deploy)
+          // or network issue. Deposit is MORE important than the proof image.
+          // Submit deposit without proof — admin can request proof via WhatsApp.
+          toast({
+            title: 'Upload Bukti Gagal',
+            description: 'Deposit tetap dikirim tanpa bukti. Admin akan meminta bukti transfer via WhatsApp.',
+            variant: 'default',
+          });
+          proofUrl = '';
+          setProofFile(null);
+          setProofPreview('');
         }
       }
 
