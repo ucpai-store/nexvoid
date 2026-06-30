@@ -133,6 +133,13 @@ export default function DepositPage() {
   const [uploadingProof, setUploadingProof] = useState(false);
   const [proofImageUrl, setProofImageUrl] = useState('');
 
+  // ★ v11 BULLETPROOF: Proof viewer modal.
+  //   Browsers BLOCK top-level navigation to data: URLs (security), so
+  //   <a target="_blank" href="data:image/..."> opens a blank tab.
+  //   Fix: open proof in an in-app modal with <img src={dataURL}>.
+  //   Works for both data: URLs (compressed proofs) and /api/files/ URLs (legacy).
+  const [viewingProof, setViewingProof] = useState<string | null>(null);
+
   // Deposit result
   const [lastDepositId, setLastDepositId] = useState<string | null>(null);
   const [lastDepositAmount, setLastDepositAmount] = useState<number>(0);
@@ -558,6 +565,55 @@ export default function DepositPage() {
                   Tutup
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── ★ v11 Proof Viewer Modal ─── */}
+      <AnimatePresence>
+        {viewingProof && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+            onClick={() => setViewingProof(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-strong rounded-3xl p-4 max-w-md w-full max-h-[90vh] flex flex-col gap-3 border border-primary/20"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-foreground font-semibold text-sm flex items-center gap-2">
+                  <ImagePlus className="w-4 h-4 text-primary" /> Bukti Transfer
+                </h3>
+                <button
+                  onClick={() => setViewingProof(null)}
+                  className="w-8 h-8 rounded-lg glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Tutup"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="rounded-2xl overflow-auto bg-black/30 flex items-center justify-center max-h-[70vh]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={viewingProof}
+                  alt="Bukti Transfer"
+                  className="max-w-full max-h-[70vh] object-contain"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    const p = document.createElement('p');
+                    p.textContent = 'Gagal memuat gambar bukti.';
+                    p.className = 'text-red-400 text-sm p-6';
+                    e.currentTarget.parentElement?.appendChild(p);
+                  }}
+                />
+              </div>
+              <p className="text-muted-foreground text-[10px] text-center">
+                Klik di luar gambar untuk menutup
+              </p>
             </motion.div>
           </motion.div>
         )}
@@ -1121,9 +1177,13 @@ export default function DepositPage() {
                     </span>
                   )}
                   {deposit.proofImage && (
-                    <a href={getFileUrl(deposit.proofImage)} target="_blank" rel="noopener noreferrer" className="text-primary text-[10px] hover:underline mt-1 inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setViewingProof(getFileUrl(deposit.proofImage))}
+                      className="text-primary text-[10px] hover:underline mt-1 inline-block"
+                    >
                       📎 Lihat Bukti
-                    </a>
+                    </button>
                   )}
                   {deposit.note && <p className="text-muted-foreground text-xs mt-0.5 italic">{deposit.note}</p>}
                 </div>
