@@ -5023,3 +5023,58 @@ Stage Summary:
   3. Kalau masih "DEPOSIT-UPLOAD-FIX-V11-20250630" → VPS masih jalan OLD code
      → jalankan manual: pm2 delete nexvo-web && PORT=3000 pm2 start "node .next/standalone/server.js" --name nexvo-web --cwd /home/nexvo
   4. Kalau marker V12 → upload bukti + profit cron PASTI jalan
+
+---
+Task ID: STATIC-ASSETS-FIX-V12.1
+Agent: main (serious mode — cek detail)
+Task: User complain "tiap update web selalu muncul tulisan" — cari root cause beneran
+
+Work Log:
+- Audit semua commit: hanya DepositPage.tsx yang UI (2x change)
+- Diff DepositPage.tsx: cuma add viewingProof state + modal + compressImage internal. TIDAK ada perubahan UI yang auto-muncul.
+- Test production mode (node .next/standalone/server.js) dengan Agent Browser
+- TEMUAN KRITIS: page load HTML TAPI "0 inputs, 0 buttons" — JS tidak hydrate!
+- Cek static assets: .next/standalone/.next/static TIDAK ADA
+- JS chunks (webpack.js, layout.js) return 404 → hydration gagal → web "kelihatan sama" (cuma landing text, no interactivity)
+- INI ROOT CAUSE "hasilnya sama" — bukan code salah, tapi static assets tidak di-serve
+
+FIX:
+- Copy .next/static → .next/standalone/.next/static (manual, Next.js standalone tidak auto-copy)
+- Copy public/ → .next/standalone/public/
+- Fix deploy script: selalu rm -rf + cp -a fresh (bug sebelumnya: skip kalau folder sudah ada)
+
+PRODUCTION VERIFIED (node .next/standalone/server.js + static copied):
+- JS chunks: 200 (webpack.js, layout.js) ✅
+- Page: 2 inputs, 11 buttons (interactive) ✅
+- NO console errors ✅
+- NO hydration warnings ✅
+- Login → deposit 200K → upload test-bukti.png → "Deposit Diterima!" modal ✅
+- DB: DP-NAF4XY, proofImage base64 1039 chars ✅
+- "📎 Lihat Bukti" = BUTTON (bukan link) → modal opens → img loaded=true ✅
+- Cron service: boot tanpa P2021, /api/status healthy ✅
+
+Commit e836fbc + push to GitHub origin/main
+
+Stage Summary:
+- ROOT CAUSE "hasilnya sama / web berubah / muncul tulisan" SETELAH DEPLOY:
+  1. next.config.js: output: 'standalone' (build ke .next/standalone/server.js)
+  2. Deploy script pakai 'next start' (BROKEN untuk standalone — Next.js warning)
+  3. .next/static TIDAK di-copy ke .next/standalone/ (Next.js tidak auto-copy)
+  4. → JS chunks 404 → hydration gagal → web load HTML tapi 0 interactive
+  5. → User lihat "web berubah" (cuma landing text) / "muncul tulisan" (error page)
+
+- FIX V12.1 (3 lapis, semua di deploy script):
+  1. Pakai 'node .next/standalone/server.js' (BUKAN next start)
+  2. Copy .next/static + public/ ke standalone (FRESH, rm + cp)
+  3. Verify marker + gitCommit sebelum claim success
+
+- USER HARUS DEPLOY 1x lagi dengan command yang sama:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+
+- VERIFIKASI (user bisa cek sendiri):
+  1. Buka https://nexvo.id/ → web HARUS interactive (bisa login, ada form)
+     Kalau cuma landing text tanpa form → deploy GAGAL, jangan lanjut
+  2. Buka https://nexvo.id/api/deploy-version → marker HARUS "STANDALONE-SERVER-FIX-V12-20250630"
+  3. Test upload bukti tf di halaman Deposit → "Deposit Diterima!"
+  4. Klik "📎 Lihat Bukti" → modal gambar muncul
+  5. pm2 logs nexvo-cron --lines 30 → "[Cron Service v2.5] 🚀 Running" (NO P2021)
