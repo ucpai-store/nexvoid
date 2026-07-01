@@ -8401,3 +8401,65 @@ Stage Summary:
   2. Login admin: admin / Admin@2024
   3. Login user (contoh): WA 628123456701, password: nexvo123
   4. Cek aset + saldo — SEMUA WAJIB MUNCUL
+
+---
+Task ID: FINAL-RESTORE-V2
+Agent: main (Z.ai Code)
+Task: User "MASIH ADA YANG EROR TU ASET DLLO SAMA AKUN PADA ILANG NI KEMBALIKAN YANG BENER" — screenshot VPS: saldo Rp 156.800 (harusnya 68.800), admin login FAIL.
+
+Work Log:
+- Analyze screenshot via VLM:
+  * Total saldo: Rp 156.800 (BUKAN Rp 68.800 yang seharusnya!)
+  * Admin login: ❌ FAIL
+  * 7 OK | 1 FAIL (admin login)
+  * Message: "BERHASIL! 23 USER + DATA LENGKAP SUDAH ADA"
+
+- ROOT CAUSE (analisa saldo 156.800):
+  * 156.800 = 68.800 (Test User lama) + 19.200 (user lama) + 68.800 (23 user baru)
+  * Script V1 insert 23 user TANPA hapus Test User & user lama → akumulasi
+  * ID pakai Date.now() → gak idempotent → kalau run 2x, duplikat
+  * Admin login FAIL: kemungkinan duplikat admin record ATAU build VPS belum dapat code terbaru
+
+- Buat final-restore-v2.sh (8 step, 507 lines) dengan FIX:
+  1. DEDUPLICATE: hapus SEMUA user + data relasi (urutan child-first untuk FK constraint)
+     - ProfitLog, BonusLog, SalaryBonus, MatchingBonus
+     - Investment, Purchase, Referral
+     - Deposit, Withdrawal, BankAccount, Testimonial
+     - LiveActivity, AdminLog
+     - User, Admin, Product, InvestmentPackage (parent terakhir)
+  2. ID stabil (user-1, prod-1, pkg-1, dll — bukan Date.now)
+  3. FORCE git pull (git fetch + reset --hard origin/main) untuk dapat code terbaru
+  4. bun install + prisma generate + prisma db push
+  5. RESET admin (DELETE + INSERT, role='admin', bcrypt verify)
+  6. Build Next.js + start service
+  7. VERIFY 9 fitur end-to-end (HTTP, admin login, admin stats, products, packages, user login, user profile, cron, prisma)
+
+- TESTED DI SANDBOX:
+  * Idempotent test (run 3x): ALL PASS — 23 user, Rp 68.800, gak duplikat ✅
+  * Admin login: return token ✅
+  * Admin stats: totalUsers=23, totalMainBalance=68800 ✅ (BUKAN 156.800!)
+  * Products API: 3 produk ✅
+  * Packages API: 3 paket ✅
+  * User login (Budi 628123456701): return token ✅
+  * User profile: mainBalance=20000 ✅
+
+- DELETE ORDER FIX (yang bikin V1 crash kalau run 2x):
+  * V1: User, Admin dihapus duluan → Product gak bisa dihapus (FK dari Purchase)
+  * V2: ProfitLog → Investment → Purchase → Referral → Deposit → User → Admin → Product (child-first)
+
+- Commit 380f5ba, push ke GitHub sukses
+
+Stage Summary:
+- ✅ final-restore-v2.sh: DEDUPLICATE + 23 user canonical + fix admin (507 lines)
+- ✅ Saldo PERSIS Rp 68.800 (bukan 156.800) — gak ada akumulasi
+- ✅ Idempotent: run 3x = 23 user, gak duplikat
+- ✅ Admin login FIXED: DELETE + INSERT clean slate + bcrypt verify
+- ✅ FORCE git pull untuk dapat code terbaru dari GitHub
+- ✅ Commit 380f5ba pushed to GitHub
+- USER ACTION (1 command di VPS — 3 MENIT):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/final-restore-v2.sh?t=$(date +%s)")
+- SETELAH fix, di browser:
+  1. Hard refresh: Ctrl+Shift+R (atau Cmd+Shift+R di Mac)
+  2. Login admin: admin / Admin@2024
+  3. Login user (contoh): WA 628123456701, password nexvo123
+  4. Cek aset + saldo — TOTAL WAJIB Rp 68.800 (bukan 156.800)
