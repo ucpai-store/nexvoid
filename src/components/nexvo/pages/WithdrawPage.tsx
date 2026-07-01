@@ -313,6 +313,17 @@ export default function WithdrawPage() {
     fetchData();
   }, [fetchData]);
 
+  // ★★★ CRITICAL FIX: Force refresh saldo dari DB tiap mount + tiap 30s
+  // Sebelumnya WithdrawPage pakai cached user.mainBalance dari localStorage
+  // yang bisa stale (saldo lama 19.200 padahal DB udah 68.800).
+  useEffect(() => {
+    hydrateUser();
+    const interval = setInterval(() => {
+      hydrateUser();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [hydrateUser]);
+
   useEffect(() => {
     setSelectedBank('');
     setSelectedEwallet('');
