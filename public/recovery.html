@@ -241,11 +241,10 @@ function skipToHome() {
   window.location.replace('https://nexvo.id/?_cb=' + Date.now());
 }
 
-// AUTO-RUN on load
+// AUTO-RUN on load — LANGSUNG clear, gak tunggu klik
 window.addEventListener('load', async function() {
-  log('⏳ Auto-diagnose...', 'info');
-  await diagnose();
-  log('Klik "Ulangi Clear Cache" untuk bersihin + reload.', 'warn');
+  log('🚀 AUTO-CLEAR dimulai...', 'info');
+  await clearAll();
 });
 </script>
 </body>

@@ -124,6 +124,29 @@ export default function RootLayout({
                   console.log('NEXVO SW registration failed:', err);
                 });
               }
+              // CSS LOAD DETECTOR — if CSS fails to load (old SW intercepting),
+              // auto-redirect to /recovery.html which clears everything + reloads.
+              (function() {
+                var checked = false;
+                function checkCSS() {
+                  if (checked) return;
+                  checked = true;
+                  var sheets = document.styleSheets;
+                  var loaded = 0;
+                  for (var i = 0; i < sheets.length; i++) {
+                    try { if (sheets[i].cssRules || sheets[i].rules) loaded++; } catch(e) {}
+                  }
+                  if (loaded === 0) {
+                    console.log('[NEXVO] CSS not loaded — redirecting to recovery.html');
+                    window.location.replace('/recovery.html?auto=1&t=' + Date.now());
+                  }
+                }
+                if (document.readyState === 'complete') {
+                  setTimeout(checkCSS, 1500);
+                } else {
+                  window.addEventListener('load', function() { setTimeout(checkCSS, 1500); });
+                }
+              })();
             `,
           }}
         />
