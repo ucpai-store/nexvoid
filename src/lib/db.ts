@@ -1,6 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import path from 'path'
-import fs from 'fs'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -46,10 +45,25 @@ function resolveDatabasePath(): string {
   // 4. CWD fallback
   add(path.resolve(process.cwd(), 'db', 'custom.db'))
 
-  // Pick the first candidate that exists as a non-empty file
+  // Pick the first candidate that exists as a non-empty file.
+  // NOTE: Use eval('require') to avoid the bundler statically resolving 'fs'
+  // (db.ts is transitively imported by client components, so a top-level
+  // `import fs from 'fs'` breaks the browser bundle).
+  let existsSync: (p: string) => boolean = () => false
+  let statSync: (p: string) => { size: number } = () => ({ size: 0 })
+  if (typeof window === 'undefined') {
+    try {
+      const fs = eval('require')('fs')
+      existsSync = fs.existsSync
+      statSync = fs.statSync
+    } catch {
+      // ignore — will fall through to env/cwd default
+    }
+  }
+
   for (const p of candidates) {
     try {
-      if (fs.existsSync(p) && fs.statSync(p).size > 0) {
+      if (existsSync(p) && statSync(p).size > 0) {
         if (envUrl && path.resolve(envUrl.replace(/^file:/, '')) !== p) {
           console.warn(`[DB] DATABASE_URL points to a missing/empty file. Using existing DB at: ${p}`)
         }
