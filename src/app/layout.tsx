@@ -100,6 +100,82 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // ───────────────────────────────────────────────────────────────
+              // NEXVO chunk-load error auto-recovery (runs BEFORE the app boots)
+              // ───────────────────────────────────────────────────────────────
+              // When a new deploy changes Next.js chunk hashes, stale clients
+              // try to fetch old chunk URLs that no longer exist -> 404 ->
+              // "Loading chunk XXXX failed". This catcher auto-reloads with a
+              // cache-buster so the browser fetches fresh HTML referencing the
+              // CURRENT chunks. Attempt-limited via sessionStorage to prevent
+              // infinite reload loops.
+              (function () {
+                var RELOAD_KEY = '__nexvo_chunk_reload_count';
+                var MAX_AUTO_RELOADS = 3;
+                function getReloadCount() {
+                  try {
+                    var n = parseInt(sessionStorage.getItem(RELOAD_KEY) || '0', 10);
+                    return Number.isFinite(n) ? n : 0;
+                  } catch (e) { return 0; }
+                }
+                function bumpReloadCount() {
+                  var n = getReloadCount() + 1;
+                  try { sessionStorage.setItem(RELOAD_KEY, String(n)); } catch (e) {}
+                  return n;
+                }
+                function resetReloadCount() {
+                  try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
+                }
+                function forceHardReload() {
+                  var url = new URL(window.location.href);
+                  url.searchParams.set('_cb', String(Date.now()));
+                  window.location.replace(url.toString());
+                }
+                function isChunkLoadMessage(msg) {
+                  if (!msg) return false;
+                  var s = String(msg).toLowerCase();
+                  return (
+                    s.indexOf('loading chunk') !== -1 ||
+                    s.indexOf('loading css chunk') !== -1 ||
+                    s.indexOf('chunkloaderror') !== -1 ||
+                    s.indexOf('failed to fetch dynamically imported module') !== -1 ||
+                    s.indexOf('importing a module script failed') !== -1 ||
+                    s.indexOf('/_next/static/chunks/') !== -1 ||
+                    s.indexOf('.chunk.js') !== -1
+                  );
+                }
+                function maybeAutoReload(detail) {
+                  if (!isChunkLoadMessage(detail)) return false;
+                  if (getReloadCount() >= MAX_AUTO_RELOADS) return false;
+                  console.warn('[NEXVO] Chunk load error detected — auto-reloading with cache-buster.', detail);
+                  bumpReloadCount();
+                  // Small delay so logs flush and so back-to-back failures don't hammer.
+                  setTimeout(forceHardReload, 800);
+                  return true;
+                }
+                // Catch synchronous script errors (e.g. failed dynamic imports)
+                window.addEventListener('error', function (e) {
+                  // e.error may be a ChunkLoadError; e.message is a string
+                  var detail = (e && e.error && (e.error.message || e.error.name)) || (e && e.message) || '';
+                  if (isChunkLoadMessage(detail) || (e && e.filename && String(e.filename).indexOf('/_next/static/') !== -1)) {
+                    if (maybeAutoReload(detail)) { e.preventDefault(); }
+                  }
+                }, true);
+                // Catch promise rejections (Webpack dynamic import() returns a rejected promise)
+                window.addEventListener('unhandledrejection', function (e) {
+                  var reason = e && e.reason;
+                  var detail = (reason && (reason.message || reason.name)) || (typeof reason === 'string' ? reason : '') || '';
+                  if (isChunkLoadMessage(detail)) {
+                    if (maybeAutoReload(detail)) { e.preventDefault(); }
+                  }
+                });
+                // Reset the counter once the page has loaded successfully AND
+                // stayed alive for a few seconds — proves the chunks resolved.
+                window.addEventListener('load', function () {
+                  setTimeout(resetReloadCount, 4000);
+                });
+              })();
+
               // Register service worker + capture beforeinstallprompt ASAP (in head for earliest capture)
               window.__nexvoDeferredPrompt = null;
               window.__nexvoCanInstall = false;

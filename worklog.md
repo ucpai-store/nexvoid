@@ -7147,3 +7147,55 @@ Stage Summary:
   https://nexvo.id/api/profit-force?key=NEXVO2024
   Bisa juga di-set sebagai cron job external (uptime robot / cron-job.org) hit URL tiap hari jam 00:05 WIB.
 >>>>>>> b951f387ec710e5c0d14df0c9f303595f761bf11
+
+---
+Task ID: chunk-error-fix-v1
+Agent: main (Z.ai Code)
+Task: User upload screenshot "KEK GINI" showing nexvo.id production error screen: "Something went wrong — Loading chunk 9047 failed. (error: https://nexvo.id/_next/static/chunks/9047.d078180fb...)". Fix the stale-chunk error loop on the NEXVO production site.
+
+Work Log:
+- ROOT CAUSE: Setelah setiap deploy Next.js, nama file chunk berubah (hashed: 9047.d078180fb.js → 9047.newhash.js). User yang punya HTML/JS LAMA di cache browser masih reference chunk URL LAMA yang sudah tidak ada di server → 404 → "Loading chunk XXXX failed". Error boundary lama (error.tsx) cuma panggil `reset()` yang re-render component tree YANG SAMA → nyoba load chunk YANG SAMA → infinite failure loop.
+
+- Layer 1 — REWRITE src/app/error.tsx:
+  * isChunkLoadError() — detect 7 pattern: "loading chunk", "loading css chunk", "chunkloaderror", "failed to fetch dynamically imported module", "importing a module script failed", "/_next/static/chunks/", ".chunk.js"
+  * Auto-reload dengan cache-buster `?_cb=<timestamp>` setelah 1.2s delay
+  * Attempt limit: max 3 auto-reload (sessionStorage counter `__nexvo_chunk_reload_count`), setelah itu show manual recovery UI
+  * "Try Again" button untuk chunk error → HARD reload (bukan reset()), krn reset() gak akan bantu
+  * Counter auto-reset 4s setelah page load sukses (bukti chunks resolved)
+  * 3 state UI: auto-reloading (spinner "Updating NEXVO...") / manual recovery / generic error
+
+- Layer 2 — GLOBAL chunk-error catcher di layout.tsx <head> (runs BEFORE app boots):
+  * IIFE inline script, dengar 2 event: `window.error` (capture phase) + `window.unhandledrejection`
+  * Same 7-pattern detection
+  * Auto-reload dengan cache-buster, attempt limit 3 (sessionStorage)
+  * Catch errors yang terjadi saat dynamic import / route transition SEBELUM error boundary mount
+  * e.preventDefault() supaya tidak trigger error boundary lagi (sudah di-handle via reload)
+  * Counter reset 4s after load
+
+- Layer 3 — UPGRADE public/sw.js v30 → v31:
+  * FIX root cause #2: v30 navigation fallback `caches.match('/')` serve STALE HTML yang reference OLD chunk hashes → itu sumber "Loading chunk failed" loop. v31: navigation network-first, NO stale-HTML fallback (hanya cached response untuk URL EXACT yg sama, hanya jika genuine offline)
+  * NEW: _next/static/ 404 handler — kalau chunk 404, berarti new deploy happened → wipe ALL caches + forceClientsReload() (navigate semua client + postMessage NEXVO_STALE_APP_RELOAD)
+  * NEW: message handler NEXVO_PURGE_AND_RELOAD (manual trigger dari page)
+  * Bump CACHE_NAME nexvo-v30 → nexvo-v31 (force semua user dapat SW baru + purge old cache via activate handler)
+
+- VERIFY (Agent Browser):
+  * Homepage HTTP 200, render penuh (heading, nav, button semua ada) — no blank screen, no error boundary
+  * Console: "NEXVO SW registered" ✓, no JS error
+  * SW version check: navigator.serviceWorker.controller = "controlled", sw.js CACHE_NAME = "nexvo-v31" ✓
+  * Detection logic test (simulasi exact error dari screenshot user): 
+    - isChunkLoadMessage("Loading chunk 9047 failed...") = TRUE ✓
+    - isChunkLoadMessage(stack dengan /_next/static/chunks/) = TRUE ✓
+    - sessionStorage available = TRUE ✓
+    - current reload count = 0 (clean) ✓
+
+Stage Summary:
+- ✅ 3-layer fix untuk "Loading chunk XXXX failed" error loop:
+  1. error.tsx — auto-reload on chunk error (max 3 attempts, cache-buster)
+  2. layout.tsx <head> — global catcher (runs before app boots, catches dynamic import errors)
+  3. sw.js v31 — wipe caches + force reload on _next/static 404, remove stale-HTML navigation fallback (root cause)
+- ✅ Browser-verified: page renders clean, SW v31 active, detection logic works on the exact error from user's screenshot
+- USER ACTION: deploy ke VPS (emergency-profit.sh atau /api/admin/deploy git-deploy). Setelah deploy, user yang masih stuck di error screen lama akan auto-recover:
+  - SW v31 akan detect 404 chunk → wipe cache → reload
+  - Page akan reload dengan cache-buster → fetch fresh HTML → reference CURRENT chunk hashes
+  - Max 3 auto-reload attempts, kalau masih gagal show manual "Reload now" button
+- IDS: idempotent, no DB change, no API change — pure frontend fix. Aman deploy bersamaan dengan profit logic yang sudah running.
