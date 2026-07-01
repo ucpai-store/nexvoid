@@ -7199,3 +7199,43 @@ Stage Summary:
   - Page akan reload dengan cache-buster → fetch fresh HTML → reference CURRENT chunk hashes
   - Max 3 auto-reload attempts, kalau masih gagal show manual "Reload now" button
 - IDS: idempotent, no DB change, no API change — pure frontend fix. Aman deploy bersamaan dengan profit logic yang sudah running.
+
+---
+Task ID: chunk-fix-v1.1-narrow-detection
+Agent: main (Z.ai Code)
+Task: User "HALAMAN NYA BANYAK YANG EROR / GK MUNCUL" — setelah fix chunk-error v1, banyak halaman production gak muncul. Investigasi root cause.
+
+Work Log:
+- ROOT CAUSE DITEMUKAN: di layout.tsx inline script baris 160, condition terlalu luas:
+    if (isChunkLoadMessage(detail) || (e && e.filename && String(e.filename).indexOf('/_next/static/') !== -1))
+  
+  Bug #1: e.filename check — di production, SEMUA file JS Next.js ada di /_next/static/. Jadi SETIAP error JS normal (React render error, API error, undefined variable, dll) akan match kondisi e.filename ini → masuk ke if block → panggil maybeAutoReload().
+  
+  Bug #2: isChunkLoadMessage() juga match path patterns '/_next/static/chunks/' dan '.chunk.js' — pattern ini muncul di STACK TRACE setiap error (karena semua JS file ada di /_next/static/chunks/). Jadi error.tsx versi lama search stack trace → false positive untuk setiap app error.
+  
+  Akibat: error boundary salah deteksi app error normal sebagai "chunk error" → trigger auto-reload atau tampilkan UI "Update required" → halaman gak render normal → user lihat blank/error screen.
+
+- FIX layout.tsx:
+  * Hapus e.filename check sepenuhnya — hanya match berdasarkan error MESSAGE
+  * Hapus pattern '/_next/static/chunks/' dan '.chunk.js' dari isChunkLoadMessage()
+  * Hanya match EXACT chunk-load phrases: "loading chunk", "loading css chunk", "chunkloaderror", "failed to fetch dynamically imported module", "importing a module script failed"
+
+- FIX error.tsx:
+  * Hapus search di stack trace (error?.stack) — hanya search message + name
+  * Hapus pattern '/_next/static/chunks/' dan '.chunk.js'
+  * Hanya match EXACT chunk-load phrases (sama dengan layout.tsx)
+
+- VERIFY:
+  * Build: exit 0, 0 errors
+  * Homepage render: 0 errors
+  * 5 halaman random (home/settings/deposit/assets/profit): semua render penuh (60K-110K chars body)
+  * GitHub raw verified: fix live di main branch (commit 366e903)
+
+Stage Summary:
+- ✅ ROOT CAUSE: false-positive chunk-error detection — app errors normal kena flag sebagai chunk error
+- ✅ FIX: narrow detection ke EXACT phrases saja, hapus e.filename check, hapus stack trace search
+- ✅ Build sukses, semua halaman render bersih di sandbox
+- ✅ Push commit 366e903 ke GitHub
+- USER ACTION: deploy ulang ke VPS dengan command yang sama:
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-chunk-fix.sh?t=$(date +%s)")
+- Setelah deploy, test pakai: https://nexvo.id/?_cb=7777 (incognito window)
