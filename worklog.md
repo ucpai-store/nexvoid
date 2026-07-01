@@ -8918,3 +8918,89 @@ Stage Summary:
 - KENAPA V7 BEDA DARI V6:
   * V6: Prisma import gagal (bun cache v7 vs project v6) → 0 users → admin FAIL
   * V7: Direct import .prisma/client → bypass bug → 23 users → admin WORK
+
+---
+Task ID: FINAL-RESTORE-V8
+Agent: main (Z.ai Code)
+Task: User jalankan V6 lagi (atau V7), masih 3 FAIL (Admin login, Admin stats, Admin users list), 0 user. Frustrasi: "TADI LO DAH BALIK AKUNYA MALAH ILANG LAGI". Build V8 dengan ULTRA-SAFE strategy.
+
+Work Log:
+- ANALISA ROOT CAUSE KENAPA V6 & V7 MASIH 0 USER:
+  * V6: `import { PrismaClient } from '@prisma/client'` → bun cache v7 vs project v6 → CRASH
+  * V7: FIX module resolution (direct require .prisma/client) TAPI...
+    MASIH DELETE-FIRST-THEN-UPSERT! Kalau upsert gagal (schema/constraint),
+    junk sudah di-delete, canonical belum di-insert → 0 user!
+  * V8 FIX: UPSERT 23 canonical DULU, verify 23/23, baru DELETE junk
+
+- BANGUN final-restore-v8.sh (856 lines, 15 step) dengan ULTRA-SAFE strategy:
+  1. AGGRESSIVE STOP (kill PM2 + orphans + ports) — dari V6/V7
+  2. DETECT PROJECT PATH
+  3. GIT PULL
+  4. TRIPLE BACKUP (.pre-v8, .pre-v8-<ts>, /tmp/nexvo-backups/) — KEY SAFETY
+  5. BUN INSTALL + PRISMA GENERATE
+  6. RECREATE .env
+  7. WAL CHECKPOINT (recover committed data from WAL) — KEY RECOVERY
+  8. SCHEMA MIGRATION (prisma db push + verify User table exists)
+  9. REWRITE ecosystem.config.cjs
+  10. BUILD NEXT.JS
+  11. RESTORE DATA — ULTRA SAFE (7 PHASES):
+      Phase 1: UPSERT 23 canonical users (try/catch each, 3 fallback methods)
+      Phase 2: VERIFY 23/23 canonical in DB (retry 3x for missing)
+      Phase 3: DELETE junk users (ONLY if 23 canonical confirmed safe)
+        - Delete child records FIRST (ProfitLog, Investment, Purchase, etc.)
+        - Testimonial: SET NULL (preserve testimonials)
+      Phase 4: FIX ADMIN (always run, never delete existing)
+      Phase 5: INSERT 3 products if empty
+      Phase 6: INSERT 3 packages if empty
+      Phase 7: FINAL VERIFY (23 users, Rp 68.800, admin exists)
+  12. VERIFY USER COUNT (with retry + sqlite3 direct check)
+  13. PM2 START FRESH + VERIFY (3-method detection dari V6)
+  14. VERIFY 12 FITUR (ZERO TOLERANCE)
+  15. FINAL SUMMARY (with diagnostics on failure)
+
+- V8 KEY SAFETY FEATURES:
+  * UPSERT FIRST, DELETE LAST (never lose canonical users)
+  * Each user upsert in try/catch (one fail doesn't kill batch)
+  * 3 fallback methods: prisma.upsert → prisma.update → raw SQL INSERT OR IGNORE
+  * WAL CHECKPOINT before restore (recover committed data)
+  * TRIPLE BACKUP: .pre-v8, .pre-v8-<ts>, /tmp/nexvo-backups/
+  * Verify after each phase (Phase 2 blocks Phase 3 if not safe)
+  * Verbose diagnostics on failure (sqlite3 direct check, all whatsapp listed)
+
+- TESTED DI SANDBOX (2 scenarios):
+  Scenario 1: Simulate 0 user → run V8 restore → 23 users, Rp 68.800 ✅
+    - All 23 upserts via prisma-upsert (no fallback needed)
+    - Admin updated successfully
+  Scenario 2: Simulate 26 user (23 canonical + 3 junk Rp 88.000 each = Rp 332.800) → run V8 restore
+    - Phase 1: 23 canonical upserted ✅
+    - Phase 2: 23/23 verified ✅
+    - Phase 3: 3 junk deleted ✅
+    - Phase 4: Admin updated ✅
+    - AFTER: 23 users, Rp 68.800 ✅ (PERSIS match)
+
+- Commit eead75f, push ke GitHub sukses
+
+Stage Summary:
+- ✅ final-restore-v8.sh: ULTRA-SAFE (UPSERT FIRST, DELETE LAST) (856 lines, 15 step)
+- ✅ FIX ROOT CAUSE: V7 delete-first-then-upsert → V8 upsert-first-verify-then-delete
+- ✅ 7 PHASES restore: upsert → verify → delete (safe) → admin → products → packages → final verify
+- ✅ 3 fallback methods per user upsert (prisma → prisma-update → raw SQL)
+- ✅ WAL CHECKPOINT (recover committed data from WAL file)
+- ✅ TRIPLE BACKUP (project + timestamp + /tmp/)
+- ✅ Tested: 0 user → 23 users Rp 68.800 ✅
+- ✅ Tested: 26 user (3 junk) → 23 users Rp 68.800 ✅ (junk deleted safely)
+- ✅ Commit eead75f pushed to GitHub
+- USER ACTION (1 command di VPS — 3 MENIT):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/final-restore-v8.sh?t=$(date +%s)")
+- SETELAH fix:
+  * 23 user canonical (Budi, Siti, Andi, dll) total Rp 68.800 (PERSIS)
+  * Admin login: WORK (admin / Admin@2024)
+  * PM2 nexvo-web + nexvo-cron: ONLINE
+  * ZERO ERROR expected (12/12 OK)
+- Login setelah fix:
+  * Admin: admin / Admin@2024
+  * User: WA 628123456701 (Budi Santoso) / nexvo123
+- KENAPA V8 BEDA DARI V6/V7:
+  * V6: import @prisma/client → module resolve FAIL → 0 users
+  * V7: direct require .prisma/client ✅, TAPI delete-first-then-upsert → kalau upsert gagal, 0 users
+  * V8: direct require .prisma/client ✅ + UPSERT-FIRST-VERIFY-THEN-DELETE → kalau upsert gagal, canonical tetap aman (delete di-skip)
