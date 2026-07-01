@@ -7454,3 +7454,74 @@ Stage Summary:
   3. Kalau <23 user → scan 8 backup, pilih yang paling banyak user, restore
   4. Reset password admin pertama ke Admin@2024
   5. Restart PM2, test login API
+
+---
+Task ID: RESTORE-ALL-V1
+Agent: main (Z.ai Code)
+Task: User "intinya kembalikan akun user terus semua fitur wajib berjalan sesuai" — 1 command buat restore user + pastikan SEMUA fitur jalan.
+
+Work Log:
+- Investigasi: nemu ROOT CAUSE baru di ecosystem.config.cjs
+  * cwd hardcode '/home/nexvo' — tapi project asli di /var/www/nexvo (dari screenshot VPS)
+  * PM2 start di path yang salah → crash → 502 Bad Gateway
+  * Plus nexvo-cron (port 3032) harus juga di-restart, gak cuma nexvo-web
+
+- Investigasi API routes nexvo:
+  * Admin login: POST /api/auth/admin-login (bukan /api/admin/auth)
+  * User login: POST /api/auth/login (kirim OTP ke WhatsApp)
+  * Products: /api/products
+  * Deposit: /api/deposit (need auth)
+  * Withdraw: /api/withdraw (need auth)
+  * Profit force: /api/profit-force?key=NEXVO2024
+  * Cron service: port 3032 (cron-service.ts)
+  * Push: /api/push
+
+- Bikin restore-all.sh all-in-one:
+  1. Detect project path (cek /var/www/nexvo, /home/nexvo, /opt/nexvo, dll)
+  2. Cek current DB via bun:sqlite (NO PRISMA — bypass module cache bug)
+  3. Kalau < 23 user → scan backup + restore dari yang terbaik
+  4. Pastikan admin bisa login (reset password admin/Admin@2024, unlock account)
+  5. Fix ecosystem.config.cjs cwd kalau salah (auto-replace /home/nexvo → path asli)
+  6. Pastikan .env ada (DATABASE_URL=file:<path>/db/custom.db)
+  7. Restart nexvo-web (port 3000) + nexvo-cron (port 3032) — pakai ecosystem config
+  8. Verify 10 fitur end-to-end via curl:
+     [1] Web HTTP 200
+     [2] CSS HTTP 200 (deteksi text-only page)
+     [3] Admin login API (POST /api/auth/admin-login)
+     [4] User login API (POST /api/auth/login — kirim OTP)
+     [5] Products API
+     [6] Deposit API
+     [7] Cron service port 3032
+     [8] Profit force API
+     [9] Withdraw API
+     [10] Push API
+  9. Report PASS/WARN/FAIL per fitur
+
+- Test semua helper script di sandbox:
+  * bun:sqlite query User count → works (USERS=1 ADMINS=0)
+  * bcryptjs hash → works (60 char hash)
+  * Sample user list → works
+  * bash -n syntax check → OK
+
+- Commit 3d56041, push ke GitHub, verified live di raw.githubusercontent.com
+
+Stage Summary:
+- ✅ restore-all.sh committed (3d56041)
+- ✅ All-in-one: restore + fix path + restart + verify 10 fitur
+- ✅ Pakai bun:sqlite (bypass Prisma module cache bug di VPS)
+- ✅ Auto-fix ecosystem.config.cjs cwd (root cause 502)
+- ✅ Restart nexvo-web + nexvo-cron
+- ✅ Reset admin password + unlock
+- ✅ Verify CSS load (deteksi text-only page)
+- ✅ Verify cron port 3032 (profit harian)
+- USER ACTION (1 command di VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-all.sh?t=$(date +%s)")
+- Expected output:
+  - Step 1: restore user (kalau perlu) atau skip (kalau data aman)
+  - Step 2: reset admin password
+  - Step 3: fix ecosystem cwd
+  - Step 4: cek .env
+  - Step 5: restart nexvo-web + nexvo-cron
+  - Step 6: verify 10 fitur dengan ✅/❌
+  - Final summary: Total PASS/WARN/FAIL
+- Kalau ada fitur FAIL, kirim outputnya ke saya untuk fix lanjut
