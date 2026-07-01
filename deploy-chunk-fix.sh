@@ -124,6 +124,40 @@ else
   echo "  ⚠️  pm2 tidak ketemu — restart manual Next.js kamu"
 fi
 
+# ─── 6. WAIT FOR SERVER + VERIFY CSS LOADS (root cause check) ───
+echo ""
+echo "▼ [6/6] Tunggu server ready + VERIFY CSS load (root cause fix check)"
+sleep 5
+
+echo "  Tes homepage..."
+HP=$(curl -s --max-time 10 -o /tmp/nexvo_hp.html -w "%{http_code}" "http://localhost:3000/?t=$(date +%s)" 2>&1)
+echo "  Homepage: HTTP $HP"
+
+if [ "$HP" = "200" ]; then
+  # Extract CSS URL from HTML
+  CSS_URL=$(grep -oE '/_next/static/css/[^"'\''>]+\.css' /tmp/nexvo_hp.html | head -1)
+  if [ -n "$CSS_URL" ]; then
+    echo "  CSS file: $CSS_URL"
+    CSS_CODE=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" "http://localhost:3000$CSS_URL?t=$(date +%s)" 2>&1)
+    echo "  CSS HTTP: $CSS_CODE"
+    if [ "$CSS_CODE" = "200" ]; then
+      echo "  ✅ CSS LOADS — halaman bakal styled"
+    else
+      echo "  ❌ CSS GAGAL LOAD (HTTP $CSS_CODE) — halaman bakal teks doang!"
+      echo "     Cek: ls .next/static/css/"
+      echo "     Fix: hapus output:standalone di next.config, rebuild"
+    fi
+  else
+    echo "  ⚠️  Gak nemu CSS URL di HTML — mungkin build gak generate CSS"
+  fi
+else
+  echo "  ❌ Server belum ready (HTTP $HP) — cek: pm2 logs nexvo-web --lines 20"
+fi
+
+# Also verify sw.js is v33
+SW_VER=$(curl -s --max-time 5 "http://localhost:3000/sw.js?t=$(date +%s)" 2>&1 | grep -oE "nexvo-v[0-9]+" | head -1)
+echo "  SW version: ${SW_VER:-not found} (harus nexvo-v33)"
+
 echo ""
 echo "═══════════════════════════════════════════════════════════"
 echo "  ✅ DEPLOY SELESAI"

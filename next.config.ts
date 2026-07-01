@@ -9,7 +9,9 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ['ws'],
-  output: 'standalone',
+  // REMOVED output: 'standalone' — was causing CSS 404 in production.
+  // `next start` serves from .next/static/ directly. Standalone mode is only
+  // needed for `node .next/standalone/server.js` (which we don't use).
   allowedDevOrigins: [
     '.space-z.ai',
     '127.0.0.1',
@@ -27,13 +29,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Service Worker - always revalidate
+      // Service Worker - always revalidate (never cache SW)
       {
         source: '/sw.js',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-cache',
+            value: 'no-cache, no-store, must-revalidate',
           },
           {
             key: 'Service-Worker-Allowed',
@@ -41,13 +43,15 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Static assets - long cache
+      // Static assets — REDUCED cache from 1 year immutable to 1 hour.
+      // 1-year-immutable caused stale CSS when new deploy changed hash but
+      // old SW/browser served cached version. 1 hour is safe + still fast.
       {
         source: '/_next/static/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            value: 'public, max-age=3600, must-revalidate',
           },
         ],
       },
