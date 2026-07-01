@@ -134,14 +134,14 @@ export default function RootLayout({
                 function isChunkLoadMessage(msg) {
                   if (!msg) return false;
                   var s = String(msg).toLowerCase();
+                  // ONLY match exact chunk-load error phrases — do NOT match file paths
+                  // like '/_next/static/chunks/' because those appear in normal stack traces.
                   return (
                     s.indexOf('loading chunk') !== -1 ||
                     s.indexOf('loading css chunk') !== -1 ||
                     s.indexOf('chunkloaderror') !== -1 ||
                     s.indexOf('failed to fetch dynamically imported module') !== -1 ||
-                    s.indexOf('importing a module script failed') !== -1 ||
-                    s.indexOf('/_next/static/chunks/') !== -1 ||
-                    s.indexOf('.chunk.js') !== -1
+                    s.indexOf('importing a module script failed') !== -1
                   );
                 }
                 function maybeAutoReload(detail) {
@@ -153,11 +153,12 @@ export default function RootLayout({
                   setTimeout(forceHardReload, 800);
                   return true;
                 }
-                // Catch synchronous script errors (e.g. failed dynamic imports)
+                // Catch synchronous script errors — ONLY match exact chunk-load error messages.
+                // (Do NOT match by e.filename — in production ALL Next.js JS is in /_next/static/,
+                //  so a filename check would fire on every normal app error and break rendering.)
                 window.addEventListener('error', function (e) {
-                  // e.error may be a ChunkLoadError; e.message is a string
                   var detail = (e && e.error && (e.error.message || e.error.name)) || (e && e.message) || '';
-                  if (isChunkLoadMessage(detail) || (e && e.filename && String(e.filename).indexOf('/_next/static/') !== -1)) {
+                  if (isChunkLoadMessage(detail)) {
                     if (maybeAutoReload(detail)) { e.preventDefault(); }
                   }
                 }, true);

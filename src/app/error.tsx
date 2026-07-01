@@ -17,15 +17,16 @@ import { useEffect, useState } from 'react';
  *  - ".chunk.js"  /  "/_next/static/chunks/"
  */
 function isChunkLoadError(error: Error & { digest?: string }): boolean {
-  const haystack = `${error?.name || ''} ${error?.message || ''} ${error?.stack || ''}`.toLowerCase();
+  // ONLY match exact chunk-load error phrases in the message/name.
+  // Do NOT search the stack trace — stack traces contain file paths like
+  // '/_next/static/chunks/...' which would false-positive on every normal error.
+  const msg = `${error?.name || ''} ${error?.message || ''}`.toLowerCase();
   return (
-    haystack.includes('loading chunk') ||
-    haystack.includes('loading css chunk') ||
-    haystack.includes('chunkloaderror') ||
-    haystack.includes('failed to fetch dynamically imported module') ||
-    haystack.includes('importing a module script failed') ||
-    haystack.includes('/_next/static/chunks/') ||
-    haystack.includes('.chunk.js')
+    msg.includes('loading chunk') ||
+    msg.includes('loading css chunk') ||
+    msg.includes('chunkloaderror') ||
+    msg.includes('failed to fetch dynamically imported module') ||
+    msg.includes('importing a module script failed')
   );
 }
 
