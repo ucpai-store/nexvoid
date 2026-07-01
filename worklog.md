@@ -7308,3 +7308,37 @@ Stage Summary:
 - Fix: sw.js v32 (passive) + deploy-chunk-fix.sh v2 (correct PM2 name)
 - Commit: 00bba3a on origin/main
 - User needs to re-run deploy command to get v32 + actually restart PM2 this time
+
+---
+Task ID: ROOT-CAUSE-CSS-FIX
+Agent: main (Z.ai Code)
+Task: Cari akar masalah CSS gak load (halaman teks doang) — fix sampai akar
+
+Work Log:
+- Investigasi CSS 404 di production: cek build output, next.config, Caddyfile
+- DITEMUKAN ROOT CAUSE: next.config.ts punya `output: 'standalone'`
+  - Standalone build bikin .next/standalone/server.js TAPI gak copy folder static/css/
+  - Saat `next start` jalan, CSS files 404 → halaman text-only (no styling)
+  - Ini bukan masalah SW, ini masalah build config dari awal
+- Fix 1: Hapus `output: 'standalone'` dari next.config.ts (gak diperlukan untuk `next start`)
+- Fix 2: Reduce _next/static cache dari `1-year immutable` ke `1-hour must-revalidate`
+  (immutable cache bikin browser simpan CSS hash lama, gak request ulang pas deploy baru)
+- Fix 3: sw.js cache header: `no-cache, no-store, must-revalidate` (force SW update)
+- Fix 4: Deploy script sekarang VERIFY CSS load setelah restart (step 6/6)
+  - Curl homepage → extract CSS URL → curl CSS → cek HTTP 200
+  - Kalau CSS 404, deploy reports failure + kasih fix instruction
+  - Verify SW version = v33 setelah restart
+- Verification sandbox:
+  - Build sukses, CSS 226KB ter-generate
+  - Standalone folder gak dibuat lagi
+  - CSS HTTP 200, 302KB, MIME text/css
+  - Homepage: 2 stylesheets loaded, body bg #070B14, no redirect (CSS detector gak trigger)
+  - Admin login page: 2 stylesheets, form fields present
+  - 0 errors console
+
+Stage Summary:
+- Root cause: output: 'standalone' bikin CSS 404 di production
+- Fix commit: 6e3569e (GitHub synced)
+- Deploy script sekarang self-verifying — kalau CSS 404, deploy bilang gagal
+- SW v33 self-destruct + CSS auto-heal detector sebagai safety net
+- Deploy command: bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-chunk-fix.sh?t=$(date +%s)")
