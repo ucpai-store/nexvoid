@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>NEXVO Recovery — Clear Cache</title>
+<title>NEXVO Recovery — Clear Cache & Diagnose</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -21,9 +21,8 @@ body {
   border: 1px solid rgba(212,175,55,0.2);
   border-radius: 24px;
   padding: 32px 24px;
-  max-width: 420px;
+  max-width: 480px;
   width: 100%;
-  text-align: center;
 }
 .logo {
   width: 56px; height: 56px;
@@ -37,23 +36,26 @@ body {
   color: #070B14;
   font-size: 28px;
 }
-h1 { font-size: 20px; margin-bottom: 8px; }
-p { color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+h1 { font-size: 20px; margin-bottom: 8px; text-align: center; }
+p { color: rgba(255,255,255,0.6); font-size: 13px; margin-bottom: 16px; line-height: 1.5; text-align: center; }
 .status {
-  background: rgba(0,0,0,0.3);
+  background: rgba(0,0,0,0.4);
   border-radius: 12px;
-  padding: 16px;
-  margin: 16px 0;
+  padding: 14px;
+  margin: 12px 0;
   text-align: left;
-  font-family: monospace;
-  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
   color: #4ade80;
-  min-height: 100px;
-  max-height: 200px;
+  min-height: 120px;
+  max-height: 280px;
   overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .status .err { color: #f87171; }
 .status .warn { color: #fbbf24; }
+.status .info { color: #60a5fa; }
 .btn {
   display: block;
   width: 100%;
@@ -65,7 +67,7 @@ p { color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 24px; line-hei
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.secondary {
@@ -73,83 +75,144 @@ p { color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 24px; line-hei
   border: 1px solid rgba(212,175,55,0.3);
   color: #fff;
 }
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+.tag.ok { background: rgba(74,222,128,0.2); color: #4ade80; }
+.tag.bad { background: rgba(248,113,113,0.2); color: #f87171; }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="logo">N</div>
   <h1>NEXVO Recovery</h1>
-  <p>Halaman ini akan clear Service Worker + cache browser kamu, lalu reload ke NEXVO dengan bersih.</p>
-  <div class="status" id="log">Klik tombol di bawah untuk mulai...</div>
-  <button class="btn" id="clearBtn" onclick="clearAll()">Clear Cache & Reload</button>
-  <button class="btn secondary" id="skipBtn" onclick="skipToHome()" style="margin-top:8px">Skip — Langsung ke NEXVO</button>
+  <p>Auto-clear Service Worker + cache + diagnose CSS</p>
+  <div class="status" id="log">⏳ Memulai otomatis...</div>
+  <button class="btn" id="clearBtn" onclick="clearAll()">🔄 Ulangi Clear Cache</button>
+  <button class="btn secondary" id="skipBtn" onclick="skipToHome()" style="margin-top:8px">⏭️ Langsung ke NEXVO</button>
 </div>
 
 <script>
 function log(msg, type) {
   var el = document.getElementById('log');
-  var cls = type === 'err' ? 'err' : (type === 'warn' ? 'warn' : '');
-  el.innerHTML += '<div class="' + cls + '">› ' + msg + '</div>';
+  var cls = type === 'err' ? 'err' : (type === 'warn' ? 'warn' : (type === 'info' ? 'info' : ''));
+  el.innerHTML += '<span class="' + cls + '">› ' + msg + '</span>\n';
   el.scrollTop = el.scrollHeight;
+}
+
+async function diagnose() {
+  log('═══ DIAGNOSTIK ═══', 'info');
+  
+  // 1. Cek SW version
+  try {
+    var swRes = await fetch('/sw.js?t=' + Date.now(), { cache: 'no-store' });
+    var swText = await swRes.text();
+    var version = swText.match(/nexvo-v(\d+)/);
+    if (version) {
+      log('SW version: v' + version[1] + (version[1] === '33' ? ' ✓ (self-destruct)' : ' ⚠️ BUKAN v33!'), version[1] === '33' ? '' : 'err');
+    } else {
+      log('SW: gak nemu version string', 'warn');
+    }
+  } catch (e) {
+    log('SW fetch gagal: ' + e.message, 'err');
+  }
+
+  // 2. Cek active SW
+  if ('serviceWorker' in navigator) {
+    var regs = await navigator.serviceWorker.getRegistrations();
+    log('Active SW registrations: ' + regs.length, 'info');
+    for (var i = 0; i < regs.length; i++) {
+      log('  → scope: ' + regs[i].scope + ' (akan di-unregister)', 'warn');
+    }
+  }
+
+  // 3. Cek homepage HTML + CSS URL
+  try {
+    var hpRes = await fetch('/?t=' + Date.now(), { cache: 'no-store' });
+    var hpText = await hpRes.text();
+    log('Homepage: HTTP ' + hpRes.status + ', ' + hpText.length + ' bytes', hpRes.ok ? '' : 'err');
+    
+    var cssMatches = hpText.match(/\/_next\/static\/css\/[^"']+\.css/g);
+    if (cssMatches && cssMatches.length > 0) {
+      log('CSS files di homepage: ' + cssMatches.length, 'info');
+      // Test fetch CSS pertama
+      var cssUrl = cssMatches[0];
+      var cssRes = await fetch(cssUrl + '?t=' + Date.now(), { cache: 'no-store' });
+      log('CSS test: ' + cssUrl, 'info');
+      log('  → HTTP ' + cssRes.status + ' ' + (cssRes.ok ? '✓' : '✗'), cssRes.ok ? '' : 'err');
+      if (cssRes.ok) {
+        var cssText = await cssRes.text();
+        log('  → Size: ' + cssText.length + ' bytes', '');
+        if (cssText.length < 100) {
+          log('  → ⚠️ CSS terlalu kecil! Mungkin corrupt.', 'err');
+        }
+      } else {
+        log('  → CSS 404/GAGAL! Ini penyebab halaman teks doang.', 'err');
+      }
+    } else {
+      log('⚠️ Gak nemu CSS URL di homepage HTML!', 'err');
+      log('   Mungkin build gagal / CSS gak ke-generate.', 'err');
+    }
+  } catch (e) {
+    log('Homepage fetch gagal: ' + e.message, 'err');
+  }
+  
+  log('═══ AKHIR DIAGNOSTIK ═══', 'info');
+  log('');
 }
 
 async function clearAll() {
   document.getElementById('clearBtn').disabled = true;
-  document.getElementById('clearBtn').textContent = 'Memproses...';
-  log('Mulai clear cache...');
+  document.getElementById('clearBtn').textContent = '⏳ Memproses...';
+  document.getElementById('log').innerHTML = '';
+  
+  log('═══ CLEAR ALL CACHE ═══', 'info');
 
-  // Step 1: Unregister all service workers
-  log('Unregister Service Worker...');
+  // Step 1: Unregister ALL service workers
+  log('1. Unregister Service Worker...');
   try {
     if ('serviceWorker' in navigator) {
       var regs = await navigator.serviceWorker.getRegistrations();
-      log('Ditemukan ' + regs.length + ' service worker(s)');
+      log('   Ditemukan ' + regs.length + ' SW');
       for (var i = 0; i < regs.length; i++) {
         await regs[i].unregister();
-        log('Unregistered: ' + regs[i].scope);
+        log('   ✓ Unregistered: ' + regs[i].scope, '');
       }
-    } else {
-      log('Service Worker tidak didukung browser ini', 'warn');
     }
   } catch (e) {
-    log('Error unregister SW: ' + e.message, 'err');
+    log('   Error: ' + e.message, 'err');
   }
 
-  // Step 2: Clear all caches
-  log('Clear Cache Storage...');
+  // Step 2: Clear ALL caches
+  log('2. Clear Cache Storage...');
   try {
     if ('caches' in window) {
       var names = await caches.keys();
-      log('Ditemukan ' + names.length + ' cache(s): ' + names.join(', '));
+      log('   Ditemukan ' + names.length + ' cache(s)');
       for (var j = 0; j < names.length; j++) {
         await caches.delete(names[j]);
-        log('Deleted cache: ' + names[j]);
+        log('   ✓ Deleted: ' + names[j], '');
       }
     }
   } catch (e) {
-    log('Error clear cache: ' + e.message, 'err');
+    log('   Error: ' + e.message, 'err');
   }
 
   // Step 3: Clear localStorage
-  log('Clear localStorage...');
-  try {
-    localStorage.clear();
-    log('localStorage cleared');
-  } catch (e) {
-    log('Error clear localStorage: ' + e.message, 'err');
-  }
+  log('3. Clear localStorage...');
+  try { localStorage.clear(); log('   ✓ Cleared'); } catch (e) { log('   ' + e.message, 'err'); }
 
   // Step 4: Clear sessionStorage
-  log('Clear sessionStorage...');
-  try {
-    sessionStorage.clear();
-    log('sessionStorage cleared');
-  } catch (e) {
-    log('Error clear sessionStorage: ' + e.message, 'err');
-  }
+  log('4. Clear sessionStorage...');
+  try { sessionStorage.clear(); log('   ✓ Cleared'); } catch (e) { log('   ' + e.message, 'err'); }
 
   // Step 5: Clear cookies
-  log('Clear cookies...');
+  log('5. Clear cookies...');
   try {
     document.cookie.split(';').forEach(function(c) {
       var eq = c.indexOf('=');
@@ -158,23 +221,32 @@ async function clearAll() {
       document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.' + window.location.hostname;
       document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=' + window.location.hostname;
     });
-    log('Cookies cleared');
-  } catch (e) {
-    log('Error clear cookies: ' + e.message, 'err');
-  }
+    log('   ✓ Cleared');
+  } catch (e) { log('   ' + e.message, 'err'); }
 
   log('');
-  log('✓ SEMUA CACHE BERSIH!', 'warn');
-  log('Reload ke NEXVO dalam 2 detik...');
-
+  log('═══ DIAGNOSTIK ULANG ═══', 'info');
+  await diagnose();
+  
+  log('');
+  log('✅ SEMUA BERSIH!', 'warn');
+  log('🔄 Auto-reload ke NEXVO dalam 3 detik...', 'warn');
+  
   setTimeout(function() {
-    window.location.replace('https://nexvo.id/?_cb=' + Date.now());
-  }, 2000);
+    window.location.replace('https://nexvo.id/?_cb=' + Date.now() + '&v=clean');
+  }, 3000);
 }
 
 function skipToHome() {
   window.location.replace('https://nexvo.id/?_cb=' + Date.now());
 }
+
+// AUTO-RUN on load
+window.addEventListener('load', async function() {
+  log('⏳ Auto-diagnose...', 'info');
+  await diagnose();
+  log('Klik "Ulangi Clear Cache" untuk bersihin + reload.', 'warn');
+});
 </script>
 </body>
 </html>
