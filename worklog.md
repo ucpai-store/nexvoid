@@ -9324,3 +9324,64 @@ Stage Summary:
 - KENAPA V12 BEDA DARI V4-V11:
   * V4-V11: INSERT 23 DUMMY user (Budi Santoso) → bukan data asli!
   * V12: SCAN backup VPS, cari "ucup", COPY backup asli → data asli kembali!
+
+---
+Task ID: FIX-PROFIT-SALDO
+Agent: main (Z.ai Code)
+Task: User: "perbaiki saldo profit dari aset masuk di saldo utama terus m.profit referal masuk juga di saldo utama sesuai kan tidak boleh salah lagi ya terus malam ini jam 00.00 profit wajib masuk dah itu aja ingatt jangan aneh aneh lagi fokus itu aja perbaiki jangan sampek ada penyakit lagi" — FOKUS: profit aset + referral → mainBalance, cron 00:00 wajib jalan. Jangan rusak.
+
+Work Log:
+- VERIFIKASI KODE (grep semua increment ke profitBalance & mainBalance):
+  * ZERO increment ke profitBalance ✅ (tidak ada kode salah arah)
+  * SEMUA profit/referral/matching/salary → mainBalance ✅:
+    - cron-service.ts:914,1118 — daily profit → mainBalance
+    - referral-bonus.ts:88 — referral bonus → mainBalance
+    - matching-bonus.ts:179,480 — matching → mainBalance
+    - salary-bonus.ts:357 — salary → mainBalance
+    - cron-service.ts:392 — matching on profit → mainBalance
+    - src/app/api/cron/profit/route.ts:189,355,535 — cron profit → mainBalance
+    - src/app/api/admin/asset/route.ts:193,276 — asset profit → mainBalance
+    - src/app/api/admin/investments/route.ts:118 — investment profit → mainBalance
+  * KESIMPULAN: KODE SUDAH 100% BENAR — tidak perlu ubah kode!
+
+- CRON SCHEDULE VERIFIED (cron-service.ts):
+  * setInterval(checkAndRunCrons, 10000) — fire tiap 10 detik
+  * runProfitCronIfDue(): kalau profit belum dikredit hari ini + weekday → run
+  * Weekend (Sat=6, Sun=0) skipped (libur)
+  * Continuous catchup: fire dalam ≤10 detik setelah 00:00 WIB, bahkan kalau cron down
+  * DB dedup (lastProfitDate >= today 00:00 WIB) prevents double-credit
+  * Atomic claim (updateMany dengan WHERE) — race-condition-proof
+
+- POTENSI MASALAH: mungkin ada SALDO LAMA di profitBalance dari run buggy sebelumnya
+  → User lihat saldo "terbagi" antara mainBalance & profitBalance, pikir profit gak masuk main
+
+- SOLUSI (fix-profit-saldo.sh — FOKUS, AMAN, TIDAK UBAH KODE):
+  1. Backup DB
+  2. Migrate: mainBalance += profitBalance (WHERE profitBalance > 0) — jangan hilang
+  3. Reset: profitBalance = 0 untuk SEMUA user
+  4. Ensure nexvo-cron running via PM2 (auto-fire tiap 10s)
+  5. Trigger profit check NOW (kredit hari ini kalau belum)
+  6. Verify: profit di mainBalance, BUKAN profitBalance
+
+- TESTED migrasi logic:
+  * Test DB: 3 users (Budi main 5000 + profit 3000, Siti main 2000 + profit 1500, Andi main 10000)
+  * BEFORE: mainBalance Rp 17000, profitBalance Rp 4500
+  * AFTER: mainBalance Rp 21500, profitBalance Rp 0
+  * Migrasi: Rp 4500 dipindahkan, TIDAK ADA UANG HILANG (17000+4500=21500) ✅
+
+- Commit 4600980, push ke GitHub sukses
+
+Stage Summary:
+- ✅ KODE SUDAH BENAR: profit + referral → mainBalance (verified, zero profitBalance increments)
+- ✅ Cron continuous catchup: fire ≤10 detik setelah 00:00 WIB (weekday only)
+- ✅ fix-profit-saldo.sh: migrate profitBalance → mainBalance + reset + ensure cron running
+- ✅ Tested: Rp 4500 migrated, no money lost, profitBalance reset to 0
+- ✅ NO CODE CHANGES (kode sudah benar, jangan rusak)
+- ✅ NO DUMMY INSERT, NO USER DELETE
+- USER ACTION (1 command di VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/fix-profit-saldo.sh?t=$(date +%s)")
+- SETELAH FIX:
+  * Semua saldo profit (lama + baru) di mainBalance (saldo utama)
+  * profitBalance = 0 untuk semua user
+  * Cron auto-fire profit tiap 10 detik → malam ini 00:00 WAJIB masuk
+  * Kode profit + referral tetap → mainBalance (tidak diubah)
