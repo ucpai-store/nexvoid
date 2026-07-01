@@ -7280,3 +7280,31 @@ Stage Summary:
   2. SETELAH deploy, buka browser ke https://nexvo.id/recovery.html → klik "Clear Cache & Reload"
   3. Browser akan clear semua cache + reload ke nexvo.id bersih
 - Kalau VPS belum deploy, recovery.html belum ada di server — user harus deploy dulu
+
+---
+Task ID: FIX-REFRESH-LOOP
+Agent: main (Z.ai Code)
+Task: Fix "REFRESH OTOMATIS GJLS" after deploy — root cause was TWO bugs
+
+Work Log:
+- Analyzed user screenshot: VPS deploy terminal showed `[PM2][ERROR] Process or Namespace nexvo not found`
+- Discovered deploy-chunk-fix.sh used `pm2 restart nexvo` but actual PM2 process name is `nexvo-web`
+- This meant PM2 restart FAILED → old code kept running in memory → user saw old bugs (auto-refresh from v31 SW forceClientsReload)
+- Also identified sw.js v31 `forceClientsReload()` as the auto-refresh cause (navigates all clients on chunk 404 → storm)
+- Rewrote sw.js to v32: PASSIVE mode. Removed forceClientsReload entirely. On chunk 404, just purge caches silently (one-shot flag prevents concurrent wipes). User manually refreshes — no auto-reload loop.
+- Fixed deploy-chunk-fix.sh v2: `pm2 restart nexvo-web` (correct name) + `pm2 save` + shows pm2 list for verification
+- Committed (00bba3a) + pushed to GitHub origin/main
+- Verified in sandbox via Agent Browser:
+  - Homepage loads (no blank screen)
+  - Admin login page (/id/admin) loads with full form (Username/Email + Password + "Masuk Admin" button)
+  - NO auto-refresh: URL stayed stable for 8+ seconds
+  - Zero console errors
+  - SW v32 registered successfully
+  - recovery.html works (Clear Cache & Reload button)
+
+Stage Summary:
+- Root cause #1: Deploy script PM2 name bug (nexvo → nexvo-web) — old code never restarted
+- Root cause #2: sw.js v31 forceClientsReload() — caused refresh storm on chunk 404
+- Fix: sw.js v32 (passive) + deploy-chunk-fix.sh v2 (correct PM2 name)
+- Commit: 00bba3a on origin/main
+- User needs to re-run deploy command to get v32 + actually restart PM2 this time
