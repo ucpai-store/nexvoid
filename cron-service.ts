@@ -437,6 +437,39 @@ async function getDirectRefCount(internalId: string): Promise<number> {
   return db.referral.count({ where: { referrerId: internalId, level: 1 } });
 }
 
+// ★★★ FIX v3.5: Tambah userHasActiveDeposit + checkAllDirectRefsActive ★★★
+// Sebelumnya cron-service.ts TIDAK cek "user sendiri wajib aktif investasi" dan
+// TIDAK cek "SEMUA direct refs wajib aktif" — melanggar rules salary-bonus.ts.
+async function userHasActiveDeposit(internalId: string): Promise<boolean> {
+  const count = await db.investment.count({
+    where: { userId: internalId, status: 'active' },
+  });
+  return count > 0;
+}
+
+async function checkAllDirectRefsActive(internalId: string): Promise<{
+  total: number;
+  active: number;
+  allActive: boolean;
+}> {
+  const directRefs = await db.referral.findMany({
+    where: { referrerId: internalId, level: 1 },
+    select: { referredId: true },
+  });
+  const total = directRefs.length;
+  if (total === 0) {
+    return { total: 0, active: 0, allActive: false };
+  }
+  const refIds = directRefs.map(r => r.referredId);
+  const usersWithActiveInvestments = await db.investment.groupBy({
+    by: ['userId'],
+    where: { userId: { in: refIds }, status: 'active' },
+    _count: true,
+  });
+  const active = usersWithActiveInvestments.length;
+  return { total, active, allActive: active === total };
+}
+
 async function getActiveDepositRefCount(internalId: string): Promise<number> {
   const directRefs = await db.referral.findMany({
     where: { referrerId: internalId, level: 1 },
@@ -476,20 +509,26 @@ async function getAllDownlineIds(internalId: string, maxDepth: number = 5): Prom
 }
 
 async function calculateGroupOmzet(internalId: string): Promise<number> {
-  const ownInvestment = await db.investment.aggregate({
-    where: { userId: internalId, status: 'active' },
+  // ★★★ FIX v3.5: Konsisten dengan src/lib/salary-bonus.ts ★★★
+  // ONLY counts active investments from DIRECT invites (Level 1).
+  // - User's OWN investment is NOT counted (only required as eligibility).
+  // - Multi-level downline (Level 2+) is NOT counted — each person builds their own group.
+  // - The inviter gets the salary; the invited people do NOT share it.
+  // Sebelumnya cron-service.ts hitung own + L1-L5 → berbeda dari admin/user claim
+  // yang pakai salary-bonus.ts (L1 only) → salary cron != salary admin trigger.
+  const directRefs = await db.referral.findMany({
+    where: { referrerId: internalId, level: 1 },
+    select: { referredId: true },
+  });
+
+  if (directRefs.length === 0) return 0;
+
+  const directIds = directRefs.map((r) => r.referredId);
+  const directInvestment = await db.investment.aggregate({
+    where: { userId: { in: directIds }, status: 'active' },
     _sum: { amount: true },
   });
-  const downlineIds = await getAllDownlineIds(internalId, 5);
-  let downlineOmzet = 0;
-  if (downlineIds.length > 0) {
-    const downlineInvestment = await db.investment.aggregate({
-      where: { userId: { in: downlineIds }, status: 'active' },
-      _sum: { amount: true },
-    });
-    downlineOmzet = downlineInvestment._sum.amount || 0;
-  }
-  return (ownInvestment._sum.amount || 0) + downlineOmzet;
+  return directInvestment._sum.amount || 0;
 }
 
 async function processAllSalaryBonuses(): Promise<{
@@ -526,8 +565,30 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
+      // ★★★ FIX v3.5: SYARAT 1 — User sendiri wajib aktif investasi ★★★
+      // Sebelumnya cron-service.ts TIDAK cek ini → user tanpa investasi tetap dapat salary.
+      if (config.requireActiveDeposit) {
+        const userHasDeposit = await userHasActiveDeposit(user.id);
+        if (!userHasDeposit) {
+          result.skipped++;
+          continue;
+        }
+      }
+
+      // ★★★ FIX v3.5: SYARAT 2 — SEMUA direct refs wajib aktif investasi (allActive) ★★★
+      // Sebelumnya cron-service.ts pakai effectiveRefs < minRequired (cukup 10 dari total),
+      // TAPI rules salary-bonus.ts: SEMUA direct refs wajib aktif.
+      const refCheck = await checkAllDirectRefsActive(user.id);
+      if (!refCheck.allActive) {
+        result.skipped++;
+        continue;
+      }
+
       const weeksReceived = await db.salaryBonus.count({ where: { userId: user.id, status: 'paid' } });
-      if (weeksReceived >= config.maxWeeks) {
+      // ★★★ FIX v3.5: maxWeeks = 0 means PERMANENT (unlimited). Only check limit if maxWeeks > 0. ★★★
+      // Sebelumnya: `if (weeksReceived >= config.maxWeeks)` — jika maxWeeks=0 (unlimited),
+      // maka `0 >= 0` = TRUE → SEMUA user di-skip → GAJI TIDAK PERNAH DIKREDIT dari cron-service!
+      if (config.maxWeeks > 0 && weeksReceived >= config.maxWeeks) {
         result.completed++;
         continue;
       }
@@ -540,9 +601,7 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
-      const effectiveRefs = config.requireActiveDeposit
-        ? await getActiveDepositRefCount(user.id)
-        : refCount;
+      const effectiveRefs = refCheck.active;
 
       if (effectiveRefs < minRequired) {
         result.skipped++;
@@ -557,7 +616,8 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
-      const currentWeekOfTotal = weeksReceived + 1;
+      // ★ FIX v3.5: jika maxWeeks=0 (unlimited), weekOfTotal = 0 (marker permanen)
+      const currentWeekOfTotal = config.maxWeeks > 0 ? weeksReceived + 1 : 0;
 
       await db.$transaction(async (tx) => {
         await tx.user.update({
@@ -591,7 +651,7 @@ async function processAllSalaryBonuses(): Promise<{
             type: 'salary',
             level: 0,
             amount: salaryAmount,
-            description: `Gaji mingguan Minggu ${weekNumber}/${year} (${currentWeekOfTotal}/${config.maxWeeks}) - ${effectiveRefs} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
+            description: `Gaji mingguan Minggu ${weekNumber}/${year} ${config.maxWeeks > 0 ? `(${currentWeekOfTotal}/${config.maxWeeks})` : '(permanen)'} - ${effectiveRefs} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
           },
         });
       });
@@ -599,7 +659,7 @@ async function processAllSalaryBonuses(): Promise<{
       result.eligible++;
       result.totalAmount += salaryAmount;
       result.processed++;
-      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} (Week ${currentWeekOfTotal}/${config.maxWeeks})`);
+      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} ${config.maxWeeks > 0 ? `(Week ${currentWeekOfTotal}/${config.maxWeeks})` : '(permanen)'}`);
     } catch (error: any) {
       result.errors++;
       console.error(`[Salary Cron] ❌ ${user.userId}: ${error.message}`);

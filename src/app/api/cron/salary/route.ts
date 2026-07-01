@@ -132,20 +132,26 @@ async function getAllDownlineIds(internalId: string, maxDepth: number = 5): Prom
 }
 
 async function calculateGroupOmzet(internalId: string): Promise<number> {
-  const ownInvestment = await db.investment.aggregate({
-    where: { userId: internalId, status: 'active' },
+  // ★★★ FIX v3.5: Konsisten dengan src/lib/salary-bonus.ts ★★★
+  // ONLY counts active investments from DIRECT invites (Level 1).
+  // - User's OWN investment is NOT counted (only required as eligibility).
+  // - Multi-level downline (Level 2+) is NOT counted — each person builds their own group.
+  // - The inviter gets the salary; the invited people do NOT share it.
+  // Sebelumnya route.ts hitung own + L1-L5 → berbeda dari admin/user claim
+  // yang pakai salary-bonus.ts (L1 only) → salary cron != salary admin trigger.
+  const directRefs = await db.referral.findMany({
+    where: { referrerId: internalId, level: 1 },
+    select: { referredId: true },
+  });
+
+  if (directRefs.length === 0) return 0;
+
+  const directIds = directRefs.map((r) => r.referredId);
+  const directInvestment = await db.investment.aggregate({
+    where: { userId: { in: directIds }, status: 'active' },
     _sum: { amount: true },
   });
-  const downlineIds = await getAllDownlineIds(internalId, 5);
-  let downlineOmzet = 0;
-  if (downlineIds.length > 0) {
-    const downlineInvestment = await db.investment.aggregate({
-      where: { userId: { in: downlineIds }, status: 'active' },
-      _sum: { amount: true },
-    });
-    downlineOmzet = downlineInvestment._sum.amount || 0;
-  }
-  return (ownInvestment._sum.amount || 0) + downlineOmzet;
+  return directInvestment._sum.amount || 0;
 }
 
 // ──────────── Salary Bonus Logic ────────────
