@@ -244,7 +244,16 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
 
   for (const inv of investments) {
     try {
+      // ★★★ FIX v3.4: Start counting from day AFTER purchase (match cron rule) ★★★
+      // Cron rule: "Skip if bought today → first profit day = day AFTER purchase"
+      // Old STEP 2 (v3.3) counted weekdays from startDate INCLUSIVE → included
+      // purchase day → Investment.totalProfitEarned was inflated by 1 day's
+      // dailyProfit vs actual mainBalance credit. AssetPage then showed
+      // "Total Profit: Rp6.000" while saldo only had Rp4.000 → user complained
+      // "profit kok gk masuk saldo utama". Fix: count from startDate+1 to match cron.
       const startWIB = getWibDateString(new Date(inv.startDate));
+      const [sy, sm, sd] = startWIB.split('-').map(Number);
+      const startPlus1WIB = getWibDateString(new Date(Date.UTC(sy, sm - 1, sd + 1)));
       // End date: min(today, inv.endDate) — if no endDate, use today
       let endWIB: string;
       if (inv.endDate) {
@@ -256,7 +265,8 @@ async function recalculateInvestments(report: CleanupReport): Promise<void> {
 
       // Cap at contractDays from package (if available)
       const contractDays = inv.package?.contractDays ?? 90;
-      const elapsedWeekdaysRaw = countWeekdaysBetween(startWIB, endWIB);
+      // ★ FIX v3.4: count from startPlus1WIB (day after purchase), NOT startWIB
+      const elapsedWeekdaysRaw = countWeekdaysBetween(startPlus1WIB, endWIB);
       const elapsedWeekdays = Math.min(elapsedWeekdaysRaw, contractDays);
 
       const expectedTotalProfit = Math.floor(elapsedWeekdays * inv.dailyProfit);
@@ -336,11 +346,14 @@ async function recalculatePurchases(report: CleanupReport): Promise<void> {
         expected = p.investments.reduce((s, i) => s + (i.totalProfitEarned || 0), 0);
       } else {
         // Standalone — compute from progress
+        // ★ FIX v3.4: start from day AFTER purchase (match cron rule)
         const startWIB = getWibDateString(new Date(p.createdAt));
+        const [sy, sm, sd] = startWIB.split('-').map(Number);
+        const startPlus1WIB = getWibDateString(new Date(Date.UTC(sy, sm - 1, sd + 1)));
         const todayWIB = getWibDateString(getWibNow());
         const productRate = p.product?.profitRate || 0;
         const dailyProfit = Math.floor(p.totalPrice * (productRate / 100));
-        const elapsedWeekdays = countWeekdaysBetween(startWIB, todayWIB);
+        const elapsedWeekdays = countWeekdaysBetween(startPlus1WIB, todayWIB);
         expected = elapsedWeekdays * dailyProfit;
       }
 

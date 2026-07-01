@@ -6145,3 +6145,81 @@ USER ACTION untuk VPS:
 4. Profit jam 00:00 WIB → masuk mainBalance + Web Push notif ke HP user
 5. Tidak ada WA bot yang perlu di-maintain — semua otomatis via Web Push
 
+
+---
+Task ID: final-detail-check-v3.5
+Agent: main (Z.ai Code)
+Task: User "CEK DETAIL SEMUANYA TIDAK BOLEH ADA PENYAKIT" — verifikasi detail ekstra sebelum deploy V18
+
+Work Log:
+- Baca worklog.md (task terakhir: wa-bot-removal-v18)
+- Verifikasi dev server running di port 3000 (HTTP 200)
+- Verifikasi /api/deploy-version → marker UNIFIED-PROFIT-V18-20250630
+- Audit profit-cleanup.ts (STEP 1-5):
+  * STEP 1: dedup BonusLog(type='profit') per (userId, WIB day) — OK
+  * STEP 2: recalculate Investment.totalProfitEarned — ❌ BUG FOUND: count weekdays dari startDate INCLUSIVE (seharusnya startDate+1, karena cron rule "first profit day = day after purchase")
+  * STEP 3: recalculate Purchase.profitEarned — same bug (count dari createdAt INCLUSIVE)
+  * STEP 4: recalculate User balance (FIX V18: include ALL bonus types 'profit','matching','referral','salary') — OK
+  * STEP 5: sync mainBalance UPWARD + totalProfit to match BonusLog (FIX v3.3) — OK
+- Audit cron profit route (/api/cron/profit/route.ts):
+  * v2.7 ATOMIC CLAIM (updateMany WHERE lastProfitDate < today) — OK
+  * Weekend block (Sabtu/Minggu libur) — OK
+  * Backfill logic konsisten (missedDays EXCLUDES today) — OK
+  * creditMatchingOnProfit → mainBalance + totalProfit + BonusLog(type='matching') — OK
+  * creditDailyReferralBonuses = NO-OP (deprecated, referral sekarang per-investment) — OK
+- Audit admin profit-trigger (/api/admin/profit-trigger/route.ts):
+  * Atomic claim (non-force mode) — OK
+  * Force mode bypasses WHERE check (admin override) — OK
+  * Hard cap: totalProfit ≤ dailyProfit × contractDays — OK
+  * Weekend guard bypassed when force=true — OK
+- Audit referral-bonus.ts (creditInvestmentReferralBonusesTx):
+  * Per-investment bonus (10%/5%/4%/3%/2% L1-L5) — OK
+  * Increment mainBalance + totalProfit + create BonusLog(type='referral') — OK
+  * creditDailyReferralBonuses = NO-OP (deprecated) — OK
+- Audit matching-bonus.ts (creditMatchingBonusOnProfit):
+  * Event-driven (credited when downline earns profit) — OK
+  * Level 6+ auto disconnect — OK
+  * Increment mainBalance + totalProfit + create BonusLog(type='matching') — OK
+- Audit salary-bonus.ts (checkAndCreditSalaryBonus):
+  * Self-heal SalaryConfig (force 1% / maxWeeks=0 / minDirectRefs=10) — OK
+  * Unique per userId+weekNumber+year — OK
+  * Increment mainBalance + totalProfit + create BonusLog(type='salary') — OK
+- Audit BonusPage.tsx (BUG #1 dari audit sebelumnya):
+  * ✓ FIX V18: pakai data.totals dari /api/bonuses (server-side aggregate, akurat)
+  * Old bug (sum 20 entries pertama) SUDAH DIPERBAIKI
+- Audit /api/network/route.ts (BUG #2):
+  * ✓ FIX V18: query type IN ['sponsor','referral'] dan ['level','matching'] (include legacy + new)
+  * BonusStats sekarang akurat untuk semua data (lama + baru)
+- Audit /api/user/profit-status/route.ts (BUG #3):
+  * ✓ FIX V18: todaySponsorLog query type IN ['referral','sponsor','level'] (include legacy)
+  * todayEarnings.sponsor sekarang akurat
+
+- ❌ BUG BARU DITEMUKAN: STEP 2 & STEP 3 di profit-cleanup.ts menghitung weekdays dari startDate INCLUSIVE, padahal cron rule "first profit day = day AFTER purchase". Ini bikin Investment.totalProfitEarned di-inflate 1 hari (dailyProfit). AssetPage menampilkan "Total Profit" yang lebih besar dari saldo sebenarnya → user komplain "profit kok gk masuk saldo utama".
+- ✅ FIX v3.4 DITERAPKAN:
+  * STEP 2: count weekdays dari startPlus1WIB (startDate + 1 day), match cron rule
+  * STEP 3 (standalone): count weekdays dari startPlus1WIB (createdAt + 1 day), match cron rule
+- ✅ Verifikasi fix v3.4 dengan test data:
+  * DL002 (bought Monday, cron credited Tue+Wed = 4,000): Investment.totalProfitEarned sekarang 4,000 (sebelumnya 6,000 — salah)
+  * DL001 (bought Sunday, cron credited Mon+Tue+Wed = 6,000): Investment.totalProfitEarned tetap 6,000 (benar)
+  * mainBalance = totalProfit untuk semua user (konservasi terjaga)
+
+- Edge case tests (semua PASS):
+  * Withdrawal: mainBalance -5000, totalProfit unchanged, totalWithdraw +5000 → cleanup TIDAK break
+  * Salary bonus: credited +25K → cleanup PRESERVE salary bonus (no wipe)
+  * Conservation law: total bonus (Rp60,660) = total mainBalance + withdrawn → ✅ CONSERVED
+  * Race condition: 2 concurrent cron calls → atomic claim WORKING (1 processed, 1 blocked, no double credit)
+
+Stage Summary:
+- ✅ Atomic claim di 3 sumber kredit profit (cron, admin trigger, cleanup) — race-proof
+- ✅ ALL bonus types (profit, matching, referral, salary) → mainBalance + totalProfit + BonusLog
+- ✅ profit-cleanup.ts STEP 4 (FIX v3.3) include ALL bonus types — no more "bonus hilang"
+- ✅ profit-cleanup.ts STEP 5 (NEW v3.3) recover lost bonuses (sync UPWARD only — safe)
+- ✅ profit-cleanup.ts STEP 2 & 3 (FIX v3.4) match cron rule "profit starts day after purchase" — no more AssetPage drift
+- ✅ BonusPage.tsx summary pakai server-side totals (akurat untuk >20 entries)
+- ✅ /api/network bonusStats include legacy + new bonus types (always accurate)
+- ✅ /api/user/profit-status todayEarnings include legacy + new (always accurate)
+- ✅ Idempotent: cleanup run twice = no-op
+- ✅ Conservation law verified: total bonus = total mainBalance + total withdrawn
+- ✅ Race condition: atomic claim blocks double credit
+
+PRODUCTION-READY. TIDAK ADA PENYAKIT LAGI. Siap deploy V18 + hotfix v3.4 ke VPS.
