@@ -7929,3 +7929,79 @@ Stage Summary:
   2. Login admin: admin / Admin@2024
   3. Login user: WA + OTP
   4. Cek aset + saldo — harus muncul semua
+
+---
+Task ID: RESTORE-23-USERS
+Agent: main (Z.ai Code)
+Task: User "tetep aja gk bisa gitu kembalikan dulu semua data akun user 23" — script sebelumnya gak berhasil restore 23 user.
+
+Work Log:
+- Investigasi script lama (restore-users.sh) — nemu 3 bug kritis:
+  1. Bug endpoint: test login pakai /api/admin/auth → SALAH
+     - Endpoint yang benar: /api/auth/admin-login (confirmed via src/app/api/auth/admin-login/route.ts)
+     - Login test selalu gagal padahal sebenarnya jalan
+  2. Bug flow: kalau current DB >= 23 user, STOP — gak fix .env/admin
+     - Padahal user gak bisa login karena Prisma gak bisa baca DB (.env path salah)
+     - Data 23 user ADA tapi gak bisa diakses
+  3. Bug crypto.randomUUID: dipakai sebagai properti (truthy check) — gak valid di bun
+
+- Buat restore-23-users.sh (427 lines, FOKUS restore 23 user):
+  1. Detect project path (auto /var/www/nexvo vs /home/nexvo)
+  2. STOP nexvo-web + nexvo-cron (release DB lock)
+  3. Cek current DB user count via bun:sqlite (NO Prisma)
+  4. Kalau current < 23:
+     - Scan SEMUA backup di VPS (8 lokasi: /var/www, /home, /root, /tmp, /var/backups, /opt, /srv)
+     - Rank by user count, prefer >= 23 (★ TARGET)
+     - Backup current DB (safety, custom.db.pre-restore23-TIMESTAMP)
+     - Restore dari backup terbaik
+     - Verify 23 user ada di DB
+  5. Kalau current >= 23: skip restore, lanjut fix .env + admin
+  6. ALWAYS recreate .env dengan DATABASE_URL path BENAR
+     - Fix Prisma 'Unable to open database' (root cause gak bisa login)
+  7. RESET admin password ke Admin@2024:
+     - bcrypt hash (verified via compareSync)
+     - ISO timestamp (Prisma-compatible, NOT SQLite datetime)
+     - Unlock: loginAttempts=0, lockedUntil=NULL
+     - Kalau Admin kosong → bikin admin baru (admin/Admin@2024)
+  8. Fix ecosystem.config.cjs cwd
+  9. START nexvo-web + nexvo-cron
+  10. Verify END-TO-END:
+      - Web HTTP 200 + Next.js render HTML
+      - nexvo-web PM2 status (informational, bukan pass/fail)
+      - DB DIRECT CHECK: 23 user ada (bun:sqlite, skip Prisma)
+      - Admin login via endpoint BENAR /api/auth/admin-login
+      - Products API (aset)
+      - Cron port 3032
+
+- Test di sandbox (3 scenarios):
+  * SCENARIO 1: Current 0 user, backup 23 user → restore OK (23 user) ✅
+  * SCENARIO 2: Admin reset with ISO timestamp, bcrypt verify true ✅
+    - loginAttempts=0, lockedUntil=null, updatedAt=ISO format
+  * SCENARIO 3: Data integrity — 23 user tetap utuh (WA, email, name) ✅
+  * bash -n syntax check: OK
+  * No undefined vars (grep verified)
+  * Endpoint correct: /api/auth/admin-login (bukan /api/admin/auth)
+
+- Commit dfad8e0, push ke GitHub, verified live via curl (427 lines)
+
+Stage Summary:
+- ✅ restore-23-users.sh: FOKUS restore 23 user (427 lines)
+- ✅ Fix 3 bug script lama: endpoint salah, flow bug, crypto.randomUUID
+- ✅ ALWAYS recreate .env (fix Prisma root cause)
+- ✅ Admin reset pakai ISO timestamp (Prisma-compatible)
+- ✅ Test endpoint BENAR /api/auth/admin-login
+- ✅ Commit dfad8e0 pushed to GitHub
+- USER ACTION (jalankan di VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-23-users.sh?t=$(date +%s)")
+- Expected output:
+  * Scan backup: nemu 8+ backup, pilih yang 23 user
+  * Restore: 23 user ada di DB
+  * .env fixed: DATABASE_URL = file:/var/www/nexvo/db/custom.db
+  * Admin reset: admin / Admin@2024 (bcrypt verified)
+  * Verify: ✅ 23 user + ✅ admin login + ✅ products API
+- SETELAH fix, user WAJIB di browser:
+  1. Buka https://nexvo.id/recovery.html → Clear Cache & Reload
+  2. Login admin: admin / Admin@2024
+  3. Login user: WA + OTP
+  4. Cek aset + saldo — harus muncul semua
+- Kalau admin login masih gagal: screenshot section 10 (verify) — kirim ke saya
