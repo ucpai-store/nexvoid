@@ -7525,3 +7525,68 @@ Stage Summary:
   - Step 6: verify 10 fitur dengan ✅/❌
   - Final summary: Total PASS/WARN/FAIL
 - Kalau ada fitur FAIL, kirim outputnya ke saya untuk fix lanjut
+
+---
+Task ID: MIGRATE-PROFIT-TO-MAIN
+Agent: main (Z.ai Code)
+Task: User "nah bagus sekarang semua profit bonus m.profit dll masuk di saldo utama ya" — pindah semua profit/bonus ke mainBalance.
+
+Work Log:
+- Investigasi cron-service.ts v2.7:
+  * Line 392: matching bonus → mainBalance ✅
+  * Line 566: salary bonus → mainBalance ✅
+  * Line 914: investment profit → mainBalance ✅
+  * Line 1118: purchase profit → mainBalance ✅
+  * TIDAK ADA reference ke profitBalance → profit harian SUDAH BENAR masuk mainBalance
+
+- Investigasi profit-force.ts:
+  * Line 471, 600: profit credit → mainBalance ✅
+  * Step 6: sync mainBalance UPWARD (fix under-credit drift)
+  * TIDAK ADA kredit ke profitBalance
+
+- Investigasi schema User:
+  * Field balance: mainBalance, depositBalance, profitBalance
+  * profitBalance masih ada di schema (untuk display lama)
+  * Setelah migrate, profitBalance = 0 (otomatis tampil 0 di UI)
+
+- Investigasi tempat lain yang write profitBalance:
+  * cron-service.ts: TIDAK ADA (verified via grep)
+  * profit-force.ts: TIDAK ADA
+  * src/app/api/admin/users/route.ts: cuma admin manual edit (bukan auto-credit)
+  * Conclusion: gak ada auto-credit ke profitBalance lagi, semuanya ke mainBalance
+
+- Bikin migrate-profit-to-main.sh:
+  1. Backup DB (custom.db.pre-migrate-<ts>)
+  2. Migrate SQL: UPDATE User SET mainBalance = mainBalance + profitBalance, profitBalance = 0 WHERE profitBalance > 0
+  3. Reset ALL profitBalance = 0 (jaga-jaga)
+  4. Pastikan nexvo-cron (port 3032) jalan
+  5. Pastikan nexvo-web (port 3000) jalan
+  6. Verify: cron-service.ts + profit-force.ts gak ada kredit ke profitBalance
+
+- Test di sandbox (DB dengan TEST001 profitBalance=50000, mainBalance=100000):
+  * BEFORE: profitBalance=50000, mainBalance=100000
+  * AFTER: profitBalance=0, mainBalance=150000
+  * ✅ PASS — migrate logic verified
+
+- Commit baabbf6, push ke GitHub, verified live
+
+Stage Summary:
+- ✅ migrate-profit-to-main.sh committed (baabbf6)
+- ✅ Pakai bun:sqlite (NO PRISMA — bypass module cache bug)
+- ✅ Backup DB dulu sebelum migrate (safety)
+- ✅ Migrate verified di sandbox: profitBalance → mainBalance sukses
+- ✅ Pastikan cron service jalan (profit harian ke depan → mainBalance)
+- ✅ Verify cron-service.ts + profit-force.ts gak ada kredit ke profitBalance
+- USER ACTION (jalankan di VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/migrate-profit-to-main.sh?t=$(date +%s)")
+- Expected output:
+  * BEFORE: total profitBalance + total mainBalance
+  * List user dengan profitBalance > 0 (yang akan di-migrate)
+  * MIGRATING: N user migrated
+  * AFTER: profitBalance = 0, mainBalance naik
+  * TOP 10 user dengan mainBalance terbesar
+  * Cron service status
+- Setelah migrate:
+  * Semua saldo profit lama → mainBalance
+  * Profit harian ke depan → mainBalance (cron v2.7)
+  * Bonus (matching, salary) → mainBalance
