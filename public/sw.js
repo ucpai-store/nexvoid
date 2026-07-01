@@ -1,9 +1,8 @@
-// NEXVO Service Worker v31 - Fix "Loading chunk XXXX failed" loop
-// Root cause: v30 navigation fallback `caches.match('/')` served STALE HTML
-// that referenced OLD chunk hashes → chunk 404 → infinite error loop.
-// Fix: (1) NO stale-HTML navigation fallback. (2) On _next/static 404, wipe
-// all caches + force-reload clients (new deploy happened, app is stale).
-const CACHE_NAME = 'nexvo-v31';
+// NEXVO Service Worker v32 — PASSIVE (no auto-reload)
+// v31 had forceClientsReload() which caused infinite refresh storm.
+// v32 fix: NEVER auto-reload. Just wipe caches silently on chunk 404.
+// User can manually refresh / click "Try Again" — no more refresh loops.
+const CACHE_NAME = 'nexvo-v32';
 
 const PRECACHE_URLS = [
   '/manifest.webmanifest',
@@ -14,11 +13,14 @@ const PRECACHE_URLS = [
   '/favicon.ico',
 ];
 
+// One-shot flag: prevent multiple cache wipes from concurrent chunk-404s
+let _purging = false;
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_URLS).catch((err) => {
-        console.warn('[SW v31] Pre-cache failed:', err);
+        console.warn('[SW v32] Pre-cache failed:', err);
       });
     }).then(() => self.skipWaiting())
   );
@@ -32,16 +34,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Tell every controlled client to hard-reload (cache-busted).
-async function forceClientsReload() {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of clients) {
-    try {
-      await client.navigate(client.url);
-    } catch (e) {
-      client.postMessage({ type: 'NEXVO_STALE_APP_RELOAD' });
-    }
-  }
+// Silent cache purge — NO client reload (v31 bug fix)
+function purgeCachesSilently() {
+  if (_purging) return;
+  _purging = true;
+  caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => {
+    console.log('[SW v32] Caches purged (stale chunks). User can hard-refresh manually.');
+    _purging = false;
+  });
 }
 
 self.addEventListener('fetch', (event) => {
@@ -51,8 +51,8 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
 
-  // Navigation requests — network first. NO stale-HTML fallback (v30 bug).
-  // Only fall back to cache if it's the EXACT same URL (genuine offline case).
+  // Navigation requests — network first. Cache fallback ONLY for exact URL (genuine offline).
+  // NO stale-HTML fallback (v30 bug that started all this).
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).then((response) => {
@@ -83,8 +83,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // _next/static/ chunks — network first + 404 recovery.
-  // A 404 here means a new deploy changed chunk hashes → wipe caches + reload.
+  // _next/static/ chunks — network first. On 404, silently purge caches.
+  // NO force-reload (v31 bug). Page will show error boundary; user refreshes manually.
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
       fetch(request).then((response) => {
@@ -94,10 +94,8 @@ self.addEventListener('fetch', (event) => {
           return response;
         }
         if (response.status === 404) {
-          console.warn('[SW v31] Stale chunk 404 — purging + reloading:', url.pathname);
-          caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => {
-            forceClientsReload();
-          });
+          console.warn('[SW v32] Stale chunk 404 — purging caches silently:', url.pathname);
+          purgeCachesSilently();
         }
         return response;
       }).catch(() => caches.match(request).then((cached) => cached || Response.error()))
@@ -105,12 +103,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API requests — network only
+  // API requests — network only (no cache)
   if (url.pathname.startsWith('/api/')) {
     return;
   }
 
-  // Everything else — network first
+  // Everything else — network first, cache fallback
   event.respondWith(
     fetch(request).then((response) => {
       if (response && response.ok) {
@@ -122,13 +120,11 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Manual purge trigger (from page if needed)
+// Manual purge trigger (from page if needed) — NO auto-reload
 self.addEventListener('message', (event) => {
   const data = event.data || {};
-  if (data.type === 'NEXVO_PURGE_AND_RELOAD') {
-    caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => {
-      forceClientsReload();
-    });
+  if (data.type === 'NEXVO_PURGE') {
+    purgeCachesSilently();
   }
   if (data.type === 'NEXVO_SKIP_WAITING') {
     self.skipWaiting();
