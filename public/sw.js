@@ -1,5 +1,5 @@
-// NEXVO Service Worker v29 - Push Notifications + Admin Support - PWA Install Support for All Platforms
-const CACHE_NAME = 'nexvo-v29';
+// NEXVO Service Worker v30 - Force cache invalidation (fix teks-only bug from stale _next/static chunks)
+const CACHE_NAME = 'nexvo-v30';
 
 // Core PWA assets to pre-cache for installability
 const PRECACHE_URLS = [
@@ -15,7 +15,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_URLS).catch((err) => {
-        console.warn('[SW v28] Pre-cache failed for some URLs:', err);
+        console.warn('[SW v30] Pre-cache failed for some URLs:', err);
       });
     }).then(() => self.skipWaiting())
   );
@@ -61,20 +61,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (_next/static/) - stale while revalidate
+  // Static assets (_next/static/) - NETWORK FIRST (v30 fix: stale-while-revalidate was serving broken chunks from old deploys)
+  // Next.js uses content-hashed URLs so each deploy has new chunk names — safe to network-first.
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        const fetchPromise = fetch(request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        }).catch(() => cached);
-
-        return cached || fetchPromise;
-      })
+      fetch(request).then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(request))
     );
     return;
   }

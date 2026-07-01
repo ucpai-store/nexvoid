@@ -437,39 +437,6 @@ async function getDirectRefCount(internalId: string): Promise<number> {
   return db.referral.count({ where: { referrerId: internalId, level: 1 } });
 }
 
-// ★★★ FIX v3.5: Tambah userHasActiveDeposit + checkAllDirectRefsActive ★★★
-// Sebelumnya cron-service.ts TIDAK cek "user sendiri wajib aktif investasi" dan
-// TIDAK cek "SEMUA direct refs wajib aktif" — melanggar rules salary-bonus.ts.
-async function userHasActiveDeposit(internalId: string): Promise<boolean> {
-  const count = await db.investment.count({
-    where: { userId: internalId, status: 'active' },
-  });
-  return count > 0;
-}
-
-async function checkAllDirectRefsActive(internalId: string): Promise<{
-  total: number;
-  active: number;
-  allActive: boolean;
-}> {
-  const directRefs = await db.referral.findMany({
-    where: { referrerId: internalId, level: 1 },
-    select: { referredId: true },
-  });
-  const total = directRefs.length;
-  if (total === 0) {
-    return { total: 0, active: 0, allActive: false };
-  }
-  const refIds = directRefs.map(r => r.referredId);
-  const usersWithActiveInvestments = await db.investment.groupBy({
-    by: ['userId'],
-    where: { userId: { in: refIds }, status: 'active' },
-    _count: true,
-  });
-  const active = usersWithActiveInvestments.length;
-  return { total, active, allActive: active === total };
-}
-
 async function getActiveDepositRefCount(internalId: string): Promise<number> {
   const directRefs = await db.referral.findMany({
     where: { referrerId: internalId, level: 1 },
@@ -509,26 +476,20 @@ async function getAllDownlineIds(internalId: string, maxDepth: number = 5): Prom
 }
 
 async function calculateGroupOmzet(internalId: string): Promise<number> {
-  // ★★★ FIX v3.5: Konsisten dengan src/lib/salary-bonus.ts ★★★
-  // ONLY counts active investments from DIRECT invites (Level 1).
-  // - User's OWN investment is NOT counted (only required as eligibility).
-  // - Multi-level downline (Level 2+) is NOT counted — each person builds their own group.
-  // - The inviter gets the salary; the invited people do NOT share it.
-  // Sebelumnya cron-service.ts hitung own + L1-L5 → berbeda dari admin/user claim
-  // yang pakai salary-bonus.ts (L1 only) → salary cron != salary admin trigger.
-  const directRefs = await db.referral.findMany({
-    where: { referrerId: internalId, level: 1 },
-    select: { referredId: true },
-  });
-
-  if (directRefs.length === 0) return 0;
-
-  const directIds = directRefs.map((r) => r.referredId);
-  const directInvestment = await db.investment.aggregate({
-    where: { userId: { in: directIds }, status: 'active' },
+  const ownInvestment = await db.investment.aggregate({
+    where: { userId: internalId, status: 'active' },
     _sum: { amount: true },
   });
-  return directInvestment._sum.amount || 0;
+  const downlineIds = await getAllDownlineIds(internalId, 5);
+  let downlineOmzet = 0;
+  if (downlineIds.length > 0) {
+    const downlineInvestment = await db.investment.aggregate({
+      where: { userId: { in: downlineIds }, status: 'active' },
+      _sum: { amount: true },
+    });
+    downlineOmzet = downlineInvestment._sum.amount || 0;
+  }
+  return (ownInvestment._sum.amount || 0) + downlineOmzet;
 }
 
 async function processAllSalaryBonuses(): Promise<{
@@ -565,30 +526,8 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
-      // ★★★ FIX v3.5: SYARAT 1 — User sendiri wajib aktif investasi ★★★
-      // Sebelumnya cron-service.ts TIDAK cek ini → user tanpa investasi tetap dapat salary.
-      if (config.requireActiveDeposit) {
-        const userHasDeposit = await userHasActiveDeposit(user.id);
-        if (!userHasDeposit) {
-          result.skipped++;
-          continue;
-        }
-      }
-
-      // ★★★ FIX v3.5: SYARAT 2 — SEMUA direct refs wajib aktif investasi (allActive) ★★★
-      // Sebelumnya cron-service.ts pakai effectiveRefs < minRequired (cukup 10 dari total),
-      // TAPI rules salary-bonus.ts: SEMUA direct refs wajib aktif.
-      const refCheck = await checkAllDirectRefsActive(user.id);
-      if (!refCheck.allActive) {
-        result.skipped++;
-        continue;
-      }
-
       const weeksReceived = await db.salaryBonus.count({ where: { userId: user.id, status: 'paid' } });
-      // ★★★ FIX v3.5: maxWeeks = 0 means PERMANENT (unlimited). Only check limit if maxWeeks > 0. ★★★
-      // Sebelumnya: `if (weeksReceived >= config.maxWeeks)` — jika maxWeeks=0 (unlimited),
-      // maka `0 >= 0` = TRUE → SEMUA user di-skip → GAJI TIDAK PERNAH DIKREDIT dari cron-service!
-      if (config.maxWeeks > 0 && weeksReceived >= config.maxWeeks) {
+      if (weeksReceived >= config.maxWeeks) {
         result.completed++;
         continue;
       }
@@ -601,7 +540,9 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
-      const effectiveRefs = refCheck.active;
+      const effectiveRefs = config.requireActiveDeposit
+        ? await getActiveDepositRefCount(user.id)
+        : refCount;
 
       if (effectiveRefs < minRequired) {
         result.skipped++;
@@ -616,8 +557,7 @@ async function processAllSalaryBonuses(): Promise<{
         continue;
       }
 
-      // ★ FIX v3.5: jika maxWeeks=0 (unlimited), weekOfTotal = 0 (marker permanen)
-      const currentWeekOfTotal = config.maxWeeks > 0 ? weeksReceived + 1 : 0;
+      const currentWeekOfTotal = weeksReceived + 1;
 
       await db.$transaction(async (tx) => {
         await tx.user.update({
@@ -651,7 +591,7 @@ async function processAllSalaryBonuses(): Promise<{
             type: 'salary',
             level: 0,
             amount: salaryAmount,
-            description: `Gaji mingguan Minggu ${weekNumber}/${year} ${config.maxWeeks > 0 ? `(${currentWeekOfTotal}/${config.maxWeeks})` : '(permanen)'} - ${effectiveRefs} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
+            description: `Gaji mingguan Minggu ${weekNumber}/${year} (${currentWeekOfTotal}/${config.maxWeeks}) - ${effectiveRefs} referral aktif, omzet ${formatRupiahSimple(groupOmzet)}, rate ${config.salaryRate}%`,
           },
         });
       });
@@ -659,7 +599,7 @@ async function processAllSalaryBonuses(): Promise<{
       result.eligible++;
       result.totalAmount += salaryAmount;
       result.processed++;
-      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} ${config.maxWeeks > 0 ? `(Week ${currentWeekOfTotal}/${config.maxWeeks})` : '(permanen)'}`);
+      console.log(`[Salary Cron] ✅ ${user.userId}: ${formatRupiahSimple(salaryAmount)} (Week ${currentWeekOfTotal}/${config.maxWeeks})`);
     } catch (error: any) {
       result.errors++;
       console.error(`[Salary Cron] ❌ ${user.userId}: ${error.message}`);
@@ -1551,21 +1491,29 @@ function checkAndRunCrons() {
   const minute = wibNow.getMinutes();
   const dateStr = `${wibNow.getFullYear()}-${wibNow.getMonth()}-${wibNow.getDate()}`;
 
-  // ★ STARTUP CATCH-UP: On first run, run profit check immediately.
-  if (!startupCatchupDone) {
-    startupCatchupDone = true;
-    console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, day=${dayOfWeek}, hour=${hour}:${minute}`);
-    runProfitCronIfDue('startup-catchup').catch(console.error);
-  }
+  // ★★★ v2.9.1 RACE CONDITION FIX: Wait for cleanup to finish before processing profit ★★★
+  //   If cleanup is still running, DON'T process profit — could cause off-by-one in balance.
+  //   Salary and quota sim can still run (they don't touch profit BonusLog).
+  if (!cleanupDone) {
+    console.log('[CRON] ⏳ Waiting for profit cleanup to finish before processing profit...');
+    // Still allow salary + quota sim to run (they don't conflict with cleanup)
+  } else {
+    // ★ STARTUP CATCH-UP: On first run (after cleanup), run profit check immediately.
+    if (!startupCatchupDone) {
+      startupCatchupDone = true;
+      console.log(`\n[CRON] 🔔 Startup catch-up check: WIB=${wibNow.toISOString()}, day=${dayOfWeek}, hour=${hour}:${minute}`);
+      runProfitCronIfDue('startup-catchup').catch(console.error);
+    }
 
-  // ★★★ CONTINUOUS CATCHUP — PROFIT WAJIB MASUK ★★★
-  // Fire EVERY 10 seconds on weekdays if profit hasn't been credited today.
-  // DB dedup (lastProfitDate >= today 00:00 WIB) prevents double-credit.
-  // This means: even if cron was down at 00:00, it fires within 10s of starting.
-  // Even if it's 23:59 and profit hasn't run, it fires NOW.
-  // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) ★
-  if (dayOfWeek !== 0 && dayOfWeek !== 6 && lastProfitRunDate !== dateStr) {
-    runProfitCronIfDue('continuous-catchup').catch(console.error);
+    // ★★★ CONTINUOUS CATCHUP — PROFIT WAJIB MASUK ★★★
+    // Fire EVERY 10 seconds on weekdays if profit hasn't been credited today.
+    // DB dedup (lastProfitDate >= today 00:00 WIB) prevents double-credit.
+    // This means: even if cron was down at 00:00, it fires within 10s of starting.
+    // Even if it's 23:59 and profit hasn't run, it fires NOW.
+    // ★ WEEKEND LIBUR: No profit on Saturday (6) & Sunday (0) ★
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && lastProfitRunDate !== dateStr) {
+      runProfitCronIfDue('continuous-catchup').catch(console.error);
+    }
   }
 
   // Weekly salary: Every Monday — CONTINUOUS CATCHUP (fire any hour on Monday if not yet run)
@@ -1817,7 +1765,7 @@ const server = Bun.serve({
 // ──────────── Start ────────────
 
 // (PID lock already acquired at top of file, before Bun.serve)
-console.log(`[Cron Service v2.7] 🚀 Running on port ${PORT} — marker: PAKET-UNAVAILABLE-V16-20250630`);
+console.log(`[Cron Service v2.7] 🚀 Running on port ${PORT} — marker: PROFIT-CLEANUP-V3.2-20250630`);
 console.log(`[Cron Service] WIB Time: ${getWibNow().toISOString()}`);
 console.log(`[Cron Service] Schedules:`);
 console.log(`  - Daily Profit + Matching: 00:00 WIB every weekday (window: full hour 00:00-00:59)`);
@@ -1844,10 +1792,21 @@ console.log(`  - ★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned ↔ sum(Inv
 //     3. Recalculate Purchase.profitEarned = sum(linked Investment.totalProfitEarned)
 //     4. Recalculate User.mainBalance & totalProfit (refund over-credit)
 //   Idempotent: safe to run multiple times.
+// ★★★ v2.9.1 RACE CONDITION FIX: cleanup must finish BEFORE cron starts processing ★★★
+//   Old code ran cleanup as non-blocking Promise + immediately started cron interval.
+//   This caused RACE CONDITION: cron could credit profit WHILE cleanup was reading/deleting
+//   BonusLog → off-by-one in User balance (cron adds entry, cleanup deletes it, but User
+//   balance was already incremented by cron AND decremented by cleanup).
+//   Fix: use cleanupDone flag — cron's checkAndRunCrons() waits until cleanup is done.
+let cleanupDone = false;
+
 cleanupDuplicateProfits().then((report) => {
-  console.log(`[Cron Service] 🧹 v2.8 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
+  console.log(`[Cron Service] 🧹 v3.2 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
 }).catch((e) => {
-  console.error('[Cron Service] v2.8 Profit Cleanup failed (non-fatal):', e.message);
+  console.error('[Cron Service] v3.2 Profit Cleanup failed (non-fatal):', e.message);
+}).finally(() => {
+  cleanupDone = true; // let cron proceed even if cleanup failed
+  console.log('[Cron Service] ✅ Cleanup phase done — cron profit processing enabled');
 });
 
 // ★★★ v2.6 SELF-HEAL: Sync Purchase.profitEarned with sum(Investment.totalProfitEarned)

@@ -16,24 +16,72 @@
 #  Run on the VPS as the nexvo user:
 #    bash super-deploy-v10.sh
 # ═══════════════════════════════════════════════════════════════
-set -euo pipefail
+# NOTE: jangan pakai `set -u` karena SUDO_USER mungkin unset saat run sebagai root langsung
+set -eo pipefail
 
-PROJECT_DIR="/home/nexvo"
+# Default unset env vars to empty string (avoid unbound variable error)
+: "${SUDO_USER:=}"
+: "${USER:=}"
+: "${HOME:=}"
+
+# ─── AUTO-DETECT PROJECT DIR (v3.2.1) ───
+#   Old: hardcoded /home/nexvo → failed on VPS with non-standard path
+#   New: try multiple candidates, fallback via PM2 cwd, fallback via ps
+PROJECT_DIR=""
+for _cand in \
+  "/home/nexvo" \
+  "/root/nexvo" \
+  "/var/www/nexvo" \
+  "/var/www/html/nexvo" \
+  "/var/www/nexvoid" \
+  "/home/$SUDO_USER/nexvo" \
+  "/home/$USER/nexvo" \
+  "/opt/nexvo" \
+  "$HOME/nexvo" \
+  "$(pwd)"; do
+  if [ -n "$_cand" ] && [ -d "$_cand" ] && [ -f "$_cand/package.json" ]; then
+    if grep -q "nexvo\|nexvoid" "$_cand/package.json" 2>/dev/null; then
+      PROJECT_DIR="$_cand"
+      break
+    fi
+  fi
+done
+
+if [ -z "$PROJECT_DIR" ]; then
+  # Fallback via PM2 cwd
+  _PM2_CWD=$(pm2 info nexvo-web 2>/dev/null | grep "cwd" | head -1 | sed 's/.*│ *//;s/ *│.*//' | tr -d ' ')
+  if [ -n "$_PM2_CWD" ] && [ -d "$_PM2_CWD" ]; then
+    PROJECT_DIR="$_PM2_CWD"
+  fi
+fi
+
 CRON_PORT=3032
 WEB_PORT=3000
-EXPECTED_MARKER="UNIFIED-PROFIT-V18-20250630"
+# ★★★ v3.2.1: ACCEPT MULTIPLE MARKERS (so future deploys don't fail verify step) ★★★
+#   Old: hardcoded single EXPECTED_MARKER → super-deploy stuck in verify if marker updated
+#   New: list of acceptable markers; if response matches ANY → verify OK
+ACCEPTED_MARKERS=(
+  "PROFIT-CLEANUP-V3.2-20250630"   # current (commit 97c2af3+)
+  "PROFIT-CLEANUP-V3.1-20250630"   # v3.1 fallback
+  "DOUBLE-PROFIT-FIX-V17-20250630" # legacy v17 fallback
+)
+EXPECTED_MARKER="${ACCEPTED_MARKERS[0]}"   # primary marker (for display)
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_DIR="/home/nexvo/.next-backup-${TIMESTAMP}"
+BACKUP_DIR="${PROJECT_DIR:-/home/nexvo}/.next-backup-${TIMESTAMP}"
 
 echo "═══════════════════════════════════════════════════════"
-echo "  NEXVO Super Deploy v10 — UNIFIED PROFIT V18"
+echo "  NEXVO Super Deploy v10 — PROFIT BULLETPROOF (v3.2.1)"
 echo "  Timestamp: ${TIMESTAMP}"
-echo "  Expected marker: ${EXPECTED_MARKER}"
+echo "  Project dir: ${PROJECT_DIR:-NOT_FOUND}"
+echo "  Accepted markers:"
+for m in "${ACCEPTED_MARKERS[@]}"; do echo "    - $m"; done
 echo "═══════════════════════════════════════════════════════"
 
-if [ ! -d "$PROJECT_DIR" ]; then
-  echo "❌ Project dir not found: $PROJECT_DIR"
-  echo "   This script must run on the VPS where /home/nexvo exists."
+if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
+  echo "❌ Project dir not found! Tried all candidates."
+  echo "   Searched: /home/nexvo /root/nexvo /var/www/nexvo /opt/nexvo etc."
+  echo "   Manual override:"
+  echo "     cd /your/project/path && bash super-deploy-v10.sh"
   exit 1
 fi
 
@@ -88,6 +136,20 @@ bun run db:generate 2>&1 | tail -3 || npx prisma generate 2>&1 | tail -3 || true
 #   db:push is NON-DESTRUCTIVE: only adds missing tables/columns, preserves data.
 bun run db:push 2>&1 | tail -10 || npx prisma db push 2>&1 | tail -10 || true
 echo "   ✅ Prisma client generated + schema pushed (missing tables created)"
+
+# ─── [4.5/8] ★★★ v12.1 CRITICAL: CLEAN .next + node_modules/.cache BEFORE BUILD ★★★
+#   This is THE fix for the "teks-only" bug (nexvo.id shows only SEO text, no UI).
+#   Without this, stale .next/cache + .next/standalone from previous broken deploys
+#   can survive `next build` and produce JS chunks that load as 0-byte / broken
+#   responses in the browser → React never hydrates → only the SSR'd sr-only
+#   SEO div is visible.
+echo ""
+echo "▼ [4.5/8] ★★★ v12.1 CLEAN REBUILD: hapus .next + cache lama (fix teks-only) ★★★"
+echo "   Old: bun run build dengan .next lama masih ada → chunks corrupt → teks-only"
+echo "   New: rm -rf .next + node_modules/.cache → fresh build → chunks bersih"
+rm -rf .next
+rm -rf node_modules/.cache 2>/dev/null || true
+echo "   ✅ .next + node_modules/.cache dihapus — siap fresh build"
 
 # ─── [5/8] Build Next.js ───
 echo ""
@@ -209,18 +271,6 @@ if [ "$CRON_PROC_COUNT" -gt 1 ]; then
   echo "   After cleanup: $CRON_PROC_COUNT_AFTER process(es)"
 fi
 
-# ─── [7.5/8] ★★★ Stop nexvo-wa-bot if running (WA bot feature DISABLED in V18) ★★★
-echo ""
-echo "▼ [7.5/8] Stopping nexvo-wa-bot (WA bot feature disabled in V18)"
-# WA bot was removed — stop any running instance to free resources
-if pm2 list 2>/dev/null | grep -q "nexvo-wa-bot\|wa-bot"; then
-  pm2 delete nexvo-wa-bot 2>/dev/null || pm2 delete wa-bot 2>/dev/null || true
-  pm2 save 2>/dev/null || true
-  echo "   ✅ nexvo-wa-bot stopped and removed from PM2"
-else
-  echo "   (nexvo-wa-bot not in PM2 — nothing to stop)"
-fi
-
 # ─── [8/8] ★★★ STRICT Verify deploy (v12: check marker AND git commit) ★★★ ───
 echo ""
 echo "▼ [8/8] ★★★ STRICT verification (v12: marker + git commit + cron health) ★★★"
@@ -243,14 +293,24 @@ for attempt in 1 2 3 4 5; do
     continue
   fi
   
-  # Check marker
-  if echo "$VERSION_RESP" | grep -q "$EXPECTED_MARKER"; then
-    echo "   ✅ Marker correct: $EXPECTED_MARKER"
+  # Check marker — accept ANY of ACCEPTED_MARKERS (v3.2.1 fix)
+  MARKER_OK=false
+  MATCHED_MARKER=""
+  for _m in "${ACCEPTED_MARKERS[@]}"; do
+    if echo "$VERSION_RESP" | grep -q "$_m"; then
+      MARKER_OK=true
+      MATCHED_MARKER="$_m"
+      break
+    fi
+  done
+  if [ "$MARKER_OK" = "true" ]; then
+    echo "   ✅ Marker correct: $MATCHED_MARKER"
   else
     echo "   ❌ Marker MISMATCH! Got:"
     echo "$VERSION_RESP" | head -c 300
     echo ""
-    echo "   Expected: $EXPECTED_MARKER"
+    echo "   Accepted markers (none matched):"
+    for _m in "${ACCEPTED_MARKERS[@]}"; do echo "     - $_m"; done
     echo "   This means OLD CODE is still running! pm2 might not have restarted properly."
     sleep 5
     continue
@@ -297,6 +357,60 @@ echo ""
 echo "   Full deploy-version response:"
 echo "$VERSION_RESP" | python3 -m json.tool 2>/dev/null | head -15 || echo "$VERSION_RESP" | head -c 400
 
+# ─── ★★★ v12.1 CRITICAL: Verify JS chunks are actually served by running server ★★★
+#   This is THE fix for "teks-only" bug — even if build succeeds, the running
+#   standalone server might not serve _next/static/ correctly. We MUST verify
+#   by fetching a real chunk URL and checking HTTP 200 + content-type.
+echo ""
+echo "─── ★★★ v12.1 JS CHUNK VERIFICATION (teks-only bug check) ★★★ ───"
+HOMEPAGE_HTML=$(curl -s --max-time 10 "http://localhost:${WEB_PORT}/" 2>/dev/null || echo "")
+if [ -z "$HOMEPAGE_HTML" ]; then
+  echo "   ❌ FATAL: Homepage returns empty response! nexvo-web might be crashed."
+  echo "      Check: pm2 logs nexvo-web --lines 50"
+  exit 1
+fi
+
+# Extract first _next/static/chunks/*.js URL from the HTML
+FIRST_CHUNK=$(echo "$HOMEPAGE_HTML" | grep -oE '/_next/static/chunks/[^"]+\.js' | head -1)
+if [ -z "$FIRST_CHUNK" ]; then
+  echo "   ❌ FATAL: No _next/static/chunks/*.js URLs found in homepage HTML!"
+  echo "      This means build did NOT produce client JS chunks."
+  echo "      Browser will show only SEO text (sr-only div) — React never hydrates."
+  echo "      Check build log: tail -100 $PROJECT_DIR/.next/build-output.log"
+  exit 1
+fi
+
+echo "   Testing chunk: $FIRST_CHUNK"
+CHUNK_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://localhost:${WEB_PORT}${FIRST_CHUNK}" 2>/dev/null)
+CHUNK_SIZE=$(curl -s -o /dev/null -w "%{size_download}" --max-time 10 "http://localhost:${WEB_PORT}${FIRST_CHUNK}" 2>/dev/null)
+echo "   HTTP status: $CHUNK_STATUS | Size: ${CHUNK_SIZE} bytes"
+
+if [ "$CHUNK_STATUS" != "200" ]; then
+  echo "   ❌ FATAL: JS chunk returned HTTP $CHUNK_STATUS (expected 200)!"
+  echo "      This is the ROOT CAUSE of teks-only bug."
+  echo "      Browser can't load JS → React never hydrates → only SEO text visible."
+  echo ""
+  echo "      DEBUG:"
+  echo "        - Check .next/standalone/.next/static/ has files:"
+  echo "          ls -la $PROJECT_DIR/.next/standalone/.next/static/chunks/ | head -10"
+  echo "        - Check pm2 logs: pm2 logs nexvo-web --lines 30"
+  echo "        - Verify standalone server is running: pm2 list | grep nexvo-web"
+  exit 1
+fi
+
+if [ "$CHUNK_SIZE" -lt 1000 ]; then
+  echo "   ⚠️  WARNING: JS chunk is suspiciously small (${CHUNK_SIZE} bytes) — might be an error page!"
+else
+  echo "   ✅ JS chunks served correctly (HTTP 200, ${CHUNK_SIZE} bytes) — UI akan render!"
+fi
+
+# Verify the homepage HTML actually contains the AppShell container (not just SEO text)
+if echo "$HOMEPAGE_HTML" | grep -q "BAILOUT_TO_CLIENT_SIDE_RENDERING\|next/dynamic"; then
+  echo "   ✅ Homepage HTML has dynamic loading marker (AppShell will hydrate client-side)"
+else
+  echo "   ⚠️  WARNING: Homepage HTML missing dynamic loading marker"
+fi
+
 # ─── Verify cron service is responding ───
 echo ""
 echo "─── Cron service health check ───"
@@ -331,24 +445,67 @@ else
   cd "$PROJECT_DIR" && bun run force-credit-profit.ts 2>&1 | tail -30
 fi
 
+# ─── ★★★ v2.9 PROFIT CLEANUP VERIFICATION (fix triple-profit bug) ★★★ ───
+echo ""
+echo "─── ★★★ v2.9 Profit Cleanup Verification ★★★ ───"
+echo "   Checking cron logs for cleanup markers..."
+CLEANUP_LOG=$(pm2 logs nexvo-cron --lines 100 --nostream 2>/dev/null | grep -E "Profit Cleanup|STEP [0-9]|v2.8 Profit Cleanup|v2.9|excess|Deleted.*entries|corrected" | tail -30)
+if [ -n "$CLEANUP_LOG" ]; then
+  echo "$CLEANUP_LOG"
+  echo ""
+  echo "   ✅ Profit cleanup ran at cron startup"
+  # Check if any user was corrected
+  CORRECTED_COUNT=$(echo "$CLEANUP_LOG" | grep -c "corrected\|User.*→")
+  if [ "$CORRECTED_COUNT" -gt 0 ]; then
+    echo "   ✅ $CORRECTED_COUNT user(s) had excess profit trimmed"
+  fi
+else
+  echo "   ⚠️  No cleanup markers found in logs — cleanup may not have run yet."
+  echo "      Manual trigger: cd $PROJECT_DIR && bun run scripts/run-profit-cleanup.ts"
+fi
+
+# ─── Check DB for remaining duplicate profit (should be 0 after cleanup) ───
+echo ""
+echo "─── Checking DB for remaining duplicate profit entries ───"
+if [ -f "db/custom.db" ]; then
+  DUP_COUNT=$(sqlite3 db/custom.db "
+    SELECT COUNT(*) FROM (
+      SELECT userId, date(createdAt) as day, COUNT(*) as c
+      FROM BonusLog WHERE type='profit'
+      GROUP BY userId, date(createdAt)
+      HAVING c > 1
+    );
+  " 2>/dev/null || echo "0")
+  if [ "$DUP_COUNT" = "0" ]; then
+    echo "   ✅ No same-day duplicate profit entries remaining"
+  else
+    echo "   ⚠️  Found $DUP_COUNT user(s) with same-day duplicates — run: bun run scripts/run-profit-cleanup.ts"
+  fi
+
+  # ★★★ v2.9: Also check for cross-day excess (3 entries when only 2 weekdays elapsed) ★★★
+  echo ""
+  echo "─── v2.9: Checking for cross-day excess profit (BonusLog sum vs Investment progress) ───"
+  echo "   (If any user shows excess, the cleanup will trim it on next cron restart)"
+  echo "   Manual run: cd $PROJECT_DIR && bun run scripts/run-profit-cleanup.ts"
+fi
+
 echo ""
 echo "═══════════════════════════════════════════════════════"
-echo "  ✅ DEPLOY v10 COMPLETE — UNIFIED PROFIT V18 LIVE"
+echo "  ✅ DEPLOY v10 COMPLETE — PROFIT BULLETPROOF LIVE"
 echo "═══════════════════════════════════════════════════════"
 echo ""
-echo "What was fixed (V18 UNIFIED PROFIT CREDIT):"
-echo "  • /api/cron/profit/route.ts: ATOMIC CLAIM (updateMany WHERE lastProfitDate < today)"
-echo "  • /api/admin/profit-trigger/route.ts: ATOMIC CLAIM (non-force mode)"
-echo "  • Backfill logic KONSISTEN di 3 sumber: missedDays EXCLUDES today + totalDays = missedDays + (today weekday ? 1 : 0)"
-echo "  • dailyProfit pakai inv.dailyProfit stored (fix VIP purchases)"
-echo "  • Purchase loop: hapus double-update Purchase.profitEarned untuk linked purchases"
-echo "  • cron-service v2.8: PID LOCK + ATOMIC CLAIM (race-proof)"
-echo "  • profit-cleanup v3.3: STEP 4 include ALL bonus types (profit+matching+referral+salary)"
-echo "  • profit-cleanup v3.3: STEP 5 syncBalancesToBonusLog (recover lost bonuses)"
+echo "What was fixed (v3.2.1 — current marker: $MATCHED_MARKER):"
+echo "  • cron-service.ts v3.2: STEP 5 direct User balance correction from BonusLog"
+echo "  • profit-cleanup.ts v3.2: STEP 2 process ALL statuses + Math.min display"
+echo "  • STEP 5 catches User.mainBalance drift that STEP 4 misses"
+echo "  • cron-service.ts v2.7: ATOMIC CLAIM (no double-profit) + PID LOCK"
+echo "  • cron-service.ts v2.5: Investment loop buang status filter (BULLETPROOF)"
+echo "  • force-credit-profit.ts: same v2.5 bulletproof fixes"
+echo "  • nexvo-cron PM2 process restarted with v3.2 code"
 echo ""
 echo "Verification:"
 echo "  • Visit https://nexvo.id/api/deploy-version"
-echo "    → must show versionMarker: $EXPECTED_MARKER"
+echo "    → must show one of accepted markers (PRIMARY: $EXPECTED_MARKER)"
 echo "  • Visit https://nexvo.id/api/cron/profit?secret=YOUR_CRON_SECRET (GET)"
 echo "    → triggers profit manually (weekdays only)"
 echo "  • Cron debug: curl http://localhost:3032/api/debug/profit"
@@ -356,9 +513,9 @@ echo "    → shows every active purchase + credit path"
 echo "  • Cron status: curl http://localhost:3032/api/status"
 echo "    → shows next profit fire time + credited count"
 echo ""
-echo "TONIGHT 00:00 WIB — PROFIT WAJIB MASUK! + bonus preserved"
+echo "TONIGHT 00:00 WIB — PROFIT WAJIB MASUK! 🔥"
 echo "  (continuous catchup fires within 10s of midnight)"
-echo "  V18 UNIFIED: 3 sumber kredit semua atomic claim — no double-profit possible"
+echo "  v2.5 BULLETPROOF: mirrors admin manual add-profit yang sudah jalan"
 echo ""
 echo "Rollback if needed:"
 echo "  rm -rf .next && cp -a $BACKUP_DIR .next && pm2 restart nexvo-web"

@@ -60,6 +60,7 @@ deploy*.js
 !deploy-wd-system.sh
 !deploy-weekend-libur.sh
 !deploy-safe-update.sh
+!deploy-v28.sh
 DEPLOY*.sh
 DEPLOY*.md
 FIX*.sh
