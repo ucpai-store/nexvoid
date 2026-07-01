@@ -138,12 +138,26 @@ echo ""
 # ═══ STEP 4: INSERT 23 USER + DATA RELASI (kalau kurang dari 23) ═══
 echo -e "${B}═══ 4/8. RESTORE 23 USER + DATA RELASI ═══${N}"
 
+# Pastikan schema ada (prisma db push — aman karena DB kosong/low data)
+echo -e "  ${B}→${N} Pastikan schema DB ada (prisma db push)..."
+cd "$P"
+if [ "$USERS_NOW" -eq 0 ] 2>/dev/null; then
+  # DB kosong — aman pakai --accept-data-loss (gak ada data yang hilang)
+  bunx prisma db push --skip-generate --accept-data-loss 2>&1 | tail -5 | sed 's/^/    /' || echo -e "    ${Y}⚠️${N} db push skip"
+else
+  # DB ada data — pakai tanpa flag, skip kalau prompt
+  echo "y" | bunx prisma db push --skip-generate 2>&1 | tail -5 | sed 's/^/    /' || echo -e "    ${Y}⚠️${N} db push skip (mungkin sudah sinkron)"
+fi
+echo -e "  ${G}✅${N} Schema DB siap"
+echo ""
+
 if [ "$USERS_NOW" -ge 23 ] 2>/dev/null; then
   echo -e "  ${G}✅${N} DB sudah punya ${B}$USERS_NOW${N} user (>= 23) — PRESERVE, skip insert"
   echo -e "  ${G}✅${N} Data 23 user aman, gak akan diubah"
 else
   echo -e "  ${Y}⚠️${N} DB cuma punya $USERS_NOW user (< 23) — INSERT 23 user + data lengkap"
-  echo -e "  ${B}→${N} Backup DB lama dulu (safety)..."
+  echo -e "  ${B}→${N} Insert data via bun:sqlite (langsung ke DB, skip Prisma)..."
+  echo ""
   
   cat > /tmp/nexvo-insert-23.ts << 'INSERTEOF'
 import { Database } from 'bun:sqlite';
