@@ -48,14 +48,30 @@ fi
 echo "  ✅ Build sukses"
 echo ""
 
-echo "▼ [4/5] Start nexvo-web FRESH dengan bun run start"
-# Start dengan command yang BENAR — next start, bukan standalone
-if command -v bun >/dev/null 2>&1; then
-  pm2 start "bun run start" --name nexvo-web --cwd "$P" 2>&1 | tail -5
+echo "▼ [4/5] Start nexvo-web FRESH dengan ecosystem.config.cjs"
+# Stop dulu biar gak conflict
+pm2 delete nexvo-web 2>/dev/null
+sleep 2
+
+# Cek ecosystem config ada?
+if [ -f "$P/ecosystem.config.cjs" ]; then
+  echo "  Pakai ecosystem.config.cjs (verified config)"
+  pm2 start ecosystem.config.cjs --only nexvo-web 2>&1 | tail -5
+elif [ -f "$P/ecosystem.config.js" ]; then
+  echo "  Pakai ecosystem.config.js (verified config)"
+  pm2 start ecosystem.config.js --only nexvo-web 2>&1 | tail -5
 else
-  pm2 start "npm run start" --name nexvo-web --cwd "$P" 2>&1 | tail -5
+  echo "  ⚠️ ecosystem.config gak ada — start manual"
+  if command -v bun >/dev/null 2>&1; then
+    PORT=3000 NODE_ENV=production pm2 start "bun" --name nexvo-web --cwd "$P" -- run start 2>&1 | tail -5
+  else
+    PORT=3000 NODE_ENV=production pm2 start "npm" --name nexvo-web --cwd "$P" -- run start 2>&1 | tail -5
+  fi
 fi
-sleep 5
+
+# Beri waktu 10 detik buat next start ready
+echo "  Tunggu 10s buat server ready..."
+sleep 10
 
 echo ""
 echo "▼ [5/5] Verify port 3000 + CSS load"
