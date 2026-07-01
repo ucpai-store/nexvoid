@@ -119,7 +119,9 @@ export async function GET(request: NextRequest) {
     const todaySponsorLog = await db.bonusLog.aggregate({
       where: {
         userId: user.id,
-        type: { in: ['sponsor', 'level'] },
+        // ★ FIX V18: backend writes type='referral' (per-investment), not 'sponsor'/'level'
+        //   Include both for backward compat with old data
+        type: { in: ['referral', 'sponsor', 'level'] },
         createdAt: { gte: todayStartUTC },
       },
       _sum: { amount: true },

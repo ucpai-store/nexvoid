@@ -100,14 +100,18 @@ echo "Deploy version response:"
 echo "$VERSION_RESP" | head -c 500
 echo ""
 
-if echo "$VERSION_RESP" | grep -q "DOUBLE-PROFIT-FIX-V17-20250630"; then
+if echo "$VERSION_RESP" | grep -q "UNIFIED-PROFIT-V18-20250630"; then
   echo ""
   echo "✅✅✅ DEPLOY SUCCESS ✅✅✅"
-  echo "   VPS is running DOUBLE-PROFIT-FIX-V17-20250630"
-  echo "   → cron v2.7 ATOMIC CLAIM aktif (no more double-profit — 2 hari = 2 entry, bukan 3)"
-  echo "   → cron v2.7 PID LOCK aktif (no duplicate cron instances)"
-  echo "   → Paket 4/5/6 inactive TETAP tampil dengan badge TIDAK TERSEDIA (defense in depth)"
-  echo "   → Profit masuk jam 00:00 WIB (Senin-Jumat), Sabtu-Minggu libur"
+  echo "   VPS is running UNIFIED-PROFIT-V18-20250630"
+  echo "   → cron v2.8 ATOMIC CLAIM aktif (3 sumber kredit profit race-proof)"
+  echo "   → profit-cleanup v3.3 STEP 4+5 (bonus preserved + recoverable)"
+  echo "   → All bonus (matching + referral + salary + profit) MASUK SALDO UTAMA"
+  echo "   → Profit jam 00:00 WIB (Senin-Jumat), Sabtu-Minggu libur"
+  echo ""
+  echo "─── Recommended: Trigger profit-cleanup to recover any lost bonuses ───"
+  echo "   Login as admin, then POST /api/admin/profit-cleanup"
+  echo "   OR run: cd $PROJECT_DIR && bun run scripts/run-profit-cleanup.ts"
 else
   echo ""
   echo "⚠️  Version marker belum terlihat. Kemungkinan:"
@@ -115,7 +119,7 @@ else
   echo "   - PM2 belum restart dengan code baru (jalankan: pm2 restart nexvo-web --update-env)"
   echo "   - Cek pm2 logs: pm2 logs nexvo-web --lines 30"
   echo ""
-  echo "   Expected marker: DOUBLE-PROFIT-FIX-V17-20250630"
+  echo "   Expected marker: UNIFIED-PROFIT-V18-20250630"
   echo "   Got response:"
   echo "$VERSION_RESP" | head -c 300
 fi

@@ -5901,3 +5901,247 @@ IMPACT:
 - Tidak akan ada complaint "bonus ilang" lagi
 - Profit jam 00:00 WIB berikutnya → masuk mainBalance + push notif ke HP
 
+
+---
+Task ID: 2-a
+Agent: frontend-audit
+Task: Audit frontend Asset/History/Bonus pages untuk konsistensi dengan backend V18
+
+Work Log:
+- Membaca worklog.md (5703-5904) untuk konteks V18: root cause bonus hilang sudah fixed (profit-cleanup STEP 4 include ALL bonus types + STEP 5 syncBalancesToBonusLog recover)
+- Verifikasi prisma/schema.prisma: User model punya mainBalance, depositBalance, profitBalance, totalDeposit, totalWithdraw, totalProfit. TIDAK ada field profitReferral/profitMatching/etc — bonus types disimpan di BonusLog.type ✓
+- Grep frontend src/ untuk profitReferral|profitMatching|referralProfit → 0 matches (frontend tidak reference field non-existent) ✓
+- Membaca src/components/nexvo/pages/AssetPage.tsx (643 baris)
+- Membaca src/components/nexvo/pages/HistoryPage.tsx (320 baris)
+- Membaca src/components/nexvo/pages/BonusPage.tsx (256 baris)
+- Membaca src/components/nexvo/pages/MatchingBonusPage.tsx (439 baris)
+- Membaca src/components/nexvo/pages/SalaryBonusPage.tsx (120 baris awal)
+- Membaca src/components/nexvo/pages/NetworkPage.tsx (200 baris awal)
+- Membaca src/components/nexvo/pages/UserDashboard.tsx (459 baris awal)
+- Membaca src/components/nexvo/pages/ProfitPage.tsx (baris 480-559)
+- Membaca src/components/nexvo/UserHeader.tsx (UserNotificationBell component)
+- Membaca src/components/nexvo/shared/PushNotificationManager.tsx
+- Membaca src/app/api/assets/route.ts (181 baris)
+- Membaca src/app/api/bonuses/route.ts (183 baris)
+- Membaca src/app/api/transactions/route.ts (275 baris)
+- Membaca src/app/api/network/route.ts (272 baris)
+- Membaca src/app/api/user/profit-status/route.ts (225 baris)
+- Membaca src/app/api/user/profile/route.ts (193 baris)
+- Membaca src/app/api/user/referral/route.ts (82 baris)
+- Membaca src/app/api/matching-bonus/route.ts (222 baris)
+- Membaca src/app/api/push/vapid-key/route.ts (10 baris)
+- Membaca src/lib/matching-bonus.ts (524 baris)
+- Membaca src/stores/auth-store.ts (162 baris)
+
+=== AUDIT FRONTEND (Task 2-a) ===
+
+FILE YANG DIBACA:
+- prisma/schema.prisma (model User, BonusLog)
+- src/components/nexvo/pages/AssetPage.tsx
+- src/components/nexvo/pages/HistoryPage.tsx
+- src/components/nexvo/pages/BonusPage.tsx
+- src/components/nexvo/pages/MatchingBonusPage.tsx
+- src/components/nexvo/pages/SalaryBonusPage.tsx
+- src/components/nexvo/pages/NetworkPage.tsx
+- src/components/nexvo/pages/UserDashboard.tsx
+- src/components/nexvo/pages/ProfitPage.tsx
+- src/components/nexvo/UserHeader.tsx
+- src/components/nexvo/shared/PushNotificationManager.tsx
+- src/app/api/assets/route.ts
+- src/app/api/bonuses/route.ts
+- src/app/api/transactions/route.ts
+- src/app/api/network/route.ts
+- src/app/api/user/profit-status/route.ts
+- src/app/api/user/profile/route.ts
+- src/app/api/user/referral/route.ts
+- src/app/api/matching-bonus/route.ts
+- src/app/api/push/vapid-key/route.ts
+- src/lib/matching-bonus.ts
+- src/stores/auth-store.ts
+
+FINDINGS:
+
+✅ [SUDAH BENAR]
+1. Schema User model: mainBalance, depositBalance, profitBalance, totalDeposit, totalWithdraw, totalProfit. TIDAK ada field profitReferral terpisah — semua bonus types disimpan di BonusLog.type (konsisten dengan asumsi V18).
+2. Frontend tidak reference field non-existent (grep profitReferral/profitMatching/referralProfit = 0 matches).
+3. AssetPage menampilkan: Aset Aktif (count), Total Modal (sum active asset.amount), Profit/Hari (sum active asset.dailyProfit), Total Profit (sum all asset.totalProfitEarned). Per-asset: modal, dailyProfit, profitRate, totalProfitEarned, endDate, progress bar (weekdays), estimasi akhir kontrak, countdown ke 00:00 WIB, lastProfitDate. UI lengkap & informatif.
+4. HistoryPage menampilkan 6 summary card: totalDeposit, totalWithdraw, totalPurchase, totalInvestment, totalBonus (excl profit/reward), totalProfit (BonusLog type=profit/reward). Tabs filter: all/deposit/withdraw/purchase/investment/bonus/profit. Data dari /api/transactions — konsisten dengan BonusLog (tidak pakai ProfitLog legacy).
+5. /api/transactions summary:
+   - totalBonus = BonusLog type NOT IN ['profit','reward'] (hanya referral+matching+salary+legacy sponsor/level) ✓
+   - totalProfit = BonusLog type IN ['profit','reward'] ✓
+   Tidak double-count.
+6. BonusPage menampilkan 3 jenis bonus: Referal, M.Profit (matching), Gaji (salary). Filter & exclude type='profit' & 'reward' (line 64). bonusTypeConfig handle BOTH legacy names (sponsor/level) AND new names (referral/matching) — robust.
+7. /api/bonuses mengembalikan `totals` aggregate (server-side) yang AKURAT untuk semua record (tidak peduli pagination).
+8. /api/user/referral correctly queries BonusLog type='referral' (new name). ReferralPage.totalBonus benar.
+9. /api/user/profile mengembalikan SEMUA balance fields (mainBalance, depositBalance, profitBalance, totalDeposit, totalWithdraw, totalProfit) → auth-store.hydrateUser() dapat data lengkap.
+10. UserDashboard menampilkan 3 balance cards: Saldo Utama (mainBalance), Saldo Deposit (depositBalance), Total Profit (totalProfit). mainBalance menampilkan dengan jelas label "Profit & bonus masuk sini (bisa ditarik)".
+11. ProfitPage menampilkan 4 summary: Saldo Utama (mainBalance), Total Profit, Total Deposit, Total Withdraw — semua benar.
+12. ProfilePage & SettingsPage juga menampilkan mainBalance + totalProfit.
+13. WithdrawPage uses user.mainBalance sebagai batas withdrawal — benar.
+14. PushNotificationManager.tsx: auto-subscribe user via /api/push/vapid-key (fetch VAPID publicKey) + PushManager.subscribe + POST /api/push/subscribe dengan userId+userType='user'. VAPID key di-fetch real-time (tidak hardcode). Idempotent (cek existing subscription dulu).
+15. /api/push/vapid-key: returns process.env.VAPID_PUBLIC_KEY atau 500 error jika belum configure.
+16. UserNotificationBell di UserHeader: cek Notification.permission + pushManager.getSubscription → display status (active/inactive/denied). Tombol "Aktifkan Notifikasi" trigger requestPermission.
+17. matching-bonus.ts: creditMatchingBonusOnProfit menulis BOTH MatchingBonus record AND BonusLog(type='matching') + increment mainBalance+totalProfit. Konsisten dengan asumsi V18.
+18. UserDashboard fetchUserData polling tiap 30s + cek perubahan mainBalance → trigger "flash +Profit!" animation. Refresh otomatis.
+
+⚠️ [POTENSI ISSUE]
+1. UserDashboard.tsx line 362-366: Footer card "Total earn X — dipakai beli paket Y" menampilkan (totalProfit - mainBalance) dengan label "dipakai beli paket". INI MISLEADING karena difference sebenarnya = total Withdraw + total Purchase dari mainBalance + transfer ke profitBalance. User yang sudah withdraw akan lihat angka "dipakai beli paket" yang lebih besar dari reality. (Bukan bug kritis, hanya label salah.)
+2. AssetPage TIDAK menampilkan user.mainBalance secara eksplisit. User harus ke Dashboard/ProfitPage/Profile/Settings/Withdraw untuk lihat saldo utama. Mungkin by-design (AssetPage fokus ke asset list), tapi kalau user expect "Asset page = total saldo saya" bisa bingung.
+3. NetworkPage.tsx (line 65-66) hardcode SPONSOR_RATES={1:10,2:5,3:4,4:3,5:2} & LEVEL_RATES={1:5,2:4,3:3,4:2,5:1} — angka BENAR (sesuai backend referral-bonus.ts & matching-bonus.ts), tapi nama "SPONSOR"/"LEVEL" adalah LEGACY. Backend sekarang pakai type='referral'/'matching'. Tidak break functionality tapi misleading di code.
+4. BonusPage fetch hanya page=1 dengan default limit=20. Tidak ada pagination control di UI. User dengan >20 bonus entries hanya lihat 20 terbaru (history list), tapi summary seharusnya tetap akurat karena... (lihat bug #1 di bawah).
+5. /api/matching-bonus POST (manual claim) masih ada sebagai "safety hatch" untuk unmatched profit. UI MatchingBonusPage berikan tombol "Klaim Matching Profit" yang muncul kalau potentialBonus > 0. Tapi backend event-driven (auto-credit saat downline dapat profit). Potential conflict: kalau user klik Klaim, creditMatchingBonus() akan credit bonus LAGI untuk profit yang sudah dicredit event-driven? Perlu verify calculateMatchingBonus benar-benar exclude already-matched profit (line 430-435: aggregate matchedOmzet per level, subtract — OK safe).
+6. /api/user/profit-status line 192: schedule.sponsorBonus = "Saat downline mendaftar (registrasi)" — tapi backend creditInvestmentReferralBonusesTx credit bonus saat downline INVEST (bukan register). Label misinformasi user.
+
+❌ [BUG YANG HARUS FIX]
+
+1. **BonusPage.tsx summary under-counted (PRIORITY HIGH)**:
+   File: src/components/nexvo/pages/BonusPage.tsx line 63-73
+   Issue: Frontend compute summary (referral/matching/salary/total) dengan sum HANYA 20 BonusLog entries pertama (default limit=20 dari /api/bonuses). User dengan >20 bonus entries akan lihat total yang UNDER-COUNTED. Padahal /api/bonuses sudah return `data.totals` (server-side aggregate, akurat) tapi frontend IGNORE itu.
+   Impact: User lihat "Total Bonus Diterima" lebih kecil dari reality → komplain "bonus ilang".
+   Fix: Ganti client-side sum dengan `data.totals` dari API:
+     - referral = data.totals.referral.amount (atau data.totals.sponsor.amount sebagai fallback)
+     - matching = data.totals.matching.amount (atau data.totals.level.amount)
+     - salary = data.totals.salary.amount
+     - total = data.totals.all.amount - data.totals.profit.amount (exclude profit)
+   Atau alternatif: fetch dengan limit besar (e.g., limit=1000) untuk ambil semua records.
+
+2. **NetworkPage bonusStats always 0 (PRIORITY MEDIUM)**:
+   File: src/app/api/network/route.ts line 198-211
+   Issue: API query BonusLog type='sponsor', 'level', 'reward' — semua LEGACY names. Backend V18 writes type='referral', 'matching', 'salary', 'profit'. Jadi:
+     - bonusStats.sponsor.totalAmount = 0 (always, kecuali ada data lama)
+     - bonusStats.level.totalAmount = 0 (always)
+     - bonusStats.reward.totalAmount = 0 (always)
+   Impact: NetworkPage "Bonus Referal", "Bonus Level", "Bonus Reward" cards semua tampilkan Rp0 → user kira tidak dapat bonus dari network.
+   Fix: Update /api/network untuk query type='referral' (atau in ['referral','sponsor']), type='matching' (atau in ['matching','level']), dan untuk "reward" bisa diganti jadi salary (atau biarkan 0 jika memang tidak ada reward system).
+   NetworkPage.tsx interface juga perlu update: bonusStats.referral, bonusStats.matching, bonusStats.salary.
+
+3. **ProfitPage "Sponsor" today's earnings always 0 (PRIORITY MEDIUM)**:
+   File: src/app/api/user/profit-status/route.ts line 119-126
+   Issue: API query type IN ['sponsor', 'level'] untuk todaySponsorLog. Backend V18 writes type='referral' (not 'sponsor'). Jadi todayEarnings.sponsor = 0 always.
+   Impact: ProfitPage "Sponsor" card (line 493) selalu tampilkan +Rp0 → user kira tidak dapat referral bonus hari ini.
+   Fix: Update query ke type IN ['referral', 'sponsor'] (include both untuk backward compat). Atau rename field jadi `referral` dan update ProfitPage & UserDashboard interface.
+
+4. **Label "Sponsor" di UI tidak match backend (PRIORITY LOW)**:
+   File: UserDashboard.tsx line 493 (icon Gift, label 'Sponsor'), profit-status route.ts line 192
+   Issue: Backend V18 namanya "Bonus Referal" (type='referral'), credit saat downline INVEST. UI masih pakai label "Sponsor" dengan description "Saat downline mendaftar (registrasi)" — keduanya misleading.
+   Fix: Rename "Sponsor" → "Referal" di UI; update schedule description jadi "Saat downline investasi pertama kali".
+
+KONSISTENSI:
+
+- Asset page vs History (Total Profit):
+  * Asset page "Total Profit" = sum(asset.totalProfitEarned) — investment profit only (per-asset accumulation, dari field Investment.totalProfitEarned)
+  * History page "Total Profit" = sum(BonusLog type IN ['profit','reward']) — transaction-level profit logs
+  * Setelah cleanup V18 STEP 2 (recalculateInvestments) + STEP 4 (recalculateUserBalances), keduanya harus konsisten karena Investment.totalProfitEarned di-recompute dari cron credit history. Asset page juga pakai Math.max(invProfitSum, purchase.profitEarned) sebagai safety net (line 121 /api/assets).
+  * Verdict: Konsisten dalam steady state. Bisa drift sebelum cleanup di-run.
+
+- Bonus page vs BonusLog:
+  * Bonus page summary = client-side sum dari 20 entries pertama (BUG — lihat #1)
+  * BonusLog actual totals = server-side aggregate dari /api/bonuses totals (akurat)
+  * Setelah fix bug #1: Bonus page akan match BonusLog perfectly
+
+- mainBalance display:
+  * Ditampilkan di: UserDashboard (Saldo Utama), ProfitPage (Saldo Utama), ProfilePage, SettingsPage, WithdrawPage (batas withdraw)
+  * TIDAK ditampilkan di: AssetPage, HistoryPage, BonusPage, MatchingBonusPage, SalaryBonusPage, ReferralPage, NetworkPage
+  * auth-store.hydrateUser() poll /api/user/profile tiap 30s (di UserDashboard) → mainBalance selalu fresh di session
+  * Setelah deploy V18 + cleanup STEP 5, mainBalance akan reflect semua bonus yang sebelumnya hilang (syncBalancesToBonusLog recover upward only — safe)
+
+REKOMENDASI FIX:
+
+PRIORITY HIGH (WAJIB sebelum deploy V18, bisa bikin komplain user):
+1. Fix BonusPage.tsx summary agar pakai data.totals dari /api/bonuses (server-side aggregate). Ini mencegah user dengan >20 bonus lihat total under-counted.
+
+PRIORITY MEDIUM (Bisa post-deploy, tapi sebaiknya fix sebelum komplain masuk):
+2. Fix /api/network/route.ts: ganti 'sponsor' → 'referral' (atau include both), 'level' → 'matching' (atau include both), 'reward' → drop atau keep untuk legacy data. Update NetworkPage.tsx interface + UI labels.
+3. Fix /api/user/profit-status/route.ts: ganti query type IN ['sponsor','level'] → type IN ['referral','sponsor'] (include new + legacy).
+
+PRIORITY LOW (Cosmetic, post-deploy):
+4. Rename "Sponsor" → "Referal" di UserDashboard.tsx & ProfitPage.tsx UI labels.
+5. Fix UserDashboard.tsx line 362-366 "dipakai beli paket" footer: hitung (totalProfit - mainBalance - totalWithdraw) untuk estimate actual "dipakai beli paket", atau ganti label jadi "Total earn X (sudah termasuk yang ditarik & dipakai beli paket)".
+6. Perbaiki label schedule.sponsorBonus di /api/user/profit-status: "Saat downline mendaftar" → "Saat downline investasi pertama kali".
+
+VERDICT:
+- AssetPage, HistoryPage, UserDashboard, ProfitPage: konsisten & ready untuk V18 deploy.
+- BonusPage: BUG summary under-counted (>20 entries) — WAJIB fix sebelum deploy.
+- NetworkPage + ProfitPage "Sponsor" card: akan tampilkan 0 untuk bonus yang sudah dikredit → user bisa komplain "bonus ilang" walau sebenarnya sudah masuk mainBalance. FIX before deploy.
+- Push notification subscription: bekerja (VAPID + auto-subscribe). VAPID env configured.
+- Schema & frontend references: no orphan fields (profitReferral tidak exist & tidak direference).
+
+Stage Summary:
+- ✅ Schema & frontend tidak ada reference ke field non-existent (profitReferral etc)
+- ✅ AssetPage, HistoryPage, UserDashboard, ProfitPage konsisten dengan V18 backend
+- ✅ Push notification subscription UI bekerja (VAPID + auto-subscribe via PushNotificationManager)
+- ❌ BUG #1: BonusPage summary under-counted (hanya sum 20 entries pertama, ignore data.totals)
+- ❌ BUG #2: /api/network query legacy bonus types ('sponsor','level','reward') → NetworkPage bonusStats always 0
+- ❌ BUG #3: /api/user/profit-status query 'sponsor'+'level' untuk todayEarnings.sponsor → always 0 (backend writes 'referral')
+- ⚠️ MISLEADING: UserDashboard "dipakai beli paket" footer, "Sponsor" label di UI
+- REKOMENDASI: Fix Bug #1 (HIGH) + Bug #2 & #3 (MEDIUM) sebelum deploy V18 untuk hindari komplain "bonus ilang" di NetworkPage/BonusPage/ProfitPage.
+
+---
+Task ID: wa-bot-removal-v18
+Agent: main (Z.ai Code)
+Task: User "HAPUS AJA FITUR WA BOT KALO GANGU HAPUS AJA INTINYA TIDAK BOLEH ADA PENYAKIT SEMUA FITUR BERJALAN SESUAI" — hapus WA bot feature, pastikan semua fitur lain jalan tanpa penyakit.
+
+Work Log:
+- Identifikasi semua referensi WA bot:
+  * mini-services/wa-bot/ (folder service)
+  * src/lib/bot-notification.ts (helper — non-blocking DB writes, safe)
+  * src/components/nexvo/pages/AdminWhatsAppPage.tsx (815 baris, admin UI)
+  * src/app/api/admin/bot-config/route.ts (config endpoint)
+  * super-deploy-v10.sh, deploy.sh, deploy-fix-all.sh (deploy scripts)
+  * cron-service.ts — VERIFIED no references (cron independent of WA bot)
+
+- HAPUS mini-services/wa-bot/ folder (semua file: index.ts, package.json, sessions, dll)
+- HAPUS mini-services/ folder (kosong setelah wa-bot dihapus)
+- UPDATE super-deploy-v10.sh: ganti step [7.5/8] dari "restart nexvo-wa-bot" jadi "stop nexvo-wa-bot if running (feature disabled)"
+- UPDATE deploy.sh: ganti blok "8b. START WA-BOT" jadi "8b. WA-BOT REMOVED IN V18" — stop stale process jika ada
+- UPDATE deploy.sh: blok install wa-bot deps (line 245-250) sudah aman — `[ -f "mini-services/wa-bot/package.json" ]` akan false, skip otomatis
+- UPDATE AdminWhatsAppPage.tsx: ganti 815 baris dengan halaman sederhana "WhatsApp Bot Dinonaktifkan" — tampilkan info Web Push sebagai pengganti
+- KEEP src/lib/bot-notification.ts (notifyBot function): non-blocking DB writes ke SystemSettings — tidak crash apa-apa walau tidak ada bot yang poll. Aman dibiarkan.
+- KEEP src/app/api/admin/bot-config/route.ts: endpoint config tetap ada, admin bisa lihat/toggle (tidak ada effect karena bot tidak running)
+- KEEP notifyBot() calls di auth/deposit/withdraw routes: non-blocking, hanya tulis ke DB, tidak error
+
+- VERIFIKASI dev server:
+  * GET / → 200 OK (64ms) — homepage render bersih
+  * GET /api/deploy-version → 200 OK, marker UNIFIED-PROFIT-V18-20250630
+  * GET /api/push/vapid-key → 200 OK, valid VAPID publicKey
+  * GET /api/admin/bot-config → 401 (admin-only, no crash)
+  * GET /api/bonuses → 401 (auth required, no crash)
+  * GET /api/network → 401 (auth required, no crash)
+  * GET /api/user/profit-status → 401 (auth required, no crash)
+
+- VERIFIKASI Agent Browser:
+  * Homepage render OK — NEXVO heading, login form, 9 sections semua tampil
+  * 20 interactive elements (buttons, inputs) terdeteksi
+  * No browser errors, no console errors
+  * Service Worker registered (PWA + Web Push active)
+
+- TypeScript check: 0 error di file yang diedit (BonusPage, network/route, profit-status, AdminWhatsAppPage, bot-notification)
+
+Stage Summary:
+- ✅ WA bot service DIHAPUS total (mini-services/wa-bot folder removed)
+- ✅ Deploy scripts updated: stop stale WA bot jika ada, tidak start yang baru
+- ✅ AdminWhatsAppPage jadi halaman info "feature disabled" (tidak crash)
+- ✅ Notifikasi user sekarang 100% via Web Push (VAPID) — lebih stabil, tidak butuh service terpisah
+- ✅ notifyBot() helper tetap ada tapi non-blocking (DB writes yang tidak di-poll — harmless)
+- ✅ cron-service.ts TIDAK tergantung WA bot — profit tetap jalan jam 00:00 WIB
+- ✅ Dev server stable, semua API respond, tidak ada error
+
+IMPACT:
+- Sebelum V18: WA bot butuh service terpisah, QR scan, reconnect issue, notifikasi gak sampai
+- Sesudah V18: WA bot dihapus, semua notifikasi via Web Push (VAPID) ke HP user langsung
+- Profit masuk → push notif ke HP (jam 00:00 WIB)
+- Deposit pending → push notif ke admin
+- Withdraw pending → push notif ke admin
+- Tidak ada service tambahan yang bisa crash → deploy lebih stabil
+
+USER ACTION untuk VPS:
+1. Deploy V18: bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/bootstrap-deploy.sh?t=$(date +%s)")
+2. Deploy script akan:
+   - Pull code V18 (tanpa WA bot)
+   - Build Next.js
+   - Restart nexvo-web + nexvo-cron
+   - STOP nexvo-wa-bot jika masih running (feature removed)
+3. Verify: https://nexvo.id/api/deploy-version → marker UNIFIED-PROFIT-V18-20250630
+4. Profit jam 00:00 WIB → masuk mainBalance + Web Push notif ke HP user
+5. Tidak ada WA bot yang perlu di-maintain — semua otomatis via Web Push
+

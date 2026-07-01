@@ -195,17 +195,31 @@ export async function GET(request: NextRequest) {
     const achievedRewards = REWARD_MILESTONES.filter((m) => myGroupOmzet >= m.omzet);
 
     // Get bonus stats from BonusLog
-    const [sponsorTotal, levelTotal, rewardTotal] = await Promise.all([
+    // ★ FIX V18: query BOTH legacy names AND new names — backend writes 'referral'/'matching'/'salary'
+    //   but old data may have 'sponsor'/'level'/'reward'. Include both to never miss bonus entries.
+    const [sponsorTotal, levelTotal, rewardTotal, referralTotal, matchingTotal, salaryTotal] = await Promise.all([
       db.bonusLog.aggregate({
-        where: { userId: user.id, type: 'sponsor' },
+        where: { userId: user.id, type: { in: ['sponsor', 'referral'] } },
         _sum: { amount: true },
       }),
       db.bonusLog.aggregate({
-        where: { userId: user.id, type: 'level' },
+        where: { userId: user.id, type: { in: ['level', 'matching'] } },
         _sum: { amount: true },
       }),
       db.bonusLog.aggregate({
         where: { userId: user.id, type: 'reward' },
+        _sum: { amount: true },
+      }),
+      db.bonusLog.aggregate({
+        where: { userId: user.id, type: 'referral' },
+        _sum: { amount: true },
+      }),
+      db.bonusLog.aggregate({
+        where: { userId: user.id, type: 'matching' },
+        _sum: { amount: true },
+      }),
+      db.bonusLog.aggregate({
+        where: { userId: user.id, type: 'salary' },
         _sum: { amount: true },
       }),
     ]);
@@ -257,6 +271,17 @@ export async function GET(request: NextRequest) {
               achieved: myGroupOmzet >= m.omzet,
               progress: Math.min((myGroupOmzet / m.omzet) * 100, 100),
             })),
+          },
+          // ★ FIX V18: expose new bonus type names (matching, referral, salary)
+          //   so frontend NetworkPage can show accurate bonus stats
+          referral: {
+            totalAmount: referralTotal._sum.amount || 0,
+          },
+          matching: {
+            totalAmount: matchingTotal._sum.amount || 0,
+          },
+          salary: {
+            totalAmount: salaryTotal._sum.amount || 0,
           },
         },
       },

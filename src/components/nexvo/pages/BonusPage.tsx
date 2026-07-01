@@ -56,20 +56,22 @@ export default function BonusPage() {
   const fetchBonuses = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch('/api/bonuses', {
+      const res = await fetch('/api/bonuses?limit=100', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.success) {
         const items: BonusItem[] = (data.data || []).filter((b: BonusItem) => b.type !== 'profit' && b.type !== 'reward');
         setBonuses(items);
-        const s: BonusSummary = { referral: 0, matching: 0, salary: 0, total: 0 };
-        for (const b of items) {
-          s.total += b.amount;
-          if (b.type === 'referral' || b.type === 'sponsor') s.referral += b.amount;
-          else if (b.type === 'matching' || b.type === 'level') s.matching += b.amount;
-          else if (b.type === 'salary') s.salary += b.amount;
-        }
+        // ★ FIX V18: Use server-side totals (accurate — includes ALL entries, not just current page)
+        // Old code summed only 20 entries from page 1 → under-counted for users with >20 bonuses
+        const t = data.totals || {};
+        const s: BonusSummary = {
+          referral: (t.referral?.amount || 0) + (t.sponsor?.amount || 0),
+          matching: (t.matching?.amount || 0) + (t.level?.amount || 0),
+          salary: t.salary?.amount || 0,
+          total: t.all?.amount || 0,
+        };
         setSummary(s);
       } else {
         setError(data.error || 'Failed to load data');

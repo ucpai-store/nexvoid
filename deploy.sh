@@ -536,18 +536,17 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 8b. START WA-BOT (optional — only if configured)
+# 8b. WA-BOT REMOVED IN V18 (notifications now via Web Push only)
 # ═══════════════════════════════════════════════════════════════
-if [ "$CHECK_ONLY" = false ] && [ -f "$APP_DIR/mini-services/wa-bot/index.ts" ]; then
-  section "8b/10 START WA-BOT (port $PORT_WABOT, optional)"
-  cd "$APP_DIR/mini-services/wa-bot"
-  # wa-bot needs tsx (in its own node_modules)
-  pm2 start "npx tsx index.ts" \
-    --name nexvo-wa-bot \
-    --cwd "$APP_DIR/mini-services/wa-bot" \
-    --log "$LOG_DIR/nexvo-wa-bot.log" \
-    --time 2>&1 | tail -3 || warn "wa-bot failed to start (optional, skip)"
-  ok "nexvo-wa-bot started (scan QR via admin panel)"
+# WA bot service was removed in V18. Web Push notifications (VAPID)
+# handle all user notifications (profit credited, deposit, etc).
+# Stop any stale wa-bot process if running.
+if pm2 list 2>/dev/null | grep -q "nexvo-wa-bot"; then
+  pm2 delete nexvo-wa-bot 2>/dev/null || true
+  pm2 save 2>/dev/null || true
+  ok "stopped stale nexvo-wa-bot (feature removed in V18)"
+else
+  ok "wa-bot not running (feature removed in V18 — Web Push handles notifications)"
 fi
 
 # ═══════════════════════════════════════════════════════════════

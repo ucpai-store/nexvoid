@@ -21,12 +21,12 @@ set -euo pipefail
 PROJECT_DIR="/home/nexvo"
 CRON_PORT=3032
 WEB_PORT=3000
-EXPECTED_MARKER="DOUBLE-PROFIT-FIX-V17-20250630"
+EXPECTED_MARKER="UNIFIED-PROFIT-V18-20250630"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="/home/nexvo/.next-backup-${TIMESTAMP}"
 
 echo "═══════════════════════════════════════════════════════"
-echo "  NEXVO Super Deploy v10 — PROFIT BULLETPROOF"
+echo "  NEXVO Super Deploy v10 — UNIFIED PROFIT V18"
 echo "  Timestamp: ${TIMESTAMP}"
 echo "  Expected marker: ${EXPECTED_MARKER}"
 echo "═══════════════════════════════════════════════════════"
@@ -209,6 +209,18 @@ if [ "$CRON_PROC_COUNT" -gt 1 ]; then
   echo "   After cleanup: $CRON_PROC_COUNT_AFTER process(es)"
 fi
 
+# ─── [7.5/8] ★★★ Stop nexvo-wa-bot if running (WA bot feature DISABLED in V18) ★★★
+echo ""
+echo "▼ [7.5/8] Stopping nexvo-wa-bot (WA bot feature disabled in V18)"
+# WA bot was removed — stop any running instance to free resources
+if pm2 list 2>/dev/null | grep -q "nexvo-wa-bot\|wa-bot"; then
+  pm2 delete nexvo-wa-bot 2>/dev/null || pm2 delete wa-bot 2>/dev/null || true
+  pm2 save 2>/dev/null || true
+  echo "   ✅ nexvo-wa-bot stopped and removed from PM2"
+else
+  echo "   (nexvo-wa-bot not in PM2 — nothing to stop)"
+fi
+
 # ─── [8/8] ★★★ STRICT Verify deploy (v12: check marker AND git commit) ★★★ ───
 echo ""
 echo "▼ [8/8] ★★★ STRICT verification (v12: marker + git commit + cron health) ★★★"
@@ -321,16 +333,18 @@ fi
 
 echo ""
 echo "═══════════════════════════════════════════════════════"
-echo "  ✅ DEPLOY v10 COMPLETE — PROFIT BULLETPROOF LIVE"
+echo "  ✅ DEPLOY v10 COMPLETE — UNIFIED PROFIT V18 LIVE"
 echo "═══════════════════════════════════════════════════════"
 echo ""
-echo "What was fixed (v2.5 BULLETPROOF):"
-echo "  • cron-service.ts v2.5: Investment loop buang status='active' filter,"
-echo "    pakai endDate > wibNow (mirror admin v2.5 yang SUDAH TERBUKTI JALAN)"
-echo "  • cron-service.ts v2.5: Purchase loop — kalo linked Investment gak"
-echo "    dikredit hari ini, CREDIT via Purchase path (jangan skip!)"
-echo "  • force-credit-profit.ts: same v2.5 bulletproof fixes"
-echo "  • nexvo-cron PM2 process restarted with v2.5 code"
+echo "What was fixed (V18 UNIFIED PROFIT CREDIT):"
+echo "  • /api/cron/profit/route.ts: ATOMIC CLAIM (updateMany WHERE lastProfitDate < today)"
+echo "  • /api/admin/profit-trigger/route.ts: ATOMIC CLAIM (non-force mode)"
+echo "  • Backfill logic KONSISTEN di 3 sumber: missedDays EXCLUDES today + totalDays = missedDays + (today weekday ? 1 : 0)"
+echo "  • dailyProfit pakai inv.dailyProfit stored (fix VIP purchases)"
+echo "  • Purchase loop: hapus double-update Purchase.profitEarned untuk linked purchases"
+echo "  • cron-service v2.8: PID LOCK + ATOMIC CLAIM (race-proof)"
+echo "  • profit-cleanup v3.3: STEP 4 include ALL bonus types (profit+matching+referral+salary)"
+echo "  • profit-cleanup v3.3: STEP 5 syncBalancesToBonusLog (recover lost bonuses)"
 echo ""
 echo "Verification:"
 echo "  • Visit https://nexvo.id/api/deploy-version"
@@ -342,9 +356,9 @@ echo "    → shows every active purchase + credit path"
 echo "  • Cron status: curl http://localhost:3032/api/status"
 echo "    → shows next profit fire time + credited count"
 echo ""
-echo "TONIGHT 00:00 WIB — PROFIT WAJIB MASUK! 🔥"
+echo "TONIGHT 00:00 WIB — PROFIT WAJIB MASUK! + bonus preserved"
 echo "  (continuous catchup fires within 10s of midnight)"
-echo "  v2.5 BULLETPROOF: mirrors admin manual add-profit yang sudah jalan"
+echo "  V18 UNIFIED: 3 sumber kredit semua atomic claim — no double-profit possible"
 echo ""
 echo "Rollback if needed:"
 echo "  rm -rf .next && cp -a $BACKUP_DIR .next && pm2 restart nexvo-web"
