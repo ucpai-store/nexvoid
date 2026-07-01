@@ -367,20 +367,37 @@ async function recalculatePurchases(report: CleanupReport): Promise<void> {
 }
 
 // ──────────── STEP 4: Recalculate User balance from BonusLog ────────────
+//
+// ★★★ CRITICAL FIX v3.3: Include ALL bonus types that credit mainBalance+totalProfit ★★★
+//
+// Previous bug (v3.2): only counted BonusLog.type='profit'. But matching, referral,
+// and salary bonuses ALSO increment mainBalance+totalProfit. So users who received
+// those bonuses appeared "over-credited" and got their mainBalance SUBTRACTED
+// by the bonus amount — BONUSES DISAPPEARED.
+//
+// Fix: count ALL bonus types that credit mainBalance+totalProfit:
+//   - 'profit'   (daily investment profit)
+//   - 'matching' (M.Profit — 5% of downline profit)
+//   - 'referral' (10% of downline investment)
+//   - 'salary'   (weekly salary bonus)
+//
+// This is the SOURCE of "bonus pada ilang, m.profit/referral gak masuk saldo utama".
 
 async function recalculateUserBalances(report: CleanupReport): Promise<void> {
-  console.log('[Profit Cleanup] 🧹 STEP 4: Recalculate User.mainBalance & totalProfit from BonusLog');
+  console.log('[Profit Cleanup] 🧹 STEP 4: Recalculate User.mainBalance & totalProfit from BonusLog (ALL bonus types: profit + matching + referral + salary)');
 
-  // Sum all profit BonusLog per user (after dedup)
-  const profitAgg = await db.bonusLog.groupBy({
+  // ★★★ FIX v3.3: Sum ALL bonus types that credit mainBalance+totalProfit ★★★
+  const BONUS_TYPES_CREDIT_MAIN = ['profit', 'matching', 'referral', 'salary'];
+  const bonusAgg = await db.bonusLog.groupBy({
     by: ['userId'],
-    where: { type: 'profit' },
+    where: { type: { in: BONUS_TYPES_CREDIT_MAIN } },
     _sum: { amount: true },
   });
-  const profitByUser = new Map<string, number>();
-  for (const a of profitAgg) {
-    profitByUser.set(a.userId, a._sum.amount || 0);
+  const bonusByUser = new Map<string, number>();
+  for (const a of bonusAgg) {
+    bonusByUser.set(a.userId, a._sum.amount || 0);
   }
+  console.log(`[Profit Cleanup]   Found ${bonusAgg.length} users with bonus records (profit+matching+referral+salary)`);
 
   const users = await db.user.findMany({
     select: { id: true, userId: true, name: true, mainBalance: true, totalProfit: true },
@@ -389,15 +406,15 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
 
   for (const u of users) {
     try {
-      const expectedProfit = profitByUser.get(u.id) || 0;
+      const expectedBonusTotal = bonusByUser.get(u.id) || 0;
       // diff = how much the user is OVER-credited relative to BonusLog sum
       // If positive → user has more totalProfit than BonusLog records → over-credited → subtract
       // If negative → user has less than BonusLog → do NOT auto-top-up (could be legit deposit/withdraw)
-      const overCredit = u.totalProfit - expectedProfit;
+      const overCredit = u.totalProfit - expectedBonusTotal;
       if (overCredit <= 1) continue; // not over-credited (within 1 rupiah tolerance)
 
       const newMain = Math.max(0, u.mainBalance - overCredit);
-      const newTotalProfit = expectedProfit; // align to BonusLog sum
+      const newTotalProfit = expectedBonusTotal; // align to BonusLog sum (ALL bonus types)
 
       await db.user.update({
         where: { id: u.id },
@@ -429,6 +446,96 @@ async function recalculateUserBalances(report: CleanupReport): Promise<void> {
   }
   console.log(
     `[Profit Cleanup]   ✅ Corrected ${report.usersBalanceCorrected} users, total ${formatRupiahSimple(report.totalBalanceCorrected)} over-credit removed`,
+  );
+}
+
+// ──────────── STEP 5: Sync mainBalance UPWARD + totalProfit to match BonusLog ────────────
+//
+// ★★★ NEW v3.3: Fix under-credit drift caused by OLD STEP 4 bug ★★★
+//
+// Old STEP 4 (v3.2) only counted BonusLog.type='profit' → users who received
+// matching/referral/salary bonuses had their mainBalance SUBTRACTED as
+// "over-credit" → BONUSES DISAPPEARED from saldo utama.
+//
+// This STEP 5 runs AFTER STEP 4 (now fixed) to RECOVER the lost bonuses:
+//   1. Compute actualBonusEarned = sum(ALL bonus types) per user
+//   2. expectedFloor = actualBonusEarned - totalWithdraw
+//   3. If mainBalance < expectedFloor: top up mainBalance (ONLY INCREASE — safe)
+//   4. If totalProfit != actualBonusEarned: align totalProfit to BonusLog sum
+//      (handles BOTH under-credit & over-credit — totalProfit must match BonusLog)
+
+async function syncBalancesToBonusLog(report: CleanupReport): Promise<void> {
+  console.log('[Profit Cleanup] 🧹 STEP 5: Sync mainBalance UPWARD + totalProfit to match BonusLog (ALL bonus types)');
+
+  const BONUS_TYPES_CREDIT_MAIN = ['profit', 'matching', 'referral', 'salary'];
+  const bonusAgg = await db.bonusLog.groupBy({
+    by: ['userId'],
+    where: { type: { in: BONUS_TYPES_CREDIT_MAIN } },
+    _sum: { amount: true },
+  });
+  const bonusByUser = new Map<string, number>();
+  for (const a of bonusAgg) {
+    bonusByUser.set(a.userId, a._sum.amount || 0);
+  }
+
+  const users = await db.user.findMany({
+    select: { id: true, userId: true, name: true, mainBalance: true, totalProfit: true, totalWithdraw: true },
+  });
+  console.log(`[Profit Cleanup]   Checking ${users.length} users for balance sync`);
+
+  let mainSynced = 0;
+  let totalSynced = 0;
+  let totalMainTopup = 0;
+  let totalProfitAdjust = 0;
+
+  for (const u of users) {
+    try {
+      const actualBonusEarned = bonusByUser.get(u.id) || 0;
+      const expectedFloor = Math.max(0, actualBonusEarned - u.totalWithdraw);
+      let needUpdate = false;
+      let newMain = u.mainBalance;
+      let newTotalProfit = u.totalProfit;
+
+      // Sync mainBalance UPWARD (only increase — safe)
+      if (u.mainBalance < expectedFloor) {
+        const topup = expectedFloor - u.mainBalance;
+        newMain = expectedFloor;
+        totalMainTopup += topup;
+        mainSynced++;
+        needUpdate = true;
+      }
+
+      // Sync totalProfit to match BonusLog (BOTH directions — must be accurate)
+      const profitDiff = actualBonusEarned - u.totalProfit;
+      if (Math.abs(profitDiff) >= 2) {
+        newTotalProfit = actualBonusEarned;
+        totalProfitAdjust += Math.abs(profitDiff);
+        totalSynced++;
+        needUpdate = true;
+      }
+
+      if (!needUpdate) continue;
+
+      await db.user.update({
+        where: { id: u.id },
+        data: {
+          ...(newMain !== u.mainBalance ? { mainBalance: newMain } : {}),
+          ...(newTotalProfit !== u.totalProfit ? { totalProfit: newTotalProfit } : {}),
+        },
+      });
+
+      console.log(
+        `[Profit Cleanup]   👉 User ${u.userId} (${u.name}): mainBalance ${formatRupiahSimple(u.mainBalance)} → ${formatRupiahSimple(newMain)} | totalProfit ${formatRupiahSimple(u.totalProfit)} → ${formatRupiahSimple(newTotalProfit)} | bonusEarned=${formatRupiahSimple(actualBonusEarned)}`,
+      );
+    } catch (e: any) {
+      const msg = `User ${u.id}: ${e.message}`;
+      report.errors.push(msg);
+      console.error(`[Profit Cleanup]   ❌ ${msg}`);
+    }
+  }
+
+  console.log(
+    `[Profit Cleanup]   ✅ STEP 5 done: mainBalance synced up for ${mainSynced} users (+${formatRupiahSimple(totalMainTopup)}), totalProfit aligned for ${totalSynced} users (adjusted ${formatRupiahSimple(totalProfitAdjust)})`,
   );
 }
 
@@ -464,6 +571,13 @@ export async function cleanupDuplicateProfits(): Promise<CleanupReport> {
   } catch (e: any) {
     report.errors.push(`STEP 4 failed: ${e.message}`);
     console.error('[Profit Cleanup] ❌ STEP 4 failed:', e.message);
+  }
+
+  try {
+    await syncBalancesToBonusLog(report);
+  } catch (e: any) {
+    report.errors.push(`STEP 5 failed: ${e.message}`);
+    console.error('[Profit Cleanup] ❌ STEP 5 failed:', e.message);
   }
 
   report.finishedAt = new Date();

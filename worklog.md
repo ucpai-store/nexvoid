@@ -5675,3 +5675,111 @@ Stage Summary:
 - ✅ Cleanup idempotent: safe untuk run multiple times
 - ✅ Cleanup konservatif: hanya kurangi over-credit, tidak auto-top-up
 - Saat deploy ke nexvo.id: PM2 akan restart cron-service, cleanup akan jalan otomatis dan hapus semua profit dobel/triple yang ada, koreksi balance user, dan lanjut dengan progres yang benar
+
+---
+Task ID: bonus-lost-fix-v3.3
+Agent: main (Z.ai Code)
+Task: User "bonus kok pada ilang m.profit.referal kok ilang gk masuk terus profit kok gk masuk saldo utama yang bener dong perbaiki tidak boleh ada penyakit lagi semua profit bonus masuk saldo utama" — bonus (matching + referral) hilang dari saldo utama, profit gak masuk mainBalance. Fix root cause, tidak boleh ada penyakit lagi.
+
+Work Log:
+- AUDIT semua helper bonus:
+  * src/lib/matching-bonus.ts (creditMatchingBonusOnProfit) — ✓ increment mainBalance + totalProfit + create BonusLog(matching)
+  * src/lib/referral-bonus.ts (creditInvestmentReferralBonusesTx) — ✓ increment mainBalance + totalProfit + create BonusLog(referral)
+  * src/lib/salary-bonus.ts (checkAndCreditSalaryBonus) — ✓ increment mainBalance + totalProfit + create BonusLog(salary)
+  * SEMUA helper sudah benar — bonus memang masuk mainBalance di code level
+
+- ROOT CAUSE DITEMUKAN: src/lib/profit-cleanup.ts STEP 4 (line 375-379 v3.2)
+  ```typescript
+  const profitAgg = await db.bonusLog.groupBy({
+    by: ['userId'],
+    where: { type: 'profit' },  // ← BUG: HANYA hitung type='profit'!
+    _sum: { amount: true },
+  });
+  ```
+  
+  STEP 4 hanya menghitung BonusLog.type='profit'. TAPI user juga dapat bonus:
+  - type='matching' (M.Profit) → increment mainBalance+totalProfit
+  - type='referral' → increment mainBalance+totalProfit
+  - type='salary' → increment mainBalance+totalProfit
+  
+  Semua bonus ini increment mainBalance+totalProfit di helper, TAPI STEP 4 menganggap
+  user "over-credited" karena expectedProfit (sum profit saja) < totalProfit (yang
+  include semua bonus). STEP 4 lalu SUBTRACT mainBalance sebesar bonus yang mereka
+  dapat → BONUS HILANG DARI SALDO UTAMA.
+  
+  Inilah "sumber penyakit" — setiap kali cron-service startup run cleanup (or admin
+  trigger /api/admin/profit-cleanup), semua user yang punya matching/referral/salary
+  bonus akan kehilangan bonus mereka dari mainBalance.
+
+- FIX v3.3 (STEP 4): include SEMUA bonus types yang credit mainBalance+totalProfit
+  ```typescript
+  const BONUS_TYPES_CREDIT_MAIN = ['profit', 'matching', 'referral', 'salary'];
+  const bonusAgg = await db.bonusLog.groupBy({
+    by: ['userId'],
+    where: { type: { in: BONUS_TYPES_CREDIT_MAIN } },
+    _sum: { amount: true },
+  });
+  ```
+  Sekarang STEP 4 compute expectedBonusTotal = sum(ALL bonus types), sehingga
+  user yang dapat matching/referral/salary bonus TIDAK dianggap over-credited.
+
+- FIX v3.3 (NEW STEP 5): syncBalancesToBonusLog() — recover lost bonuses
+  Untuk setiap user:
+  1. actualBonusEarned = sum(ALL bonus types from BonusLog)
+  2. expectedFloor = max(0, actualBonusEarned - totalWithdraw)
+  3. If mainBalance < expectedFloor: top up mainBalance (ONLY INCREASE — safe)
+  4. If totalProfit != actualBonusEarned: align totalProfit to BonusLog sum
+  
+  STEP 5 ini RECOVER bonus yang sudah hilang dari mainBalance karena OLD STEP 4 bug.
+  Idempotent — running twice is no-op. Per-user try/catch.
+
+- TEST 1: test-bonus-survival.ts
+  * Create user A: matching bonus Rp 5.000 (mainBalance=5000, totalProfit=5000, BonusLog matching=5000)
+  * Create user B: referral bonus Rp 10.000 (mainBalance=10000, totalProfit=10000, BonusLog referral=10000)
+  * Run cleanupDuplicateProfits()
+  * Verify: mainBalance + totalProfit TIDAK berubah (bonus preserved)
+  * RESULT: ✅ ALL PASS — bonus tidak hilang lagi
+
+- TEST 2: test-bonus-recovery.ts
+  * Create user C: matching Rp 5.000 credited BUT mainBalance=0 (simulated lost bonus)
+  * Create user D: referral Rp10.000 + profit Rp5.000 BUT mainBalance=5000 (should be 15000)
+  * Run cleanupDuplicateProfits() v3.3
+  * Verify: STEP 5 recover bonus ke mainBalance
+    - User C: mainBalance 0 → 5000 ✅
+    - User D: mainBalance 5000 → 15000 ✅
+  * RESULT: ✅ ALL PASS — bonus recovered ke saldo utama
+
+- ENVIRONMENT FIX: .env sudah include VAPID keys (web push untuk notifikasi HP)
+  * VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY + VAPID_SUBJECT configured
+  * /api/push/vapid-key returns valid public key
+  * PushNotificationManager auto-subscribe user saat login
+
+- VERIFIKASI via Agent Browser:
+  * Page render OK (NEXVO homepage)
+  * Login form visible
+  * /api/deploy-version → 200 OK
+  * /api/push/vapid-key → 200 OK dengan valid publicKey
+  * No "VAPID keys not configured" warning di log
+
+Stage Summary:
+- ✅ ROOT CAUSE FIXED: profit-cleanup.ts STEP 4 sekarang include SEMUA bonus types (profit+matching+referral+salary) — bonus TIDAK akan di-subtract lagi
+- ✅ NEW STEP 5: syncBalancesToBonusLog() — recover bonus yang sudah hilang dari mainBalance (under-credit drift fix)
+- ✅ TESTED: bonus matching + referral preserved setelah cleanup
+- ✅ TESTED: bonus yang hilang DAPAT di-recover ke mainBalance
+- ✅ VAPID env configured (untuk push notif ke HP)
+- ✅ Dev server stable, no compile error, page render OK
+
+IMPACT:
+- Setiap kali cron-service startup run cleanup, OR admin trigger /api/admin/profit-cleanup:
+  * OLD v3.2: bonus matching/referral/salary HILANG dari mainBalance
+  * NEW v3.3: bonus preserved + bonus yang hilang di-recover ke mainBalance
+- Semua profit + bonus (matching, referral, salary) sekarang MASUK SALDO UTAMA (mainBalance)
+- Idempotent — aman di-run berkali-kali
+
+USER ACTION untuk VPS:
+1. Deploy code baru ke VPS (git pull + build + restart)
+2. Trigger /api/admin/profit-cleanup (admin login required) — ini akan:
+   a. Run STEP 4 (fixed) — tidak akan subtract bonus lagi
+   b. Run STEP 5 (new) — recover semua bonus yang hilang ke mainBalance
+3. Refresh Asset page → bonus + profit sudah masuk saldo utama
+4. Profit jam 00:00 WIB berikutnya → masuk mainBalance + kirim push notif ke HP
