@@ -1,7 +1,10 @@
-// NEXVO Service Worker v30 - Force cache invalidation (fix teks-only bug from stale _next/static chunks)
-const CACHE_NAME = 'nexvo-v30';
+// NEXVO Service Worker v31 - Fix "Loading chunk XXXX failed" loop
+// Root cause: v30 navigation fallback `caches.match('/')` served STALE HTML
+// that referenced OLD chunk hashes → chunk 404 → infinite error loop.
+// Fix: (1) NO stale-HTML navigation fallback. (2) On _next/static 404, wipe
+// all caches + force-reload clients (new deploy happened, app is stale).
+const CACHE_NAME = 'nexvo-v31';
 
-// Core PWA assets to pre-cache for installability
 const PRECACHE_URLS = [
   '/manifest.webmanifest',
   '/icon-192x192.png',
@@ -15,7 +18,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_URLS).catch((err) => {
-        console.warn('[SW v30] Pre-cache failed for some URLs:', err);
+        console.warn('[SW v31] Pre-cache failed:', err);
       });
     }).then(() => self.skipWaiting())
   );
@@ -23,11 +26,23 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) => 
+    caches.keys().then((names) =>
       Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
     ).then(() => self.clients.claim())
   );
 });
+
+// Tell every controlled client to hard-reload (cache-busted).
+async function forceClientsReload() {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clients) {
+    try {
+      await client.navigate(client.url);
+    } catch (e) {
+      client.postMessage({ type: 'NEXVO_STALE_APP_RELOAD' });
+    }
+  }
+}
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
@@ -36,15 +51,22 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
 
-  // Navigation requests - network first, fallback to cached root
+  // Navigation requests — network first. NO stale-HTML fallback (v30 bug).
+  // Only fall back to cache if it's the EXACT same URL (genuine offline case).
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/'))
+      fetch(request).then((response) => {
+        if (response && response.ok && response.status < 500) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
+        }
+        return response;
+      }).catch(() => caches.match(request).then((cached) => cached || Response.error()))
     );
     return;
   }
 
-  // PWA critical assets (manifest, icons, sw) - cache first for installability
+  // PWA critical assets — cache first
   if (url.pathname.match(/\/icon-|manifest\.webmanifest|apple-touch|favicon|nexvo-logo|sw\.js/)) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -61,40 +83,62 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (_next/static/) - NETWORK FIRST (v30 fix: stale-while-revalidate was serving broken chunks from old deploys)
-  // Next.js uses content-hashed URLs so each deploy has new chunk names — safe to network-first.
+  // _next/static/ chunks — network first + 404 recovery.
+  // A 404 here means a new deploy changed chunk hashes → wipe caches + reload.
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
       fetch(request).then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return response;
+        }
+        if (response.status === 404) {
+          console.warn('[SW v31] Stale chunk 404 — purging + reloading:', url.pathname);
+          caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => {
+            forceClientsReload();
+          });
         }
         return response;
-      }).catch(() => caches.match(request))
+      }).catch(() => caches.match(request).then((cached) => cached || Response.error()))
     );
     return;
   }
 
-  // API requests - network only (no caching)
+  // API requests — network only
   if (url.pathname.startsWith('/api/')) {
     return;
   }
 
-  // Everything else - network first
+  // Everything else — network first
   event.respondWith(
     fetch(request).then((response) => {
+      if (response && response.ok) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+      }
       return response;
-    }).catch(() => caches.match(request))
+    }).catch(() => caches.match(request).then((cached) => cached || Response.error()))
   );
 });
 
-
+// Manual purge trigger (from page if needed)
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'NEXVO_PURGE_AND_RELOAD') {
+    caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => {
+      forceClientsReload();
+    });
+  }
+  if (data.type === 'NEXVO_SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // ──────────── Push Notification Handlers ────────────
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received:', event);
-  
+
   let data = {
     title: 'NEXVO',
     body: 'Anda memiliki notifikasi baru',
@@ -135,7 +179,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification click:', event);
-  
+
   event.notification.close();
 
   if (event.action === 'close') {
@@ -143,20 +187,16 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   const targetUrl = event.notification.data?.url || '/';
-  
+
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If there's already an open window, focus it and navigate
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           client.navigate(targetUrl);
           return client.focus();
         }
       }
-      // Otherwise open a new window
       return self.clients.openWindow(targetUrl);
     })
   );
 });
-
-
