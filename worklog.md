@@ -7342,3 +7342,49 @@ Stage Summary:
 - Deploy script sekarang self-verifying — kalau CSS 404, deploy bilang gagal
 - SW v33 self-destruct + CSS auto-heal detector sebagai safety net
 - Deploy command: bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/deploy-chunk-fix.sh?t=$(date +%s)")
+
+---
+Task ID: RESTORE-USERS-V2
+Agent: main (Z.ai Code)
+Task: User "kenapa data webkok kamu hilangkan kan udah ku suruh update tu fokus di perintah ni malah ilang jadi deploy lagi ni data akun biosa kembalikan" — restore 23 user data yang hilang setelah deploy.
+
+Work Log:
+- Investigasi: ternyata 2 script lama (restore-db.sh, fix-login.sh) PUNYA BUG serius:
+  1. Pakai field `phone` untuk query User — tapi schema User gak punya `phone`, yang ada `whatsapp`. Verify script akan crash.
+  2. restore-db.sh memanggil `bun run db:push` — ini BISA DROP DATA kalau schema DB backup beda dengan schema sekarang (Prisma push akan drop & recreate tabel yang mismatch).
+- HAPUS kedua script buggy itu (commit 264bb93).
+- CREATE restore-users.sh baru dengan defensive approach:
+  - STEP 0: auto-detect project path (/home/nexvo, /var/www/nexvo, /opt/nexvo, /srv/nexvo, /root/nexvo)
+  - STEP 1: cek current DB user count. Kalau >= 23 → SKIP RESTORE (data aman, cuma session expired). Tidak sentuh DB sama sekali.
+  - STEP 2-3: kalau < 23 user, scan backup di /home /root /tmp /var/backups /opt /srv — filter size>50KB + modified 60 hari
+  - STEP 4: rank backup by user count (prefer yang >=23), pakai field schema yang BENAR (whatsapp, bukan phone)
+  - STEP 5: BACKUP current DB dulu ke custom.db.pre-restore-<timestamp> (safety)
+  - STEP 6: stop PM2, copy backup → current DB
+  - TIDAK memanggil `bun run db:push` (bisa drop data)
+  - STEP 7: pastikan admin bisa login (create default admin/Admin@2024 kalau 0 admin)
+  - STEP 8: restart PM2
+  - STEP 9: verify final user count
+  - STEP 10: test admin login API
+- Verify syntax bash OK (`bash -n restore-users.sh`)
+- Verify Prisma client bisa query pakai datasource override (test di sandbox)
+- Verify script structure: 9 numbered sections, no `db:push` call, no `phone` field bug, has `whatsapp` field, has pre-restore backup safety, has ensure-admin step
+- Push ke GitHub (commit 264bb93), verified accessible di raw.githubusercontent.com
+- Tested flow simulation di sandbox: current DB = 1 user → triggered "need restore" branch correctly
+
+Stage Summary:
+- ✅ restore-users.sh committed & pushed (commit 264bb93)
+- ✅ Defensive: tidak akan destroy data tanpa backup; skip restore kalau data aman
+- ✅ Tidak panggil db:push (bisa drop data)
+- ✅ Pakai field schema yang benar (whatsapp)
+- ✅ Default admin fallback (admin/Admin@2024) kalau 0 admin
+- USER ACTION (jalankan di VPS nexvo.id):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-users.sh?t=$(date +%s)")
+- Script akan:
+  1. Cek current DB — kalau 23 user masih ada, bilang "data aman, skip restore"
+  2. Kalau < 23, scan backup di VPS, pilih yang paling banyak user
+  3. Backup current DB dulu (safety)
+  4. Restore dari backup terpilih
+  5. Pastikan admin bisa login
+  6. Restart PM2
+  7. Test login API
+- Kalau ternyata gak nemu backup 23 user di VPS, script akan exit 2 dengan pesan jelas — user harus register ulang (data memang tidak bisa di-restore tanpa backup).
