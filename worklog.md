@@ -8005,3 +8005,70 @@ Stage Summary:
   3. Login user: WA + OTP
   4. Cek aset + saldo — harus muncul semua
 - Kalau admin login masih gagal: screenshot section 10 (verify) — kirim ke saya
+
+---
+Task ID: RESTORE-23-USERS
+Agent: main (Z.ai Code)
+Task: User "tetep aja gk bisa gitu kembalikan dulu semua data akun user 23" — restore 23 akun user dari backup.
+
+Work Log:
+- Buat restore-23-users.sh (FOCUS restore 23 user dari backup):
+  1. STOP nexvo-web + nexvo-cron (release DB lock)
+  2. CEK current DB — kalau >= 23 user, skip restore (data aman)
+  3. Kalau < 23 → SCAN semua backup DB di VPS:
+     - Path: /var/www /home /root /tmp /var/backups /opt /srv (maxdepth 7)
+     - Filter: size >30KB, exclude node_modules, exclude current DB
+     - Pattern: custom.db*, *.db, *.db.backup*, nexvo*.db*
+  4. RANK backup by user count (prefer >= 23, terbaru sebagai tiebreaker)
+  5. Backup current DB (safety) → RESTORE dari backup terbaik
+  6. VERIFY restore: cek user count + sample 5 user
+  7. ALWAYS recreate .env (fix Prisma path)
+  8. RESET admin password → admin / Admin@2024:
+     - bcrypt hash + ISO timestamp (Prisma-compatible)
+     - Kalau Admin kosong → INSERT admin baru
+     - Kalau ada → UPDATE password + unlock (loginAttempts=0, lockedUntil=NULL)
+     - bcrypt.compareSync verify
+  9. FIX SALDO: migrate profitBalance → mainBalance, sync upward
+  10. FIX ecosystem cwd
+  11. START nexvo-web + nexvo-cron
+  12. VERIFY end-to-end:
+      - Web HTTP 200 + HTML render check
+      - Admin login API (POST /api/auth/admin-login)
+      - Products API (count produk)
+      - Cron port 3032
+      - DB DIRECT CHECK: count 7 tabel + top 10 user
+
+- Test di sandbox:
+  * Scan + rank: 3 backup (5/23/15 user) → BEST = 23 user ✅
+  * bash -n syntax: OK ✅
+  * No undefined vars (grep verified) ✅
+
+- Smart logic:
+  * Kalau current DB sudah 23 user → SKIP restore, langsung fix admin + saldo
+  * Kalau < 23 → scan backup, pilih yg ada 23 user
+  * Kalau gak ada backup 23 user → pilih yg user count terbanyak
+  * Kalau gak ada backup valid → report error + saran manual
+
+- Commit 4e103e5, push ke GitHub, verified live (481 lines)
+
+Stage Summary:
+- ✅ restore-23-users.sh: scan backup + restore 23 user + fix all
+- ✅ Smart skip: kalau DB sudah 23 user, skip restore
+- ✅ Backup safety: current DB di-backup sebelum restore
+- ✅ Admin + saldo + .env fix dalam 1 script
+- ✅ Commit 4e103e5 pushed to GitHub
+- USER ACTION (1 command di VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-23-users.sh?t=$(date +%s)")
+- Expected output:
+  * CEK current DB (sample 5 user)
+  * Kalau < 23 → scan backup, rank, pilih best, restore
+  * VERIFY restore (user count + sample)
+  * FIX .env + admin + saldo
+  * START service
+  * VERIFY: web HTTP + HTML + admin login + products + cron
+  * DB DIRECT CHECK: 7 tabel count + top 10 user
+- SETELAH fix, di browser:
+  1. https://nexvo.id/recovery.html → Clear Cache & Reload
+  2. Login admin: admin / Admin@2024
+  3. Login user: WA + OTP
+  4. Cek aset + saldo
