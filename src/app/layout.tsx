@@ -114,10 +114,12 @@ export default function RootLayout({
                 window.__nexvoCanInstall = false;
                 console.log('NEXVO: App installed!');
               });
+              // SW v33: self-destruct mode. Register once to let old SWs update,
+              // then it unregisters itself + wipes caches. After all users updated,
+              // this block can be removed.
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/sw.js', {scope:'/'}).then(function(reg) {
-                  console.log('NEXVO SW registered:', reg.scope);
-                  reg.update();
+                  console.log('NEXVO SW v33 (self-destruct) registered');
                 }).catch(function(err) {
                   console.log('NEXVO SW registration failed:', err);
                 });
