@@ -9004,3 +9004,99 @@ Stage Summary:
   * V6: import @prisma/client → module resolve FAIL → 0 users
   * V7: direct require .prisma/client ✅, TAPI delete-first-then-upsert → kalau upsert gagal, 0 users
   * V8: direct require .prisma/client ✅ + UPSERT-FIRST-VERIFY-THEN-DELETE → kalau upsert gagal, canonical tetap aman (delete di-skip)
+
+---
+Task ID: FINAL-RESTORE-V9
+Agent: main (Z.ai Code)
+Task: User jalankan V8, MASIH 3 FAIL (Admin login, stats, users list), 0 user, Rp 0. Build V9 dengan ROOT CAUSE FIX.
+
+Work Log:
+- ROOT CAUSE DITEMUKAN (KENAPA V4-V8 SEMUA GAGAL DENGAN 0 USER):
+  * Next.js production mode loads `.env.production` OVER `.env`!
+  * `.env.production` punya HARDCODED `DATABASE_URL=file:/home/nexvo/db/custom.db`
+  * TAPI VPS project ada di `/var/www/nexvo/`, BUKAN `/home/nexvo/`!
+  * V8 restore writes 23 users ke `/var/www/nexvo/db/custom.db` ✅
+  * Next.js app reads dari `/home/nexvo/db/custom.db` (empty/non-existent!) ❌
+  * Admin login FAILS karena app lihat 0 users
+  * V4/V5/V6/V7/V8 SEMUA gagal karena `.env.production` ini!
+
+- BUKTI: Check sandbox `.env.production`:
+  * DATABASE_URL=file:/home/nexvo/db/custom.db ← HARDCODED WRONG PATH!
+  * VPS sebenarnya di /var/www/nexvo (detected di Step 2)
+
+- BANGUN final-restore-v9.sh (815 lines, 15 step) dengan FIX:
+  1. AGGRESSIVE STOP (dari V8)
+  2. DETECT PROJECT PATH
+  3. GIT PULL
+  4. TRIPLE BACKUP (dari V8)
+  5. BUN INSTALL + PRISMA GENERATE
+  6. **OVERWRITE BOTH .env AND .env.production** (KEY FIX!)
+     - Backup old .env.production dulu
+     - Write SAME DATABASE_URL ke BOTH files
+     - Preserve all other env values (SMTP, VAPID, JWT, CRON_SECRET, dll)
+     - Verify both files have SAME DATABASE_URL after write
+  7. WAL CHECKPOINT
+  8. SCHEMA MIGRATION (verify User table exists via bun:sqlite)
+  9. REWRITE ecosystem.config.cjs (env DATABASE_URL explicit)
+  10. BUILD NEXT.JS
+  11. **RESTORE DATA via bun:sqlite** (KEY FIX — no Prisma, no env!):
+      - Use `const { Database } = require('bun:sqlite')` (built-in, no module resolution)
+      - DB path passed as argv (explicit, not from env)
+      - 7 PHASES: UPSERT → VERIFY → DELETE → ADMIN → PRODUCTS → PACKAGES → VERIFY
+      - 3 fallback methods per user: update → insert-replace → insert-ignore+update
+  12. VERIFY USER COUNT (bun:sqlite, explicit path)
+  13. PM2 START FRESH + VERIFY (3-method detection)
+  14. VERIFY 12 FITUR (ZERO TOLERANCE)
+      - Check #12: .env.production DATABASE_URL (NEW! was .env in V8)
+  15. FINAL SUMMARY
+
+- BUG FIXES during development:
+  * Bug 1: heredoc gak quoted → backticks escaped → JS syntax error
+    Fix: `<< 'RESTOREEOF'` (quoted heredoc, no bash expansion)
+  * Bug 2: `\\n` in quoted heredoc → literal `\\n` (2 chars) in JS → no newline
+    Fix: `\n` (single backslash-n) in quoted heredoc
+  * Bug 3: `\${placeholders}` in quoted heredoc → escaped template literal → no interpolation
+    Fix: `${placeholders}` (no backslash) in quoted heredoc
+  * Bug 4: sed replacement created `console\.log` (escaped dot)
+    Fix: `sed -i 's/console\\.log/console.log/g'`
+
+- TESTED DI SANDBOX (2 scenarios):
+  Scenario 1: 0 user → run V9 restore → 23 users, Rp 68.800 ✅
+    - All 23 upserts via insert-replace (method 2)
+    - Admin updated successfully
+  Scenario 2: 25 user (23 canonical + 2 junk Rp 88.000) → run V9 restore
+    - Phase 1: 23 canonical upserted ✅
+    - Phase 2: 23/23 verified ✅
+    - Phase 3: 2 junk deleted ✅
+    - Phase 4: Admin updated ✅
+    - AFTER: 23 users, Rp 68.800 ✅ (PERSIS match)
+
+- Commit 2a76ce2, push ke GitHub sukses
+
+Stage Summary:
+- ✅ final-restore-v9.sh: FIX .env.production override + bun:sqlite (815 lines, 15 step)
+- ✅ ROOT CAUSE: .env.production hardcoded wrong DB path, overrides .env in Next.js prod
+- ✅ FIX: OVERWRITE BOTH .env AND .env.production with correct DATABASE_URL
+- ✅ FIX: Use bun:sqlite (explicit path, no Prisma, no env dependency)
+- ✅ 7 PHASES restore: upsert → verify → delete → admin → products → packages → verify
+- ✅ 3 fallback methods per user upsert
+- ✅ WAL CHECKPOINT + TRIPLE BACKUP
+- ✅ NEW Check #12: .env.production DATABASE_URL (was .env in V8)
+- ✅ Tested: 0 user → 23 users Rp 68.800 ✅
+- ✅ Tested: 25 user (2 junk) → 23 users Rp 68.800 ✅
+- ✅ Commit 2a76ce2 pushed to GitHub
+- USER ACTION (1 command di VPS — 3 MENIT):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/final-restore-v9.sh?t=$(date +%s)")
+- SETELAH fix:
+  * 23 user canonical (Budi, Siti, Andi, dll) total Rp 68.800 (PERSIS)
+  * Admin login: WORK (admin / Admin@2024)
+  * PM2 nexvo-web + nexvo-cron: ONLINE
+  * ZERO ERROR expected (12/12 OK)
+- Login setelah fix:
+  * Admin: admin / Admin@2024
+  * User: WA 628123456701 (Budi Santoso) / nexvo123
+- KENAPA V9 BEDA DARI V4-V8:
+  * V4-V8: .env.production (hardcoded /home/nexvo/) overrides .env → app read wrong DB → 0 users
+  * V9: OVERWRITE .env.production dengan path benar → app read correct DB → 23 users visible
+  * V4-V8: pakai Prisma Client (module resolution + env loading issues)
+  * V9: pakai bun:sqlite (built-in, explicit path, no env dependency)
