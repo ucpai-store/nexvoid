@@ -13,7 +13,37 @@
  *
  * Cron service has special health check: if it stops responding,
  * PM2 will restart it automatically.
+ *
+ * NOTE: cwd is auto-detected — tries /var/www/nexvo, /home/nexvo, then __dirname.
+ * This ensures PM2 always runs in the correct project directory regardless of
+ * where the project was cloned on the VPS.
  */
+
+const path = require('path')
+const fs = require('fs')
+
+function detectCwd() {
+  const candidates = [
+    '/var/www/nexvo',
+    '/home/nexvo',
+    '/opt/nexvo',
+    '/srv/nexvo',
+    '/root/nexvo',
+    __dirname, // fallback: directory of this file
+  ]
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(path.join(c, 'package.json')) &&
+          fs.existsSync(path.join(c, 'db'))) {
+        return c
+      }
+    } catch {}
+  }
+  return __dirname
+}
+
+const CWD = detectCwd()
+const LOG_DIR = path.join(CWD, '.pm2-logs')
 
 module.exports = {
   apps: [
@@ -21,7 +51,7 @@ module.exports = {
       name: 'nexvo-web',
       script: 'bun',
       args: 'run start',
-      cwd: '/home/nexvo',
+      cwd: CWD,
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
@@ -31,8 +61,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: '3000',
       },
-      error_file: '/home/nexvo/.pm2-logs/nexvo-web-error.log',
-      out_file: '/home/nexvo/.pm2-logs/nexvo-web-out.log',
+      error_file: path.join(LOG_DIR, 'nexvo-web-error.log'),
+      out_file: path.join(LOG_DIR, 'nexvo-web-out.log'),
       merge_logs: true,
       time: true,
       // Restart policy
@@ -46,7 +76,7 @@ module.exports = {
       name: 'nexvo-cron',
       script: 'bun',
       args: 'run cron-service.ts',
-      cwd: '/home/nexvo',
+      cwd: CWD,
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
@@ -56,8 +86,8 @@ module.exports = {
         NODE_ENV: 'production',
         CRON_PORT: '3032',
       },
-      error_file: '/home/nexvo/.pm2-logs/nexvo-cron-error.log',
-      out_file: '/home/nexvo/.pm2-logs/nexvo-cron-out.log',
+      error_file: path.join(LOG_DIR, 'nexvo-cron-error.log'),
+      out_file: path.join(LOG_DIR, 'nexvo-cron-out.log'),
       merge_logs: true,
       time: true,
       // Restart policy — be more aggressive for cron (critical service)

@@ -1,32 +1,80 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import path from 'path'
+import fs from 'fs'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-function createPrismaClient(): PrismaClient {
-  let connectionString = process.env.DATABASE_URL
+/**
+ * Resolve the SQLite database file path using a bulletproof strategy.
+ *
+ * Priority order (first EXISTING file with data wins):
+ *   1. DATABASE_URL env var (if its file exists)
+ *   2. /var/www/nexvo/db/custom.db  (VPS production - CyberPanel/Hostinger)
+ *   3. /home/nexvo/db/custom.db     (VPS alt path)
+ *   4. <cwd>/db/custom.db           (local dev / fallback)
+ *
+ * This ensures the app ALWAYS connects to a DB that has real data,
+ * even if .env.production points to a wrong/non-existent path.
+ */
+function resolveDatabasePath(): string {
+  const envUrl = process.env.DATABASE_URL
 
-  // If DATABASE_URL is not set, fall back to a default SQLite path at <cwd>/db/custom.db.
-  // This makes the app resilient even if .env is missing at runtime (e.g. on a fresh VPS
-  // where someone forgot to run setup-env, or if .env was accidentally deleted).
-  // scripts/setup-env.mjs normally creates .env automatically, but this is a safety net.
-  if (!connectionString) {
-    const fallbackPath = path.resolve(process.cwd(), 'db', 'custom.db')
-    connectionString = `file:${fallbackPath}`
-    console.warn(`[DB] DATABASE_URL not set — falling back to ${connectionString}. Run 'bun run db:push' to initialize the schema.`)
+  // Build candidate list (deduped, preserving order)
+  const seen = new Set<string>()
+  const candidates: string[] = []
+
+  const add = (p: string | null | undefined) => {
+    if (!p) return
+    const norm = path.resolve(p)
+    if (!seen.has(norm)) {
+      seen.add(norm)
+      candidates.push(norm)
+    }
   }
+
+  // 1. Env var path
+  if (envUrl && envUrl.startsWith('file:')) {
+    add(envUrl.replace(/^file:/, ''))
+  }
+
+  // 2-3. Known VPS paths
+  add('/var/www/nexvo/db/custom.db')
+  add('/home/nexvo/db/custom.db')
+
+  // 4. CWD fallback
+  add(path.resolve(process.cwd(), 'db', 'custom.db'))
+
+  // Pick the first candidate that exists as a non-empty file
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p) && fs.statSync(p).size > 0) {
+        if (envUrl && path.resolve(envUrl.replace(/^file:/, '')) !== p) {
+          console.warn(`[DB] DATABASE_URL points to a missing/empty file. Using existing DB at: ${p}`)
+        }
+        return `file:${p}`
+      }
+    } catch {
+      // ignore stat errors
+    }
+  }
+
+  // Nothing exists yet — use env if set, otherwise cwd fallback (will be created)
+  if (envUrl) return envUrl
+  const fallback = path.resolve(process.cwd(), 'db', 'custom.db')
+  console.warn(`[DB] No existing DB found. Will use: file:${fallback}`)
+  return `file:${fallback}`
+}
+
+function createPrismaClient(): PrismaClient {
+  const connectionString = resolveDatabasePath()
 
   const isPostgreSQL = connectionString.startsWith('postgresql://') || connectionString.startsWith('postgres://')
 
-  // For Neon PostgreSQL on Vercel, use the pooled connection string with pgBouncer mode
-  // For SQLite locally, use the standard client
   const clientOptions: Prisma.PrismaClientOptions = {}
 
   if (isPostgreSQL) {
-    // Neon pooler URL already ends in -pooler, so we can use it directly
-    // Add pgBouncer mode for serverless compatibility
     let url = connectionString
     if (!url.includes('pgbouncer=true') && !url.includes('channel_binding')) {
       url += (url.includes('?') ? '&' : '?') + 'pgbouncer=true'
