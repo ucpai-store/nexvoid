@@ -7388,3 +7388,69 @@ Stage Summary:
   6. Restart PM2
   7. Test login API
 - Kalau ternyata gak nemu backup 23 user di VPS, script akan exit 2 dengan pesan jelas — user harus register ulang (data memang tidak bisa di-restore tanpa backup).
+
+---
+Task ID: RESTORE-USERS-V2-BUNSQLITE
+Agent: main (Z.ai Code)
+Task: User upload screenshot — restore-users.sh v1 gagal di VPS dengan error "Cannot find module '.prisma/client/default' from '/root/.bun/install/cache/@prisma/client@7.8.0@@1/default.js'". DB file 319KB confirmed ada. 8 backup candidate ditemukan tapi gak bisa di-query.
+
+Work Log:
+- Analyze screenshot via VLM:
+  * Project path terdeteksi: /var/www/nexvo
+  * Current DB: /var/www/nexvo/db/custom.db (319488 bytes) — DATA KEMUNGKINAN BESAR MASIH ADA (319KB > 50KB empty DB)
+  * 8 backup candidates ditemukan di:
+    - /home/z/my-project/db/custom.db (712KB) [aneh — sandbox path, mungkin VLM salah baca atau VPS punya path ini juga]
+    - /root/nexvo/.next/standalone/db/custom.db (307KB)
+    - /root/nexvo/db.db.backup-restore-20260625-032349 (282KB)
+    - /root/nexvo/db/custom.db.backup-restore-20260626-132452 (307KB)
+    - /root/nexvo/db/custom.db.backup-restore-20260625-040112 (282KB)
+    - /root/nexvo/db/custom.db.backup-restore-20260625-033603 (282KB)
+    - /root/nexvo/db/custom.db.backup-restore-20260626-125340 (299KB)
+    - /root/nexvo/db/custom.db (323KB) — paling besar di /root/nexvo
+  * Error: bun cache punya @prisma/client@7.8.0 tapi project pakai @prisma/client@6.x → module resolve gagal
+
+- ROOT CAUSE: Prisma client module resolution bug di VPS — bun install cache conflict antar prisma version
+- SOLUTION: Rewrite restore-users.sh pakai `bun:sqlite` built-in (gak perlu Prisma sama sekali)
+
+- Test bun:sqlite di sandbox:
+  * Bisa baca User, Admin, Deposit, Withdrawal, Investment tables
+  * User count query works
+  * Sample user query works
+  * Sample: TEST001 | 62800000001 | test@nexvo.com | Test User | Bronze | Rp68800 | 2026-07-01
+
+- Test ranker:
+  * Sort by users desc, then mtime desc
+  * Prefer backup dengan >=23 user
+  * Output: best backup file path
+
+- Test ensure-admin:
+  * bcryptjs berhasil di-import & hash password
+  * Bisa cek kolom tabel Admin via PRAGMA table_info (idempotent)
+  * Create admin baru dengan kolom lengkap (id, username, email, password, role, createdAt, updatedAt)
+  * Logic reset password admin pertama ke Admin@2024 kalau admin sudah ada
+
+- Rewrote restore-users.sh v2 (commit c58e6f3):
+  * Pakai bun:sqlite (NO PRISMA)
+  * Query User count via SQL langsung
+  * Rank backup by user count
+  * Backup current DB ke custom.db.pre-restore-<ts> sebelum overwrite
+  * Stop PM2 → copy backup → restart PM2
+  * Pastikan admin bisa login (create atau reset password)
+  * Test login API
+
+- Verified syntax OK (bash -n)
+- Push ke GitHub (commit c58e6f3), confirmed live di raw.githubusercontent.com
+
+Stage Summary:
+- ✅ restore-users.sh v2 (bun:sqlite) — bypass Prisma module cache bug
+- ✅ Commit c58e6f3 pushed to GitHub
+- ✅ Verified sandbox: bun:sqlite bisa query User/Admin tables, ranker works, ensure-admin works
+- ✅ Current DB VPS 319KB — kemungkinan besar data 23 user masih ada (cuma session expired)
+- USER ACTION (jalankan ulang di VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-users.sh?t=$(date +%s)")
+- Expected outcome:
+  1. Step 1: cek current DB 319KB → query user count
+  2. Kalau >=23 user → SKIP RESTORE (data aman), lanjut fix admin + restart
+  3. Kalau <23 user → scan 8 backup, pilih yang paling banyak user, restore
+  4. Reset password admin pertama ke Admin@2024
+  5. Restart PM2, test login API
