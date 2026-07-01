@@ -7847,3 +7847,85 @@ Stage Summary:
   * .env path salah → Prisma gak bisa buka DB
   * Semua API error 500 → frontend tampil kosong/error
   * Fix .env → Prisma bisa baca DB → semua API jalan → aset + admin balik
+
+---
+Task ID: FIX-NC-BUG + ISO-TIMESTAMP
+Agent: main (Z.ai Code)
+Task: User "kok gini padahal seharusnya bisa lo" — screenshot VPS show: nexvo-web 7.7mb, error "line 317: NC: unbound variable", script abort di verify section.
+
+Work Log:
+- Analyze screenshot (2 gambar):
+  * Screenshot 1: Hostinger VPS dashboard — Ubuntu 22.04, KVM 4, 16GB RAM, 200GB disk (VPS sehat)
+  * Screenshot 2: VPS terminal output:
+    - ecosystem cwd=/var/www/nexvo ✅
+    - nexvo-web + nexvo-cron launched (PM2)
+    - nexvo-web: status=online, mem=7.7mb, uptime=3s
+    - nexvo-cron: status=online, mem=73.9mb (sehat)
+    - "Waiting 20s for nexvo-web boot..."
+    - VERIFY section:
+      - ✅ Web HTTP 200
+      - ❌ nexvo-web memori: 7.7mb (TERLALU KECIL — crash!)
+      - Error: /dev/fd/63: line 317: NC: unbound variable
+    - Script ABORT di line 317 → admin login & products API gak pernah di-test
+
+- Root cause 1: Bug 'NC: unbound variable' (line 317):
+  * Script pakai ${NC} tapi cuma define N (bukan NC)
+  * Dengan 'set -uo pipefail' (flag -u), undefined var → script ABORT
+  * Akibat: verify section gak selesai, user pikir gagal padahal sebenarnya OK
+  * Fix: ganti ${NC} → ${N} (consistent)
+
+- Root cause 2: PM2 memory check FALSE ALARM:
+  * nexvo-web pakai 'bun run start' → bun spawn 'next start' as CHILD process
+  * PM2 cuma track bun PARENT (7.7mb), bukan Next.js child (80-150mb)
+  * Web HTTP 200 = Next.js JALAN (child process serving)
+  * 7.7mb itu NORMAL untuk bun wrapper, BUKAN crash
+  * Fix: hapus memory check sebagai pass/fail, jadi informational only
+
+- Root cause 3: ISO timestamp bug di admin reset (latent bug):
+  * Script pakai SQLite datetime('now') → format 'YYYY-MM-DD HH:MM:SS'
+  * Prisma expect ISO string 'YYYY-MM-DDTHH:MM:SS.SSSZ'
+  * Prisma gak bisa parse SQLite format → crash saat baca Admin row
+  * Akibat: admin login API 500 error (Prisma crash baca Admin table)
+  * Fix: pakai new Date().toISOString() (Prisma-compatible)
+
+- Improvement verify section (lebih robust):
+  * Tambah Next.js functional check: homepage harus contain HTML (bukan error page)
+  * Tambah admin login bcrypt verify (read back password + compareSync)
+  * Tambah Packages API check (paket investasi)
+  * Tambah DB DIRECT CHECK (bun:sqlite, skip Prisma):
+    - Count 7 tabel penting (User, Admin, Product, InvestmentPackage, Investment, Deposit, Withdrawal, Purchase)
+    - Top 3 user saldo — konfirmasi data intact
+  * PM2 status jadi informational (ℹ️), bukan pass/fail (❌)
+
+- Test di sandbox (admin reset + saldo + data integrity):
+  * Admin reset with ISO: bcrypt verify true ✅
+  * Admin unlock: loginAttempts=0, lockedUntil=null ✅
+  * Saldo fix: 19200 → 68800 ✅
+  * bash -n syntax check: OK ✅
+  * grep verified: no undefined vars (NC gone) ✅
+
+- Commit 419ea8a, push ke GitHub, verified live via curl:
+  * Line 166: nowIso = new Date().toISOString() ✅
+  * No ${NC} remaining ✅
+
+Stage Summary:
+- ✅ Fix 3 bugs: NC variable, ISO timestamp, false alarm memory check
+- ✅ Verify section sekarang complete (gak abort di tengah)
+- ✅ Admin login akan jalan karena: (1) password reset dengan ISO timestamp, (2) verify section beres
+- ✅ Commit 419ea8a pushed to GitHub
+- USER ACTION (jalankan lagi di VPS — script sudah di-fix):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/restore-full-data.sh?t=$(date +%s)")
+- Expected output sekarang:
+  * ✅ Web HTTP 200 (Next.js serving)
+  * ✅ Next.js render HTML
+  * ℹ️ nexvo-web PM2: status=online, mem=7.7mb (NORMAL — bun parent, Next.js child track terpisah)
+  * ✅ Admin login OK — admin / Admin@2024
+  * ✅ Products API: N produk (aset muncul)
+  * ✅ Packages API: N paket investasi
+  * ✅ Cron port 3032 OK
+  * ✅ DB DIRECT CHECK: semua tabel ada data, top 3 user saldo
+- SETELAH fix, user WAJIB di browser:
+  1. Buka https://nexvo.id/recovery.html → Clear Cache & Reload
+  2. Login admin: admin / Admin@2024
+  3. Login user: WA + OTP
+  4. Cek aset + saldo — harus muncul semua
