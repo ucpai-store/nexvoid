@@ -7715,3 +7715,66 @@ Stage Summary:
   3. Login ulang
   4. Cek saldo utama — harus = totalProfit - totalWithdraw (68.800)
 - Kalau gak clear cache browser, saldo lama 19.200 masih akan tampil walau DB sudah 68.800
+
+---
+Task ID: FIX-SALDO-SIMPLE
+Agent: main (Z.ai Code)
+Task: User "kok malah gini aku kan minta benerin saldo nya" — screenshot VPS show error: nexvo-web mem 7.6mb (crash), Prisma "Unable to open database file", admin login gagal, profit-force HTTP 500. Script fix-saldo-deploy.sh sebelumnya terlalu rumit & bikin error baru.
+
+Work Log:
+- Analyze screenshot user (VPS terminal output):
+  * nexvo-web memori: 7.6mb (TERLALU KECIL = crash, Next.js butuh 80mb+)
+  * Prisma error: "Unable to open the database file" (code 14)
+  * Admin login gagal, Profit-force HTTP 500
+  * RINGKASAN script claim sukses tapi verify sebenarnya gagal
+
+- Root cause analysis:
+  * Script fix-saldo-deploy.sh terlalu rumit: build + git pull + profit-force API call
+  * Build step bikin .next regenerate, Prisma client ke-lose path DB
+  * .env mungkin path salah (setup-env.mjs cuma create kalau gak ada, gak fix kalau salah)
+  * profit-force API call gagal karena Prisma gak bisa baca DB
+
+- Buat fix-saldo-simple.sh (SIMPLE, ROBUST):
+  * STOP nexvo-web + nexvo-cron (release DB lock)
+  * ALWAYS recreate .env dengan DATABASE_URL absolut yang BENAR
+    (ini fix Prisma "Unable to open database file")
+  * Backup DB (safety)
+  * Fix saldo via bun:sqlite (NO PRISMA):
+    - FIX 1: Migrate profitBalance -> mainBalance (DULUAN!)
+    - FIX 2: Sync mainBalance upward = MAX(0, totalProfit - totalWithdraw)
+    - FIX 3: Reset profitBalance = 0
+  * Fix ecosystem.config.cjs cwd
+  * START nexvo-web + nexvo-cron
+  * Verify: web HTTP, nexvo-web memory > 20mb, admin login (DB readable), cron port
+  * TIDAK ada build, TIDAK ada git pull, TIDAK ada profit-force API call
+
+- Test fix logic di sandbox (5 test cases):
+  * User 1 (screenshot case): main=19200, profit=68800, withdraw=0 -> 68800 ✅
+  * User 2 (profitBalance migrate): main=5000, profit=15000, profitBal=3000 -> 15000 ✅
+  * User 3 (withdraw): main=30000, profit=80000, withdraw=20000 -> 60000 ✅
+  * User 4 (sudah ok): main=10000, profit=10000 -> 10000 ✅ (no change)
+  * User 5 (main > expected): main=5000, profit=10000, withdraw=8000 -> 5000 ✅ (jangan turun!)
+
+- Bug ditemukan & di-fix: ORDER matters!
+  * WRONG: sync upward DULU, migrate profitBalance KEDUA -> mainBalance jadi 18000 (exceed expected)
+  * CORRECT: migrate profitBalance DULU, sync upward KEDUA -> mainBalance = 15000 (correct)
+  * Invariant: mainBalance >= MAX(0, totalProfit - totalWithdraw) DAN profitBalance == 0
+  * Gak pernah turunkan mainBalance (jangan curi uang user)
+
+- Commit 92591e6, push ke GitHub, verified live via curl
+
+Stage Summary:
+- ✅ fix-saldo-simple.sh: SIMPLE script (332 lines) — no build, no git pull, no API
+- ✅ Fix 2 root cause: .env path (Prisma error) + DB saldo drift
+- ✅ Test 5 cases passed di sandbox (termasuk screenshot case 19200 -> 68800)
+- ✅ Commit 92591e6 pushed to GitHub
+- USER ACTION (1 command di VPS):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/fix-saldo-simple.sh?t=$(date +%s)")
+- SETELAH fix, user WAJIB di browser:
+  1. Buka https://nexvo.id/recovery.html
+  2. Klik 'Clear Cache & Reload'
+  3. Login ulang
+  4. Cek saldo utama — harus = 68.800
+- Kenapa script ini beda dari sebelumnya:
+  * Sebelumnya: build + git pull + profit-force API -> error berantakan
+  * Sekarang: STOP -> fix .env -> fix DB -> START -> verify. Simple & robust.
