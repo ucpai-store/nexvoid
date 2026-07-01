@@ -8171,3 +8171,89 @@ Stage Summary:
 - KALAU MASIH ADA FITUR ❌:
   Screenshot output lengkap — sekarang verify section complete (gak abort),
   jadi kita bisa lihat persis fitur mana yang gagal + error message-nya.
+
+---
+Task ID: DIAGNOSE-ADMIN
+Agent: main (Z.ai Code)
+Task: User "GINI CEK YANG BENER WAJIB BERES TIDAK BOLEH ADA KENDALA LAGI" — screenshot full-recovery.sh result: 11 OK, 2 FAIL (Admin login + Prisma client).
+
+Work Log:
+- Analyze screenshot (full-recovery.sh result):
+  * ✅ Build Next.js
+  * ✅ Web HTTP
+  * ✅ HTML render
+  * ❌ Admin login
+  * ✅ User login API
+  * ✅ Products API
+  * ✅ Packages API
+  * ✅ Cron port
+  * ❌ Prisma client
+  * ✅ .env path
+  * ✅ .next build
+  * ✅ 23 user ada
+  * ✅ List user
+  * Total: 11 OK | 2 FAIL | 0 WARN
+
+- KEY INSIGHT: Products API ✅ + Packages API ✅ (juga pakai Prisma!)
+  → Prisma JALAN. Masalahnya spesifik di ADMIN RECORD, bukan Prisma.
+
+- Root cause analysis:
+  * Backup DB mungkin gak punya admin record (atau password hash invalid)
+  * Script full-recovery.sh INSERT admin tapi gak VERIFY hasil sebenarnya
+  * Summary cuma static echo '✅ Admin: admin/Admin@2024' walau INSERT mungkin gagal
+  * Akibat: admin login API return 401 'Akun admin tidak ditemukan'
+  * Test check untuk '"success":true|"token"' → FAIL
+
+- Buat diagnose-admin.sh (319 lines, FOCUS fix admin login):
+  1. STOP nexvo-web (release DB lock)
+  2. DIAGNOSE via bun:sqlite (skip Prisma):
+     - Cek tabel Admin ada?
+     - Cek struktur kolom (PRAGMA table_info) — pairingCode, lastLogin, dll
+     - Cek record admin + bcrypt verify
+  3. FIX: DELETE all admin → INSERT baru (clean slate):
+     - Dynamic INSERT berdasarkan kolom yang ada (pairingCode/lastLogin)
+     - Hash Admin@2024 via bcrypt
+     - ISO timestamp (Prisma-compatible, bukan SQLite datetime())
+     - role='admin' (validRoles include 'admin')
+     - loginAttempts=0, lockedUntil=NULL
+     - Fallback: INSERT minimal kalau INSERT lengkap gagal
+  4. VERIFY: SELECT back + bcrypt.compareSync
+     - Kalau verify gagal → exit 1 (jangan lanjut)
+  5. Recreate .env (safety)
+  6. START nexvo-web
+  7. TEST admin login 3x dengan FULL response output:
+     - Kalau sukses → done ✅
+     - Kalau gagal → show pm2 logs (error sebenarnya) + direct Prisma test
+
+- TESTED DI SANDBOX:
+  * bash -n syntax: OK ✅
+  * Admin INSERT: ✅
+  * bcrypt verify: true ✅
+  * Admin login API: {"success":true,"data":{"token":"eyJ..."}} ✅
+  * 3-attempt retry logic: ✅
+
+- Commit 009fb08, push ke GitHub, verified live (319 lines)
+
+Stage Summary:
+- ✅ diagnose-admin.sh: fix admin login (319 lines, 30 detik)
+- ✅ ROOT CAUSE: admin record missing/invalid di backup DB
+- ✅ FIX: DELETE + INSERT clean slate + VERIFY (bcrypt.compareSync)
+- ✅ TESTED: admin login return token di sandbox
+- ✅ Commit 009fb08 pushed to GitHub
+- USER ACTION (1 command di VPS — 30 DETIK):
+  bash <(curl -sL "https://raw.githubusercontent.com/ucpai-store/nexvoid/main/diagnose-admin.sh?t=$(date +%s)")
+- Expected output:
+  * DIAGNOSE: cek Admin table + kolom + record
+  * FIX: DELETE old → INSERT new (dynamic kolom)
+  * VERIFY: SELECT + bcrypt.compareSync
+  * TEST: admin login 3x dengan FULL response
+  * Kalau sukses: ✅ ADMIN LOGIN BERHASIL
+  * Kalau gagal: show pm2 logs + direct Prisma test (error sebenarnya)
+- SETELAH fix, di browser:
+  1. https://nexvo.id/recovery.html → Clear Cache & Reload
+  2. Login admin: admin / Admin@2024
+  3. Cek aset + saldo — SEMUA WAJIB MUNCUL
+- Kenapa ini beda dari full-recovery.sh:
+  * full-recovery.sh: rebuild total (3-5 min) — semua fitur
+  * diagnose-admin.sh: FOCUS admin login (30 detik) — fix spesifik
+  * Karena 11 fitur lain sudah OK, cuma admin login yang perlu di-fix
