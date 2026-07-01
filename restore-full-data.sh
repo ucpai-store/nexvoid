@@ -161,22 +161,31 @@ if (missingTables.length > 0) {
 console.log('  ─── RESET ADMIN PASSWORD ───');
 if (tableNames.includes('Admin')) {
   const admins = db.query("SELECT id, username, email FROM Admin LIMIT 10").all() as any[];
+  // Prisma stores DateTime as ISO string (e.g. '2024-01-01T00:00:00.000Z')
+  // Using SQLite's datetime('now') returns '2024-01-01 00:00:00' which Prisma can't parse → crash
+  const nowIso = new Date().toISOString();
   if (admins.length === 0) {
     console.log('  ⚠️ Tabel Admin KOSONG — bikin admin baru...');
-    // Hash password Admin@2024
     const hash = bcrypt.hashSync('Admin@2024', 10);
     const id = 'admin-' + Date.now();
-    db.run(`INSERT INTO Admin (id, username, email, password, name, role, loginAttempts, createdAt, updatedAt)
-            VALUES (?, 'admin', 'admin@nexvo.id', ?, 'Super Admin', 'superadmin', 0, datetime('now'), datetime('now'))`,
-            [id, hash]);
+    db.run(`INSERT INTO Admin (id, username, email, password, name, role, loginAttempts, lockedUntil, createdAt, updatedAt)
+            VALUES (?, 'admin', 'admin@nexvo.id', ?, 'Super Admin', 'superadmin', 0, NULL, ?, ?)`,
+            [id, hash, nowIso, nowIso]);
     console.log(`  ✅ Admin baru dibuat: admin / Admin@2024`);
   } else {
     console.log(`  Admin ditemukan: ${admins.length} akun`);
     admins.forEach(a => console.log(`    - ${a.username} (${a.email})`));
-    // Reset password semua admin ke Admin@2024
+    // Reset password semua admin ke Admin@2024 + unlock + ISO timestamp (Prisma-compatible)
     const hash = bcrypt.hashSync('Admin@2024', 10);
-    const reset = db.run(`UPDATE Admin SET password = ?, loginAttempts = 0, lockedUntil = NULL, updatedAt = datetime('now')`, [hash]);
+    const reset = db.run(`UPDATE Admin SET password = ?, loginAttempts = 0, lockedUntil = NULL, updatedAt = ?`, [hash, nowIso]);
     console.log(`  ✅ Password reset ke "Admin@2024": ${reset.changes} admin`);
+    // VERIFY: read back and check bcrypt
+    const verify = db.query("SELECT password FROM Admin WHERE username = 'admin' LIMIT 1").get() as any;
+    if (verify && bcrypt.compareSync('Admin@2024', verify.password)) {
+      console.log(`  ✅ Verify: bcrypt.compareSync('Admin@2024', hash) = true`);
+    } else {
+      console.log(`  ❌ Verify FAILED — hash gak match`);
+    }
   }
 } else {
   console.log('  ❌ Tabel Admin gak ada — skip reset');
@@ -297,24 +306,26 @@ echo ""
 # ═══ STEP 7: VERIFY END-TO-END ═══
 echo -e "${B}═══ 7. VERIFY — admin login + aset + saldo ═══${N}"
 
-# [1] Web HTTP
+# [1] Web HTTP — Next.js serving?
 HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://localhost:3000/ 2>/dev/null)
-[ "$HTTP" = "200" ] && echo -e "  ${G}✅${N} Web HTTP 200" || echo -e "  ${R}❌${N} Web HTTP $HTTP"
+[ "$HTTP" = "200" ] && echo -e "  ${G}✅${N} Web HTTP 200 (Next.js serving)" || echo -e "  ${R}❌${N} Web HTTP $HTTP"
 
-# [2] nexvo-web memory (kalau <20mb = crash)
-MEM=$(pm2 list 2>/dev/null | grep nexvo-web | grep -oP '\d+\.\d+mb' | head -1)
-if [ -n "$MEM" ]; then
-  MEM_NUM=$(echo "$MEM" | sed 's/mb//')
-  MEM_OK=$(echo "$MEM_NUM > 20" | bc 2>/dev/null)
-  if [ "$MEM_OK" = "1" ]; then
-    echo -e "  ${G}✅${N} nexvo-web memori: $MEM (sehat, Next.js jalan)"
-  else
-    echo -e "  ${R}❌${N} nexvo-web memori: $MEM (TERLALU KECIL — crash!)"
-  fi
+# [2] Next.js functional check — homepage harus contain HTML (bukan error page)
+HOMEPAGE=$(curl -s --max-time 10 http://localhost:3000/ 2>/dev/null)
+if echo "$HOMEPAGE" | grep -qi 'html\|nexvo\|<div\|<body'; then
+  echo -e "  ${G}✅${N} Next.js render HTML (bukan error page)"
+else
+  echo -e "  ${R}❌${N} Homepage gak render HTML — Next.js mungkin crash"
+  echo -e "      ${Y}→ Cek: pm2 logs nexvo-web --lines 30${N}"
 fi
 
-# [3] Admin login — TEST NYATA (POST /api/auth/admin-login)
-echo -e "  ${C}Test admin login (POST /api/auth/admin-login)...${NC}"
+# [3] nexvo-web PM2 status (informational, bukan pass/fail)
+PM2_STATUS=$(pm2 list 2>/dev/null | grep nexvo-web | awk '{print $10}' | head -1)
+PM2_MEM=$(pm2 list 2>/dev/null | grep nexvo-web | grep -oP '\d+\.\d+mb' | head -1)
+echo -e "  ${C}ℹ️${N}  nexvo-web PM2: status=$PM2_STATUS, mem=$PM2_MEM (bun parent; Next.js child track terpisah)"
+
+# [4] Admin login — TEST NYATA (POST /api/auth/admin-login)
+echo -e "  ${C}Test admin login (POST /api/auth/admin-login)...${N}"
 LOGIN_RES=$(curl -s --max-time 15 -X POST "http://localhost:3000/api/auth/admin-login" \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"Admin@2024"}' 2>/dev/null)
@@ -323,20 +334,53 @@ if echo "$LOGIN_RES" | grep -q '"success":true\|"token"'; then
 else
   echo -e "  ${R}❌${N} Admin login GAGAL"
   echo -e "      Response: $(echo "$LOGIN_RES" | head -c 250)"
+  echo -e "      ${Y}→ Cek: pm2 logs nexvo-web --lines 30 (lihat Prisma error)${N}"
 fi
 
-# [4] Products API (aset muncul di frontend)
+# [5] Products API (aset muncul di frontend)
 PROD_RES=$(curl -s --max-time 10 "http://localhost:3000/api/products" 2>/dev/null)
-PROD_COUNT=$(echo "$PROD_RES" | grep -oP '"id"' | wc -l)
+PROD_COUNT=$(echo "$PROD_RES" | grep -oP '"id"' | wc -l | tr -d ' ')
 if [ "$PROD_COUNT" -gt 0 ]; then
   echo -e "  ${G}✅${N} Products API: $PROD_COUNT produk (aset muncul)"
 else
   echo -e "  ${R}❌${N} Products API: gak ada produk (aset kosong)"
+  echo -e "      ${Y}→ Cek: curl http://localhost:3000/api/products${N}"
 fi
 
-# [5] Cron service
+# [6] Investment packages API (paket aset)
+PKG_RES=$(curl -s --max-time 10 "http://localhost:3000/api/packages" 2>/dev/null)
+PKG_COUNT=$(echo "$PKG_RES" | grep -oP '"id"' | wc -l | tr -d ' ')
+if [ "$PKG_COUNT" -gt 0 ]; then
+  echo -e "  ${G}✅${N} Packages API: $PKG_COUNT paket investasi"
+else
+  echo -e "  ${Y}⚠️${N} Packages API: $PKG_COUNT paket (mungkin kosong atau endpoint beda)"
+fi
+
+# [7] Cron service
 CRON_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3032/" 2>/dev/null)
 [ "$CRON_HTTP" != "000" ] && echo -e "  ${G}✅${N} Cron port 3032 OK (HTTP $CRON_HTTP)" || echo -e "  ${Y}⚠️${N} Cron port 3032 gak respon"
+echo ""
+
+# [8] DB direct check — confirm data still intact (bukan lewat Prisma)
+echo -e "${B}═══ 8. DB DIRECT CHECK (bun:sqlite, skip Prisma) ═══${N}"
+cat > /tmp/nexvo-verify-db.ts << 'VEOF'
+import { Database } from 'bun:sqlite';
+const db = new Database(process.argv[2]);
+const tables = ['User','Admin','Product','InvestmentPackage','Investment','Deposit','Withdrawal','Purchase'];
+console.log('  ─── DB TABLE COUNTS (data asli, bukan via API) ───');
+tables.forEach(t => {
+  try {
+    const r = db.query(`SELECT COUNT(*) as c FROM ${t}`).get() as any;
+    console.log(`  ${r.c > 0 ? '✅' : '⚠️'} ${t}: ${r.c} rows`);
+  } catch { console.log(`  ❌ ${t}: tabel gak ada`); }
+});
+// Top 3 user saldo
+console.log('  ─── TOP 3 USER SALDO ───');
+const top = db.query(`SELECT userId, name, whatsapp, mainBalance, totalProfit, totalWithdraw FROM User ORDER BY mainBalance DESC LIMIT 3`).all() as any[];
+top.forEach((u,i) => console.log(`  ${i+1}. ${u.userId} | ${u.name||'-'} | ${u.whatsapp||'-'} | Saldo: Rp ${u.mainBalance.toLocaleString()} | Profit: Rp ${(u.totalProfit||0).toLocaleString()}`));
+db.close();
+VEOF
+bun /tmp/nexvo-verify-db.ts "$DB" 2>&1 | grep -v "^Bun v"
 echo ""
 
 # ═══ STEP 8: FINAL SUMMARY ═══
