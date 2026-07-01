@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>NEXVO Recovery — Clear Cache</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #070B14;
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(212,175,55,0.2);
+  border-radius: 24px;
+  padding: 32px 24px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+.logo {
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, #D4AF37, #F4D35E);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-weight: 800;
+  color: #070B14;
+  font-size: 28px;
+}
+h1 { font-size: 20px; margin-bottom: 8px; }
+p { color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+.status {
+  background: rgba(0,0,0,0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+  text-align: left;
+  font-family: monospace;
+  font-size: 12px;
+  color: #4ade80;
+  min-height: 100px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.status .err { color: #f87171; }
+.status .warn { color: #fbbf24; }
+.btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #D4AF37, #F4D35E);
+  color: #070B14;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 12px;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.secondary {
+  background: transparent;
+  border: 1px solid rgba(212,175,55,0.3);
+  color: #fff;
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">N</div>
+  <h1>NEXVO Recovery</h1>
+  <p>Halaman ini akan clear Service Worker + cache browser kamu, lalu reload ke NEXVO dengan bersih.</p>
+  <div class="status" id="log">Klik tombol di bawah untuk mulai...</div>
+  <button class="btn" id="clearBtn" onclick="clearAll()">Clear Cache & Reload</button>
+  <button class="btn secondary" id="skipBtn" onclick="skipToHome()" style="margin-top:8px">Skip — Langsung ke NEXVO</button>
+</div>
+
+<script>
+function log(msg, type) {
+  var el = document.getElementById('log');
+  var cls = type === 'err' ? 'err' : (type === 'warn' ? 'warn' : '');
+  el.innerHTML += '<div class="' + cls + '">› ' + msg + '</div>';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function clearAll() {
+  document.getElementById('clearBtn').disabled = true;
+  document.getElementById('clearBtn').textContent = 'Memproses...';
+  log('Mulai clear cache...');
+
+  // Step 1: Unregister all service workers
+  log('Unregister Service Worker...');
+  try {
+    if ('serviceWorker' in navigator) {
+      var regs = await navigator.serviceWorker.getRegistrations();
+      log('Ditemukan ' + regs.length + ' service worker(s)');
+      for (var i = 0; i < regs.length; i++) {
+        await regs[i].unregister();
+        log('Unregistered: ' + regs[i].scope);
+      }
+    } else {
+      log('Service Worker tidak didukung browser ini', 'warn');
+    }
+  } catch (e) {
+    log('Error unregister SW: ' + e.message, 'err');
+  }
+
+  // Step 2: Clear all caches
+  log('Clear Cache Storage...');
+  try {
+    if ('caches' in window) {
+      var names = await caches.keys();
+      log('Ditemukan ' + names.length + ' cache(s): ' + names.join(', '));
+      for (var j = 0; j < names.length; j++) {
+        await caches.delete(names[j]);
+        log('Deleted cache: ' + names[j]);
+      }
+    }
+  } catch (e) {
+    log('Error clear cache: ' + e.message, 'err');
+  }
+
+  // Step 3: Clear localStorage
+  log('Clear localStorage...');
+  try {
+    localStorage.clear();
+    log('localStorage cleared');
+  } catch (e) {
+    log('Error clear localStorage: ' + e.message, 'err');
+  }
+
+  // Step 4: Clear sessionStorage
+  log('Clear sessionStorage...');
+  try {
+    sessionStorage.clear();
+    log('sessionStorage cleared');
+  } catch (e) {
+    log('Error clear sessionStorage: ' + e.message, 'err');
+  }
+
+  // Step 5: Clear cookies
+  log('Clear cookies...');
+  try {
+    document.cookie.split(';').forEach(function(c) {
+      var eq = c.indexOf('=');
+      var name = eq > -1 ? c.substr(0, eq).trim() : c.trim();
+      document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+      document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.' + window.location.hostname;
+      document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=' + window.location.hostname;
+    });
+    log('Cookies cleared');
+  } catch (e) {
+    log('Error clear cookies: ' + e.message, 'err');
+  }
+
+  log('');
+  log('✓ SEMUA CACHE BERSIH!', 'warn');
+  log('Reload ke NEXVO dalam 2 detik...');
+
+  setTimeout(function() {
+    window.location.replace('https://nexvo.id/?_cb=' + Date.now());
+  }, 2000);
+}
+
+function skipToHome() {
+  window.location.replace('https://nexvo.id/?_cb=' + Date.now());
+}
+</script>
+</body>
+</html>
