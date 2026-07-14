@@ -227,7 +227,7 @@ export default function AdminSettingsPage() {
     if (!adminToken) return;
     setWaLoading(true);
     try {
-      const res = await fetch('/api/admin/whatsapp', {
+      const res = await fetch('/api/admin/whatsapp-admins', {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       const data = await res.json();
@@ -377,7 +377,7 @@ export default function AdminSettingsPage() {
 
     setWaSaving(true);
     try {
-      const url = '/api/admin/whatsapp';
+      const url = '/api/admin/whatsapp-admins';
       const method = waEditMode ? 'PUT' : 'POST';
       const body = waEditMode
         ? { id: waEditId, name: waName, phone: waPhone, order: waOrder }
@@ -406,7 +406,7 @@ export default function AdminSettingsPage() {
 
   const handleWaToggle = async (wa: WhatsAppAdmin) => {
     try {
-      const res = await fetch('/api/admin/whatsapp', {
+      const res = await fetch('/api/admin/whatsapp-admins', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ id: wa.id, isActive: !wa.isActive }),
@@ -438,7 +438,7 @@ export default function AdminSettingsPage() {
     setWaDeleting(true);
     try {
       const targetId = waDeleteTarget.id;
-      const res = await fetch(`/api/admin/whatsapp?id=${targetId}`, {
+      const res = await fetch(`/api/admin/whatsapp-admins?id=${targetId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${adminToken}` },
       });

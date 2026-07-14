@@ -6,15 +6,19 @@ import {
   Users, ArrowDownCircle, ArrowUpCircle, ShoppingBag,
   Wallet, TrendingUp, Clock, CheckCircle2,
   XCircle, Loader2, ChevronRight, Activity,
-  Shield, BarChart3, Zap, AlertTriangle, Calendar
+  Shield, BarChart3, Zap, AlertTriangle, Calendar,
+  Wrench, Power
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useSiteStore } from '@/stores/site-store';
 import { formatRupiah, formatNumber } from '@/lib/auth';
 import { adminFetch } from '@/lib/fetch-utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
@@ -51,9 +55,17 @@ export default function AdminDashboardPage() {
     totalActiveInvestments?: number; alreadyCreditedToday?: number; needsCrediting?: number;
   } | null>(null);
   const [profitTriggering, setProfitTriggering] = useState(false);
+  // Maintenance mode state
+  const [maintEnabled, setMaintEnabled] = useState(false);
+  const [maintMessage, setMaintMessage] = useState('');
+  const [maintDraft, setMaintDraft] = useState('');
+  const [maintLoading, setMaintLoading] = useState(true);
+  const [maintSaving, setMaintSaving] = useState(false);
+  const [maintToggling, setMaintToggling] = useState(false);
   const { adminToken, admin, adminLogout } = useAuthStore();
   const { navigate } = useAppStore();
   const { toast } = useToast();
+  const setSiteMaintenance = useSiteStore((s) => s.setMaintenance);
 
   // Generate chart data based on real stats - memoized to prevent flickering
   const chartData = useMemo(() => {
@@ -176,6 +188,101 @@ export default function AdminDashboardPage() {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  // ────────────────────────────────────────────────
+  // MAINTENANCE MODE
+  // ────────────────────────────────────────────────
+  const fetchMaintenance = useCallback(async () => {
+    if (!adminToken) return;
+    setMaintLoading(true);
+    try {
+      const r = await adminFetch('/api/admin/maintenance', adminToken);
+      if (r.status === 401) { adminLogout(); navigate('admin-login'); return; }
+      const data = await r.json();
+      if (data.success) {
+        setMaintEnabled(data.data.enabled);
+        setMaintMessage(data.data.message);
+        setMaintDraft(data.data.message);
+        // sync to site store so the banner updates instantly for this admin too
+        setSiteMaintenance(data.data.enabled, data.data.message);
+      }
+    } catch {
+      // non-critical
+    } finally {
+      setMaintLoading(false);
+    }
+  }, [adminToken, adminLogout, navigate, setSiteMaintenance]);
+
+  useEffect(() => {
+    fetchMaintenance();
+  }, [fetchMaintenance]);
+
+  const handleToggleMaintenance = async (checked: boolean) => {
+    if (!adminToken) return;
+    setMaintToggling(true);
+    // optimistic update
+    setMaintEnabled(checked);
+    setSiteMaintenance(checked, maintMessage);
+    try {
+      const r = await adminFetch('/api/admin/maintenance', adminToken, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: checked }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        setMaintEnabled(data.data.enabled);
+        setSiteMaintenance(data.data.enabled, data.data.message);
+        toast({
+          title: checked ? '🛠️ Mode Perbaikan Aktif' : '✅ Mode Perbaikan Dimatikan',
+          description: checked
+            ? 'User sekarang melihat banner pemberitahuan.'
+            : 'User kembali bisa akses web normal.',
+        });
+      } else {
+        // revert on failure
+        setMaintEnabled(!checked);
+        setSiteMaintenance(!checked, maintMessage);
+        toast({ title: 'Gagal', description: data.error || 'Gagal mengubah mode', variant: 'destructive' });
+      }
+    } catch {
+      setMaintEnabled(!checked);
+      setSiteMaintenance(!checked, maintMessage);
+      toast({ title: 'Error', description: 'Network error', variant: 'destructive' });
+    } finally {
+      setMaintToggling(false);
+    }
+  };
+
+  const handleSaveMaintMessage = async () => {
+    if (!adminToken) return;
+    const trimmed = maintDraft.trim();
+    if (!trimmed) {
+      toast({ title: 'Error', description: 'Pesan tidak boleh kosong', variant: 'destructive' });
+      return;
+    }
+    setMaintSaving(true);
+    try {
+      const r = await adminFetch('/api/admin/maintenance', adminToken, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: trimmed }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        setMaintMessage(data.data.message);
+        setMaintDraft(data.data.message);
+        setSiteMaintenance(maintEnabled, data.data.message);
+        toast({ title: '✅ Pesan disimpan', description: 'Pesan perbaikan sudah diperbarui.' });
+      } else {
+        toast({ title: 'Gagal', description: data.error || 'Gagal menyimpan pesan', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Network error', variant: 'destructive' });
+    } finally {
+      setMaintSaving(false);
+    }
+  };
 
   const handleDepositAction = async (id: string, action: 'approve' | 'reject') => {
     setProcessing((p) => ({ ...p, [`dep-${id}`]: true }));
@@ -529,6 +636,84 @@ export default function AdminDashboardPage() {
             <span className="font-semibold text-foreground">Trigger Normal:</span> kredits profit ke investasi yang belum dikredit hari ini (skip weekend & yang sudah dikredit).<br/>
             <span className="font-semibold text-foreground">Force Trigger:</span> paksa kredit ke SEMUA investasi aktif, lewati cek weekend & lastProfitDate (untuk emergency/debug).
           </p>
+        </div>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="mt-6">
+        <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-amber-400" />
+          Mode Perbaikan (Maintenance)
+        </h3>
+        <div className="glass rounded-2xl p-4 sm:p-5 space-y-4">
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Aktifkan mode ini saat web sedang bermasalah/diperbaiki. User akan melihat banner pemberitahuan
+            di bagian atas halaman. <span className="text-foreground font-medium">Data &amp; saldo user tetap aman</span> —
+            ini hanya pemberitahuan, bukan pemblokiran akses.
+          </p>
+
+          {/* Status + toggle */}
+          <div className="flex items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-foreground/[0.03] border border-border">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${maintEnabled ? 'bg-amber-500/15' : 'bg-emerald-500/10'}`}>
+                {maintLoading ? (
+                  <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                ) : maintEnabled ? (
+                  <Wrench className="w-5 h-5 text-amber-400" />
+                ) : (
+                  <Power className="w-5 h-5 text-emerald-400" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-foreground text-sm font-semibold">
+                  {maintLoading ? 'Memuat status...' : maintEnabled ? 'Mode Perbaikan AKTIF' : 'Web Normal'}
+                </p>
+                <p className="text-muted-foreground text-[11px]">
+                  {maintEnabled ? 'User melihat banner perbaikan' : 'User tidak melihat banner'}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={maintEnabled}
+              onCheckedChange={handleToggleMaintenance}
+              disabled={maintLoading || maintToggling}
+              aria-label="Toggle mode perbaikan"
+            />
+          </div>
+
+          {/* Message editor */}
+          <div className="space-y-2">
+            <label className="text-foreground text-xs font-medium">Pesan untuk user</label>
+            <Textarea
+              value={maintDraft}
+              onChange={(e) => setMaintDraft(e.target.value)}
+              placeholder="Contoh: Sedang maintenance peningkatan server. Data Anda aman. Kembali 1 jam lagi."
+              rows={3}
+              disabled={maintSaving}
+              className="rounded-xl resize-none text-sm"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-muted-foreground text-[10px]">{maintDraft.length}/300 karakter</p>
+              <Button
+                size="sm"
+                onClick={handleSaveMaintMessage}
+                disabled={maintSaving || maintDraft.trim() === maintMessage || !maintDraft.trim()}
+                className="rounded-xl bg-gold-gradient text-primary-foreground font-semibold hover:opacity-90 disabled:opacity-40 text-xs h-9"
+              >
+                {maintSaving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                Simpan Pesan
+              </Button>
+            </div>
+          </div>
+
+          {maintEnabled && (
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-400/10 border border-amber-400/20">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-amber-300 text-xs">
+                Mode perbaikan sedang <span className="font-bold">AKTIF</span>. Semua user (yang login maupun belum)
+                melihat banner di bagian atas. Admin tetap bisa akses dashboard tanpa banner.
+              </p>
+            </div>
+          )}
         </div>
       </motion.div>
 

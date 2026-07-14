@@ -7,6 +7,7 @@ import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
 import AdminHeader from '@/components/nexvo/AdminHeader';
 import UserHeader from '@/components/nexvo/UserHeader';
+import MaintenanceBanner from '@/components/nexvo/shared/MaintenanceBanner';
 
 /* ───────── Dynamic imports for all pages (reduces bundle size) ───────── */
 const LoginPage = dynamic(() => import('@/components/nexvo/pages/LoginPage'), { ssr: false });
@@ -280,5 +281,13 @@ function AppShellInner() {
 
 /* ───────── Wrapper: renders the app shell ───────── */
 export default function AppShell() {
-  return <AppShellInner />;
+  const { currentPage } = useAppStore();
+  const isAdminPage = currentPage.startsWith('admin');
+  return (
+    <>
+      {/* Maintenance banner — shown to users (not admin) when admin enables it */}
+      {!isAdminPage && <MaintenanceBanner />}
+      <AppShellInner />
+    </>
+  );
 }

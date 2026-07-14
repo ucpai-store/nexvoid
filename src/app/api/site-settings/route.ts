@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const settings = await db.systemSettings.findMany({
       where: {
-        key: { in: ['site_logo', 'site_favicon', 'site_name', 'deposit_fee', 'min_withdraw', 'withdraw_fee'] },
+        key: { in: ['site_logo', 'site_favicon', 'site_name', 'deposit_fee', 'min_withdraw', 'withdraw_fee', 'maintenance_mode', 'maintenance_message'] },
       },
     });
 
@@ -18,6 +18,9 @@ export async function GET() {
     if (!data.deposit_fee) data.deposit_fee = '500';
     if (!data.site_logo) data.site_logo = '/api/files/nexvo-logo.png';
     if (!data.site_favicon) data.site_favicon = data.site_logo || '/api/files/nexvo-logo.png';
+    // Maintenance mode defaults (off by default)
+    if (!data.maintenance_mode) data.maintenance_mode = 'false';
+    if (!data.maintenance_message) data.maintenance_message = 'Situs sedang dalam perbaikan. Semua data Anda aman. Silakan kembali beberapa saat lagi.';
 
     return NextResponse.json({
       success: true,
@@ -31,6 +34,8 @@ export async function GET() {
         site_logo: '/api/files/nexvo-logo.png',
         site_name: 'NEXVO',
         deposit_fee: '500',
+        maintenance_mode: 'false',
+        maintenance_message: 'Situs sedang dalam perbaikan. Semua data Anda aman. Silakan kembali beberapa saat lagi.',
       },
     });
   }

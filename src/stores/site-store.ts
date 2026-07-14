@@ -14,10 +14,15 @@ interface SiteState {
   logoUrl: string;
   siteName: string;
   loaded: boolean;
+  // Maintenance mode state (read from /api/site-settings)
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
   fetchSettings: () => Promise<void>;
   setLogoUrl: (url: string) => void;
   setSiteName: (name: string) => void;
   refreshLogo: () => void;
+  // Update maintenance state locally (used after admin toggles)
+  setMaintenance: (enabled: boolean, message: string) => void;
 }
 
 /**
@@ -42,10 +47,15 @@ function updateBrowserFavicon(logoUrl: string) {
   }
 }
 
+const DEFAULT_MAINTENANCE_MESSAGE =
+  'Situs sedang dalam perbaikan. Semua data Anda aman. Silakan kembali beberapa saat lagi.';
+
 export const useSiteStore = create<SiteState>((set, get) => ({
   logoUrl: DEFAULT_LOGO,
   siteName: 'NEXVO',
   loaded: false,
+  maintenanceMode: false,
+  maintenanceMessage: DEFAULT_MAINTENANCE_MESSAGE,
 
   fetchSettings: async () => {
     try {
@@ -62,6 +72,8 @@ export const useSiteStore = create<SiteState>((set, get) => ({
             logoUrl: finalUrl,
             siteName: settings.site_name || 'NEXVO',
             loaded: true,
+            maintenanceMode: settings.maintenance_mode === 'true',
+            maintenanceMessage: settings.maintenance_message || DEFAULT_MAINTENANCE_MESSAGE,
           });
           // Update browser favicon to match
           updateBrowserFavicon(finalUrl);
@@ -70,6 +82,13 @@ export const useSiteStore = create<SiteState>((set, get) => ({
     } catch {
       set({ loaded: true });
     }
+  },
+
+  setMaintenance: (enabled: boolean, message: string) => {
+    set({
+      maintenanceMode: enabled,
+      maintenanceMessage: message || DEFAULT_MAINTENANCE_MESSAGE,
+    });
   },
 
   setLogoUrl: (url: string) => {

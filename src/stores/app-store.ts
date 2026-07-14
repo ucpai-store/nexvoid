@@ -9,7 +9,7 @@ export type Page =
   | 'admin-deposits' | 'admin-withdrawals' | 'admin-asset' | 'admin-payment'
   | 'admin-app' | 'admin-banners' | 'admin-settings' | 'admin-live'
   | 'admin-api-keys' | 'admin-api-key' | 'admin-system' | 'admin-appearance'
-  | 'admin-packages';
+  | 'admin-packages' | 'admin-whatsapp';
 
 // Valid pages for hash routing
 const VALID_PAGES: Set<string> = new Set([
@@ -21,7 +21,7 @@ const VALID_PAGES: Set<string> = new Set([
   'admin-deposits', 'admin-withdrawals', 'admin-asset', 'admin-payment',
   'admin-app', 'admin-banners', 'admin-settings', 'admin-live',
   'admin-api-keys', 'admin-api-key', 'admin-system', 'admin-appearance',
-  'admin-packages',
+  'admin-packages', 'admin-whatsapp',
 ]);
 
 // Read initial page from URL hash

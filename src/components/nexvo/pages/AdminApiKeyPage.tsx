@@ -193,7 +193,7 @@ export default function AdminApiKeyPage() {
         if (data.data.connected) {
           toast({ title: 'Bot Connected!', description: 'WhatsApp bot is connected.' });
         } else if (data.data.pairingCode) {
-          toast({ title: '📱 Pairing Code Ready!', description: 'Masukkan kode ini di WhatsApp HP Anda: Settings {'>'} Linked Devices {'>'} Link with phone number' });
+          toast({ title: '📱 Pairing Code Ready!', description: 'Masukkan kode ini di WhatsApp HP Anda: Settings > Linked Devices > Link with phone number' });
           startPolling();
         } else {
           toast({ title: 'Waiting...', description: 'Waiting for pairing code from WhatsApp.' });
