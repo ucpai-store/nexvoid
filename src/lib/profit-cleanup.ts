@@ -602,9 +602,14 @@ async function correctUserBalanceDrift(report: CleanupReport): Promise<void> {
   console.log('[Profit Cleanup] 🧹 STEP 5 (v3.2): Direct User balance correction from BonusLog ground truth — catch drift STEP 4 misses');
 
   // ── 5a. Sum all profit BonusLog per user (ground truth) ──
+  // ★★★ FIX v6 (CRITICAL): Sum ALL bonus types (profit + referral + matching + salary).
+  // OLD buggy code only summed type='profit' → users with referral/matching/salary
+  // bonuses were flagged as "drift" → mainBalance & totalProfit got STRIPPED of all
+  // non-profit bonuses on every cron run → saldo user jadi 0. This was the root cause
+  // of "saldo tiba-tiba berkurang jadi 0" after deploy.
   const profitLogAgg = await db.bonusLog.groupBy({
     by: ['userId'],
-    where: { type: 'profit' },
+    where: { type: { in: ['profit', 'referral', 'matching', 'salary'] } },
     _sum: { amount: true },
   });
   const expectedProfitByUser = new Map<string, number>();
