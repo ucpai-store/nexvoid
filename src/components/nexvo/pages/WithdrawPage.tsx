@@ -268,7 +268,7 @@ export default function WithdrawPage() {
   const [lastWithdrawNet, setLastWithdrawNet] = useState(0);
   const [lastWithdrawMethod, setLastWithdrawMethod] = useState('');
   const [lastWithdrawId, setLastWithdrawId] = useState('');
-  // Meta from API: min/max withdrawal + pending withdrawal check + 24h cooldown
+  // Meta from API: min/max withdrawal + pending withdrawal check + daily WD limit
   const [meta, setMeta] = useState<{
     lastPackageAmount?: number;
     hasPendingWithdrawal?: boolean;
@@ -276,52 +276,27 @@ export default function WithdrawPage() {
     minWithdraw?: number;
     maxWithdraw?: number;
     feePercent?: number;
-    inCooldown24h?: boolean;
-    nextAvailableAt?: string | null;
-    cooldownRemainingMs?: number;
+    wdLimitDaily?: boolean;
   }>({});
 
-  // Live countdown for 24h cooldown (updates every second)
-  const [cooldownCountdown, setCooldownCountdown] = useState<string>('');
-  // Popup modal "tunggu hari berikutnya" — auto muncul saat user buka halaman WD dalam cooldown
+  // Popup modal "tunggu hari berikutnya" — auto muncul saat user buka halaman WD & sudah WD hari ini
   const [showCooldownModal, setShowCooldownModal] = useState(false);
-  useEffect(() => {
-    if (!meta.inCooldown24h || !meta.nextAvailableAt) {
-      setCooldownCountdown('');
-      return;
-    }
-    const tick = () => {
-      const target = new Date(meta.nextAvailableAt!).getTime();
-      const remaining = target - Date.now();
-      if (remaining <= 0) {
-        setCooldownCountdown('Tersedia sekarang');
-        return;
-      }
-      const h = Math.floor(remaining / (60 * 60 * 1000));
-      const m = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-      const s = Math.floor((remaining % (60 * 1000)) / 1000);
-      setCooldownCountdown(`${h}j ${m}m ${s}d`);
-    };
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [meta.inCooldown24h, meta.nextAvailableAt]);
 
-  // Auto-buka popup cooldown saat halaman WD pertama kali load & user dalam cooldown
+  // Auto-buka popup saat halaman WD pertama kali load & user sudah WD hari ini
   useEffect(() => {
-    if (meta.inCooldown24h && meta.nextAvailableAt) {
-      const dismissed = sessionStorage.getItem('nexvo_wd_cooldown_dismissed');
+    if (meta.wdLimitDaily) {
+      const dismissed = sessionStorage.getItem('nexvo_wd_daily_dismissed');
       if (!dismissed) {
         setShowCooldownModal(true);
       }
     } else {
-      sessionStorage.removeItem('nexvo_wd_cooldown_dismissed');
+      sessionStorage.removeItem('nexvo_wd_daily_dismissed');
     }
-  }, [meta.inCooldown24h, meta.nextAvailableAt]);
+  }, [meta.wdLimitDaily]);
 
   const closeCooldownModal = () => {
     setShowCooldownModal(false);
-    sessionStorage.setItem('nexvo_wd_cooldown_dismissed', '1');
+    sessionStorage.setItem('nexvo_wd_daily_dismissed', '1');
   };
 
   // Form state
@@ -388,7 +363,7 @@ export default function WithdrawPage() {
   const maxWithdraw = meta.maxWithdraw || 0;
   const feeRate = (meta.feePercent || 10) / 100;
   const hasPendingWithdrawal = meta.hasPendingWithdrawal || false;
-  const inCooldown24h = meta.inCooldown24h || false;
+  const wdLimitDaily = meta.wdLimitDaily || false;
   const fee = Math.round(numAmount * feeRate);
   const netAmount = numAmount - fee;
   const mainBalance = user?.mainBalance || 0;
@@ -425,8 +400,8 @@ export default function WithdrawPage() {
   const isFormValid = (): boolean => {
     // Block if user has pending withdrawal (must wait for admin approval)
     if (hasPendingWithdrawal) return false;
-    // Block if user is in 24h cooldown (1x WD per 24 jam)
-    if (inCooldown24h) return false;
+    // Block if user sudah WD hari ini (1x WD per hari)
+    if (wdLimitDaily) return false;
     // Block if no package purchased (maxWithdraw = 0)
     if (maxWithdraw <= 0) return false;
     if (!numAmount || numAmount < minWithdraw) return false;
@@ -508,9 +483,9 @@ export default function WithdrawPage() {
         fetchData();
       } else {
         toast({ title: 'Gagal', description: data.error || 'Withdrawal failed', variant: 'destructive' });
-        // Jika backend return COOLDOWN_24H, refresh meta + tampilkan popup "Tunggu Hari Berikutnya"
-        if (data.code === 'COOLDOWN_24H') {
-          sessionStorage.removeItem('nexvo_wd_cooldown_dismissed');
+        // Jika backend return WD_LIMIT_DAILY, refresh meta + tampilkan popup "Tunggu Hari Berikutnya"
+        if (data.code === 'WD_LIMIT_DAILY') {
+          sessionStorage.removeItem('nexvo_wd_daily_dismissed');
           await fetchData();
           setShowCooldownModal(true);
         }
@@ -567,9 +542,9 @@ export default function WithdrawPage() {
       {/* ─── Weekend Libur Notice ─── */}
       <WeekendNoticeBanner activity="Withdrawal" />
 
-      {/* ─── Cooldown Popup "Tunggu Hari Berikutnya" ─── */}
+      {/* ─── Popup "Tunggu Hari Berikutnya" ─── */}
       <AnimatePresence>
-        {showCooldownModal && meta.inCooldown24h && meta.nextAvailableAt && (
+        {showCooldownModal && wdLimitDaily && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/70 backdrop-blur-md"
@@ -596,34 +571,13 @@ export default function WithdrawPage() {
 
                 <h2 className="text-foreground text-xl font-bold mb-2">Tunggu Hari Berikutnya</h2>
                 <p className="text-muted-foreground text-sm mb-5">
-                  Anda sudah melakukan withdrawal hari ini. Withdrawal hanya bisa <span className="text-orange-400 font-semibold">1x per 24 jam</span>. Silakan tunggu hari berikutnya untuk withdrawal kembali.
+                  Anda sudah melakukan withdrawal hari ini. Withdrawal hanya bisa <span className="text-orange-400 font-semibold">1x per hari</span>. Silakan kembali besok untuk withdrawal kembali.
                 </p>
 
-                <div className="glass rounded-2xl p-4 mb-5 border border-orange-400/20">
-                  <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-2">Sisa Waktu Tunggu</p>
-                  <p className="text-orange-400 text-3xl font-bold font-mono tracking-wider mb-3">
-                    {cooldownCountdown || 'beberapa saat'}
-                  </p>
-                  {meta.nextAvailableAt && (
-                    <>
-                      <div className="border-t border-white/5 pt-3">
-                        <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Tersedia Kembali Pada</p>
-                        <p className="text-foreground text-sm font-semibold">
-                          {new Date(meta.nextAvailableAt).toLocaleString('id-ID', {
-                            timeZone: 'Asia/Jakarta',
-                            weekday: 'long',
-                            day: '2-digit',
-                            month: 'long',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}{' '}WIB
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <button onClick={closeCooldownModal} className="text-muted-foreground text-sm hover:text-foreground transition-colors">
+                <button
+                  onClick={closeCooldownModal}
+                  className="w-full py-2.5 rounded-xl bg-orange-400/20 text-orange-300 font-semibold text-sm hover:bg-orange-400/30 transition-colors border border-orange-400/30"
+                >
                   Mengerti
                 </button>
               </div>
@@ -780,8 +734,8 @@ export default function WithdrawPage() {
         </motion.div>
       )}
 
-      {/* ─── 24h Cooldown Warning (1x WD per 24 jam) ─── */}
-      {!hasPendingWithdrawal && inCooldown24h && (
+      {/* ─── Daily Limit Banner (1x WD per hari) ─── */}
+      {!hasPendingWithdrawal && wdLimitDaily && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -791,33 +745,16 @@ export default function WithdrawPage() {
             <Clock className="w-5 h-5 text-orange-400" />
           </div>
           <div className="flex-1">
-            <p className="text-foreground text-sm font-semibold">Withdrawal Tersedia 1x per 24 Jam</p>
+            <p className="text-foreground text-sm font-semibold">Sudah Withdrawal Hari Ini</p>
             <p className="text-muted-foreground text-xs">
-              Anda sudah melakukan withdrawal dalam 24 jam terakhir. Silakan tunggu{' '}
-              <span className="text-orange-400 font-mono font-bold">{cooldownCountdown || 'beberapa saat'}</span>{' '}
-              lagi sebelum bisa withdrawal kembali.
-              {meta.nextAvailableAt && (
-                <>
-                  <br />
-                  Tersedia kembali sekitar:{' '}
-                  <span className="text-orange-300 font-semibold">
-                    {new Date(meta.nextAvailableAt).toLocaleString('id-ID', {
-                      timeZone: 'Asia/Jakarta',
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}{' '}WIB
-                  </span>
-                </>
-              )}
+              Anda sudah melakukan withdrawal hari ini. Withdrawal hanya bisa 1x per hari. Silakan tunggu hari berikutnya untuk withdrawal kembali.
             </p>
           </div>
         </motion.div>
       )}
 
       {/* ─── No Package Warning (maxWithdraw = 0) ─── */}
-      {!hasPendingWithdrawal && !inCooldown24h && maxWithdraw <= 0 && (
+      {!hasPendingWithdrawal && !wdLimitDaily && maxWithdraw <= 0 && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1024,7 +961,7 @@ export default function WithdrawPage() {
               {presetAmounts.map((preset) => {
                 // Disable preset if: insufficient balance, exceeds maxWithdraw, or user has pending WD
                 const exceedsMax = maxWithdraw > 0 && preset.value > maxWithdraw;
-                const disabled = mainBalance < preset.value || exceedsMax || hasPendingWithdrawal || inCooldown24h || maxWithdraw <= 0;
+                const disabled = mainBalance < preset.value || exceedsMax || hasPendingWithdrawal || wdLimitDaily || maxWithdraw <= 0;
                 const isSelected = amount === preset.value.toString();
                 return (
                   <motion.button
