@@ -734,25 +734,6 @@ export default function WithdrawPage() {
         </motion.div>
       )}
 
-      {/* ─── Daily Limit Banner (1x WD per hari) ─── */}
-      {!hasPendingWithdrawal && wdLimitDaily && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-2xl p-4 flex items-center gap-3 border border-orange-400/30 bg-orange-400/5"
-        >
-          <div className="w-10 h-10 rounded-xl bg-orange-400/15 flex items-center justify-center shrink-0">
-            <Clock className="w-5 h-5 text-orange-400" />
-          </div>
-          <div className="flex-1">
-            <p className="text-foreground text-sm font-semibold">Sudah Withdrawal Hari Ini</p>
-            <p className="text-muted-foreground text-xs">
-              Anda sudah melakukan withdrawal hari ini. Withdrawal hanya bisa 1x per hari. Silakan tunggu hari berikutnya untuk withdrawal kembali.
-            </p>
-          </div>
-        </motion.div>
-      )}
-
       {/* ─── No Package Warning (maxWithdraw = 0) ─── */}
       {!hasPendingWithdrawal && !wdLimitDaily && maxWithdraw <= 0 && (
         <motion.div
