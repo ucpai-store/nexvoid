@@ -283,6 +283,8 @@ export default function WithdrawPage() {
 
   // Live countdown for 24h cooldown (updates every second)
   const [cooldownCountdown, setCooldownCountdown] = useState<string>('');
+  // Popup modal "tunggu hari berikutnya" — auto muncul saat user buka halaman WD dalam cooldown
+  const [showCooldownModal, setShowCooldownModal] = useState(false);
   useEffect(() => {
     if (!meta.inCooldown24h || !meta.nextAvailableAt) {
       setCooldownCountdown('');
@@ -304,6 +306,23 @@ export default function WithdrawPage() {
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [meta.inCooldown24h, meta.nextAvailableAt]);
+
+  // Auto-buka popup cooldown saat halaman WD pertama kali load & user dalam cooldown
+  useEffect(() => {
+    if (meta.inCooldown24h && meta.nextAvailableAt) {
+      const dismissed = sessionStorage.getItem('nexvo_wd_cooldown_dismissed');
+      if (!dismissed) {
+        setShowCooldownModal(true);
+      }
+    } else {
+      sessionStorage.removeItem('nexvo_wd_cooldown_dismissed');
+    }
+  }, [meta.inCooldown24h, meta.nextAvailableAt]);
+
+  const closeCooldownModal = () => {
+    setShowCooldownModal(false);
+    sessionStorage.setItem('nexvo_wd_cooldown_dismissed', '1');
+  };
 
   // Form state
   const [selectedCategory, setSelectedCategory] = useState<PaymentCategory>('bank');
@@ -489,9 +508,11 @@ export default function WithdrawPage() {
         fetchData();
       } else {
         toast({ title: 'Gagal', description: data.error || 'Withdrawal failed', variant: 'destructive' });
-        // Jika backend return COOLDOWN_24H, refresh meta biar banner countdown muncul
+        // Jika backend return COOLDOWN_24H, refresh meta + tampilkan popup "Tunggu Hari Berikutnya"
         if (data.code === 'COOLDOWN_24H') {
-          fetchData();
+          sessionStorage.removeItem('nexvo_wd_cooldown_dismissed');
+          await fetchData();
+          setShowCooldownModal(true);
         }
       }
     } catch {
@@ -545,6 +566,71 @@ export default function WithdrawPage() {
     <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
       {/* ─── Weekend Libur Notice ─── */}
       <WeekendNoticeBanner activity="Withdrawal" />
+
+      {/* ─── Cooldown Popup "Tunggu Hari Berikutnya" ─── */}
+      <AnimatePresence>
+        {showCooldownModal && meta.inCooldown24h && meta.nextAvailableAt && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/70 backdrop-blur-md"
+            onClick={closeCooldownModal}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-strong rounded-3xl p-5 sm:p-7 max-w-sm w-full glow-gold-strong border border-orange-400/30 relative overflow-hidden"
+            >
+              <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-orange-400/10 blur-3xl" />
+              <div className="absolute -bottom-20 -left-20 w-40 h-40 rounded-full bg-orange-400/10 blur-3xl" />
+
+              <div className="text-center relative z-10">
+                <motion.div
+                  initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: 'spring', damping: 12, stiffness: 200 }}
+                  className="w-20 h-20 rounded-full bg-orange-400/15 flex items-center justify-center mx-auto mb-4 relative"
+                >
+                  <div className="absolute inset-0 rounded-full bg-orange-400/10 animate-ping" />
+                  <Clock className="w-11 h-11 text-orange-400 relative z-10" />
+                </motion.div>
+
+                <h2 className="text-foreground text-xl font-bold mb-2">Tunggu Hari Berikutnya</h2>
+                <p className="text-muted-foreground text-sm mb-5">
+                  Anda sudah melakukan withdrawal hari ini. Withdrawal hanya bisa <span className="text-orange-400 font-semibold">1x per 24 jam</span>. Silakan tunggu hari berikutnya untuk withdrawal kembali.
+                </p>
+
+                <div className="glass rounded-2xl p-4 mb-5 border border-orange-400/20">
+                  <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-2">Sisa Waktu Tunggu</p>
+                  <p className="text-orange-400 text-3xl font-bold font-mono tracking-wider mb-3">
+                    {cooldownCountdown || 'beberapa saat'}
+                  </p>
+                  {meta.nextAvailableAt && (
+                    <>
+                      <div className="border-t border-white/5 pt-3">
+                        <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Tersedia Kembali Pada</p>
+                        <p className="text-foreground text-sm font-semibold">
+                          {new Date(meta.nextAvailableAt).toLocaleString('id-ID', {
+                            timeZone: 'Asia/Jakarta',
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: 'long',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}{' '}WIB
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button onClick={closeCooldownModal} className="text-muted-foreground text-sm hover:text-foreground transition-colors">
+                  Mengerti
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ─── Success Modal ─── */}
       <AnimatePresence>
