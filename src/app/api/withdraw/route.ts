@@ -87,6 +87,37 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ─── RULE 2.5 (NEW): 1x withdrawal per 24 jam ────────────────────
+    // Cek withdrawal terakhir user (status apapun kecuali 'rejected').
+    // Kalau masih dalam 24 jam terakhir → tolak, suruh tunggu sampai 24 jam terlewati.
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 jam
+    const lastWithdrawal = await db.withdrawal.findFirst({
+      where: {
+        userId: user.id,
+        status: { not: 'rejected' },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (lastWithdrawal) {
+      const elapsed = Date.now() - new Date(lastWithdrawal.createdAt).getTime();
+      if (elapsed < COOLDOWN_MS) {
+        const nextAvailableAt = new Date(new Date(lastWithdrawal.createdAt).getTime() + COOLDOWN_MS);
+        const remainingMs = COOLDOWN_MS - elapsed;
+        const remainingHours = Math.floor(remainingMs / (60 * 60 * 1000));
+        const remainingMinutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+        const timeLabel = remainingHours > 0
+          ? `${remainingHours} jam ${remainingMinutes} menit`
+          : `${remainingMinutes} menit`;
+        return NextResponse.json({
+          success: false,
+          error: `Withdrawal hanya bisa 1x per 24 jam. Withdrawal terakhir Anda pada ${new Date(lastWithdrawal.createdAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB. Silakan tunggu ${timeLabel} lagi (tersedia kembali sekitar ${nextAvailableAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB).`,
+          code: 'COOLDOWN_24H',
+          nextAvailableAt: nextAvailableAt.toISOString(),
+          remainingMs,
+        }, { status: 400 });
+      }
+    }
+
     // ─── RULE 3: Maximum withdrawal = last purchased package/product amount ─
     // Find user's most recent purchase (product or package)
     // Try Purchase table first
@@ -288,6 +319,25 @@ export async function GET(request: NextRequest) {
 
     const pendingWithdrawal = withdrawals.find(w => w.status === 'pending');
 
+    // ─── Compute 24h cooldown status (1x WD per 24 jam) ─────────────
+    // Cari withdrawal terakhir (status apapun kecuali rejected), cek apakah masih dalam cooldown 24h
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    const lastWithdrawalAny = await db.withdrawal.findFirst({
+      where: { userId: user.id, status: { not: 'rejected' } },
+      orderBy: { createdAt: 'desc' },
+    });
+    let inCooldown24h = false;
+    let nextAvailableAt: string | null = null;
+    let cooldownRemainingMs = 0;
+    if (lastWithdrawalAny) {
+      const elapsed = Date.now() - new Date(lastWithdrawalAny.createdAt).getTime();
+      if (elapsed < COOLDOWN_MS) {
+        inCooldown24h = true;
+        cooldownRemainingMs = COOLDOWN_MS - elapsed;
+        nextAvailableAt = new Date(new Date(lastWithdrawalAny.createdAt).getTime() + COOLDOWN_MS).toISOString();
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: withdrawals,
@@ -298,6 +348,10 @@ export async function GET(request: NextRequest) {
         minWithdraw: 100000,
         maxWithdraw: lastPackageAmount,
         feePercent: 10,
+        // 24h cooldown info (NEW)
+        inCooldown24h,
+        nextAvailableAt,
+        cooldownRemainingMs,
       },
       pagination: {
         page,
@@ -317,6 +371,9 @@ export async function GET(request: NextRequest) {
         minWithdraw: 100000,
         maxWithdraw: 0,
         feePercent: 10,
+        inCooldown24h: false,
+        nextAvailableAt: null,
+        cooldownRemainingMs: 0,
       },
       pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
     });

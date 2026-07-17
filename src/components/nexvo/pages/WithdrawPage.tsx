@@ -268,7 +268,7 @@ export default function WithdrawPage() {
   const [lastWithdrawNet, setLastWithdrawNet] = useState(0);
   const [lastWithdrawMethod, setLastWithdrawMethod] = useState('');
   const [lastWithdrawId, setLastWithdrawId] = useState('');
-  // Meta from API: min/max withdrawal + pending withdrawal check
+  // Meta from API: min/max withdrawal + pending withdrawal check + 24h cooldown
   const [meta, setMeta] = useState<{
     lastPackageAmount?: number;
     hasPendingWithdrawal?: boolean;
@@ -276,7 +276,34 @@ export default function WithdrawPage() {
     minWithdraw?: number;
     maxWithdraw?: number;
     feePercent?: number;
+    inCooldown24h?: boolean;
+    nextAvailableAt?: string | null;
+    cooldownRemainingMs?: number;
   }>({});
+
+  // Live countdown for 24h cooldown (updates every second)
+  const [cooldownCountdown, setCooldownCountdown] = useState<string>('');
+  useEffect(() => {
+    if (!meta.inCooldown24h || !meta.nextAvailableAt) {
+      setCooldownCountdown('');
+      return;
+    }
+    const tick = () => {
+      const target = new Date(meta.nextAvailableAt!).getTime();
+      const remaining = target - Date.now();
+      if (remaining <= 0) {
+        setCooldownCountdown('Tersedia sekarang');
+        return;
+      }
+      const h = Math.floor(remaining / (60 * 60 * 1000));
+      const m = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+      const s = Math.floor((remaining % (60 * 1000)) / 1000);
+      setCooldownCountdown(`${h}j ${m}m ${s}d`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [meta.inCooldown24h, meta.nextAvailableAt]);
 
   // Form state
   const [selectedCategory, setSelectedCategory] = useState<PaymentCategory>('bank');
@@ -342,6 +369,7 @@ export default function WithdrawPage() {
   const maxWithdraw = meta.maxWithdraw || 0;
   const feeRate = (meta.feePercent || 10) / 100;
   const hasPendingWithdrawal = meta.hasPendingWithdrawal || false;
+  const inCooldown24h = meta.inCooldown24h || false;
   const fee = Math.round(numAmount * feeRate);
   const netAmount = numAmount - fee;
   const mainBalance = user?.mainBalance || 0;
@@ -378,6 +406,8 @@ export default function WithdrawPage() {
   const isFormValid = (): boolean => {
     // Block if user has pending withdrawal (must wait for admin approval)
     if (hasPendingWithdrawal) return false;
+    // Block if user is in 24h cooldown (1x WD per 24 jam)
+    if (inCooldown24h) return false;
     // Block if no package purchased (maxWithdraw = 0)
     if (maxWithdraw <= 0) return false;
     if (!numAmount || numAmount < minWithdraw) return false;
@@ -459,6 +489,10 @@ export default function WithdrawPage() {
         fetchData();
       } else {
         toast({ title: 'Gagal', description: data.error || 'Withdrawal failed', variant: 'destructive' });
+        // Jika backend return COOLDOWN_24H, refresh meta biar banner countdown muncul
+        if (data.code === 'COOLDOWN_24H') {
+          fetchData();
+        }
       }
     } catch {
       toast({ title: 'Error', description: 'Network error occurred', variant: 'destructive' });
@@ -660,8 +694,44 @@ export default function WithdrawPage() {
         </motion.div>
       )}
 
+      {/* ─── 24h Cooldown Warning (1x WD per 24 jam) ─── */}
+      {!hasPendingWithdrawal && inCooldown24h && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-2xl p-4 flex items-center gap-3 border border-orange-400/30 bg-orange-400/5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-orange-400/15 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-orange-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-foreground text-sm font-semibold">Withdrawal Tersedia 1x per 24 Jam</p>
+            <p className="text-muted-foreground text-xs">
+              Anda sudah melakukan withdrawal dalam 24 jam terakhir. Silakan tunggu{' '}
+              <span className="text-orange-400 font-mono font-bold">{cooldownCountdown || 'beberapa saat'}</span>{' '}
+              lagi sebelum bisa withdrawal kembali.
+              {meta.nextAvailableAt && (
+                <>
+                  <br />
+                  Tersedia kembali sekitar:{' '}
+                  <span className="text-orange-300 font-semibold">
+                    {new Date(meta.nextAvailableAt).toLocaleString('id-ID', {
+                      timeZone: 'Asia/Jakarta',
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}{' '}WIB
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* ─── No Package Warning (maxWithdraw = 0) ─── */}
-      {!hasPendingWithdrawal && maxWithdraw <= 0 && (
+      {!hasPendingWithdrawal && !inCooldown24h && maxWithdraw <= 0 && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -868,7 +938,7 @@ export default function WithdrawPage() {
               {presetAmounts.map((preset) => {
                 // Disable preset if: insufficient balance, exceeds maxWithdraw, or user has pending WD
                 const exceedsMax = maxWithdraw > 0 && preset.value > maxWithdraw;
-                const disabled = mainBalance < preset.value || exceedsMax || hasPendingWithdrawal || maxWithdraw <= 0;
+                const disabled = mainBalance < preset.value || exceedsMax || hasPendingWithdrawal || inCooldown24h || maxWithdraw <= 0;
                 const isSelected = amount === preset.value.toString();
                 return (
                   <motion.button
