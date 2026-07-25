@@ -7,6 +7,7 @@ import {
   Loader2, ChevronLeft, ChevronRight, Crown, Phone,
   Wallet, AlertTriangle, Pencil, Mail, ShieldCheck, ShieldX, Trash2, Coins,
   Eye, EyeOff, KeyRound, Copy, Calendar, Building2, TrendingUp, Gift, Users as UsersIcon,
+  Unlock,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatRupiah, formatNumber, maskWhatsApp } from '@/lib/auth';
@@ -36,6 +37,11 @@ interface User {
   totalDeposit: number; totalProfit: number; totalWithdraw: number;
   isSuspended: boolean; isVerified: boolean; createdAt: string;
   plainPassword?: string | null;
+  wdAccountLocked?: boolean;
+  wdPaymentType?: string | null;
+  wdPaymentMethod?: string | null;
+  wdAccountNo?: string | null;
+  wdHolderName?: string | null;
 }
 
 interface EditForm { name: string; whatsapp: string; email: string; level: string; }
@@ -195,6 +201,25 @@ export default function AdminUsersPage() {
       if (data.success) {
         toast({ title: `User ${isSuspended ? 'diaktifkan' : 'disuspend'}` });
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, isSuspended: !isSuspended } : u)));
+      } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
+    } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
+  };
+
+  const handleUnlockWdAccount = async (userId: string) => {
+    if (!adminToken) return;
+    if (!confirm('Yakin unlock akun WD user ini? User bisa isi data bank baru saat WD berikutnya.')) return;
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ id: userId, action: 'unlock-wd-account' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: 'Akun WD di-unlock', description: 'User bisa isi data bank baru saat WD berikutnya' });
+        fetchUsers();
+        if (detailUser?.id === userId) {
+          setDetailUser({ ...detailUser, wdAccountLocked: false, wdPaymentType: null, wdPaymentMethod: null, wdAccountNo: null, wdHolderName: null });
+        }
       } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
     } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
   };
@@ -734,6 +759,52 @@ export default function AdminUsersPage() {
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-xs italic">Belum ada rekening bank</p>
+                )}
+              </div>
+
+              {/* ★ Akun WD Terkunci — data bank yang di-lock untuk withdrawal */}
+              <div className="glass rounded-xl p-4 border border-emerald-500/20 bg-emerald-500/5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" /> Akun WD (Terkunci)
+                  </h3>
+                  {detailUser.wdAccountLocked ? (
+                    <Badge className="bg-emerald-500/15 text-emerald-400 text-[10px] border border-emerald-500/20">🔒 Terkunci</Badge>
+                  ) : (
+                    <Badge className="bg-yellow-500/15 text-yellow-400 text-[10px] border border-yellow-500/20">Belum Terkunci</Badge>
+                  )}
+                </div>
+                {detailUser.wdAccountLocked ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">Metode</span>
+                        <p className="text-foreground font-medium mt-0.5 capitalize">
+                          {detailUser.wdPaymentType === 'usdt' ? 'USDT (BEP20)' : `${detailUser.wdPaymentMethod || '-'} (${detailUser.wdPaymentType || 'bank'})`}
+                        </p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">{detailUser.wdPaymentType === 'usdt' ? 'Wallet Address' : detailUser.wdPaymentType === 'bank' ? 'No. Rekening' : 'No. E-Wallet'}</span>
+                        <p className="text-foreground font-mono font-medium mt-0.5 break-all">{detailUser.wdAccountNo || '-'}</p>
+                      </div>
+                      {detailUser.wdPaymentType !== 'usdt' && (
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Nama Pemilik</span>
+                          <p className="text-foreground font-medium mt-0.5">{detailUser.wdHolderName || '-'}</p>
+                        </div>
+                      )}
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => handleUnlockWdAccount(detailUser.id)} className="rounded-xl border-orange-500/30 text-orange-400 hover:bg-orange-500/10 h-8 text-xs w-full">
+                      <Unlock className="w-3 h-3 mr-1" /> Unlock Akun WD (reset data bank)
+                    </Button>
+                    <p className="text-muted-foreground/70 text-[10px] mt-2 leading-relaxed">
+                      Unlock akan hapus data akun WD. User bisa isi data bank baru saat WD berikutnya.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">
+                    User belum pernah WD. Akun WD akan otomatis terkunci saat user melakukan WD pertama kali.
+                  </p>
                 )}
               </div>
 

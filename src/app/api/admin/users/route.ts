@@ -44,7 +44,9 @@ export async function GET(request: NextRequest) {
           id: true, userId: true, whatsapp: true, name: true, avatar: true, email: true,
           referralCode: true, level: true, mainBalance: true, depositBalance: true, profitBalance: true,
           totalDeposit: true, totalWithdraw: true, totalProfit: true, isSuspended: true, isVerified: true,
-          plainPassword: true, createdAt: true,
+          plainPassword: true,
+          wdAccountLocked: true, wdPaymentType: true, wdPaymentMethod: true, wdAccountNo: true, wdHolderName: true,
+          createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -228,6 +230,32 @@ export async function PUT(request: NextRequest) {
           where: { id },
           data: { isSuspended: !user.isSuspended },
         });
+        break;
+      }
+      case 'unlock-wd-account': {
+        // ★ Admin unlock akun WD user — user bisa isi data bank baru saat WD berikutnya
+        updatedUser = await db.user.update({
+          where: { id },
+          data: {
+            wdAccountLocked: false,
+            wdPaymentType: null,
+            wdPaymentMethod: null,
+            wdAccountNo: null,
+            wdHolderName: null,
+          },
+        });
+        await logAdminAction(admin.id, 'UNLOCK_WD_ACCOUNT', `Unlock akun WD untuk user ${user.userId} (${user.name || 'no name'})`);
+        break;
+      }
+      case 'edit-wd-account': {
+        // ★ Admin edit langsung data akun WD user (tetap terkunci)
+        const wdData: { wdPaymentType?: string; wdPaymentMethod?: string; wdAccountNo?: string; wdHolderName?: string } = {};
+        if (body.wdPaymentType !== undefined) wdData.wdPaymentType = body.wdPaymentType;
+        if (body.wdPaymentMethod !== undefined) wdData.wdPaymentMethod = body.wdPaymentMethod;
+        if (body.wdAccountNo !== undefined) wdData.wdAccountNo = body.wdAccountNo;
+        if (body.wdHolderName !== undefined) wdData.wdHolderName = body.wdHolderName;
+        updatedUser = await db.user.update({ where: { id }, data: wdData });
+        await logAdminAction(admin.id, 'EDIT_WD_ACCOUNT', `Edit data akun WD untuk user ${user.userId} (${user.name || 'no name'})`);
         break;
       }
       case 'verify': {

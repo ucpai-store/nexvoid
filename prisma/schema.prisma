@@ -27,6 +27,12 @@ model User {
   totalProfit   Float    @default(0)
   isSuspended   Boolean  @default(false)
   isVerified    Boolean  @default(false)
+  // ★ WD account lock: sekali user WD, akun bank terkunci. Hanya admin bisa ubah.
+  wdAccountLocked Boolean @default(false)
+  wdPaymentType  String?  // bank | ewallet | usdt
+  wdPaymentMethod String? // BCA, Mandiri, DANA, OVO, GoPay, USDT (BEP20), dll
+  wdAccountNo    String?  // nomor rekening / nomor e-wallet / wallet address USDT
+  wdHolderName   String?  // nama pemilik rekening
   otpCode       String?
   otpExpiry     DateTime?
   emailOtpCode  String?

@@ -44,6 +44,7 @@ export async function getUserFromRequest(request: NextRequest) {
       referralCode: true, level: true, mainBalance: true, depositBalance: true, profitBalance: true,
       totalDeposit: true, totalWithdraw: true, totalProfit: true, isSuspended: true,
       isVerified: true, email: true,
+      wdAccountLocked: true, wdPaymentType: true, wdPaymentMethod: true, wdAccountNo: true, wdHolderName: true,
       createdAt: true,
     },
   });

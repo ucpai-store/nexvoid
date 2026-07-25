@@ -277,6 +277,8 @@ export default function WithdrawPage() {
     maxWithdraw?: number;
     feePercent?: number;
     wdLimitDaily?: boolean;
+    wdAccountLocked?: boolean;
+    wdAccount?: { paymentType?: string; paymentMethod?: string; accountNo?: string; holderName?: string } | null;
   }>({});
 
   // Popup modal "tunggu hari berikutnya" — auto muncul saat user buka halaman WD & sudah WD hari ini
@@ -364,6 +366,8 @@ export default function WithdrawPage() {
   const feeRate = (meta.feePercent || 10) / 100;
   const hasPendingWithdrawal = meta.hasPendingWithdrawal || false;
   const wdLimitDaily = meta.wdLimitDaily || false;
+  const wdAccountLocked = meta.wdAccountLocked || false;
+  const lockedAccount = meta.wdAccount || null;
   const fee = Math.round(numAmount * feeRate);
   const netAmount = numAmount - fee;
   const mainBalance = user?.mainBalance || 0;
@@ -407,6 +411,8 @@ export default function WithdrawPage() {
     if (!numAmount || numAmount < minWithdraw) return false;
     if (numAmount > maxWithdraw) return false;
     if (numAmount > mainBalance) return false;
+    // ★ Akun WD terkunci: data bank udah tersimpan, cuma butuh amount
+    if (wdAccountLocked) return true;
     switch (selectedCategory) {
       case 'bank': return !!selectedBank && !!accountNo && !!holderName;
       case 'ewallet': return !!selectedEwallet && !!accountNo && !!holderName;
@@ -758,6 +764,50 @@ export default function WithdrawPage() {
         className="glass glow-gold rounded-3xl p-4 sm:p-6 border border-primary/10">
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
 
+          {/* ★ LOCKED WD ACCOUNT CARD — tampil kalau akun user udah terkunci */}
+          {wdAccountLocked && lockedAccount ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-2xl p-4 border border-emerald-500/30 bg-emerald-500/5"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-foreground text-sm font-semibold">Akun Penarikan Terkunci</p>
+                    <p className="text-muted-foreground text-[10px]">Data rekening sudah dikunci untuk keamanan. Hubungi admin untuk ubah.</p>
+                  </div>
+                </div>
+                <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-[10px]">
+                  <Check className="w-3 h-3 mr-1" /> Terkunci
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Metode</span>
+                  <p className="text-foreground font-semibold mt-0.5 capitalize">
+                    {lockedAccount.paymentType === 'usdt' ? 'USDT (BEP20)' : `${lockedAccount.paymentMethod || ''} (${lockedAccount.paymentType || 'bank'})`}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">
+                    {lockedAccount.paymentType === 'usdt' ? 'Wallet Address' : lockedAccount.paymentType === 'bank' ? 'Nomor Rekening' : 'Nomor E-Wallet'}
+                  </span>
+                  <p className="text-foreground font-mono font-medium mt-0.5 break-all">{lockedAccount.accountNo}</p>
+                </div>
+                {lockedAccount.paymentType !== 'usdt' && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Nama Pemilik</span>
+                    <p className="text-foreground font-medium mt-0.5">{lockedAccount.holderName}</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          ) : (
+          <>
           {/* ── Category Tabs (Bank / E-Wallet / USDT) ── */}
           <div className="space-y-2">
             <Label className="text-foreground text-sm font-medium flex items-center gap-1.5">
@@ -899,6 +949,8 @@ export default function WithdrawPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          </>
+          )}
 
           {/* ── Premium Amount Input ── */}
           <div className="space-y-2">

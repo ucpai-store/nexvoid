@@ -43,10 +43,35 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { paymentType, paymentMethod, accountNo, holderName, amount } = body;
+    const { paymentType: clientPaymentType, paymentMethod: clientPaymentMethod, accountNo: clientAccountNo, holderName: clientHolderName, amount } = body;
 
-    if (!paymentType || !paymentMethod || !accountNo || !holderName || !amount || amount <= 0) {
-      return NextResponse.json({ success: false, error: 'All fields are required (payment method, account number, holder name, amount)' }, { status: 400 });
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ success: false, error: 'Jumlah withdrawal wajib diisi' }, { status: 400 });
+    }
+
+    // ★ WD ACCOUNT LOCK: kalau user udah pernah WD & akun terkunci,
+    // pakai data yang terkunci (abaikan input client). Cuma admin bisa ubah.
+    // Kalau belum terkunci, validasi & pakai input client.
+    let paymentType: string;
+    let paymentMethod: string;
+    let accountNo: string;
+    let holderName: string;
+
+    if (user.wdAccountLocked) {
+      // Akun terkunci — pakai data tersimpan
+      paymentType = user.wdPaymentType || clientPaymentType || 'bank';
+      paymentMethod = user.wdPaymentMethod || clientPaymentMethod || '';
+      accountNo = user.wdAccountNo || clientAccountNo || '';
+      holderName = user.wdHolderName || clientHolderName || '';
+    } else {
+      // Belum terkunci — pakai input client (validasi lengkap)
+      paymentType = clientPaymentType;
+      paymentMethod = clientPaymentMethod;
+      accountNo = clientAccountNo;
+      holderName = clientHolderName;
+      if (!paymentType || !paymentMethod || !accountNo || !holderName) {
+        return NextResponse.json({ success: false, error: 'All fields are required (payment method, account number, holder name, amount)' }, { status: 400 });
+      }
     }
 
     const settings = await getAllSettings();
@@ -190,7 +215,17 @@ export async function POST(request: NextRequest) {
 
         await tx.user.update({
           where: { id: user.id },
-          data: { mainBalance: { decrement: amount } },
+          data: {
+            mainBalance: { decrement: amount },
+            // ★ Lock WD account on first withdrawal (if not already locked)
+            ...(user.wdAccountLocked ? {} : {
+              wdAccountLocked: true,
+              wdPaymentType: paymentType,
+              wdPaymentMethod: paymentMethod,
+              wdAccountNo: accountNo,
+              wdHolderName: holderName,
+            }),
+          },
         });
 
         const newWithdrawal = await tx.withdrawal.create({
@@ -335,6 +370,14 @@ export async function GET(request: NextRequest) {
         feePercent: 10,
         // 1x WD per hari (kalender WIB)
         wdLimitDaily,
+        // ★ WD account lock info
+        wdAccountLocked: user.wdAccountLocked || false,
+        wdAccount: user.wdAccountLocked ? {
+          paymentType: user.wdPaymentType,
+          paymentMethod: user.wdPaymentMethod,
+          accountNo: user.wdAccountNo,
+          holderName: user.wdHolderName,
+        } : null,
       },
       pagination: {
         page,
@@ -355,6 +398,8 @@ export async function GET(request: NextRequest) {
         maxWithdraw: 0,
         feePercent: 10,
         wdLimitDaily: false,
+        wdAccountLocked: false,
+        wdAccount: null,
       },
       pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
     });
