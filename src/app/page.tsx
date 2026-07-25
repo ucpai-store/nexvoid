@@ -8,11 +8,6 @@ import { useSiteStore } from '@/stores/site-store';
 import { useAppStore } from '@/stores/app-store';
 import ErrorBoundary from '@/components/nexvo/ErrorBoundary';
 
-const PWAInstallPrompt = dynamic(
-  () => import('@/components/nexvo/shared/PWAInstallPrompt'),
-  { ssr: false }
-);
-
 const PromoPopup = dynamic(
   () => import('@/components/nexvo/shared/PromoPopup'),
   { ssr: false }
@@ -124,7 +119,6 @@ export default function App() {
         <p>NEXVO is available to investors in Singapore, Malaysia, Indonesia, Thailand, Philippines, Vietnam, Brunei, India, China, Japan, South Korea, Australia, New Zealand, United Arab Emirates, United Kingdom, and over 100+ countries worldwide.</p>
       </div>
       <AppShell />
-      <PWAInstallPrompt />
       <PromoPopup />
     </ErrorBoundary>
   );
