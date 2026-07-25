@@ -258,7 +258,20 @@ export async function PUT(request: NextRequest) {
 
       return NextResponse.json({ success: true, data: { message: 'User berhasil dihapus' } });
     }
-    default:
+      case 'reset-password': {
+        const newPassword = body.password;
+        if (!newPassword || newPassword.length < 6) {
+          return NextResponse.json({ success: false, error: 'Password baru minimal 6 karakter' }, { status: 400 });
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        updatedUser = await db.user.update({
+          where: { id },
+          data: { password: hashedPassword },
+        });
+        await logAdminAction(admin.id, 'RESET_USER_PASSWORD', `Reset password for user ${user.userId} (${user.name || 'no name'})`);
+        break;
+      }
+      default:
         return NextResponse.json({ success: false, error: 'Action tidak valid' }, { status: 400 });
     }
 
