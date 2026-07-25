@@ -9453,3 +9453,45 @@ Stage Summary:
   - Tambah/Kurang Saldo WD (mainBalance) — saldo penarikan
   - Tambah/Kurang Saldo Deposit (depositBalance) — saldo beli produk
   - Tambah Profit Manual (mainBalance + totalProfit + BonusLog) — tetap ada
+
+---
+Task ID: wd-account-lock
+Agent: main (Z.ai Code)
+Task: Lock akun bank WD — user sekali isi data, terkunci permanen, hanya admin bisa ubah
+
+Work Log:
+- Schema (prisma/schema.prisma): tambah 5 field di User model
+  - wdAccountLocked Boolean @default(false)
+  - wdPaymentType String? (bank|ewallet|usdt)
+  - wdPaymentMethod String? (BCA, Mandiri, DANA, USDT, dll)
+  - wdAccountNo String? (nomor rek / wallet address)
+  - wdHolderName String?
+- WD POST (api/withdraw/route.ts):
+  - Kalau wdAccountLocked=true: pakai data tersimpan, abaikan input client
+  - Kalau false: validasi & pakai input client, lock setelah WD berhasil
+  - Lock terjadi di dalam transaction (atomic dengan balance decrement)
+- WD GET: return wdAccountLocked + wdAccount object di meta
+- auth.ts getUserFromRequest: tambah select field wdAccount* baru
+- WithdrawPage UI:
+  - wdAccountLocked=true → tampilkan "Akun Penarikan Terkunci" card (read-only)
+    dengan Shield icon, badge "Terkunci", data metode/no rek/nama pemilik
+  - Form category tabs + bank selector + account input DISIMPAN saat locked
+  - User cuma input nominal + submit
+  - wdAccountLocked=false → form normal seperti sebelumnya
+- Admin (AdminUsersPage + api/admin/users):
+  - GET users: select wdAccount* fields
+  - Detail dialog: section "Akun WD (Terkunci)" dengan badge + data + tombol Unlock
+  - Action 'unlock-wd-account': reset semua field wdAccount* (user bisa isi baru)
+  - Action 'edit-wd-account': admin edit langsung (tetap terkunci)
+  - logAdminAction untuk audit trail
+- Verified via API: edit-wd-account sets data, unlock-wd-account clears data
+- Verified via Agent Browser:
+  - User WD page: "Akun Penarikan Terkunci" card tampil dengan BCA/1234567890/Budi
+  - Category tabs & bank selector hidden saat locked
+  - Admin detail dialog: section "Akun WD (Terkunci)" dengan 🔒 badge + Unlock button
+
+Stage Summary:
+- Commit: 1fd484c
+- Files: prisma/schema.prisma, src/app/api/withdraw/route.ts, src/app/api/admin/users/route.ts,
+  src/lib/auth.ts, src/components/nexvo/pages/WithdrawPage.tsx, src/components/nexvo/pages/AdminUsersPage.tsx
+- Flow: User WD pertama → isi data → lock. WD berikutnya → cuma nominal. Admin bisa unlock/edit.
