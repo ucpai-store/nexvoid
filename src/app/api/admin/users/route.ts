@@ -176,6 +176,7 @@ export async function PUT(request: NextRequest) {
           where: { id },
           data: { mainBalance: { increment: addAmount } },
         });
+        await logAdminAction(admin.id, 'ADD_SALDO_WD', `Tambah saldo WD ${formatRupiahAdmin(addAmount)} to user ${user.userId} (${user.name || 'no name'})`);
         break;
       }
       case 'reduce-saldo': {
@@ -190,6 +191,36 @@ export async function PUT(request: NextRequest) {
           where: { id },
           data: { mainBalance: { decrement: reduceAmount } },
         });
+        await logAdminAction(admin.id, 'REDUCE_SALDO_WD', `Kurangi saldo WD ${formatRupiahAdmin(reduceAmount)} from user ${user.userId} (${user.name || 'no name'})`);
+        break;
+      }
+      case 'add-deposit': {
+        // ★ Tambah Saldo Deposit (depositBalance) — terpisah dari saldo WD (mainBalance)
+        const addAmount = parseFloat(String(amount || 0));
+        if (addAmount <= 0) {
+          return NextResponse.json({ success: false, error: 'Jumlah harus lebih dari 0' }, { status: 400 });
+        }
+        updatedUser = await db.user.update({
+          where: { id },
+          data: { depositBalance: { increment: addAmount } },
+        });
+        await logAdminAction(admin.id, 'ADD_SALDO_DEPOSIT', `Tambah saldo deposit ${formatRupiahAdmin(addAmount)} to user ${user.userId} (${user.name || 'no name'})`);
+        break;
+      }
+      case 'reduce-deposit': {
+        // ★ Kurangi Saldo Deposit (depositBalance)
+        const reduceAmount = parseFloat(String(amount || 0));
+        if (reduceAmount <= 0) {
+          return NextResponse.json({ success: false, error: 'Jumlah harus lebih dari 0' }, { status: 400 });
+        }
+        if (user.depositBalance < reduceAmount) {
+          return NextResponse.json({ success: false, error: 'Saldo deposit tidak mencukupi' }, { status: 400 });
+        }
+        updatedUser = await db.user.update({
+          where: { id },
+          data: { depositBalance: { decrement: reduceAmount } },
+        });
+        await logAdminAction(admin.id, 'REDUCE_SALDO_DEPOSIT', `Kurangi saldo deposit ${formatRupiahAdmin(reduceAmount)} from user ${user.userId} (${user.name || 'no name'})`);
         break;
       }
       case 'suspend': {

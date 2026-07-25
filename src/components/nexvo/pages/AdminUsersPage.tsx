@@ -47,6 +47,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [saldoDialog, setSaldoDialog] = useState<{ userId: string; type: 'add' | 'reduce' | 'profit' } | null>(null);
   const [saldoAmount, setSaldoAmount] = useState('');
+  const [saldoTarget, setSaldoTarget] = useState<'main' | 'deposit'>('main');
   const [processing, setProcessing] = useState(false);
   const [editDialog, setEditDialog] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({ name: '', whatsapp: '', email: '', level: 'Bronze' });
@@ -156,8 +157,12 @@ export default function AdminUsersPage() {
     if (isNaN(amount) || amount <= 0) { toast({ title: 'Jumlah tidak valid', variant: 'destructive' }); return; }
     setProcessing(true);
     try {
-      // ★ v2.3: type='profit' → kirim isProfit=true biar backend bikin BonusLog + update investment
-      const action = saldoDialog.type === 'add' ? 'add-saldo' : saldoDialog.type === 'reduce' ? 'reduce-saldo' : 'add-saldo';
+      // ★ Target saldo: 'main' (WD/utama) atau 'deposit' — kirim action berbeda
+      let action = saldoDialog.type === 'add' ? 'add-saldo' : saldoDialog.type === 'reduce' ? 'reduce-saldo' : 'add-saldo';
+      // Override action kalau target deposit
+      if (saldoDialog.type === 'add' && saldoTarget === 'deposit') action = 'add-deposit';
+      else if (saldoDialog.type === 'reduce' && saldoTarget === 'deposit') action = 'reduce-deposit';
+
       const payload: Record<string, unknown> = { id: saldoDialog.userId, action, amount };
       if (saldoDialog.type === 'profit') {
         payload.isProfit = true;
@@ -169,10 +174,11 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        const msg = saldoDialog.type === 'add' ? 'Saldo ditambahkan' : saldoDialog.type === 'reduce' ? 'Saldo dikurangi' : 'Profit manual dikredit (saldo + riwayat + aset updated)';
+        const targetLabel = saldoDialog.type === 'profit' ? '' : (saldoTarget === 'deposit' ? ' Deposit' : ' WD');
+        const msg = saldoDialog.type === 'add' ? `Saldo${targetLabel} ditambahkan` : saldoDialog.type === 'reduce' ? `Saldo${targetLabel} dikurangi` : 'Profit manual dikredit (saldo + riwayat + aset updated)';
         toast({ title: msg });
         fetchUsers();
-        setSaldoDialog(null); setSaldoAmount('');
+        setSaldoDialog(null); setSaldoAmount(''); setSaldoTarget('main');
       } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
     } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
     finally { setProcessing(false); }
@@ -500,31 +506,57 @@ export default function AdminUsersPage() {
       </Dialog>
 
       {/* Saldo Dialog */}
-      <Dialog open={!!saldoDialog} onOpenChange={(open) => { if (!open) { setSaldoDialog(null); setSaldoAmount(''); } }}>
+      <Dialog open={!!saldoDialog} onOpenChange={(open) => { if (!open) { setSaldoDialog(null); setSaldoAmount(''); setSaldoTarget('main'); } }}>
         <DialogContent className="glass-strong border-primary/20 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient">
-              {saldoDialog?.type === 'add' ? 'Tambah Saldo' : saldoDialog?.type === 'reduce' ? 'Kurangi Saldo' : 'Tambah Profit Manual'}
+              {saldoDialog?.type === 'add'
+                ? saldoTarget === 'deposit' ? 'Tambah Saldo Deposit' : 'Tambah Saldo WD'
+                : saldoDialog?.type === 'reduce'
+                ? saldoTarget === 'deposit' ? 'Kurangi Saldo Deposit' : 'Kurangi Saldo WD'
+                : 'Tambah Profit Manual'}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {saldoDialog?.type === 'profit'
                 ? 'Kredit profit ke user. Saldo + Riwayat + Aset + Total Profit semua ter-update. Anti double-credit (cron gak akan re-credit).'
-                : `Masukkan jumlah saldo yang ingin ${saldoDialog?.type === 'add' ? 'ditambahkan' : 'dikurangi'}`}
+                : `Pilih target saldo & masukkan jumlah yang ingin ${saldoDialog?.type === 'add' ? 'ditambahkan' : 'dikurangi'}`}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label className="text-muted-foreground text-xs mb-2 block">Jumlah (Rp)</Label>
-            <Input type="number" value={saldoAmount} onChange={(e) => setSaldoAmount(e.target.value)} placeholder="Masukkan jumlah..." className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
-            {saldoAmount && parseFloat(saldoAmount) > 0 && (<p className="text-foreground text-sm mt-2">= {formatRupiah(parseFloat(saldoAmount))}</p>)}
+          <div className="py-4 space-y-3">
+            {/* Target Saldo Selector — only for add/reduce, not profit */}
+            {saldoDialog?.type !== 'profit' && (
+              <div>
+                <Label className="text-muted-foreground text-xs mb-2 block">Target Saldo</Label>
+                <Select value={saldoTarget} onValueChange={(v) => setSaldoTarget(v as 'main' | 'deposit')}>
+                  <SelectTrigger className="glass rounded-xl border-primary/20 bg-transparent text-foreground">
+                    <SelectValue placeholder="Pilih target saldo" />
+                  </SelectTrigger>
+                  <SelectContent className="glass-strong border-primary/20">
+                    <SelectItem value="main">💵 Saldo WD (Utama) — bisa ditarik</SelectItem>
+                    <SelectItem value="deposit">🏦 Saldo Deposit — untuk beli produk</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground/70 text-[10px] mt-1.5 leading-relaxed">
+                  {saldoTarget === 'deposit'
+                    ? 'Saldo Deposit dipakai untuk pembelian produk/investasi. Tidak bisa langsung ditarik (WD).'
+                    : 'Saldo WD (Utama) adalah saldo yang bisa ditarik user. Ini saldo penarikan.'}
+                </p>
+              </div>
+            )}
+            <div>
+              <Label className="text-muted-foreground text-xs mb-2 block">Jumlah (Rp)</Label>
+              <Input type="number" value={saldoAmount} onChange={(e) => setSaldoAmount(e.target.value)} placeholder="Masukkan jumlah..." className="glass rounded-xl border-primary/20 bg-transparent text-foreground" />
+              {saldoAmount && parseFloat(saldoAmount) > 0 && (<p className="text-foreground text-sm mt-2">= {formatRupiah(parseFloat(saldoAmount))}</p>)}
+            </div>
             {saldoDialog?.type === 'profit' && (
-              <p className="text-yellow-400/80 text-[11px] mt-2 leading-relaxed">
+              <p className="text-yellow-400/80 text-[11px] leading-relaxed">
                 ⚠️ Ini akan: +saldo, +total profit, +riwayat profit, +aset total profit, update lastProfitDate (anti cron double-credit).
               </p>
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setSaldoDialog(null); setSaldoAmount(''); }} disabled={processing} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
-            <Button onClick={handleSaldoAction} disabled={processing || !saldoAmount} className={`rounded-xl font-semibold ${saldoDialog?.type === 'add' ? 'bg-cardmerald-600 hover:bg-cardmerald-700 text-white' : saldoDialog?.type === 'profit' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}>
+            <Button variant="outline" onClick={() => { setSaldoDialog(null); setSaldoAmount(''); setSaldoTarget('main'); }} disabled={processing} className="rounded-xl border-primary/20 text-foreground">Batal</Button>
+            <Button onClick={handleSaldoAction} disabled={processing || !saldoAmount} className={`rounded-xl font-semibold ${saldoDialog?.type === 'add' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : saldoDialog?.type === 'profit' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}>
               {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : saldoDialog?.type === 'add' ? 'Tambah' : saldoDialog?.type === 'profit' ? 'Kredit Profit' : 'Kurangi'}
             </Button>
           </DialogFooter>
