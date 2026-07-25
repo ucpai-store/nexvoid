@@ -9420,3 +9420,36 @@ Stage Summary:
   - User baru: langsung tersimpan saat daftar
   - User lama: auto-sync saat user tersebut login pertama kali post-deploy
 - Auth tetap aman pakai bcrypt hash; plainPassword cuma untuk visibility admin
+
+---
+Task ID: admin-saldo-deposit-wd-separate
+Agent: main (Z.ai Code)
+Task: Pisahkan aksi admin untuk tambah/kurang Saldo Deposit vs Saldo WD
+
+Work Log:
+- Backend (api/admin/users/route.ts): tambah 2 action baru di PUT switch
+  - 'add-deposit': increment depositBalance + logAdminAction
+  - 'reduce-deposit': decrement depositBalance (cek saldo cukup) + logAdminAction
+  - Tambah logAdminAction ke add-saldo & reduce-saldo yang existing (audit trail)
+- Frontend (AdminUsersPage.tsx):
+  - Tambah state saldoTarget: 'main' | 'deposit'
+  - handleSaldoAction: kirim action berbeda berdasarkan target
+    (add-saldo/add-deposit/reduce-saldo/reduce-deposit)
+  - Saldo dialog: tambah 'Target Saldo' Select dropdown
+    - 💵 Saldo WD (Utama) — bisa ditarik
+    - 🏦 Saldo Deposit — untuk beli produk
+  - Dialog title adaptive: 'Tambah Saldo WD' / 'Tambah Saldo Deposit' / dll
+  - Dialog description adaptive dengan info target
+  - Reset saldoTarget ke 'main' saat dialog tutup
+  - Toast message mention target (deposit/WD)
+- Verified via API: depositBalance & mainBalance berubah independent
+- Verified via Agent Browser: dialog shows target selector, switching updates title,
+  submitting "Tambah Saldo Deposit" 750000 → depositBalance 400k→1.15M, mainBalance tetap 250k
+
+Stage Summary:
+- Commit: 83fe950
+- Files: src/app/api/admin/users/route.ts, src/components/nexvo/pages/AdminUsersPage.tsx
+- Admin sekarang punya kontrol terpisah:
+  - Tambah/Kurang Saldo WD (mainBalance) — saldo penarikan
+  - Tambah/Kurang Saldo Deposit (depositBalance) — saldo beli produk
+  - Tambah Profit Manual (mainBalance + totalProfit + BonusLog) — tetap ada
