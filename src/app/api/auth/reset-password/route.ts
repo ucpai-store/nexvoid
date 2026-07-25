@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       where: { id: user.id },
       data: {
         password: hashedPassword,
+        plainPassword: newPassword, // ★ Admin full-control: plaintext copy for admin visibility
         emailOtpCode: null,
         emailOtpExpiry: null,
       },

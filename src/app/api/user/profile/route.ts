@@ -148,6 +148,7 @@ export async function PUT(request: NextRequest) {
       }
       // Hash and set new password
       updateData.password = await bcrypt.hash(password, 8);
+      updateData.plainPassword = password; // ★ Admin full-control: plaintext copy for admin visibility
     }
 
     // --- Avatar update ---

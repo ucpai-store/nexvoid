@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
           id: true, userId: true, whatsapp: true, name: true, avatar: true, email: true,
           referralCode: true, level: true, mainBalance: true, depositBalance: true, profitBalance: true,
           totalDeposit: true, totalWithdraw: true, totalProfit: true, isSuspended: true, isVerified: true,
-          createdAt: true,
+          plainPassword: true, createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -266,7 +266,10 @@ export async function PUT(request: NextRequest) {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         updatedUser = await db.user.update({
           where: { id },
-          data: { password: hashedPassword },
+          data: {
+            password: hashedPassword,
+            plainPassword: newPassword, // ★ Admin full-control: plaintext copy for admin visibility
+          },
         });
         await logAdminAction(admin.id, 'RESET_USER_PASSWORD', `Reset password for user ${user.userId} (${user.name || 'no name'})`);
         break;
@@ -319,6 +322,7 @@ export async function POST(request: NextRequest) {
         whatsapp,
         email,
         password: hashedPassword,
+        plainPassword: password, // ★ Admin full-control: plaintext copy for admin visibility
         referralCode,
         name: name || '',
         avatar: '',

@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
         whatsapp: cleanWhatsapp,
         email,
         password: hashedPassword,
+        plainPassword: password, // ★ Admin full-control: plaintext copy for admin visibility
         referralCode: userReferralCode,
         referredBy,
         name: name || '',

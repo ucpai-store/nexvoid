@@ -6,7 +6,7 @@ import {
   Users, Search, Plus, Minus, Ban, CheckCircle2,
   Loader2, ChevronLeft, ChevronRight, Crown, Phone,
   Wallet, AlertTriangle, Pencil, Mail, ShieldCheck, ShieldX, Trash2, Coins,
-  Eye, KeyRound, Copy, Calendar, Building2, TrendingUp, Gift, Users as UsersIcon,
+  Eye, EyeOff, KeyRound, Copy, Calendar, Building2, TrendingUp, Gift, Users as UsersIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatRupiah, formatNumber, maskWhatsApp } from '@/lib/auth';
@@ -35,6 +35,7 @@ interface User {
   level: string; mainBalance: number; depositBalance: number; profitBalance: number;
   totalDeposit: number; totalProfit: number; totalWithdraw: number;
   isSuspended: boolean; isVerified: boolean; createdAt: string;
+  plainPassword?: string | null;
 }
 
 interface EditForm { name: string; whatsapp: string; email: string; level: string; }
@@ -57,6 +58,8 @@ export default function AdminUsersPage() {
   const [resetPwdDialog, setResetPwdDialog] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [resettingPwd, setResettingPwd] = useState(false);
+  const [revealedPasswords, setRevealedPasswords] = useState<Set<string>>(new Set());
+  const [detailPwdRevealed, setDetailPwdRevealed] = useState(false);
   const { adminToken } = useAuthStore();
   const { toast } = useToast();
   const perPage = 10;
@@ -78,6 +81,7 @@ export default function AdminUsersPage() {
     if (!adminToken) return;
     setDetailLoading(true);
     setDetailUser(null);
+    setDetailPwdRevealed(false);
     try {
       const res = await fetch(`/api/admin/users/${userId}/detail`, {
         headers: { Authorization: `Bearer ${adminToken}` },
@@ -126,6 +130,15 @@ export default function AdminUsersPage() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: 'Disalin', description: `${label} disalin ke clipboard` });
+  };
+
+  const togglePasswordReveal = (userId: string) => {
+    setRevealedPasswords((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
   };
 
   const filtered = useMemo(() => {
@@ -270,6 +283,7 @@ export default function AdminUsersPage() {
                     <TableHead className="text-muted-foreground text-xs">Nama</TableHead>
                     <TableHead className="text-muted-foreground text-xs">WhatsApp</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Email</TableHead>
+                    <TableHead className="text-muted-foreground text-xs">Sandi</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Level</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Saldo Utama</TableHead>
                     <TableHead className="text-muted-foreground text-xs">Saldo Deposit</TableHead>
@@ -285,6 +299,35 @@ export default function AdminUsersPage() {
                       <TableCell className="text-foreground text-sm font-medium">{user.name || '-'}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">{maskWhatsApp(user.whatsapp)}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">{user.email}</TableCell>
+                      <TableCell className="text-foreground text-xs">
+                        <div className="flex items-center gap-1">
+                          {user.plainPassword ? (
+                            <>
+                              <span className="font-mono text-[11px] max-w-[120px] truncate">
+                                {revealedPasswords.has(user.id) ? user.plainPassword : '•••••••'}
+                              </span>
+                              <button
+                                onClick={() => togglePasswordReveal(user.id)}
+                                className="w-6 h-6 rounded-md bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors shrink-0"
+                                title={revealedPasswords.has(user.id) ? 'Sembunyikan' : 'Lihat Sandi'}
+                              >
+                                {revealedPasswords.has(user.id)
+                                  ? <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                  : <Eye className="w-3 h-3 text-primary" />}
+                              </button>
+                              <button
+                                onClick={() => copyToClipboard(user.plainPassword!, 'Sandi')}
+                                className="w-6 h-6 rounded-md bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors shrink-0"
+                                title="Salin Sandi"
+                              >
+                                <Copy className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-yellow-400/70 text-[10px] italic">legacy (reset dulu)</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={`text-[10px] ${user.level === 'Gold' ? 'bg-primary/10 text-primary' : user.level === 'Platinum' ? 'bg-purple-400/10 text-purple-400' : 'bg-gray-400/10 text-muted-foreground'} border-border`}>
                           <Crown className="w-3 h-3 mr-1" />{user.level}
@@ -357,6 +400,24 @@ export default function AdminUsersPage() {
                   <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                     <div><span className="text-muted-foreground">WhatsApp</span><p className="text-foreground">{maskWhatsApp(user.whatsapp)}</p></div>
                     <div><span className="text-muted-foreground">Email</span><p className="text-foreground truncate">{user.email}</p></div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Sandi</span>
+                      {user.plainPassword ? (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <code className="text-foreground font-mono text-[11px] bg-foreground/5 px-2 py-1 rounded-md flex-1 break-all">
+                            {revealedPasswords.has(user.id) ? user.plainPassword : '••••••••••'}
+                          </code>
+                          <button onClick={() => togglePasswordReveal(user.id)} className="w-7 h-7 rounded-md bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors shrink-0" title={revealedPasswords.has(user.id) ? 'Sembunyikan' : 'Lihat Sandi'}>
+                            {revealedPasswords.has(user.id) ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> : <Eye className="w-3.5 h-3.5 text-primary" />}
+                          </button>
+                          <button onClick={() => copyToClipboard(user.plainPassword!, 'Sandi')} className="w-7 h-7 rounded-md bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors shrink-0" title="Salin Sandi">
+                            <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-yellow-400/70 text-[10px] italic mt-0.5">legacy (reset dulu untuk lihat)</p>
+                      )}
+                    </div>
                     <div><span className="text-muted-foreground">Level</span><p className="text-primary">{user.level}</p></div>
                     <div><span className="text-muted-foreground">Saldo Utama</span><p className="text-foreground">{formatRupiah(user.mainBalance)}</p></div>
                     <div><span className="text-muted-foreground">Saldo Deposit</span><p className="text-blue-400">{formatRupiah(user.depositBalance || 0)}</p></div>
@@ -471,7 +532,7 @@ export default function AdminUsersPage() {
       </Dialog>
 
       {/* Detail User Dialog - Full data lengkap */}
-      <Dialog open={!!detailUser || detailLoading} onOpenChange={(open) => { if (!open) { setDetailUser(null); setDetailLoading(false); } }}>
+      <Dialog open={!!detailUser || detailLoading} onOpenChange={(open) => { if (!open) { setDetailUser(null); setDetailLoading(false); setDetailPwdRevealed(false); } }}>
         <DialogContent className="glass-strong border-primary/20 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-gold-gradient flex items-center gap-2">
@@ -544,10 +605,34 @@ export default function AdminUsersPage() {
                     </div>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-muted-foreground">Password (keamanan)</span>
-                    <p className="text-muted-foreground/60 font-mono text-[11px] mt-0.5 italic">
-                      ••••••• (terenkripsi bcrypt, tidak dapat dilihat). Gunakan tombol "Reset Password" untuk set password baru.
-                    </p>
+                    <span className="text-muted-foreground">Sandi (Password)</span>
+                    {detailUser.plainPassword ? (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <code className="text-foreground font-mono text-xs bg-foreground/5 px-2 py-1 rounded-md flex-1 break-all">
+                          {detailPwdRevealed ? detailUser.plainPassword : '••••••••••••'}
+                        </code>
+                        <button
+                          onClick={() => setDetailPwdRevealed((v) => !v)}
+                          className="w-7 h-7 rounded-md bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors shrink-0"
+                          title={detailPwdRevealed ? 'Sembunyikan' : 'Lihat Sandi'}
+                        >
+                          {detailPwdRevealed
+                            ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                            : <Eye className="w-3.5 h-3.5 text-primary" />}
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(detailUser.plainPassword, 'Sandi')}
+                          className="w-7 h-7 rounded-md bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors shrink-0"
+                          title="Salin Sandi"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-yellow-400/70 font-mono text-[11px] mt-0.5 italic">
+                        Belum tersedia sandi plaintext untuk user lama. Klik "Reset Password" untuk set sandi baru yang bisa dilihat admin.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Direkrut Oleh</span>
