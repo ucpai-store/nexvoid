@@ -16,6 +16,11 @@
  *    - Investment duplikat → mark 'completed' (jangan hard-delete, keep audit trail).
  *
  *  Run on VPS:
+ *    # Fix SEMUA user dengan duplikat (recommended — one shot):
+ *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts --fix-all
+ *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply
+ *
+ *    # Fix per-user (untuk user spesifik):
  *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts
  *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts --apply
  *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts --user=62812xxxx --apply
@@ -27,6 +32,7 @@ import { db } from '../src/lib/db';
 
 const DEFAULT_SEARCH = 'mulyono5';
 const APPLY = process.argv.includes('--apply');
+const FIX_ALL = process.argv.includes('--fix-all');
 const userArg = process.argv.find((a) => a.startsWith('--user='));
 const SEARCH_TERM = (userArg ? userArg.split('=')[1] : DEFAULT_SEARCH) as string;
 
@@ -140,15 +146,109 @@ async function detectDuplicatesForUser(userId: string) {
   };
 }
 
+/**
+ * Fix ALL users with duplicates in one go (v18 ONE-ACTIVE-RULE).
+ * Same logic as `fix-all-dupes` admin action.
+ */
+async function runFixAll() {
+  console.log('🌐 Fix ALL users — detect + fix duplicates untuk SEMUA user\n');
+  const allUsers = await db.user.findMany({
+    select: { id: true, userId: true, name: true, whatsapp: true, email: true, mainBalance: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  console.log(`Total users: ${allUsers.length}\n`);
+
+  const report: { userId: string; name: string; deleted: number; marked: number }[] = [];
+  let totalDeleted = 0;
+  let totalMarked = 0;
+  let usersFixed = 0;
+
+  for (const u of allUsers) {
+    const { sameProductDuplicates, multiActiveViolation } = await detectDuplicatesForUser(u.id);
+    const willDelete = sameProductDuplicates.reduce((sum, d) => sum + (d.count - 1), 0);
+    const willMark = multiActiveViolation ? multiActiveViolation.toRemove.length : 0;
+
+    if (willDelete > 0 || willMark > 0) {
+      usersFixed++;
+      totalDeleted += willDelete;
+      totalMarked += willMark;
+      report.push({ userId: u.userId, name: u.name || '-', deleted: willDelete, marked: willMark });
+      console.log(`  ⚠️  ${u.userId} | ${u.name || '-'} | will delete ${willDelete} same-product dup + mark ${willMark} multi-active 'completed'`);
+    }
+  }
+
+  console.log(`\n  ── RINGKASAN PREVIEW ──`);
+  console.log(`  Users yang bakal diperbaiki: ${usersFixed}`);
+  console.log(`  Total same-product dup dihapus: ${totalDeleted}`);
+  console.log(`  Total multi-active ditandai 'completed': ${totalMarked}`);
+
+  if (usersFixed === 0) {
+    console.log('\n  ✅ Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18.');
+    return;
+  }
+
+  if (!APPLY) {
+    console.log('\n  🔍 DRY-RUN: tidak ada perubahan. Run dengan --apply untuk eksekusi.');
+    console.log('     Contoh: bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply\n');
+    return;
+  }
+
+  // APPLY — execute fix for each user
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  console.log('  ⚡ APPLY — Performing fix for all users...');
+  console.log('═══════════════════════════════════════════════════════════════\n');
+
+  for (const u of allUsers) {
+    const { sameProductDuplicates, multiActiveViolation } = await detectDuplicatesForUser(u.id);
+    let deletedForUser = 0;
+    let markedForUser = 0;
+
+    // A: same-product duplicates — hard delete
+    for (const d of sameProductDuplicates) {
+      const ids = d.purchases.slice(1).map((p) => p.id);
+      if (ids.length === 0) continue;
+      await db.profitLog.deleteMany({ where: { purchaseId: { in: ids } } });
+      await db.investment.updateMany({
+        where: { purchaseId: { in: ids } },
+        data: { purchaseId: null, status: 'completed' },
+      });
+      await db.purchase.deleteMany({ where: { id: { in: ids } } });
+      deletedForUser += ids.length;
+    }
+
+    // B: multi-active violation — re-check active, mark older 'completed'
+    if (multiActiveViolation) {
+      const ids = multiActiveViolation.toRemove.map((p) => p.id);
+      await db.purchase.updateMany({ where: { id: { in: ids } }, data: { status: 'completed' } });
+      await db.investment.updateMany({ where: { purchaseId: { in: ids } }, data: { status: 'completed' } });
+      markedForUser += ids.length;
+    }
+
+    if (deletedForUser > 0 || markedForUser > 0) {
+      console.log(`  ✅ ${u.userId} | ${u.name || '-'} | hapus ${deletedForUser} + mark ${markedForUser} 'completed'`);
+    }
+  }
+
+  console.log(`\n═══════════════════════════════════════════════════════════════`);
+  console.log(`  ✅ Fix selesai. ${usersFixed} user diperbaiki.`);
+  console.log(`     - ${totalDeleted} same-product duplikat dihapus`);
+  console.log(`     - ${totalMarked} multi-active ditandai 'completed' (audit trail dipertahankan)`);
+  console.log(`     - Saldo TIDAK diubah (gunakan admin UI "Set Saldo 0" per user kalau perlu)`);
+  console.log(`═══════════════════════════════════════════════════════════════\n`);
+}
+
 async function main() {
   console.log('\n═══════════════════════════════════════════════════════════════');
   console.log('  NEXVO — Fix Mulyono5 + Audit + ONE-ACTIVE-RULE');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`  Mode       : ${APPLY ? '⚡ APPLY (will modify DB)' : '🔍 DRY-RUN (read-only)'}`);
-  console.log(`  Search term: "${SEARCH_TERM}"`);
+  console.log(`  Scope      : ${FIX_ALL ? '🌐 ALL users (--fix-all)' : `🎯 single user "${SEARCH_TERM}"`}`);
   console.log(`  Fields     : userId | whatsapp | email | name`);
   console.log('═══════════════════════════════════════════════════════════════\n');
 
+  if (FIX_ALL) {
+    return await runFixAll();
+  }
   /* ─── 1. Find target user across all fields ─── */
   const candidates = await findUserEverywhere(SEARCH_TERM);
 

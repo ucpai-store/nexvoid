@@ -72,6 +72,9 @@ export default function AdminUsersPage() {
   const [assetLoading, setAssetLoading] = useState(false);
   const [assetData, setAssetData] = useState<any | null>(null);
   const [assetBusy, setAssetBusy] = useState<string | null>(null); // which action is in progress
+  // ★ Global "Fix Semua Duplikat" — one-click fix all users with duplicate active packages (v18 ONE-ACTIVE-RULE)
+  const [fixAllBusy, setFixAllBusy] = useState(false);
+  const [fixAllReport, setFixAllReport] = useState<any | null>(null);
   const { adminToken } = useAuthStore();
   const { toast } = useToast();
   const perPage = 10;
@@ -291,6 +294,36 @@ export default function AdminUsersPage() {
     }
   };
 
+  // ★ Global Fix All Duplicates — one click, fix SEMUA user yang punya paket duplikat (v18)
+  const handleFixAllDupes = async () => {
+    if (!adminToken) return;
+    if (!confirm('Yakin fix SEMUA user yang punya paket duplikat?\n\nAturan v18: user hanya boleh 1 paket/produk aktif.\n\n- Same-product dup → hapus duplikat, keep latest\n- Multi-active (beda produk) → tandai lama "completed", keep latest\n\nAudit trail dipertahankan. Saldo TIDAK diubah.')) return;
+    setFixAllBusy(true);
+    setFixAllReport(null);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ id: '__global__', action: 'fix-all-dupes' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFixAllReport(data.data);
+        toast({
+          title: `Fix selesai`,
+          description: `${data.data.usersFixed} user diperbaiki · ${data.data.totalDeleted} duplikat dihapus · ${data.data.totalMarked} ditandai 'completed'`,
+        });
+        fetchUsers();
+      } else {
+        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Network Error', variant: 'destructive' });
+    } finally {
+      setFixAllBusy(false);
+    }
+  };
+
   const handleVerify = async (userId: string, isVerified: boolean) => {
     if (!adminToken) return;
     try {
@@ -359,13 +392,86 @@ export default function AdminUsersPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gold-gradient">Kelola Users</h1>
           <p className="text-muted-foreground text-sm">{filtered.length} pengguna terdaftar</p>
         </div>
-        <div className="relative max-w-xs w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Cari nama, ID, WhatsApp, email..."
-            className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground placeholder:text-muted-foreground" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <Button
+            onClick={handleFixAllDupes}
+            disabled={fixAllBusy}
+            variant="outline"
+            className="glass border-amber-500/30 bg-amber-500/5 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400 rounded-xl"
+            title="Fix SEMUA user yang punya paket/produk duplikat (v18: 1 aktif per user)"
+          >
+            {fixAllBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Boxes className="w-4 h-4 mr-2" />}
+            Fix Semua Duplikat
+          </Button>
+          <div className="relative max-w-xs w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Cari nama, ID, WhatsApp, email..."
+              className="pl-10 glass rounded-xl border-primary/20 bg-transparent text-foreground placeholder:text-muted-foreground" />
+          </div>
         </div>
       </motion.div>
+
+      {/* ★ Fix All Report Dialog — show results after handleFixAllDupes */}
+      <Dialog open={!!fixAllReport} onOpenChange={(open) => { if (!open) setFixAllReport(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Boxes className="w-5 h-5 text-amber-500" />
+              Fix Semua Duplikat — Selesai
+            </DialogTitle>
+            <DialogDescription>
+              v18 ONE-ACTIVE-RULE: user hanya boleh punya 1 paket/produk aktif.
+            </DialogDescription>
+          </DialogHeader>
+          {fixAllReport && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-amber-500">{fixAllReport.usersFixed}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">User Diperbaiki</div>
+                </div>
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-red-400">{fixAllReport.totalDeleted}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Duplikat Dihapus</div>
+                </div>
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-emerald-400">{fixAllReport.totalMarked}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Ditandai 'completed'</div>
+                </div>
+              </div>
+              {fixAllReport.report && fixAllReport.report.length > 0 ? (
+                <div className="max-h-64 overflow-y-auto rounded-xl border border-border p-3 space-y-2">
+                  {fixAllReport.report.map((r: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-amber-500/10 text-amber-500 text-[9px] border-border">{r.userId}</Badge>
+                        <span className="text-foreground">{r.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        {r.deletedCount > 0 && <span className="text-red-400">−{r.deletedCount} hapus</span>}
+                        {r.markedCompleted > 0 && <span className="text-emerald-400">→{r.markedCompleted} completed</span>}
+                        {r.deletedCount === 0 && r.markedCompleted === 0 && <span>—</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-sm text-muted-foreground py-4">
+                  Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18.
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                Catatan: Audit trail dipertahankan. Multi-active paket ditandai 'completed' (tidak di-hard-delete).
+                Saldo <span className="text-foreground">TIDAK diubah</span> — pakai "Set Saldo 0" per user kalau perlu.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setFixAllReport(null)} className="bg-primary text-primary-foreground">Tutup</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="glass rounded-2xl overflow-hidden">
