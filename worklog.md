@@ -9690,3 +9690,66 @@ Stage Summary:
   (legacy data) masih bisa dikasih fix manual via:
     bun run scripts/fix-mulyono5-and-dupes.ts --user=<email> (dry-run)
     bun run scripts/fix-mulyono5-and-dupes.ts --user=<email> --apply (eksekusi)
+
+---
+Task ID: 13
+Agent: main (Z.ai Code)
+Task: User nunjukin mulyono5 masih 2 aktif padahal harusnya 1. Tambahin cara gampang buat fix SEMUA user sekaligus (one-click / one-command), bukan satu-satu per user.
+
+Work Log:
+- Cek state: local DB udah clean (mulyono5 = 0 active). User kemungkinan liat VPS production yang belum di-fix.
+- Sebelumnya: cuman ada 'dedupe-purchases' (per-user, handle same-product duplikat aja, TIDAK handle multi-active violation).
+- Update src/app/api/admin/users/route.ts:
+  • Update 'dedupe-purchases': sekarang handle 2 skenario (v18):
+    - A. Same-product duplicate (≥2 active untuk produk yang sama) → hard-delete duplikat (keep latest)
+    - B. Multi-active violation (≥2 active untuk produk BERBEDA) → mark older 'completed' (keep audit trail)
+  • Tambah 'fix-all-dupes' action (early-return sebelum user lookup, pakai id='__global__'):
+    - Iterasi SEMUA user
+    - Apply A + B fix per user
+    - Return report: { usersFixed, totalDeleted, totalMarked, report[] }
+  • Log via logAdminAction('FIX_ALL_DUPES', ...) untuk audit trail.
+- Update src/components/nexvo/pages/AdminUsersPage.tsx:
+  • Tambah state: fixAllBusy, fixAllReport
+  • Tambah handler handleFixAllDupes() — confirm dialog → PUT fix-all-dupes → set report
+  • Tambah tombol 'Fix Semua Duplikat' (amber outline, icon Boxes) di header admin users page
+  • Tambah report dialog: grid 3 stat (usersFixed, totalDeleted, totalMarked) + per-user breakdown list + audit note
+- Update scripts/fix-mulyono5-and-dupes.ts:
+  • Tambah --fix-all flag (kalau set, skip per-user search, langsung fix semua)
+  • Tambah function runFixAll() — preview dulu (dry-run), --apply buat eksekusi
+  • Print ringkasan: usersFixed, totalDeleted, totalMarked + per-user log
+- Test end-to-end:
+  • Seed data test: user 'testerdupe' dengan 2 active purchases (Paket 320 + Paket 650, multi-active violation)
+  • API test via curl: PUT /api/admin/users {id:'__global__', action:'fix-all-dupes'} → return report 1 user fixed, 0 deleted, 1 marked
+  • UI test via Agent Browser:
+    - Login admin (admin/admin123) → navigate to #admin-users
+    - Lihat tombol 'Fix Semua Duplikat' (amber, icon Boxes) di header
+    - Lihat row 'testerdupe | Tester Dupe (2 active)' di table
+    - Click 'Fix Semua Duplikat' → confirm dialog muncul → accept
+    - Report dialog muncul: 1 user diperbaiki, 0 duplikat dihapus, 1 ditandai 'completed'
+    - Per-user row: testerdupe | Tester Dupe (2 active) | →1 completed
+  • Verify DB after: Paket 320 → status='completed', Paket 650 → status='active' (kept), Investments ikut statusnya.
+  • Screenshot saved: agent-ctx/fix-all-dupes-success.png
+- Cleanup: hapus test data (testerdupe user + test products) + hapus temp test scripts.
+- TypeScript check: 0 error baru (cuma 1 pre-existing di AlertDialogAction forceMount).
+- Commit + push GitHub (commit 2a66ff1).
+
+Stage Summary:
+- ✅ Fix Semua Duplikat — one-click di admin UI + one-command di VPS (bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply)
+- ✅ v18 ONE-ACTIVE-RULE: handle BOTH same-product duplicates (hard delete) AND multi-active violations (mark 'completed', keep audit trail)
+- ✅ Audit trail dipertahankan. Saldo TIDAK diubah (pakai "Set Saldo 0" per user kalau perlu).
+- ✅ Agent Browser end-to-end verification PASSED.
+- Files modified:
+  • src/app/api/admin/users/route.ts (update dedupe-purchases + add fix-all-dupes)
+  • src/components/nexvo/pages/AdminUsersPage.tsx (button + dialog + handler)
+  • scripts/fix-mulyono5-and-dupes.ts (--fix-all flag + runFixAll function)
+
+Cara deploy + fix mulyono5 di VPS:
+1. ssh ke VPS → cd /var/www/nexvo → git pull
+2. bun run build && pm2 restart nexvo-web nexvo-cron
+3. Option A (CLI, recommended buat fix banyak user sekaligus):
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all            (DRY-RUN — preview)
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply    (EKSEKUSI)
+4. Option B (Admin UI):
+   Login admin → Kelola Users → klik 'Fix Semua Duplikat' → confirm → lihat report
+5. Kalau perlu set saldo mulyono5 ke 0: buka dialog 📦 Kelola Aset user → 'Set Saldo 0'
+   Atau pakai CLI --user=<email> --apply (per-user, akan auto-set saldo ke 0)
