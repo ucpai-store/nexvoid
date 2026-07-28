@@ -7,7 +7,7 @@ import {
   Loader2, ChevronLeft, ChevronRight, Crown, Phone,
   Wallet, AlertTriangle, Pencil, Mail, ShieldCheck, ShieldX, Trash2, Coins,
   Eye, EyeOff, KeyRound, Copy, Calendar, Building2, TrendingUp, Gift, Users as UsersIcon,
-  Unlock,
+  Unlock, Boxes, Eraser, RefreshCw, AlertOctagon,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatRupiah, formatNumber, maskWhatsApp } from '@/lib/auth';
@@ -67,6 +67,11 @@ export default function AdminUsersPage() {
   const [resettingPwd, setResettingPwd] = useState(false);
   const [revealedPasswords, setRevealedPasswords] = useState<Set<string>>(new Set());
   const [detailPwdRevealed, setDetailPwdRevealed] = useState(false);
+  // ★ Admin full control — Kelola Aset
+  const [assetDialog, setAssetDialog] = useState<User | null>(null);
+  const [assetLoading, setAssetLoading] = useState(false);
+  const [assetData, setAssetData] = useState<any | null>(null);
+  const [assetBusy, setAssetBusy] = useState<string | null>(null); // which action is in progress
   const { adminToken } = useAuthStore();
   const { toast } = useToast();
   const perPage = 10;
@@ -222,6 +227,68 @@ export default function AdminUsersPage() {
         }
       } else { toast({ title: 'Failed', description: data.error, variant: 'destructive' }); }
     } catch { toast({ title: 'Network Error', variant: 'destructive' }); }
+  };
+
+  /* ════════════════════════════════════════════════════════════════
+   *  ★★★ ADMIN FULL CONTROL — Kelola Aset User
+   * ════════════════════════════════════════════════════════════════ */
+  const openAssetDialog = async (user: User) => {
+    setAssetDialog(user);
+    setAssetData(null);
+    setAssetLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/detail`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAssetData(data.data);
+      } else {
+        toast({ title: 'Gagal memuat aset', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Network Error', variant: 'destructive' });
+    } finally {
+      setAssetLoading(false);
+    }
+  };
+
+  const reloadAssetData = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/detail`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const data = await res.json();
+      if (data.success) setAssetData(data.data);
+    } catch {
+      // silent
+    }
+  };
+
+  // Generic call for asset actions (single delete, bulk clear, set-saldo-zero, reset-stats, dedupe-purchases, clear-all-assets)
+  const runAssetAction = async (userId: string, action: string, payload: Record<string, unknown> = {}, successMsg?: string, confirmMsg?: string) => {
+    if (!adminToken) return;
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    setAssetBusy(action);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ id: userId, action, ...payload }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: successMsg || 'Aksi berhasil' });
+        await reloadAssetData(userId);
+        fetchUsers();
+      } else {
+        toast({ title: 'Gagal', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Network Error', variant: 'destructive' });
+    } finally {
+      setAssetBusy(null);
+    }
   };
 
   const handleVerify = async (userId: string, isVerified: boolean) => {
@@ -380,6 +447,9 @@ export default function AdminUsersPage() {
                           <button onClick={() => openDetail(user.id)} className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center hover:bg-blue-500/20 transition-colors" title="Lihat Detail Lengkap">
                             <Eye className="w-3.5 h-3.5 text-blue-400" />
                           </button>
+                          <button onClick={() => openAssetDialog(user)} className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center hover:bg-teal-500/20 transition-colors" title="Kelola Aset (hapus aset, set saldo 0, fix duplikat paket)">
+                            <Boxes className="w-3.5 h-3.5 text-teal-400" />
+                          </button>
                           <button onClick={() => openEditDialog(user)} className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors" title="Edit User">
                             <Pencil className="w-3.5 h-3.5 text-primary" />
                           </button>
@@ -457,6 +527,9 @@ export default function AdminUsersPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => openDetail(user.id)} className="rounded-xl border-blue-500/20 text-blue-400 hover:bg-blue-500/10 h-8 text-xs">
                       <Eye className="w-3 h-3 mr-1" /> Detail
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openAssetDialog(user)} className="rounded-xl border-teal-500/20 text-teal-400 hover:bg-teal-500/10 h-8 text-xs">
+                      <Boxes className="w-3 h-3 mr-1" /> Aset
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => openEditDialog(user)} className="rounded-xl border-primary/20 text-primary hover:bg-primary/5 h-8 text-xs">
                       <Pencil className="w-3 h-3 mr-1" /> Edit
@@ -996,6 +1069,569 @@ export default function AdminUsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ════════════════════════════════════════════════════════════════
+       *  ★★★ KEOLOLA ASET DIALOG — Admin full control: hapus aset per item / bulk / set saldo 0 / fix duplikat paket
+       * ════════════════════════════════════════════════════════════════ */}
+      <Dialog open={!!assetDialog} onOpenChange={(open) => { if (!open) { setAssetDialog(null); setAssetData(null); } }}>
+        <DialogContent className="glass-strong border-primary/20 max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-gold-gradient flex items-center gap-2">
+              <Boxes className="w-4 h-4" /> Kelola Aset User
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Full kontrol aset user: <span className="text-foreground font-mono">{assetDialog?.userId}</span> — {assetDialog?.name || 'no name'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {assetLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : assetData ? (
+            <div className="space-y-4 py-2">
+              {/* Quick Actions — Saldo & Stats */}
+              <div className="glass rounded-xl p-4 border border-orange-500/30 bg-orange-500/5">
+                <h3 className="text-foreground text-sm font-semibold mb-3 flex items-center gap-2">
+                  <AlertOctagon className="w-4 h-4 text-orange-400" /> Aksi Cepat
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(
+                      assetDialog!.id,
+                      'set-saldo-zero',
+                      {},
+                      'Saldo user di-set ke 0 (main+deposit+profit)',
+                      'Yakin set saldo user ini ke 0? Saldo WD + Saldo Deposit + Saldo Profit semua jadi 0.'
+                    )}
+                    disabled={assetBusy === 'set-saldo-zero'}
+                    className="rounded-xl border-orange-500/30 text-orange-400 hover:bg-orange-500/10 h-9 text-xs"
+                  >
+                    {assetBusy === 'set-saldo-zero' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Eraser className="w-3 h-3 mr-1" />}
+                    Set Saldo 0
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(
+                      assetDialog!.id,
+                      'reset-stats',
+                      {},
+                      'Statistik (total deposit/WD/profit) di-reset ke 0',
+                      'Yakin reset statistik user ini? totalDeposit, totalWithdraw, totalProfit jadi 0. Saldo utama TIDAK diubah.'
+                    )}
+                    disabled={assetBusy === 'reset-stats'}
+                    className="rounded-xl border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 h-9 text-xs"
+                  >
+                    {assetBusy === 'reset-stats' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                    Reset Stats
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(
+                      assetDialog!.id,
+                      'dedupe-purchases',
+                      {},
+                      'Paket duplikat di-fix (keep 1 per produk)',
+                      'Yakin fix paket duplikat? Akan keep 1 purchase active per produk (yg paling baru), sisanya dihapus.'
+                    )}
+                    disabled={assetBusy === 'dedupe-purchases'}
+                    className="rounded-xl border-teal-500/30 text-teal-400 hover:bg-teal-500/10 h-9 text-xs"
+                  >
+                    {assetBusy === 'dedupe-purchases' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Boxes className="w-3 h-3 mr-1" />}
+                    Fix Duplikat Paket
+                  </Button>
+                </div>
+                <p className="text-muted-foreground/70 text-[10px] mt-2 leading-relaxed">
+                  Saldo & stats saat ini: Main {formatRupiah(assetData.mainBalance)} • Deposit {formatRupiah(assetData.depositBalance)} • Profit {formatRupiah(assetData.profitBalance)} • TotDep {formatRupiah(assetData.totalDeposit)} • TotWD {formatRupiah(assetData.totalWithdraw)} • TotProfit {formatRupiah(assetData.totalProfit)}
+                </p>
+              </div>
+
+              {/* Purchases — Paket/Produk */}
+              <div className="glass rounded-xl p-4 border border-primary/10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-primary" /> Purchases / Paket ({assetData._counts?.purchases || 0})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(
+                      assetDialog!.id,
+                      'clear-all-purchases',
+                      {},
+                      'Semua purchases dihapus',
+                      'Yakin hapus SEMUA purchases user ini? Tidak bisa dibatalkan.'
+                    )}
+                    disabled={assetBusy === 'clear-all-purchases' || !assetData.purchases?.length}
+                    className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                  >
+                    {assetBusy === 'clear-all-purchases' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                    Hapus Semua
+                  </Button>
+                </div>
+                {/* Duplicate detection */}
+                {(() => {
+                  const active = (assetData.purchases || []).filter((p: any) => p.status === 'active');
+                  const byProduct = new Map<string, any[]>();
+                  for (const p of active) {
+                    const arr = byProduct.get(p.productId) || [];
+                    arr.push(p);
+                    byProduct.set(p.productId, arr);
+                  }
+                  const dupes: string[] = [];
+                  for (const [pid, arr] of byProduct) {
+                    if (arr.length > 1) dupes.push(`${arr[0].product?.name || pid} (×${arr.length})`);
+                  }
+                  if (dupes.length === 0) return null;
+                  return (
+                    <div className="mb-3 p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs">
+                      <p className="text-red-400 font-semibold flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Paket Duplikat Ditemukan!
+                      </p>
+                      <p className="text-red-300/80 mt-1">{dupes.join(', ')}</p>
+                      <p className="text-muted-foreground text-[10px] mt-1">Klik "Fix Duplikat Paket" di atas untuk hapus duplikat (keep 1 per produk).</p>
+                    </div>
+                  );
+                })()}
+                {assetData.purchases?.length > 0 ? (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {assetData.purchases.map((p: any) => (
+                      <div key={p.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {p.product?.name || '(deleted)'} — {formatRupiah(p.totalPrice)} (qty {p.quantity})
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            {new Date(p.createdAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB
+                            {' • '}profit earned: {formatRupiah(p.profitEarned || 0)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge className={`text-[9px] ${p.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted-500/10 text-muted-foreground'} border-border`}>
+                            {p.status}
+                          </Badge>
+                          <button
+                            onClick={() => runAssetAction(
+                              assetDialog!.id,
+                              'delete-purchase',
+                              { purchaseId: p.id },
+                              'Purchase dihapus',
+                              `Yakin hapus purchase ${p.product?.name || p.id}? Profit logs terkait juga dihapus.`
+                            )}
+                            disabled={assetBusy === `delete-purchase`}
+                            className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors"
+                            title="Hapus purchase ini"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">Belum ada purchases</p>
+                )}
+              </div>
+
+              {/* Investments */}
+              <div className="glass rounded-xl p-4 border border-primary/10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-primary" /> Investasi ({assetData._counts?.investments || 0})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(assetDialog!.id, 'clear-all-investments', {}, 'Semua investasi dihapus', 'Yakin hapus SEMUA investasi user ini?')}
+                    disabled={assetBusy === 'clear-all-investments' || !assetData.investments?.length}
+                    className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                  >
+                    {assetBusy === 'clear-all-investments' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                    Hapus Semua
+                  </Button>
+                </div>
+                {assetData.investments?.length > 0 ? (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {assetData.investments.map((inv: any) => (
+                      <div key={inv.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {inv.package?.name || 'Package'} — {formatRupiah(inv.amount)}
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            profit earned: {formatRupiah(inv.totalProfitEarned || 0)} • daily: {formatRupiah(inv.dailyProfit || 0)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge className={`text-[9px] ${inv.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted-500/10 text-muted-foreground'} border-border`}>
+                            {inv.status}
+                          </Badge>
+                          <button
+                            onClick={() => runAssetAction(assetDialog!.id, 'delete-investment', { investmentId: inv.id }, 'Investasi dihapus', `Yakin hapus investasi ${inv.package?.name || inv.id}?`)}
+                            disabled={assetBusy === 'delete-investment'}
+                            className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors"
+                            title="Hapus investasi ini"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">Belum ada investasi</p>
+                )}
+              </div>
+
+              {/* Deposits */}
+              <div className="glass rounded-xl p-4 border border-primary/10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-primary" /> Deposit ({assetData._counts?.deposits || 0})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(assetDialog!.id, 'clear-all-deposits', {}, 'Semua deposit dihapus', 'Yakin hapus SEMUA riwayat deposit user ini?')}
+                    disabled={assetBusy === 'clear-all-deposits' || !assetData.deposits?.length}
+                    className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                  >
+                    {assetBusy === 'clear-all-deposits' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                    Hapus Semua
+                  </Button>
+                </div>
+                {assetData.deposits?.length > 0 ? (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {assetData.deposits.map((dep: any) => (
+                      <div key={dep.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {formatRupiah(dep.amount)} • {dep.paymentName || dep.paymentType || '-'}
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            {dep.depositId} • {new Date(dep.createdAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge className={`text-[9px] ${dep.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400' : dep.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'} border-border`}>
+                            {dep.status}
+                          </Badge>
+                          <button
+                            onClick={() => runAssetAction(assetDialog!.id, 'delete-deposit', { depositId: dep.id }, 'Deposit dihapus', `Yakin hapus deposit ${dep.depositId}?`)}
+                            disabled={assetBusy === 'delete-deposit'}
+                            className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors"
+                            title="Hapus deposit ini"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">Belum ada deposit</p>
+                )}
+              </div>
+
+              {/* Withdrawals */}
+              <div className="glass rounded-xl p-4 border border-primary/10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-primary" /> Withdrawal ({assetData._counts?.withdrawals || 0})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(assetDialog!.id, 'clear-all-withdrawals', {}, 'Semua withdrawal dihapus', 'Yakin hapus SEMUA riwayat withdrawal user ini?')}
+                    disabled={assetBusy === 'clear-all-withdrawals' || !assetData.withdrawals?.length}
+                    className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                  >
+                    {assetBusy === 'clear-all-withdrawals' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                    Hapus Semua
+                  </Button>
+                </div>
+                {assetData.withdrawals?.length > 0 ? (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {assetData.withdrawals.map((wd: any) => (
+                      <div key={wd.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {formatRupiah(wd.amount)} • {wd.bankName} ({wd.accountNo})
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            {wd.withdrawalId} • {new Date(wd.createdAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge className={`text-[9px] ${wd.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400' : wd.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'} border-border`}>
+                            {wd.status}
+                          </Badge>
+                          <button
+                            onClick={() => runAssetAction(assetDialog!.id, 'delete-withdrawal', { withdrawalId: wd.id }, 'Withdrawal dihapus', `Yakin hapus withdrawal ${wd.withdrawalId}?`)}
+                            disabled={assetBusy === 'delete-withdrawal'}
+                            className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors"
+                            title="Hapus withdrawal ini"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">Belum ada withdrawal</p>
+                )}
+              </div>
+
+              {/* Bonus Logs */}
+              <div className="glass rounded-xl p-4 border border-primary/10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-primary" /> Bonus Logs ({assetData._counts?.bonusLogs || 0})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runAssetAction(assetDialog!.id, 'clear-all-bonus-logs', {}, 'Semua bonus logs dihapus', 'Yakin hapus SEMUA riwayat bonus user ini?')}
+                    disabled={assetBusy === 'clear-all-bonus-logs' || !assetData.bonusLogs?.length}
+                    className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                  >
+                    {assetBusy === 'clear-all-bonus-logs' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                    Hapus Semua
+                  </Button>
+                </div>
+                {assetData.bonusLogs?.length > 0 ? (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {assetData.bonusLogs.slice(0, 30).map((bl: any) => (
+                      <div key={bl.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {formatRupiah(bl.amount)} • <span className="capitalize">{bl.type}</span>
+                          </p>
+                          <p className="text-muted-foreground text-[10px] truncate">{bl.description || '-'}</p>
+                        </div>
+                        <button
+                          onClick={() => runAssetAction(assetDialog!.id, 'delete-bonus-log', { bonusLogId: bl.id }, 'Bonus log dihapus', `Yakin hapus bonus log ini?`)}
+                          disabled={assetBusy === 'delete-bonus-log'}
+                          className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0"
+                          title="Hapus bonus log ini"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs italic">Belum ada bonus log</p>
+                )}
+              </div>
+
+              {/* Salary Bonuses */}
+              {assetData.salaryBonuses?.length > 0 && (
+                <div className="glass rounded-xl p-4 border border-primary/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                      <Gift className="w-4 h-4 text-primary" /> Salary Bonuses ({assetData._counts?.salaryBonuses || 0})
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runAssetAction(assetDialog!.id, 'clear-all-salary-bonuses', {}, 'Semua salary bonuses dihapus', 'Yakin hapus SEMUA salary bonuses user ini?')}
+                      disabled={assetBusy === 'clear-all-salary-bonuses'}
+                      className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                    >
+                      {assetBusy === 'clear-all-salary-bonuses' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                      Hapus Semua
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {assetData.salaryBonuses.map((sb: any) => (
+                      <div key={sb.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {formatRupiah(sb.amount)} • week {sb.weekNumber}/{sb.year}
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">direct refs: {sb.directRefs}</p>
+                        </div>
+                        <button
+                          onClick={() => runAssetAction(assetDialog!.id, 'delete-salary-bonus', { salaryBonusId: sb.id }, 'Salary bonus dihapus', `Yakin hapus salary bonus ini?`)}
+                          disabled={assetBusy === 'delete-salary-bonus'}
+                          className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0"
+                          title="Hapus salary bonus ini"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Matching Bonuses */}
+              {assetData.matchingBonuses?.length > 0 && (
+                <div className="glass rounded-xl p-4 border border-primary/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                      <Gift className="w-4 h-4 text-primary" /> Matching Bonuses ({assetData._counts?.matchingBonuses || 0})
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runAssetAction(assetDialog!.id, 'clear-all-matching-bonuses', {}, 'Semua matching bonuses dihapus', 'Yakin hapus SEMUA matching bonuses user ini?')}
+                      disabled={assetBusy === 'clear-all-matching-bonuses'}
+                      className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                    >
+                      {assetBusy === 'clear-all-matching-bonuses' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                      Hapus Semua
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {assetData.matchingBonuses.map((mb: any) => (
+                      <div key={mb.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {formatRupiah(mb.amount)} • level {mb.level} ({mb.rate}%)
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            matched: {formatRupiah(mb.matchedOmzet)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => runAssetAction(assetDialog!.id, 'delete-matching-bonus', { matchingBonusId: mb.id }, 'Matching bonus dihapus', `Yakin hapus matching bonus ini?`)}
+                          disabled={assetBusy === 'delete-matching-bonus'}
+                          className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0"
+                          title="Hapus matching bonus ini"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Referrals */}
+              {assetData.referralsFrom?.length > 0 && (
+                <div className="glass rounded-xl p-4 border border-primary/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                      <UsersIcon className="w-4 h-4 text-primary" /> Referral Network ({assetData._counts?.referrals || 0})
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runAssetAction(assetDialog!.id, 'clear-all-referrals', {}, 'Semua referral dihapus', 'Yakin hapus SEMUA referral user ini (sebagai referrer ATAU referred)?')}
+                      disabled={assetBusy === 'clear-all-referrals'}
+                      className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                    >
+                      {assetBusy === 'clear-all-referrals' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                      Hapus Semua
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {assetData.referralsFrom.map((ref: any) => (
+                      <div key={ref.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {ref.referred?.userId} — {ref.referred?.name || '-'}
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            level {ref.level} • bonus {formatRupiah(ref.bonus)} • {ref.referred?.whatsapp}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => runAssetAction(assetDialog!.id, 'delete-referral', { referralId: ref.id }, 'Referral dihapus', `Yakin hapus referral ${ref.referred?.userId}?`)}
+                          disabled={assetBusy === 'delete-referral'}
+                          className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0"
+                          title="Hapus referral ini"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bank Accounts */}
+              {assetData.banks?.length > 0 && (
+                <div className="glass rounded-xl p-4 border border-primary/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-foreground text-sm font-semibold flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-primary" /> Bank Accounts ({assetData.banks?.length || 0})
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runAssetAction(assetDialog!.id, 'clear-all-bank-accounts', {}, 'Semua bank accounts dihapus', 'Yakin hapus SEMUA bank accounts user ini?')}
+                      disabled={assetBusy === 'clear-all-bank-accounts'}
+                      className="rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 h-7 text-[11px]"
+                    >
+                      {assetBusy === 'clear-all-bank-accounts' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                      Hapus Semua
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {assetData.banks.map((b: any) => (
+                      <div key={b.id} className="bg-foreground/5 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground font-medium truncate">
+                            {b.bankName} — {b.accountNo}
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">{b.holderName}{b.isPrimary && ' • Utama'}</p>
+                        </div>
+                        <button
+                          onClick={() => runAssetAction(assetDialog!.id, 'delete-bank-account', { bankAccountId: b.id }, 'Bank account dihapus', `Yakin hapus bank account ${b.bankName}?`)}
+                          disabled={assetBusy === 'delete-bank-account'}
+                          className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0"
+                          title="Hapus bank account ini"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Nuclear: Clear All Assets */}
+              <div className="glass rounded-xl p-4 border border-red-500/40 bg-red-500/5">
+                <h3 className="text-foreground text-sm font-semibold mb-2 flex items-center gap-2">
+                  <AlertOctagon className="w-4 h-4 text-red-400" /> Nuclear Reset
+                </h3>
+                <p className="text-muted-foreground text-xs mb-3 leading-relaxed">
+                  Hapus <strong className="text-red-400">SEMUA</strong> aset user (purchases, investments, deposits, withdrawals, bonus logs, salary bonuses, matching bonuses, referrals, bank accounts) <strong className="text-red-400">+ reset saldo & statistik ke 0</strong>. Account user tetap ada. Hanya dipakai untuk kasus parah (user mau start bersih).
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => runAssetAction(
+                    assetDialog!.id,
+                    'clear-all-assets',
+                    {},
+                    'SEMUA aset user dihapus + saldo & stats di-reset ke 0',
+                    'Yakin NUCLEAR RESET user ini?\n\nAkan hapus: SEMUA purchases, investments, deposits, withdrawals, bonus logs, salary bonuses, matching bonuses, referrals, bank accounts.\n\n+ Reset: mainBalance, depositBalance, profitBalance, totalDeposit, totalWithdraw, totalProfit, akun WD unlock → semua jadi 0.\n\nAccount user TIDAK dihapus. TIDAK BISA DIBATALKAN.'
+                  )}
+                  disabled={!!assetBusy}
+                  className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold h-9 text-xs w-full"
+                >
+                  {assetBusy === 'clear-all-assets' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertOctagon className="w-4 h-4 mr-2" />}
+                  NUCLEAR RESET — Hapus Semua Aset + Reset Saldo
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAssetDialog(null); setAssetData(null); }} className="rounded-xl border-primary/20 text-foreground">
+              Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

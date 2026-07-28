@@ -258,6 +258,246 @@ export async function PUT(request: NextRequest) {
         await logAdminAction(admin.id, 'EDIT_WD_ACCOUNT', `Edit data akun WD untuk user ${user.userId} (${user.name || 'no name'})`);
         break;
       }
+
+      /* ════════════════════════════════════════════════════════════════
+       *  ★★★ ADMIN FULL CONTROL — Kelola Aset User (hapus per item / hapus semua / set saldo 0 / fix duplikat paket)
+       *  Tambahkan sesuai permintaan: "fitur admin kasi full kontrol bisa hapus aset user dll lengkap ya"
+       * ════════════════════════════════════════════════════════════════ */
+
+      /* ─── Saldo & Stats ─── */
+      case 'set-saldo-zero': {
+        // Set SEMUA saldo user ke 0 (mainBalance, depositBalance, profitBalance)
+        updatedUser = await db.user.update({
+          where: { id },
+          data: { mainBalance: 0, depositBalance: 0, profitBalance: 0 },
+        });
+        await logAdminAction(admin.id, 'SET_SALDO_ZERO', `Set saldo user ${user.userId} (${user.name || 'no name'}) ke 0 (main+deposit+profit)`);
+        break;
+      }
+      case 'reset-stats': {
+        // Reset totalDeposit, totalWithdraw, totalProfit ke 0 (saldo utama TIDAK diubah)
+        updatedUser = await db.user.update({
+          where: { id },
+          data: { totalDeposit: 0, totalWithdraw: 0, totalProfit: 0 },
+        });
+        await logAdminAction(admin.id, 'RESET_STATS', `Reset statistik user ${user.userId} (${user.name || 'no name'}) ke 0`);
+        break;
+      }
+
+      /* ─── Delete single asset by id ─── */
+      case 'delete-purchase': {
+        const purchaseId = String(body.purchaseId || '');
+        if (!purchaseId) return NextResponse.json({ success: false, error: 'purchaseId wajib diisi' }, { status: 400 });
+        const target = await db.purchase.findFirst({ where: { id: purchaseId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Purchase tidak ditemukan' }, { status: 404 });
+        // Cascade: delete profitLogs first, then nullify investment.purchaseId, then delete purchase
+        await db.profitLog.deleteMany({ where: { purchaseId } });
+        await db.investment.updateMany({ where: { purchaseId }, data: { purchaseId: null } });
+        await db.purchase.delete({ where: { id: purchaseId } });
+        await logAdminAction(admin.id, 'DELETE_PURCHASE', `Hapus purchase ${purchaseId} (${formatRupiahAdmin(target.totalPrice)}) dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-investment': {
+        const investmentId = String(body.investmentId || '');
+        if (!investmentId) return NextResponse.json({ success: false, error: 'investmentId wajib diisi' }, { status: 400 });
+        const target = await db.investment.findFirst({ where: { id: investmentId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Investment tidak ditemukan' }, { status: 404 });
+        await db.investment.delete({ where: { id: investmentId } });
+        await logAdminAction(admin.id, 'DELETE_INVESTMENT', `Hapus investment ${investmentId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-deposit': {
+        const depositId = String(body.depositId || '');
+        if (!depositId) return NextResponse.json({ success: false, error: 'depositId wajib diisi' }, { status: 400 });
+        const target = await db.deposit.findFirst({ where: { id: depositId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Deposit tidak ditemukan' }, { status: 404 });
+        await db.deposit.delete({ where: { id: depositId } });
+        await logAdminAction(admin.id, 'DELETE_DEPOSIT', `Hapus deposit ${depositId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-withdrawal': {
+        const withdrawalId = String(body.withdrawalId || '');
+        if (!withdrawalId) return NextResponse.json({ success: false, error: 'withdrawalId wajib diisi' }, { status: 400 });
+        const target = await db.withdrawal.findFirst({ where: { id: withdrawalId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Withdrawal tidak ditemukan' }, { status: 404 });
+        await db.withdrawal.delete({ where: { id: withdrawalId } });
+        await logAdminAction(admin.id, 'DELETE_WITHDRAWAL', `Hapus withdrawal ${withdrawalId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-bonus-log': {
+        const bonusLogId = String(body.bonusLogId || '');
+        if (!bonusLogId) return NextResponse.json({ success: false, error: 'bonusLogId wajib diisi' }, { status: 400 });
+        const target = await db.bonusLog.findFirst({ where: { id: bonusLogId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Bonus log tidak ditemukan' }, { status: 404 });
+        await db.bonusLog.delete({ where: { id: bonusLogId } });
+        await logAdminAction(admin.id, 'DELETE_BONUS_LOG', `Hapus bonus log ${bonusLogId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-salary-bonus': {
+        const salaryBonusId = String(body.salaryBonusId || '');
+        if (!salaryBonusId) return NextResponse.json({ success: false, error: 'salaryBonusId wajib diisi' }, { status: 400 });
+        const target = await db.salaryBonus.findFirst({ where: { id: salaryBonusId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Salary bonus tidak ditemukan' }, { status: 404 });
+        await db.salaryBonus.delete({ where: { id: salaryBonusId } });
+        await logAdminAction(admin.id, 'DELETE_SALARY_BONUS', `Hapus salary bonus ${salaryBonusId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-matching-bonus': {
+        const matchingBonusId = String(body.matchingBonusId || '');
+        if (!matchingBonusId) return NextResponse.json({ success: false, error: 'matchingBonusId wajib diisi' }, { status: 400 });
+        const target = await db.matchingBonus.findFirst({ where: { id: matchingBonusId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Matching bonus tidak ditemukan' }, { status: 404 });
+        await db.matchingBonus.delete({ where: { id: matchingBonusId } });
+        await logAdminAction(admin.id, 'DELETE_MATCHING_BONUS', `Hapus matching bonus ${matchingBonusId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-referral': {
+        const referralId = String(body.referralId || '');
+        if (!referralId) return NextResponse.json({ success: false, error: 'referralId wajib diisi' }, { status: 400 });
+        const target = await db.referral.findFirst({ where: { id: referralId, OR: [{ referrerId: id }, { referredId: id }] } });
+        if (!target) return NextResponse.json({ success: false, error: 'Referral tidak ditemukan' }, { status: 404 });
+        await db.referral.delete({ where: { id: referralId } });
+        await logAdminAction(admin.id, 'DELETE_REFERRAL', `Hapus referral ${referralId} dari user ${user.userId}`);
+        break;
+      }
+      case 'delete-bank-account': {
+        const bankAccountId = String(body.bankAccountId || '');
+        if (!bankAccountId) return NextResponse.json({ success: false, error: 'bankAccountId wajib diisi' }, { status: 400 });
+        const target = await db.bankAccount.findFirst({ where: { id: bankAccountId, userId: id } });
+        if (!target) return NextResponse.json({ success: false, error: 'Bank account tidak ditemukan' }, { status: 404 });
+        await db.bankAccount.delete({ where: { id: bankAccountId } });
+        await logAdminAction(admin.id, 'DELETE_BANK_ACCOUNT', `Hapus bank account ${bankAccountId} (${target.bankName} - ${target.accountNo}) dari user ${user.userId}`);
+        break;
+      }
+
+      /* ─── Clear ALL of one asset type for a user ─── */
+      case 'clear-all-purchases': {
+        const purchases = await db.purchase.findMany({ where: { userId: id }, select: { id: true } });
+        const ids = purchases.map((p) => p.id);
+        if (ids.length > 0) {
+          await db.profitLog.deleteMany({ where: { purchaseId: { in: ids } } });
+          await db.investment.updateMany({ where: { purchaseId: { in: ids } }, data: { purchaseId: null } });
+          await db.purchase.deleteMany({ where: { id: { in: ids } } });
+        }
+        await logAdminAction(admin.id, 'CLEAR_ALL_PURCHASES', `Hapus SEMUA purchases (${ids.length} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-investments': {
+        const count = await db.investment.count({ where: { userId: id } });
+        if (count > 0) await db.investment.deleteMany({ where: { userId: id } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_INVESTMENTS', `Hapus SEMUA investments (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-deposits': {
+        const count = await db.deposit.count({ where: { userId: id } });
+        if (count > 0) await db.deposit.deleteMany({ where: { userId: id } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_DEPOSITS', `Hapus SEMUA deposits (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-withdrawals': {
+        const count = await db.withdrawal.count({ where: { userId: id } });
+        if (count > 0) await db.withdrawal.deleteMany({ where: { userId: id } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_WITHDRAWALS', `Hapus SEMUA withdrawals (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-bonus-logs': {
+        const count = await db.bonusLog.count({ where: { OR: [{ userId: id }, { fromUserId: id }] } });
+        if (count > 0) await db.bonusLog.deleteMany({ where: { OR: [{ userId: id }, { fromUserId: id }] } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_BONUS_LOGS', `Hapus SEMUA bonus logs (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-salary-bonuses': {
+        const count = await db.salaryBonus.count({ where: { userId: id } });
+        if (count > 0) await db.salaryBonus.deleteMany({ where: { userId: id } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_SALARY_BONUSES', `Hapus SEMUA salary bonuses (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-matching-bonuses': {
+        const count = await db.matchingBonus.count({ where: { userId: id } });
+        if (count > 0) await db.matchingBonus.deleteMany({ where: { userId: id } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_MATCHING_BONUSES', `Hapus SEMUA matching bonuses (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-referrals': {
+        const count = await db.referral.count({ where: { OR: [{ referrerId: id }, { referredId: id }] } });
+        if (count > 0) await db.referral.deleteMany({ where: { OR: [{ referrerId: id }, { referredId: id }] } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_REFERRALS', `Hapus SEMUA referrals (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-bank-accounts': {
+        const count = await db.bankAccount.count({ where: { userId: id } });
+        if (count > 0) await db.bankAccount.deleteMany({ where: { userId: id } });
+        await logAdminAction(admin.id, 'CLEAR_ALL_BANK_ACCOUNTS', `Hapus SEMUA bank accounts (${count} item) dari user ${user.userId}`);
+        break;
+      }
+      case 'clear-all-assets': {
+        // Nuclear option: hapus SEMUA aset user (tapi user account tetap ada)
+        await db.salaryBonus.deleteMany({ where: { userId: id } });
+        await db.matchingBonus.deleteMany({ where: { userId: id } });
+        await db.referral.deleteMany({ where: { OR: [{ referrerId: id }, { referredId: id }] } });
+        await db.bonusLog.deleteMany({ where: { OR: [{ userId: id }, { fromUserId: id }] } });
+        const purchases = await db.purchase.findMany({ where: { userId: id }, select: { id: true } });
+        const purchaseIds = purchases.map((p) => p.id);
+        if (purchaseIds.length > 0) {
+          await db.profitLog.deleteMany({ where: { purchaseId: { in: purchaseIds } } });
+          await db.investment.updateMany({ where: { purchaseId: { in: purchaseIds } }, data: { purchaseId: null } });
+          await db.purchase.deleteMany({ where: { id: { in: purchaseIds } } });
+        }
+        await db.investment.deleteMany({ where: { userId: id } });
+        await db.deposit.deleteMany({ where: { userId: id } });
+        await db.withdrawal.deleteMany({ where: { userId: id } });
+        await db.bankAccount.deleteMany({ where: { userId: id } });
+        // Reset saldo + stats ke 0
+        updatedUser = await db.user.update({
+          where: { id },
+          data: {
+            mainBalance: 0, depositBalance: 0, profitBalance: 0,
+            totalDeposit: 0, totalWithdraw: 0, totalProfit: 0,
+            wdAccountLocked: false, wdPaymentType: null, wdPaymentMethod: null, wdAccountNo: null, wdHolderName: null,
+          },
+        });
+        await logAdminAction(admin.id, 'CLEAR_ALL_ASSETS', `Nuclear reset: hapus SEMUA aset + reset saldo & stats user ${user.userId}`);
+        break;
+      }
+
+      /* ─── Fix duplicate active purchases (same product, multiple active) ─── */
+      case 'dedupe-purchases': {
+        // Cari semua active purchases untuk user ini, group by productId.
+        // Untuk setiap group yang punya >1 record active, simpen paling baru (createdAt desc), hapus sisanya.
+        const activePurchases = await db.purchase.findMany({
+          where: { userId: id, status: 'active' },
+          orderBy: { createdAt: 'desc' },
+        });
+        const byProduct = new Map<string, typeof activePurchases>();
+        for (const p of activePurchases) {
+          const arr = byProduct.get(p.productId) || [];
+          arr.push(p);
+          byProduct.set(p.productId, arr);
+        }
+        let deletedCount = 0;
+        const deletedIds: string[] = [];
+        for (const [, arr] of byProduct) {
+          if (arr.length > 1) {
+            // arr[0] = paling baru (keep), arr[1..n] = hapus
+            const toDelete = arr.slice(1);
+            for (const p of toDelete) {
+              deletedIds.push(p.id);
+              deletedCount++;
+            }
+          }
+        }
+        if (deletedIds.length > 0) {
+          await db.profitLog.deleteMany({ where: { purchaseId: { in: deletedIds } } });
+          await db.investment.updateMany({ where: { purchaseId: { in: deletedIds } }, data: { purchaseId: null } });
+          await db.purchase.deleteMany({ where: { id: { in: deletedIds } } });
+        }
+        await logAdminAction(admin.id, 'DEDUPE_PURCHASES', `Fix duplikat paket user ${user.userId}: hapus ${deletedCount} purchase duplikat, keep 1 per produk`);
+        // Return info about what was deleted
+        return NextResponse.json({
+          success: true,
+          data: { deletedCount, message: `Hapus ${deletedCount} purchase duplikat` },
+        });
+      }
       case 'verify': {
         updatedUser = await db.user.update({
           where: { id },
