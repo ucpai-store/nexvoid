@@ -72,7 +72,9 @@ export default function AdminUsersPage() {
   const [assetLoading, setAssetLoading] = useState(false);
   const [assetData, setAssetData] = useState<any | null>(null);
   const [assetBusy, setAssetBusy] = useState<string | null>(null); // which action is in progress
-  // ★ Global "Fix Semua Duplikat" — one-click fix all users with duplicate active packages (v18 ONE-ACTIVE-RULE)
+  // ★ Global "Fix Semua Duplikat" — one-click fix all users with same-asset duplicate
+  //   active packages (v19 PER-ASSET-UNIQUE-RULE). User boleh punya banyak aset
+  //   aktif (VIP1+VIP2+VIP3 bersamaan), tapi 1 aset maks 1 aktif.
   const [fixAllBusy, setFixAllBusy] = useState(false);
   const [fixAllReport, setFixAllReport] = useState<any | null>(null);
   const { adminToken } = useAuthStore();
@@ -294,10 +296,12 @@ export default function AdminUsersPage() {
     }
   };
 
-  // ★ Global Fix All Duplicates — one click, fix SEMUA user yang punya paket duplikat (v18)
+  // ★ Global Fix All Duplicates — one click, fix SEMUA user yang punya same-asset
+  //   duplikat (v19 PER-ASSET-UNIQUE-RULE). User boleh punya banyak aset aktif
+  //   (VIP1+VIP2+VIP3 bersamaan), tapi 1 aset maks 1 aktif.
   const handleFixAllDupes = async () => {
     if (!adminToken) return;
-    if (!confirm('Yakin fix SEMUA user yang punya paket/produk duplikat?\n\nAturan v18: user hanya boleh 1 paket/produk aktif.\n\nBersihkan BOTH:\n- Purchase duplikat (same-product → hapus, multi-active → tandai completed)\n- Investment multi-active (★ source of truth — keep latest, tandai sisanya completed)\n\nAudit trail dipertahankan. Saldo TIDAK diubah.')) return;
+    if (!confirm('Yakin fix SEMUA user yang punya same-asset duplikat?\n\nAturan v19 PER-ASSET-UNIQUE-RULE:\n- User BOLEH punya banyak aset aktif (VIP1 + VIP2 + VIP3 bersamaan)\n- YANG DILARANG: 2 active untuk aset yang sama (same tier index)\n- produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset\n\nAkan dibersihkan:\n- Purchase duplikat (same-product → hapus, keep latest)\n- Investment same-asset duplikat (★ source of truth — keep latest per asset, tandai sisanya completed)\n\nAudit trail dipertahankan. Saldo TIDAK diubah.')) return;
     setFixAllBusy(true);
     setFixAllReport(null);
     try {
@@ -398,7 +402,7 @@ export default function AdminUsersPage() {
             disabled={fixAllBusy}
             variant="outline"
             className="glass border-amber-500/30 bg-amber-500/5 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400 rounded-xl"
-            title="Fix SEMUA user yang punya paket/produk duplikat (v18: 1 aktif per user)"
+            title="Fix SEMUA user yang punya same-asset duplikat (v19: 1 aktif per aset)"
           >
             {fixAllBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Boxes className="w-4 h-4 mr-2" />}
             Fix Semua Duplikat
@@ -421,7 +425,9 @@ export default function AdminUsersPage() {
               Fix Semua Duplikat — Selesai
             </DialogTitle>
             <DialogDescription>
-              v18 ONE-ACTIVE-RULE: user hanya boleh punya 1 paket/produk aktif. Source of truth = tabel Investment.
+              v19 PER-ASSET-UNIQUE-RULE: user boleh punya banyak aset aktif (VIP1+VIP2+VIP3 bersamaan),
+              tapi 1 aset maks 1 aktif. Source of truth = tabel Investment.
+              Matching: produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset.
             </DialogDescription>
           </DialogHeader>
           {fixAllReport && (
@@ -463,7 +469,7 @@ export default function AdminUsersPage() {
                 </div>
               ) : (
                 <div className="text-center text-sm text-muted-foreground py-4">
-                  ✅ Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18 (1 aset aktif per user).
+                  ✅ Tidak ada user dengan same-asset duplikat. Semua sudah sesuai aturan v19 (1 aset aktif per tier, multi-asset allowed).
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground">
@@ -1248,7 +1254,7 @@ export default function AdminUsersPage() {
                       'dedupe-purchases',
                       {},
                       'Paket duplikat di-fix (keep 1 per produk)',
-                      'Yakin fix paket duplikat? Akan keep 1 purchase active per produk (yg paling baru), sisanya dihapus.'
+                      'Yakin fix same-asset duplikat? v19: keep 1 active per aset (tier), boleh banyak aset aktif bersamaan. Mark duplikat per-aset completed (keep latest).'
                     )}
                     disabled={assetBusy === 'dedupe-purchases'}
                     className="rounded-xl border-teal-500/30 text-teal-400 hover:bg-teal-500/10 h-9 text-xs"

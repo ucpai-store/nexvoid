@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
-import { getUserActivePackageInfo } from '@/lib/tier-system';
+import { validateProductPurchase } from '@/lib/tier-system';
 
 // FALLBACK = Gold Premium Aset 1-6 (sama dengan seed-all.js / restore-products.sh / deploy.sh)
 // Dipakai HANYA jika DB error. Modal TIDAK dikembalikan, user hanya terima profit harian.
@@ -234,60 +234,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Product ID wajib diisi' }, { status: 400 });
     }
 
-    // ★ v18 ONE-ACTIVE-RULE: user hanya boleh punya SATU paket/produk aktif.
-    //   Sebelumnya MULTI-ACTIVE (VIP1+VIP2+VIP3 semua aktif). Itu yang bikin
-    //   mulyono5 bisa punya 2 paket aktif. Sekarang: block beli kalau user
-    //   sudah punya active package, sampai kontrak yang aktif selesai.
+    // ★ v19 PER-ASSET-UNIQUE-RULE: user boleh punya BANYAK aset aktif (VIP1+VIP2+VIP3)
+    //   bersamaan. YANG DILARANG: beli aset yang SAMA (same tier index) saat masih aktif.
+    //   Contoh: produk VIP1 aktif → beli paket VIP1 (atau produk VIP1 lagi) = DITOLAK.
+    //            produk VIP1 aktif → beli paket VIP2 = BOLEH (aset beda).
     //
-    //   Cek di tabel Investment (sumber of truth), karena /api/products
-    //   juga create Investment saat beli. Jadi cek Investment = cover
-    //   semua jalur beli (Product page + Paket page).
-    const activeInfo = await getUserActivePackageInfo(user.id);
-    if (activeInfo.hasActive) {
-      const days = activeInfo.daysRemaining ?? 0;
-      const name = activeInfo.activePackageName ?? 'paket aktif';
+    //   Matching: produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset i.
+    //   Source of truth = Investment table (cover semua jalur beli: produk & paket).
+    const productCheck = await validateProductPurchase(user.id, productId);
+    if (!productCheck.ok) {
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            days > 0
-              ? `Anda sudah memiliki paket aktif ("${name}"). Tunggu ${days} hari sampai kontrak selesai sebelum beli paket lain.`
-              : `Anda sudah memiliki paket aktif ("${name}"). Tunggu sampai kontrak selesai sebelum beli paket lain.`,
-        },
+        { success: false, error: productCheck.error },
         { status: 400 }
       );
-    }
-
-    // ★ Backward-compat safety: juga cek tabel Purchase (kalau ada data
-    //   legacy yang punya Purchase active tapi Investment-nya hilang/dihapus).
-    //   Kalau ketemu, treat sama: block beli.
-    const legacyActivePurchase = await db.purchase.findFirst({
-      where: { userId: user.id, status: 'active' },
-      include: { product: { select: { name: true } } },
-    });
-    if (legacyActivePurchase) {
-      // Cek apakah Investment-nya ada. Kalau tidak ada, ini data legacy yang
-      // inconsistent — kita_tolong_ dengan block beli juga (lebih aman).
-      const linkedInvestment = await db.investment.findFirst({
-        where: { purchaseId: legacyActivePurchase.id, status: 'active' },
-        select: { id: true, endDate: true },
-      });
-      if (linkedInvestment) {
-        // Seharusnya tidak ke-trigger karena getUserActivePackageInfo sudah
-        // detect lewat Investment. Tapi kalau ada race condition, ini safety.
-        const msRemaining = (linkedInvestment.endDate?.getTime() ?? 0) - Date.now();
-        const days = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              days > 0
-                ? `Anda sudah memiliki produk aktif ("${legacyActivePurchase.product?.name || 'aktif'}"). Tunggu ${days} hari sampai kontrak selesai.`
-                : `Anda sudah memiliki produk aktif. Tunggu sampai kontrak selesai.`,
-          },
-          { status: 400 }
-        );
-      }
     }
 
     // ★ No-duplicates rule: each product can only be bought ONCE per user.
@@ -306,10 +265,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: `Produk '${product.name}' sedang dihentikan sementara oleh admin.` }, { status: 400 });
     }
 
-    // ★ Defensive backstop: ONE-ACTIVE-RULE block di atas sudah pastikan user
-    // belum punya active package/investment manapun. Cek ini tinggal backstop
-    // kalau ada data legacy yang inconsistent (Purchase active tapi Investment
-    // hilang). Praktis tidak akan ke-trigger di VPS sehat.
+    // ★ Defensive backstop: PER-ASSET-UNIQUE-RULE block di atas sudah pastikan
+    // user belum punya active investment untuk aset yang sama (same tier index).
+    // Cek ini tinggal backstop kalau ada data legacy yang inconsistent (Purchase
+    // active untuk produk yang sama tapi Investment-nya hilang). Praktis tidak
+    // akan ke-trigger di VPS sehat.
     const activePurchase = await db.purchase.findFirst({
       where: { userId: user.id, productId, status: 'active' },
       select: { id: true, status: true },
@@ -344,10 +304,10 @@ export async function POST(request: NextRequest) {
     const totalPrice = product.price * qty;
 
     // ★ Purchase — NO immediate profit. Profit ONLY at 00:00 WIB via cron ★
-    // ★ v18 ONE-ACTIVE-RULE: user hanya boleh punya SATU paket/produk aktif. ★
-    //   JANGAN supersede previous active purchases/investments — block beli
-    //   sudah handle di atas (return error kalau ada active).
-    //   Cron akan credit active investments jam 00:00 WIB.
+    // ★ v19 PER-ASSET-UNIQUE-RULE: user boleh punya banyak aset aktif (beda tier).
+    //   YANG DILARANG: dobel aset yang sama (same tier index). Block beli di atas
+    //   sudah handle (return error kalau aset yg sama masih active).
+    //   Cron akan credit SEMUA active investments jam 00:00 WIB.
     const purchase = await db.$transaction(async (tx) => {
       const currentUser = await tx.user.findUnique({ where: { id: user.id } });
       if (!currentUser) {
@@ -359,9 +319,10 @@ export async function POST(request: NextRequest) {
         throw new Error('Saldo tidak mencukupi');
       }
 
-      // ★ v18 ONE-ACTIVE-RULE: do NOT mark previous purchases/investments
-      // as completed — block beli di atas sudah pastikan user belum punya
-      // paket aktif. New purchase = ONE active package user has.
+      // ★ v19 PER-ASSET-UNIQUE-RULE: do NOT mark previous purchases/investments
+      // as completed — block beli di atas sudah pastikan user belum punya aset
+      // yang sama (same tier index). Other-tier assets remain untouched.
+      // Cron akan credit SEMUA active investments jam 00:00 WIB.
 
       // Deduct from depositBalance first, then mainBalance
       let remaining = totalPrice;

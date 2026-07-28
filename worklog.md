@@ -9795,3 +9795,100 @@ Stage Summary:
 - 📊 Result: 9/9 PASS — system correctly treats produk + paket as 1 aset per tier.
 
 Next step: deploy to VPS + run fix-all script (per worklog Task ID 12).
+
+---
+Task ID: 15
+Agent: main (Z.ai Code)
+Task: CORRECT v18 ONE-ACTIVE-RULE → v19 PER-ASSET-UNIQUE-RULE. User clarified: "bukan 1 aset aktif" — user BOLEH punya banyak aset aktif (VIP1+VIP2+VIP3 bersamaan). Yang dilarang: dobel aset yang sama (same tier index). produk[i] (price asc) ≡ paket[i] (amount asc) = same asset i.
+
+Work Log:
+- User message clarified: "intinya tu bukan 1 aset aktif tu kayak gini produk ni kan ada 3 ya 1 2 3 gitu nah tu yang di aktifkan gitu aset nya paham kan jadi kalau produk 1 dah aktif ya mau beli paket 1 g bisa tunggu kontrak habis"
+- Translation: NOT 1 active total. 3 produk + 3 paket = 3 aset (bukan 6). User can have all 3 active. Only blocked: same asset 2x.
+- Identify all places using v18 ONE-ACTIVE-RULE:
+  • src/lib/tier-system.ts — getUserActivePackageInfo, getUserTierAvailability, validateTierPurchase
+  • src/app/api/products/route.ts — block beli if hasActive
+  • src/app/api/investments/route.ts — block beli if hasActive
+  • src/app/api/admin/users/route.ts — fix-all-dupes + dedupe-purchases actions
+  • scripts/fix-mulyono5-and-dupes.ts — fix-all logic + per-user dedupe
+  • scripts/verify-one-active-rule.ts — verify tests (rename to per-asset)
+  • src/components/nexvo/pages/AdminUsersPage.tsx — UI text & confirm dialog
+- REWRITE src/lib/tier-system.ts (v19 PER-ASSET-UNIQUE-RULE):
+  • Add getPackageAssetIndex(packageId): 1-based rank by amount asc (filter amount>0 AND isActive=true, exclude "Internal Default"/"_internal_default" FK placeholder)
+  • Add getProductAssetIndex(productId): 1-based rank by price asc
+  • Add getUserActiveAssets(userId): Set of asset indices currently active for user. Investment with purchaseId → product rank; without → package rank.
+  • Add getUserActiveAssetInfo(userId, assetIndex): per-asset info (hasActive, name, type, daysRemaining)
+  • Add validateProductPurchase(userId, productId): block if same asset active
+  • Update validateTierPurchase: only block if THIS tier is active (not global lock)
+  • Update getUserTierAvailability: state='active' if user has active investment for THIS tier, others remain 'available' (NOT 'locked')
+  • Keep getUserActivePackageInfo (backward-compat, used by dashboard "any active?" display)
+- UPDATE src/app/api/products/route.ts POST:
+  • Replace `getUserActivePackageInfo + hasActive` block with `validateProductPurchase(userId, productId)`
+  • Returns per-asset error: "Aset X sedang aktif (sama dengan produk ini). Tunggu N hari..."
+  • Multi-asset allowed: beli produk VIP1 + produk VIP2 = OK (different asset)
+- UPDATE src/app/api/investments/route.ts POST:
+  • Replace `getUserActivePackageInfo + hasActive` block with per-asset check via `getPackageAssetIndex + getUserActiveAssets + getUserActiveAssetInfo`
+  • Returns per-asset error message
+  • Keep `validateSequentialPurchase` as safety net (double-check)
+- UPDATE src/app/api/admin/users/route.ts:
+  • fix-all-dupes: group active Investments by asset index (NOT global). For each asset with ≥2 active, keep latest, mark sisanya 'completed' + sync Purchase.
+  • dedupe-purchases: same per-asset logic for single user.
+  • Asset index maps filter: amount>0 AND isActive=true (exclude Internal Default FK placeholder)
+- REWRITE scripts/fix-mulyono5-and-dupes.ts:
+  • Add buildAssetIndexMaps() helper
+  • detectDuplicatesForUser: only same-product (NO multi-active violation)
+  • detectInvestmentViolations: group by asset index, return duplicateGroups per asset
+  • runFixAll: per-asset fix (keep latest per asset, mark sisanya completed)
+  • Per-user fix: same per-asset logic
+  • Audit: same-asset violations only (NOT multi-active)
+- UPDATE src/components/nexvo/pages/AdminUsersPage.tsx:
+  • Update handleFixAllDupes confirm dialog text: "v19 PER-ASSET-UNIQUE-RULE: User BOLEH punya banyak aset aktif (VIP1+VIP2+VIP3 bersamaan). YANG DILARANG: 2 active untuk aset yang sama (same tier index). produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset"
+  • Update per-user dedupe-purchases confirm text
+  • Update page comments + report dialog text
+- REWRITE scripts/verify-one-active-rule.ts:
+  • 14-test comprehensive verification of v19 PER-ASSET-UNIQUE-RULE
+  • TEST 1: Asset index helpers (produk[i] = paket[i] = asset i)
+  • TEST 2-3: User kosong → boleh beli; beli produk 1 → aset 1 aktif
+  • TEST 4-6: Same asset blocked (produk 1 active → block beli paket 1, block beli produk 1 lagi)
+  • TEST 7-9: ★ Multi-asset allowed (produk 1 active → boleh beli paket 2, boleh beli produk 2; beli paket 2 → 2 aset aktif)
+  • TEST 10-11: Same asset blocked after multi-active (block beli paket 2 lagi, block beli produk 2 cross-route)
+  • TEST 12: getUserActiveAssetInfo returns correct type ('product' from produk, 'package' from paket)
+  • TEST 13: Kontrak aset 1 selesai (completed) → bisa beli aset 1 lagi (sambil aset 2 masih aktif)
+  • TEST 14: Konsep 3 aset (produk + paket = same asset)
+- DEBUG: Initial run had 5 FAIL because "Internal Default" package (Rp0) was being included in asset index, shifting all real package indices by 1. Fixed by filtering amount>0 AND isActive=true.
+- Verification FINAL result: 15/15 PASS (100%)
+  ✓ User boleh banyak aset aktif (multi-asset allowed)
+  ✓ Dobel aset yang sama (same tier) → DIBLOCK
+  ✓ produk[i] (price asc) ≡ paket[i] (amount asc) = same asset i
+  ✓ Beli produk VIP1 + beli paket VIP1 (same asset) → DIBLOCK
+  ✓ Beli produk VIP1 + beli paket VIP2 (different asset) → BOLEH
+  ✓ Kontrak selesai → bisa beli aset yang sama lagi
+- TypeScript check: 0 new errors (1 pre-existing in AdminUsersPage AlertDialogAction forceMount — was already there before changes)
+- Dev server starts OK (HTTP 200 on / + /api/site-settings). Agent Browser had connection issues in sandbox, but verify script 15/15 PASS is the strongest proof.
+
+Stage Summary:
+- ✅ v19 PER-ASSET-UNIQUE-RULE implemented end-to-end:
+  • Backend: per-asset block di /api/products + /api/investments (multi-asset allowed)
+  • Fix scripts: per-asset duplicate detection + fix (keep latest per asset)
+  • UI: confirm dialog text updated to reflect new rule
+  • Verification: 14-test suite, 15/15 PASS
+- ✅ Key insight: produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset i
+- ✅ Filter "Internal Default" / "_internal_default" FK placeholder (Rp0) so it doesn't shift real package indices
+- ✅ Source of truth = Investment table (covers both routes: beli via produk + via paket)
+- ✅ Contract completion (status='completed') → user can re-activate same asset
+- Files modified:
+  • src/lib/tier-system.ts (rewrite for v19 PER-ASSET-UNIQUE-RULE)
+  • src/app/api/products/route.ts (per-asset block)
+  • src/app/api/investments/route.ts (per-asset block)
+  • src/app/api/admin/users/route.ts (per-asset fix-all-dupes + dedupe-purchases)
+  • scripts/fix-mulyono5-and-dupes.ts (per-asset logic + audit)
+  • scripts/verify-one-active-rule.ts (14-test verification, 15/15 PASS)
+  • src/components/nexvo/pages/AdminUsersPage.tsx (UI text update)
+
+Cara deploy ke VPS:
+1. ssh ke VPS → cd /var/www/nexvo → git pull
+2. bun run build && pm2 restart nexvo-web nexvo-cron
+3. Fix data existing:
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all            (DRY-RUN — preview)
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply    (EKSEKUSI)
+   atau via Admin UI: Kelola Users → "Fix Semua Duplikat" (text baru: v19 PER-ASSET-UNIQUE-RULE)
+4. Verifikasi: bun run scripts/verify-one-active-rule.ts (harusnya 15/15 PASS)

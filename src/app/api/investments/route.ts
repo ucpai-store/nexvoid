@@ -4,8 +4,10 @@ import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
 import {
   validateSequentialPurchase,
-  getUserTierAvailability,
-  getUserActivePackageInfo,
+  validateTierPurchase,
+  getPackageAssetIndex,
+  getUserActiveAssets,
+  getUserActiveAssetInfo,
 } from '@/lib/tier-system';
 
 // ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
@@ -152,32 +154,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ★ v18 ONE-ACTIVE-RULE: user hanya boleh punya SATU paket/produk aktif.
-    //   Kalau user sudah punya active Investment (entah dari beli PRODUK atau
-    //   PAKET), block beli paket lain sampai kontrak yang aktif selesai.
-    //   Produk & Paket = 1 aset (per user request).
+    // ★ v19 PER-ASSET-UNIQUE-RULE: user boleh punya BANYAK aset aktif bersamaan
+    //   (VIP1 + VIP2 + VIP3 — semua boleh aktif). YANG DILARANG: beli aset yang
+    //   SAMA (same tier index) saat masih aktif.
     //
-    //   Cek di tabel Investment (sumber of truth) — cover semua jalur beli.
-    const activeInfo = await getUserActivePackageInfo(user.id);
-    if (activeInfo.hasActive) {
+    //   Matching: produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset i.
+    //   Jadi kalau user beli paket VIP1, lalu beli produk yg rank-1 (cheapest) =
+    //   same asset → DITOLAK. Tapi beli produk rank-2 = BOLEH (beda aset).
+    //
+    //   Cek: asset index of this package vs user's active assets.
+    const packageAssetIdx = await getPackageAssetIndex(pkg.id);
+    if (!packageAssetIdx) {
+      return NextResponse.json(
+        { success: false, error: 'Paket tidak ditemukan dalam daftar aset' },
+        { status: 400 }
+      );
+    }
+
+    const activeAssets = await getUserActiveAssets(user.id);
+    if (activeAssets.has(packageAssetIdx)) {
+      // Same asset already active → BLOCK. Get info for meaningful error message.
+      const activeInfo = await getUserActiveAssetInfo(user.id, packageAssetIdx);
       const days = activeInfo.daysRemaining ?? 0;
-      const name = activeInfo.activePackageName ?? 'paket aktif';
+      const name = activeInfo.activeAssetName || pkg.name;
       return NextResponse.json(
         {
           success: false,
           error:
             days > 0
-              ? `Anda sudah memiliki paket aktif ("${name}"). Tunggu ${days} hari sampai kontrak selesai sebelum beli paket lain.`
-              : `Anda sudah memiliki paket aktif ("${name}"). Tunggu sampai kontrak selesai sebelum beli paket lain.`,
+              ? `Aset "${name}" sedang aktif (sama dengan paket/produk ini). Tunggu ${days} hari sampai kontrak selesai sebelum beli aset yang sama.`
+              : `Aset "${name}" sedang aktif. Tunggu sampai kontrak selesai sebelum beli aset yang sama.`,
         },
         { status: 400 }
       );
     }
 
-    // ★ Multi-active rule: user BOLEH punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst) ★
-    // Tiap paket generate profit sendiri jam 00:00 WIB. Cron credit SEMUA active investments.
-    // Aturan tunggal: tiap paket hanya bisa dibeli SEKALI per kontrak (180 hari).
-    // Kalau kontrak sudah habis (status='completed'), bisa di-aktivasi lagi.
+    // ★ v19 backward-compat: validateTierPurchase juga boleh dipakai buat
+    //   double-check (cek apakah tier ini active untuk user). Tapi karena kita
+    //   udah cek di atas via getUserActiveAssets (lebih akurat — handle beli via
+    //   produk juga), ini cuma safety net.
     const tierCheck = await validateSequentialPurchase(user.id, packageId);
     if (!tierCheck.ok) {
       return NextResponse.json(
@@ -230,10 +245,10 @@ export async function POST(request: NextRequest) {
           data: updateData,
         });
 
-        // ★ v18 ONE-ACTIVE-RULE: block beli di atas sudah pastikan user belum
-        // punya paket aktif. New investment = ONE active package user has.
-        // Cron akan credit active investments jam 00:00 WIB.
-        // Profit PERTAMA tunggu jam 00:00 WIB (lastProfitDate: null di bawah).
+        // ★ v19 PER-ASSET-UNIQUE-RULE: block beli di atas sudah pastikan user
+        //   belum punya aset yang sama (same tier index) aktif. Boleh punya banyak
+        //   aset aktif (beda tier). Cron credit SEMUA active investments jam 00:00 WIB.
+        //   Profit PERTAMA tunggu jam 00:00 WIB (lastProfitDate: null di bawah).
 
         // Create investment WITHOUT immediate profit — cron will credit at 00:00 WIB
         const investment = await tx.investment.create({

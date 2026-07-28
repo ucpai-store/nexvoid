@@ -1,19 +1,26 @@
 /**
  * ════════════════════════════════════════════════════════════════
- *  NEXVO — Fix Mulyono5 + Audit Duplicate Packages + ONE-ACTIVE-RULE
+ *  NEXVO — Fix Mulyono5 + Audit Duplicate Packages + PER-ASSET-UNIQUE-RULE
  * ════════════════════════════════════════════════════════════════
  *
- *  v18 ONE-ACTIVE-RULE: user hanya boleh punya SATU paket/produk aktif.
- *  Script ini detect:
- *    A. Same-product duplicates (≥2 active purchases untuk produk yang sama)
- *    B. Multi-active violations (≥2 active purchases untuk produk BERBEDA)
- *       — sebelumnya boleh (MULTI-ACTIVE era), sekarang dilarang.
+ *  v19 PER-ASSET-UNIQUE-RULE: user boleh punya BANYAK aset aktif
+ *  (VIP1 + VIP2 + VIP3 bersamaan). Yang dilarang: 2 active investments
+ *  untuk aset yang sama (same tier index).
  *
- *  Fix apply untuk A & B:
- *    - Keep 1 active purchase terbaru (createdAt DESC)
- *    - Purchase duplikat → nullify Investment.purchaseId + delete ProfitLog
- *      + delete Purchase.
- *    - Investment duplikat → mark 'completed' (jangan hard-delete, keep audit trail).
+ *  Matching produk ↔ paket:
+ *    - produk[i] (by price asc) = asset i
+ *    - paket[i] (by amount asc) = asset i
+ *    - produk[i] ≡ paket[i] = same asset
+ *
+ *  Script ini detect:
+ *    A. Same-product Purchase duplicates (≥2 active untuk produk yang sama)
+ *    B. Same-asset Investment duplicates (≥2 active Investments for same asset
+ *       index — includes cross-route: beli via produk + beli via paket)
+ *
+ *  Fix apply:
+ *    A. Hard-delete duplicate Purchases (keep latest per productId)
+ *    B. Mark older Investments 'completed' per asset (keep latest)
+ *       + sync Purchase terkait juga 'completed'
  *
  *  Run on VPS:
  *    # Fix SEMUA user dengan duplikat (recommended — one shot):
@@ -58,7 +65,6 @@ async function findUserEverywhere(term: string) {
   if (exact) matches.push(exact as any);
 
   // 2) Then contains search across all identifier fields
-  // NOTE: SQLite's `contains` is already case-insensitive, no `mode` arg needed.
   const [byUserId, byWhatsapp, byEmail, byName] = await Promise.all([
     db.user.findMany({ where: { userId:   { contains: term } } }),
     db.user.findMany({ where: { whatsapp: { contains: term } } }),
@@ -78,13 +84,47 @@ async function findUserEverywhere(term: string) {
 }
 
 /**
- * Detect duplicates for a user — v18 ONE-ACTIVE-RULE aware.
+ * Build asset index maps:
+ *   - productIndexMap: productId → 1-based asset index (by price asc)
+ *   - pkgIndexMap: packageId → 1-based asset index (by amount asc)
+ *
+ *produk[i] (price asc) ≡ paket[i] (amount asc) = same asset i.
+ */
+async function buildAssetIndexMaps() {
+  const allProducts = await db.product.findMany({
+    orderBy: [{ price: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true, name: true },
+  });
+  const productIndexMap = new Map<string, number>();
+  const productNameMap = new Map<string, string>();
+  allProducts.forEach((p, i) => {
+    productIndexMap.set(p.id, i + 1);
+    productNameMap.set(p.id, p.name);
+  });
+
+  const allPkgs = await db.investmentPackage.findMany({
+    where: { amount: { gt: 0 }, isActive: true },
+    orderBy: [{ amount: 'asc' }, { order: 'asc' }],
+    select: { id: true, name: true },
+  });
+  const pkgIndexMap = new Map<string, number>();
+  const pkgNameMap = new Map<string, string>();
+  allPkgs.forEach((p, i) => {
+    pkgIndexMap.set(p.id, i + 1);
+    pkgNameMap.set(p.id, p.name);
+  });
+
+  return { productIndexMap, productNameMap, pkgIndexMap, pkgNameMap };
+}
+
+/**
+ * Detect duplicates for a user — v19 PER-ASSET-UNIQUE-RULE aware.
  *
  * Returns:
- *   - activePurchases: ALL active purchases (any product), sorted by createdAt DESC.
+ *   - activePurchases: ALL active purchases, sorted by createdAt DESC.
  *   - sameProductDuplicates: groups where same product has ≥2 active.
- *   - multiActiveViolation: under v18, only 1 active purchase allowed TOTAL.
- *     If user has ≥2 active for DIFFERENT products, that's a violation.
+ *   - sameAssetDuplicates: groups where ≥2 active Investments have same asset
+ *     index (includes cross-route: beli via produk + via paket).
  */
 async function detectDuplicatesForUser(userId: string) {
   const activePurchases = await db.purchase.findMany({
@@ -117,70 +157,104 @@ async function detectDuplicatesForUser(userId: string) {
     }
   }
 
-  // B: multi-active violation — under v18, only 1 active purchase allowed TOTAL.
-  // If user has ≥2 active purchases (across ANY products), it's a violation.
-  // Strategy: keep the LATEST active purchase, mark all others 'completed'.
-  let multiActiveViolation: {
-    isViolation: boolean;
-    keepPurchase: typeof activePurchases[number] | null;
-    toRemove: typeof activePurchases;
-    description: string;
-  } | null = null;
-
-  if (activePurchases.length > 1) {
-    const keep = activePurchases[0]; // already sorted desc by createdAt
-    const toRemove = activePurchases.slice(1);
-    const removedNames = toRemove.map((p) => p.product?.name || '(deleted)');
-    multiActiveViolation = {
-      isViolation: true,
-      keepPurchase: keep,
-      toRemove,
-      description: `User punya ${activePurchases.length} paket aktif (harusnya 1). Keep: ${keep.product?.name || '-'}. Hapus: ${removedNames.join(', ')}.`,
-    };
-  }
-
   return {
     activePurchases,
     sameProductDuplicates,
-    multiActiveViolation,
   };
 }
 
 /**
- * Detect active Investments count for a user. v18 ONE-ACTIVE-RULE: max 1 active Investment.
- * (Investment table = source of truth for "active asset", bukan Purchase).
+ * Detect active Investments for a user, grouped by asset index.
+ * v19 PER-ASSET-UNIQUE-RULE: 1 active per asset allowed. ≥2 = duplicate.
+ *
+ * Returns groups where ≥2 active Investments share same asset index.
+ * For each group: keep latest (ordered desc by createdAt), mark sisanya 'completed'.
  */
-async function detectInvestmentViolations(userId: string) {
+async function detectInvestmentViolations(
+  userId: string,
+  maps?: Awaited<ReturnType<typeof buildAssetIndexMaps>>,
+) {
+  const { productIndexMap, pkgIndexMap, productNameMap, pkgNameMap } =
+    maps || (await buildAssetIndexMaps());
+
   const activeInvestments = await db.investment.findMany({
     where: { userId, status: 'active' },
-    orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+    include: {
+      package: { select: { id: true, name: true } },
+      purchase: { select: { product: { select: { id: true, name: true } } } },
+    },
+    orderBy: [{ createdAt: 'desc' }, { startDate: 'desc' }],
   });
+
+  // Group by asset index
+  const byAsset = new Map<number, typeof activeInvestments>();
+  for (const inv of activeInvestments) {
+    let assetIdx: number | null = null;
+    if (inv.purchaseId && inv.purchase?.product) {
+      assetIdx = productIndexMap.get(inv.purchase.product.id) ?? null;
+    } else if (inv.package) {
+      assetIdx = pkgIndexMap.get(inv.package.id) ?? null;
+    }
+    if (assetIdx === null) continue;
+    const arr = byAsset.get(assetIdx) || [];
+    arr.push(inv);
+    byAsset.set(assetIdx, arr);
+  }
+
+  // Find groups with ≥2 active (duplicates)
+  const duplicateGroups: {
+    assetIndex: number;
+    assetName: string;
+    count: number;
+    keep: typeof activeInvestments[number];
+    toMarkCompleted: typeof activeInvestments;
+  }[] = [];
+
+  for (const [assetIdx, arr] of byAsset) {
+    if (arr.length > 1) {
+      const keep = arr[0]; // first = latest (ordered desc)
+      const toMarkCompleted = arr.slice(1);
+      // Asset name: prefer product name (real) over package name (might be _internal_default)
+      const productName = keep.purchase?.product?.name || productNameMap.get(keep.purchase?.product?.id || '') || null;
+      const packageName = keep.package?.name && keep.package.name !== '_internal_default' ? keep.package.name : null;
+      const assetName = productName || packageName || `Aset ${assetIdx}`;
+      duplicateGroups.push({
+        assetIndex: assetIdx,
+        assetName,
+        count: arr.length,
+        keep,
+        toMarkCompleted,
+      });
+    }
+  }
+
   return {
     activeCount: activeInvestments.length,
-    keep: activeInvestments[0] || null,
-    toMarkCompleted: activeInvestments.slice(1),
+    duplicateGroups,
+    toMarkCompleted: duplicateGroups.flatMap((g) => g.toMarkCompleted),
   };
 }
 
 /**
- * Fix ALL users with duplicates in one go (v18 ONE-ACTIVE-RULE).
+ * Fix ALL users with duplicates in one go (v19 PER-ASSET-UNIQUE-RULE).
  * Same logic as `fix-all-dupes` admin action.
- * Cleans BOTH Purchase duplicates AND Investment multi-active (source of truth).
  *
  * Strategi:
  *   1. Same-product Purchase duplikat → hard delete (keep latest per productId).
- *   2. Multi-active Purchase → mark older 'completed' (keep latest).
- *   3. ★ CRITICAL: Investment table (source of truth) — keep latest active, mark sisanya 'completed'.
- *      Handle case Sholeh01: 1 active Purchase tapi 4 active Investments.
- *   4. Sync: kalau Investment 'completed', Purchase terkait juga 'completed'.
+ *   2. ★ Same-asset Investment duplicates → keep latest per asset, mark sisanya
+ *      'completed' + sync Purchase terkait.
+ *
+ * Data user (saldo, profile) TIDAK diubah. Audit trail dijaga (mark, not delete).
  */
 async function runFixAll() {
-  console.log('🌐 Fix ALL users — detect + fix duplicates untuk SEMUA user\n');
+  console.log('🌐 Fix ALL users — detect + fix duplicates untuk SEMUA user (v19 PER-ASSET)\n');
   const allUsers = await db.user.findMany({
     select: { id: true, userId: true, name: true, whatsapp: true, email: true, mainBalance: true },
     orderBy: { createdAt: 'asc' },
   });
   console.log(`Total users: ${allUsers.length}\n`);
+
+  const maps = await buildAssetIndexMaps();
 
   interface UserReport {
     userId: string; name: string;
@@ -211,23 +285,16 @@ async function runFixAll() {
       }
     }
 
-    // ─── STEP 2: multi-active Purchase → mark older 'completed' ───
-    // (re-check after step 1 deletes)
-    const stillActivePurchases_afterStep1 = activePurchases.filter(
-      (p) => !deletedPurchaseIds.includes(p.id),
-    );
+    // ─── STEP 2: ★ v19 per-asset Investment duplicates ───
+    const { duplicateGroups } = await detectInvestmentViolations(u.id, maps);
+    const investmentMarkedIds: string[] = [];
     const purchaseMarkedIds: string[] = [];
-    if (stillActivePurchases_afterStep1.length > 1) {
-      // sort by createdAt desc, keep first, mark rest
-      const sorted = [...stillActivePurchases_afterStep1].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-      );
-      for (const p of sorted.slice(1)) purchaseMarkedIds.push(p.id);
+    for (const g of duplicateGroups) {
+      for (const inv of g.toMarkCompleted) {
+        investmentMarkedIds.push(inv.id);
+        if (inv.purchaseId) purchaseMarkedIds.push(inv.purchaseId);
+      }
     }
-
-    // ─── STEP 3: ★ CRITICAL — Investment table cleanup (source of truth) ───
-    const { toMarkCompleted } = await detectInvestmentViolations(u.id);
-    const investmentMarkedIds = toMarkCompleted.map((inv) => inv.id);
 
     const dp = deletedPurchaseIds.length;
     const mp = purchaseMarkedIds.length;
@@ -255,7 +322,7 @@ async function runFixAll() {
   console.log(`  Total Investment ditandai 'completed': ${totalMarkedInvestments} (★ source of truth)`);
 
   if (usersFixed === 0) {
-    console.log('\n  ✅ Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18 (1 aset aktif per user).');
+    console.log('\n  ✅ Tidak ada user dengan same-asset duplikat. Semua sudah sesuai aturan v19 (1 aset aktif per tier).');
     return;
   }
 
@@ -297,44 +364,27 @@ async function runFixAll() {
       await db.purchase.deleteMany({ where: { id: { in: deletedPurchaseIds } } });
     }
 
-    // STEP 2: multi-active Purchase → mark older 'completed'
-    const stillActivePurchases = await db.purchase.findMany({
-      where: { userId: u.id, status: 'active' },
-      orderBy: { createdAt: 'desc' },
-    });
+    // STEP 2: ★ v19 per-asset Investment duplicates
+    const { duplicateGroups } = await detectInvestmentViolations(u.id, maps);
+    const investmentMarkedIds: string[] = [];
     const purchaseMarkedIds: string[] = [];
-    if (stillActivePurchases.length > 1) {
-      for (const p of stillActivePurchases.slice(1)) purchaseMarkedIds.push(p.id);
+    for (const g of duplicateGroups) {
+      for (const inv of g.toMarkCompleted) {
+        investmentMarkedIds.push(inv.id);
+        if (inv.purchaseId) purchaseMarkedIds.push(inv.purchaseId);
+      }
     }
-    if (purchaseMarkedIds.length > 0) {
-      await db.purchase.updateMany({
-        where: { id: { in: purchaseMarkedIds } },
-        data: { status: 'completed' },
-      });
-      await db.investment.updateMany({
-        where: { purchaseId: { in: purchaseMarkedIds } },
-        data: { status: 'completed' },
-      });
-    }
-
-    // STEP 3: ★ Investment table cleanup (source of truth)
-    const { toMarkCompleted } = await detectInvestmentViolations(u.id);
-    const investmentMarkedIds = toMarkCompleted.map((inv) => inv.id);
     if (investmentMarkedIds.length > 0) {
       await db.investment.updateMany({
         where: { id: { in: investmentMarkedIds } },
         data: { status: 'completed' },
       });
-      // Sync: Purchase terkait juga 'completed' (kalau masih active)
-      const invPurchaseIds = toMarkCompleted
-        .map((inv) => inv.purchaseId)
-        .filter((pid): pid is string => !!pid);
-      if (invPurchaseIds.length > 0) {
-        await db.purchase.updateMany({
-          where: { id: { in: invPurchaseIds }, status: 'active' },
-          data: { status: 'completed' },
-        });
-      }
+    }
+    if (purchaseMarkedIds.length > 0) {
+      await db.purchase.updateMany({
+        where: { id: { in: purchaseMarkedIds }, status: 'active' },
+        data: { status: 'completed' },
+      });
     }
 
     const dp = deletedPurchaseIds.length;
@@ -356,7 +406,7 @@ async function runFixAll() {
 
 async function main() {
   console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log('  NEXVO — Fix Mulyono5 + Audit + ONE-ACTIVE-RULE');
+  console.log('  NEXVO — Fix Mulyono5 + Audit + PER-ASSET-UNIQUE-RULE (v19)');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`  Mode       : ${APPLY ? '⚡ APPLY (will modify DB)' : '🔍 DRY-RUN (read-only)'}`);
   console.log(`  Scope      : ${FIX_ALL ? '🌐 ALL users (--fix-all)' : `🎯 single user "${SEARCH_TERM}"`}`);
@@ -408,13 +458,17 @@ async function main() {
   console.log(`   totalProfit    : ${fmt(target.totalProfit)}`);
   console.log();
 
-  /* ─── 2. Detect duplicates for target (v18: same-product + multi-active) ─── */
-  const { activePurchases, sameProductDuplicates, multiActiveViolation } =
+  /* ─── 2. Detect duplicates for target (v19: same-product + same-asset) ─── */
+  const { activePurchases, sameProductDuplicates } =
     await detectDuplicatesForUser(target.id);
+
+  // Also load investment violations for display
+  const maps = await buildAssetIndexMaps();
+  const { duplicateGroups: sameAssetViolations } = await detectInvestmentViolations(target.id, maps);
 
   console.log(`📦 Active purchases: ${activePurchases.length} total`);
   console.log(`🔁 Same-product duplicate groups: ${sameProductDuplicates.length}`);
-  console.log(`🚫 Multi-active violations: ${multiActiveViolation ? 1 : 0}`);
+  console.log(`🚫 Same-asset Investment duplicates: ${sameAssetViolations.length}`);
 
   if (sameProductDuplicates.length > 0) {
     console.log('\n   ── DUPLICATE PACKAGES (same product, ≥2 active) ──');
@@ -428,17 +482,19 @@ async function main() {
     }
   }
 
-  if (multiActiveViolation) {
-    console.log('\n   ── MULTI-ACTIVE VIOLATION (v18: only 1 active allowed) ──');
-    console.log(`   ${multiActiveViolation.description}`);
-    console.log(`   ✅ KEEP: ${multiActiveViolation.keepPurchase?.product?.name || '-'} | id=${multiActiveViolation.keepPurchase?.id} | created=${ts(multiActiveViolation.keepPurchase?.createdAt ?? null)}`);
-    multiActiveViolation.toRemove.forEach((p, idx) => {
-      console.log(`   ❌ REMOVE: ${p.product?.name || '-'} | id=${p.id} | created=${ts(p.createdAt)}`);
-    });
+  if (sameAssetViolations.length > 0) {
+    console.log('\n   ── SAME-ASSET INVESTMENT DUPLICATES (v19) ──');
+    for (const v of sameAssetViolations) {
+      console.log(`\n   Aset ${v.assetIndex} ("${v.assetName}") — ${v.count} active Investments`);
+      console.log(`     ✅ KEEP: id=${v.keep.id} | created=${ts(v.keep.createdAt)}`);
+      v.toMarkCompleted.forEach((inv, idx) => {
+        console.log(`     ❌ MARK: id=${inv.id} | created=${ts(inv.createdAt)}`);
+      });
+    }
   }
 
-  if (sameProductDuplicates.length === 0 && !multiActiveViolation) {
-    console.log('   ✅ Tidak ada duplikat atau multi-active violation untuk user ini.');
+  if (sameProductDuplicates.length === 0 && sameAssetViolations.length === 0) {
+    console.log('   ✅ Tidak ada same-product atau same-asset duplikat untuk user ini.');
   }
   console.log();
 
@@ -456,8 +512,6 @@ async function main() {
         const ids = toDelete.map((p) => p.id);
         if (ids.length === 0) continue;
 
-        // Nullify linked Investment.purchaseId + mark Investment 'completed'
-        // (so audit trail kept, but profit stops).
         await tx.profitLog.deleteMany({ where: { purchaseId: { in: ids } } });
         await tx.investment.updateMany({
           where: { purchaseId: { in: ids } },
@@ -469,49 +523,35 @@ async function main() {
       }
       console.log(`  ✅ Total same-product duplikat dihapus: ${totalDeleted} purchases`);
 
-      // 3b. Multi-active violation fix — under v18, only 1 active allowed TOTAL.
-      //     Keep latest, mark all others 'completed' (Purchase + Investment).
-      if (multiActiveViolation) {
-        const toRemoveIds = multiActiveViolation.toRemove.map((p) => p.id);
-        console.log(`  🚫 Fix multi-active violation: keep "${multiActiveViolation.keepPurchase?.product?.name || '-'}", mark ${toRemoveIds.length} lainnya 'completed'`);
-        // Mark Purchase 'completed'
-        await tx.purchase.updateMany({
-          where: { id: { in: toRemoveIds } },
-          data: { status: 'completed' },
-        });
-        // Mark linked Investment 'completed' (don't hard-delete — keep audit trail)
-        await tx.investment.updateMany({
-          where: { purchaseId: { in: toRemoveIds } },
-          data: { status: 'completed' },
-        });
-        console.log(`  ✅ ${toRemoveIds.length} paket ditandai 'completed' (audit trail dipertahankan)`);
-      }
-
-      // 3b.★ CRITICAL — Investment table cleanup (source of truth).
-      // Kalau user punya ≥2 active Investments (bisa terjadi tanpa Purchase duplikat,
-      // e.g. Sholeh01: 1 active Purchase tapi 4 active Investments), keep latest, mark sisanya 'completed'.
-      const { toMarkCompleted: invToMark } = await detectInvestmentViolations(target.id);
-      if (invToMark.length > 0) {
-        const invIds = invToMark.map((inv) => inv.id);
-        console.log(`  ★ Fix Investment multi-active: ${invToMark.length + 1} active Investments → keep latest, mark ${invIds.length} 'completed'`);
-        await tx.investment.updateMany({
-          where: { id: { in: invIds } },
-          data: { status: 'completed' },
-        });
-        // Sync: Purchase terkait juga 'completed' (kalau masih active)
-        const invPurchaseIds = invToMark
+      // 3b. ★ v19 — Fix same-asset Investment duplicates per asset.
+      //     Keep latest per asset, mark sisanya 'completed' + sync Purchase.
+      let totalInvestmentMarked = 0;
+      let totalPurchaseMarked = 0;
+      for (const v of sameAssetViolations) {
+        const invIds = v.toMarkCompleted.map((inv) => inv.id);
+        const purchaseIds = v.toMarkCompleted
           .map((inv) => inv.purchaseId)
           .filter((pid): pid is string => !!pid);
-        if (invPurchaseIds.length > 0) {
-          await tx.purchase.updateMany({
-            where: { id: { in: invPurchaseIds }, status: 'active' },
+
+        if (invIds.length > 0) {
+          await tx.investment.updateMany({
+            where: { id: { in: invIds } },
             data: { status: 'completed' },
           });
+          totalInvestmentMarked += invIds.length;
         }
-        console.log(`  ✅ ${invIds.length} Investment ditandai 'completed' (audit trail dipertahankan)`);
+        if (purchaseIds.length > 0) {
+          await tx.purchase.updateMany({
+            where: { id: { in: purchaseIds }, status: 'active' },
+            data: { status: 'completed' },
+          });
+          totalPurchaseMarked += purchaseIds.length;
+        }
+        console.log(`  🚫 Fix same-asset Aset ${v.assetIndex} ("${v.assetName}"): keep latest, mark ${invIds.length} Investment + ${purchaseIds.length} Purchase 'completed'`);
       }
+      console.log(`  ✅ Total same-asset duplicates: ${totalInvestmentMarked} Investment + ${totalPurchaseMarked} Purchase marked 'completed'`);
 
-      // 3c. Set saldo to 0 (main + deposit + profit)
+      // 3c. Set saldo to 0 (main + deposit + profit) — ONLY for mulyono5 legacy cleanup
       const before = {
         main: target.mainBalance,
         dep: target.depositBalance,
@@ -534,9 +574,9 @@ async function main() {
     console.log('   Contoh: bun run scripts/fix-mulyono5-and-dupes.ts --apply\n');
   }
 
-  /* ─── 4. Audit ALL users for duplicate active packages ─── */
+  /* ─── 4. Audit ALL users for duplicate active packages (v19: same-asset) ─── */
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('  🔍 AUDIT — Cek duplikat paket aktif untuk SEMUA user');
+  console.log('  🔍 AUDIT — Cek same-asset duplikat untuk SEMUA user (v19)');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   const allUsers = await db.user.findMany({
@@ -546,12 +586,13 @@ async function main() {
   console.log(`Total users: ${allUsers.length}`);
 
   let usersWithDupes = 0;
-  let usersWithMultiActive = 0;
+  let usersWithSameAsset = 0;
   let totalDupeRecords = 0;
-  let totalMultiActiveRecords = 0;
+  let totalSameAssetRecords = 0;
 
   for (const u of allUsers) {
-    const { sameProductDuplicates, multiActiveViolation } = await detectDuplicatesForUser(u.id);
+    const { sameProductDuplicates } = await detectDuplicatesForUser(u.id);
+    const { duplicateGroups: sameAssetViolations } = await detectInvestmentViolations(u.id, maps);
     if (sameProductDuplicates.length > 0) {
       usersWithDupes++;
       for (const d of sameProductDuplicates) {
@@ -559,25 +600,26 @@ async function main() {
         console.log(`  ⚠️  ${u.userId} | ${u.name || '-'} | same-product dup "${d.productName}" (×${d.count}) — hapus ${d.count - 1}`);
       }
     }
-    if (multiActiveViolation) {
-      usersWithMultiActive++;
-      totalMultiActiveRecords += multiActiveViolation.toRemove.length;
-      console.log(`  🚫 ${u.userId} | ${u.name || '-'} | MULTI-ACTIVE (${multiActiveViolation.toRemove.length + 1} paket aktif) — keep latest, mark ${multiActiveViolation.toRemove.length} 'completed'`);
+    if (sameAssetViolations.length > 0) {
+      usersWithSameAsset++;
+      for (const v of sameAssetViolations) {
+        totalSameAssetRecords += v.toMarkCompleted.length;
+        console.log(`  🚫 ${u.userId} | ${u.name || '-'} | same-asset Aset ${v.assetIndex} "${v.assetName}" (×${v.count}) — keep latest, mark ${v.toMarkCompleted.length} 'completed'`);
+      }
     }
   }
 
   console.log(`\n  ── RINGKASAN AUDIT ──`);
-  console.log(`  Users dengan same-product duplicate: ${usersWithDupes}`);
-  console.log(`  Users dengan multi-active violation : ${usersWithMultiActive}`);
-  console.log(`  Total same-product duplikat         : ${totalDupeRecords}`);
-  console.log(`  Total multi-active to mark completed: ${totalMultiActiveRecords}`);
-  if (usersWithDupes > 0 || usersWithMultiActive > 0) {
-    console.log('\n  👉 Cara fix: buka admin panel → Kelola Users → klik tombol 📦 (Kelola Aset)');
-    console.log('     → lihat banner merah → klik tombol fix.');
-    console.log('     Atau jalankan: bun run scripts/fix-mulyono5-and-dupes.ts --user=<identifier> --apply');
-    console.log('     untuk fix per-user. Tidak ada opsi fix-semua otomatis (admin wajib pilih user).');
+  console.log(`  Users dengan same-product duplicate : ${usersWithDupes}`);
+  console.log(`  Users dengan same-asset violation    : ${usersWithSameAsset}`);
+  console.log(`  Total same-product duplikat          : ${totalDupeRecords}`);
+  console.log(`  Total same-asset to mark completed    : ${totalSameAssetRecords}`);
+  if (usersWithDupes > 0 || usersWithSameAsset > 0) {
+    console.log('\n  👉 Cara fix: jalankan:');
+    console.log('     bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply');
+    console.log('     Atau via admin UI: Kelola Users → "Fix Semua Duplikat"');
   } else {
-    console.log('\n  ✅ Tidak ada user lain dengan duplikat. Selesai.');
+    console.log('\n  ✅ Tidak ada user dengan same-asset duplikat. Semua sesuai v19 PER-ASSET-UNIQUE-RULE.');
   }
 
   console.log('\n═══════════════════════════════════════════════════════════════');

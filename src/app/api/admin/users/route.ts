@@ -89,10 +89,39 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'ID dan action wajib diisi' }, { status: 400 });
     }
 
-    // ★ Global action — fix-all-dupes (v18) — tidak butuh single user lookup
-    // Source of truth "active asset" = Investment table. Purchase = transaksi.
-    // Bersihkan BOTH: Purchase duplikat + Investment multi-active.
+    // ★ Global action — fix-all-dupes (v19 PER-ASSET-UNIQUE-RULE) — tidak butuh
+    //   single user lookup. Source of truth "active asset" = Investment table.
+    //   Bersihkan same-asset duplicates (per tier index). Multi-asset allowed.
     if (action === 'fix-all-dupes') {
+      // ★ v19 PER-ASSET-UNIQUE-RULE: user boleh punya banyak aset aktif (VIP1+VIP2+VIP3
+      //   bersamaan). Yang dilarang: 2 active investments untuk aset yang sama (same tier index).
+      //
+      //   Matching produk ↔ paket:
+      //   - produk[i] (by price asc) = asset i
+      //   - paket[i] (by amount asc) = asset i
+      //   - produk[i] ≡ paket[i] = same asset
+      //
+      //   Untuk setiap user, kelompokkan active Investments berdasarkan asset index:
+      //   - 1 active per asset → keep (boleh)
+      //   - ≥2 active per asset → keep latest (max createdAt), mark sisanya 'completed'
+      //     + sync Purchase terkait juga 'completed'
+      //
+      //   Data user (saldo, profile) TIDAK diubah. Audit trail dijaga (mark, not delete).
+      const allProducts = await db.product.findMany({
+        orderBy: [{ price: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true },
+      });
+      const productIndexMap = new Map<string, number>();
+      allProducts.forEach((p, i) => productIndexMap.set(p.id, i + 1));
+
+      const allPkgs = await db.investmentPackage.findMany({
+        where: { amount: { gt: 0 }, isActive: true },
+        orderBy: [{ amount: 'asc' }, { order: 'asc' }],
+        select: { id: true },
+      });
+      const pkgIndexMap = new Map<string, number>();
+      allPkgs.forEach((p, i) => pkgIndexMap.set(p.id, i + 1));
+
       const allUsers = await db.user.findMany({ select: { id: true, userId: true, name: true } });
       const report: {
         userId: string; name: string;
@@ -105,6 +134,7 @@ export async function PUT(request: NextRequest) {
 
       for (const u of allUsers) {
         // ─── STEP 1: same-product Purchase duplikat (hard delete) ───
+        //   Under v19, same product bought twice = same asset duplicate. Hard-delete older.
         const activePurchases = await db.purchase.findMany({
           where: { userId: u.id, status: 'active' },
           orderBy: { createdAt: 'desc' },
@@ -130,50 +160,63 @@ export async function PUT(request: NextRequest) {
           await db.purchase.deleteMany({ where: { id: { in: deletedPurchaseIds } } });
         }
 
-        // ─── STEP 2: multi-active Purchase → mark older 'completed' ───
-        const stillActivePurchases = await db.purchase.findMany({
-          where: { userId: u.id, status: 'active' },
-          orderBy: { createdAt: 'desc' },
-        });
-        const purchaseMarkedIds: string[] = [];
-        if (stillActivePurchases.length > 1) {
-          for (const p of stillActivePurchases.slice(1)) purchaseMarkedIds.push(p.id);
-        }
-        if (purchaseMarkedIds.length > 0) {
-          await db.purchase.updateMany({ where: { id: { in: purchaseMarkedIds } }, data: { status: 'completed' } });
-          await db.investment.updateMany({
-            where: { purchaseId: { in: purchaseMarkedIds } },
-            data: { status: 'completed' },
-          });
-        }
-
-        // ─── STEP 3: ★ CRITICAL — Clean Investment table (source of truth) ───
-        // Keep latest active Investment, mark sisanya 'completed'.
-        // Handle case Sholeh01: 1 Purchase active tapi 4 active Investments.
+        // ─── STEP 2: ★ v19 — per-asset duplicate detection ───
+        //   Kelompokkan SEMUA active Investments by asset index. Untuk tiap grup
+        //   yg punya ≥2 active, keep latest, mark sisanya 'completed'.
+        //
+        //   Asset index computation:
+        //   - Investment with purchaseId + purchase.product → use product's rank
+        //   - Investment without purchaseId → use package's rank
+        //   - If package is "_internal_default" fallback (purchaseId null but product
+        //     fallback) → treat by product rank via purchase relation (handled above).
         const activeInvestments = await db.investment.findMany({
           where: { userId: u.id, status: 'active' },
-          orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+          include: {
+            package: { select: { id: true, name: true } },
+            purchase: { select: { product: { select: { id: true } } } },
+          },
+          orderBy: [{ createdAt: 'desc' }, { startDate: 'desc' }],
         });
-        const investmentMarkedIds: string[] = [];
-        if (activeInvestments.length > 1) {
-          for (const inv of activeInvestments.slice(1)) investmentMarkedIds.push(inv.id);
+
+        // Group by asset index
+        const byAsset = new Map<number, typeof activeInvestments>();
+        for (const inv of activeInvestments) {
+          let assetIdx: number | null = null;
+          if (inv.purchaseId && inv.purchase?.product) {
+            assetIdx = productIndexMap.get(inv.purchase.product.id) ?? null;
+          } else if (inv.package) {
+            assetIdx = pkgIndexMap.get(inv.package.id) ?? null;
+          }
+          if (assetIdx === null) continue; // skip investments we can't classify
+          const arr = byAsset.get(assetIdx) || [];
+          arr.push(inv);
+          byAsset.set(assetIdx, arr);
         }
+
+        const investmentMarkedIds: string[] = [];
+        const purchaseMarkedIds: string[] = [];
+        for (const [, arr] of byAsset) {
+          if (arr.length > 1) {
+            // Keep first (latest, since ordered desc), mark sisanya
+            for (const inv of arr.slice(1)) {
+              investmentMarkedIds.push(inv.id);
+              if (inv.purchaseId) purchaseMarkedIds.push(inv.purchaseId);
+            }
+          }
+        }
+
         if (investmentMarkedIds.length > 0) {
           await db.investment.updateMany({
             where: { id: { in: investmentMarkedIds } },
             data: { status: 'completed' },
           });
+        }
+        if (purchaseMarkedIds.length > 0) {
           // Sync: Purchase terkait juga 'completed' (kalau masih active)
-          const invPurchaseIds = activeInvestments
-            .slice(1)
-            .map((inv) => inv.purchaseId)
-            .filter((pid): pid is string => !!pid);
-          if (invPurchaseIds.length > 0) {
-            await db.purchase.updateMany({
-              where: { id: { in: invPurchaseIds }, status: 'active' },
-              data: { status: 'completed' },
-            });
-          }
+          await db.purchase.updateMany({
+            where: { id: { in: purchaseMarkedIds }, status: 'active' },
+            data: { status: 'completed' },
+          });
         }
 
         const dp = deletedPurchaseIds.length;
@@ -192,7 +235,7 @@ export async function PUT(request: NextRequest) {
       }
       await logAdminAction(
         admin.id, 'FIX_ALL_DUPES',
-        `Fix semua duplikat: ${usersFixed} user diperbaiki. Hapus ${totalDeletedPurchases} Purchase dup, mark ${totalMarkedPurchases} Purchase + ${totalMarkedInvestments} Investment 'completed'`
+        `Fix per-aset duplikat (v19): ${usersFixed} user diperbaiki. Hapus ${totalDeletedPurchases} Purchase dup, mark ${totalMarkedPurchases} Purchase + ${totalMarkedInvestments} Investment 'completed'`
       );
       return NextResponse.json({
         success: true,
@@ -581,19 +624,34 @@ export async function PUT(request: NextRequest) {
         break;
       }
 
-      /* ─── Fix duplicate active purchases + investments (v18 ONE-ACTIVE-RULE) ─── */
+      /* ─── Fix duplicate active purchases + investments (v19 PER-ASSET-UNIQUE-RULE) ─── */
       case 'dedupe-purchases': {
-        // v18 ONE-ACTIVE-RULE: user hanya boleh punya 1 paket/produk aktif.
-        // Source of truth untuk "active asset" = tabel Investment (status='active').
-        // Tabel Purchase = record transaksi. Investment bisa lebih banyak dari Purchase
-        // (e.g. user beli produk → 1 Purchase + 1 Investment, atau cron/legacy bikin Investment tanpa Purchase).
+        // v19 PER-ASSET-UNIQUE-RULE: user boleh punya banyak aset aktif (VIP1+VIP2+VIP3
+        //   bersamaan). Yang dilarang: 2 active investments untuk aset yang sama
+        //   (same tier index). Matching: produk[i] (price asc) ≡ paket[i] (amount asc).
         //
-        // Strategi fix (urutan):
-        //   1. Hapus same-product Purchase duplikat (hard delete, keep latest per productId).
-        //   2. Mark multi-active Purchase 'completed' (keep latest, audit trail).
-        //   3. ★ CRITICAL: Clean Investment table — keep latest active, mark sisanya 'completed'.
-        //      Ini yang sebenarnya menentukan "active asset" di getUserActivePackageInfo.
-        //   4. Sync: kalau Investment 'completed', Purchase terkait juga 'completed'.
+        // Strategi fix (per user):
+        //   1. Hard-delete same-product Purchase duplikat (keep latest per productId).
+        //   2. Kelompokkan active Investments by asset index. Untuk tiap grup
+        //      yang ≥2 active, keep latest, mark sisanya 'completed' + sync Purchase.
+        //
+        // Data user (saldo, profile) TIDAK diubah. Audit trail dijaga.
+
+        // Preload asset index maps (produk by price asc, paket by amount asc).
+        const allProductsDedupe = await db.product.findMany({
+          orderBy: [{ price: 'asc' }, { createdAt: 'asc' }],
+          select: { id: true },
+        });
+        const productIndexMapDedupe = new Map<string, number>();
+        allProductsDedupe.forEach((p, i) => productIndexMapDedupe.set(p.id, i + 1));
+
+        const allPkgsDedupe = await db.investmentPackage.findMany({
+          where: { amount: { gt: 0 }, isActive: true },
+          orderBy: [{ amount: 'asc' }, { order: 'asc' }],
+          select: { id: true },
+        });
+        const pkgIndexMapDedupe = new Map<string, number>();
+        allPkgsDedupe.forEach((p, i) => pkgIndexMapDedupe.set(p.id, i + 1));
 
         // ─── STEP 1: same-product Purchase duplikat (hard delete) ───
         const activePurchases = await db.purchase.findMany({
@@ -626,65 +684,63 @@ export async function PUT(request: NextRequest) {
           await db.purchase.deleteMany({ where: { id: { in: deletedPurchaseIds } } });
         }
 
-        // ─── STEP 2: multi-active Purchase → mark older 'completed' ───
-        const stillActivePurchases = await db.purchase.findMany({
-          where: { userId: id, status: 'active' },
-          orderBy: { createdAt: 'desc' },
-        });
-        let purchaseMarkedCompleted = 0;
-        const purchaseMarkedIds: string[] = [];
-        if (stillActivePurchases.length > 1) {
-          for (const p of stillActivePurchases.slice(1)) {
-            purchaseMarkedIds.push(p.id);
-            purchaseMarkedCompleted++;
-          }
-          if (purchaseMarkedIds.length > 0) {
-            await db.purchase.updateMany({
-              where: { id: { in: purchaseMarkedIds } },
-              data: { status: 'completed' },
-            });
-            await db.investment.updateMany({
-              where: { purchaseId: { in: purchaseMarkedIds } },
-              data: { status: 'completed' },
-            });
-          }
-        }
-
-        // ─── STEP 3: ★ CRITICAL — Clean Investment table (source of truth) ───
-        // Kalau user masih punya ≥2 active Investments, keep latest, mark sisanya 'completed'.
-        // Ini handle case Sholeh01: 2 Purchases (1 active) tapi 4 active Investments.
+        // ─── STEP 2: ★ v19 per-asset duplicate detection ───
+        //   Kelompokkan active Investments by asset index. Untuk tiap grup
+        //   yang ≥2 active, keep latest (ordered desc), mark sisanya 'completed'
+        //   + sync Purchase terkait.
         const activeInvestments = await db.investment.findMany({
           where: { userId: id, status: 'active' },
-          orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+          include: {
+            package: { select: { id: true, name: true } },
+            purchase: { select: { product: { select: { id: true } } } },
+          },
+          orderBy: [{ createdAt: 'desc' }, { startDate: 'desc' }],
         });
-        let investmentMarkedCompleted = 0;
-        const investmentMarkedIds: string[] = [];
-        if (activeInvestments.length > 1) {
-          // keep activeInvestments[0] (latest), mark sisanya 'completed'
-          for (const inv of activeInvestments.slice(1)) {
-            investmentMarkedIds.push(inv.id);
-            investmentMarkedCompleted++;
+
+        const byAsset = new Map<number, typeof activeInvestments>();
+        for (const inv of activeInvestments) {
+          let assetIdx: number | null = null;
+          if (inv.purchaseId && inv.purchase?.product) {
+            assetIdx = productIndexMapDedupe.get(inv.purchase.product.id) ?? null;
+          } else if (inv.package) {
+            assetIdx = pkgIndexMapDedupe.get(inv.package.id) ?? null;
           }
-          if (investmentMarkedIds.length > 0) {
-            await db.investment.updateMany({
-              where: { id: { in: investmentMarkedIds } },
-              data: { status: 'completed' },
-            });
-            // Sync: Purchase terkait juga 'completed' (kalau ada & masih active)
-            const invPurchaseIds = activeInvestments
-              .slice(1)
-              .map((inv) => inv.purchaseId)
-              .filter((pid): pid is string => !!pid);
-            if (invPurchaseIds.length > 0) {
-              await db.purchase.updateMany({
-                where: { id: { in: invPurchaseIds }, status: 'active' },
-                data: { status: 'completed' },
-              });
+          if (assetIdx === null) continue;
+          const arr = byAsset.get(assetIdx) || [];
+          arr.push(inv);
+          byAsset.set(assetIdx, arr);
+        }
+
+        let investmentMarkedCompleted = 0;
+        let purchaseMarkedCompleted = 0;
+        const investmentMarkedIds: string[] = [];
+        const purchaseMarkedIds: string[] = [];
+        for (const [, arr] of byAsset) {
+          if (arr.length > 1) {
+            for (const inv of arr.slice(1)) {
+              investmentMarkedIds.push(inv.id);
+              investmentMarkedCompleted++;
+              if (inv.purchaseId) {
+                purchaseMarkedIds.push(inv.purchaseId);
+                purchaseMarkedCompleted++;
+              }
             }
           }
         }
+        if (investmentMarkedIds.length > 0) {
+          await db.investment.updateMany({
+            where: { id: { in: investmentMarkedIds } },
+            data: { status: 'completed' },
+          });
+        }
+        if (purchaseMarkedIds.length > 0) {
+          await db.purchase.updateMany({
+            where: { id: { in: purchaseMarkedIds }, status: 'active' },
+            data: { status: 'completed' },
+          });
+        }
 
-        const summary = `Fix duplikat user ${user.userId}: hapus ${deletedCount} same-product Purchase, mark ${purchaseMarkedCompleted} Purchase + ${investmentMarkedCompleted} Investment 'completed'`;
+        const summary = `Fix per-aset duplikat (v19) user ${user.userId}: hapus ${deletedCount} same-product Purchase, mark ${purchaseMarkedCompleted} Purchase + ${investmentMarkedCompleted} Investment 'completed'`;
         await logAdminAction(admin.id, 'DEDUPE_PURCHASES', summary);
         return NextResponse.json({
           success: true,
