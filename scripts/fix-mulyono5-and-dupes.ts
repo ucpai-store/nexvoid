@@ -147,8 +147,32 @@ async function detectDuplicatesForUser(userId: string) {
 }
 
 /**
+ * Detect active Investments count for a user. v18 ONE-ACTIVE-RULE: max 1 active Investment.
+ * (Investment table = source of truth for "active asset", bukan Purchase).
+ */
+async function detectInvestmentViolations(userId: string) {
+  const activeInvestments = await db.investment.findMany({
+    where: { userId, status: 'active' },
+    orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+  });
+  return {
+    activeCount: activeInvestments.length,
+    keep: activeInvestments[0] || null,
+    toMarkCompleted: activeInvestments.slice(1),
+  };
+}
+
+/**
  * Fix ALL users with duplicates in one go (v18 ONE-ACTIVE-RULE).
  * Same logic as `fix-all-dupes` admin action.
+ * Cleans BOTH Purchase duplicates AND Investment multi-active (source of truth).
+ *
+ * Strategi:
+ *   1. Same-product Purchase duplikat → hard delete (keep latest per productId).
+ *   2. Multi-active Purchase → mark older 'completed' (keep latest).
+ *   3. ★ CRITICAL: Investment table (source of truth) — keep latest active, mark sisanya 'completed'.
+ *      Handle case Sholeh01: 1 active Purchase tapi 4 active Investments.
+ *   4. Sync: kalau Investment 'completed', Purchase terkait juga 'completed'.
  */
 async function runFixAll() {
   console.log('🌐 Fix ALL users — detect + fix duplicates untuk SEMUA user\n');
@@ -158,32 +182,80 @@ async function runFixAll() {
   });
   console.log(`Total users: ${allUsers.length}\n`);
 
-  const report: { userId: string; name: string; deleted: number; marked: number }[] = [];
-  let totalDeleted = 0;
-  let totalMarked = 0;
+  interface UserReport {
+    userId: string; name: string;
+    deletedPurchases: number; markedPurchases: number; markedInvestments: number;
+  }
+  const report: UserReport[] = [];
+  let totalDeletedPurchases = 0;
+  let totalMarkedPurchases = 0;
+  let totalMarkedInvestments = 0;
   let usersFixed = 0;
 
   for (const u of allUsers) {
-    const { sameProductDuplicates, multiActiveViolation } = await detectDuplicatesForUser(u.id);
-    const willDelete = sameProductDuplicates.reduce((sum, d) => sum + (d.count - 1), 0);
-    const willMark = multiActiveViolation ? multiActiveViolation.toRemove.length : 0;
+    // ─── STEP 1: same-product Purchase duplikat (hard delete) ───
+    const activePurchases = await db.purchase.findMany({
+      where: { userId: u.id, status: 'active' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const byProduct = new Map<string, typeof activePurchases>();
+    for (const p of activePurchases) {
+      const arr = byProduct.get(p.productId) || [];
+      arr.push(p);
+      byProduct.set(p.productId, arr);
+    }
+    const deletedPurchaseIds: string[] = [];
+    for (const [, arr] of byProduct) {
+      if (arr.length > 1) {
+        for (const p of arr.slice(1)) deletedPurchaseIds.push(p.id);
+      }
+    }
 
-    if (willDelete > 0 || willMark > 0) {
+    // ─── STEP 2: multi-active Purchase → mark older 'completed' ───
+    // (re-check after step 1 deletes)
+    const stillActivePurchases_afterStep1 = activePurchases.filter(
+      (p) => !deletedPurchaseIds.includes(p.id),
+    );
+    const purchaseMarkedIds: string[] = [];
+    if (stillActivePurchases_afterStep1.length > 1) {
+      // sort by createdAt desc, keep first, mark rest
+      const sorted = [...stillActivePurchases_afterStep1].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+      for (const p of sorted.slice(1)) purchaseMarkedIds.push(p.id);
+    }
+
+    // ─── STEP 3: ★ CRITICAL — Investment table cleanup (source of truth) ───
+    const { toMarkCompleted } = await detectInvestmentViolations(u.id);
+    const investmentMarkedIds = toMarkCompleted.map((inv) => inv.id);
+
+    const dp = deletedPurchaseIds.length;
+    const mp = purchaseMarkedIds.length;
+    const mi = investmentMarkedIds.length;
+
+    if (dp > 0 || mp > 0 || mi > 0) {
       usersFixed++;
-      totalDeleted += willDelete;
-      totalMarked += willMark;
-      report.push({ userId: u.userId, name: u.name || '-', deleted: willDelete, marked: willMark });
-      console.log(`  ⚠️  ${u.userId} | ${u.name || '-'} | will delete ${willDelete} same-product dup + mark ${willMark} multi-active 'completed'`);
+      totalDeletedPurchases += dp;
+      totalMarkedPurchases += mp;
+      totalMarkedInvestments += mi;
+      report.push({
+        userId: u.userId, name: u.name || '-',
+        deletedPurchases: dp, markedPurchases: mp, markedInvestments: mi,
+      });
+      console.log(
+        `  ⚠️  ${u.userId} | ${u.name || '-'} | −${dp} P · →${mp} P 'completed' · →${mi} I 'completed'`,
+      );
     }
   }
 
   console.log(`\n  ── RINGKASAN PREVIEW ──`);
   console.log(`  Users yang bakal diperbaiki: ${usersFixed}`);
-  console.log(`  Total same-product dup dihapus: ${totalDeleted}`);
-  console.log(`  Total multi-active ditandai 'completed': ${totalMarked}`);
+  console.log(`  Total Purchase duplikat dihapus: ${totalDeletedPurchases}`);
+  console.log(`  Total Purchase ditandai 'completed': ${totalMarkedPurchases}`);
+  console.log(`  Total Investment ditandai 'completed': ${totalMarkedInvestments} (★ source of truth)`);
 
   if (usersFixed === 0) {
-    console.log('\n  ✅ Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18.');
+    console.log('\n  ✅ Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18 (1 aset aktif per user).');
     return;
   }
 
@@ -199,40 +271,85 @@ async function runFixAll() {
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   for (const u of allUsers) {
-    const { sameProductDuplicates, multiActiveViolation } = await detectDuplicatesForUser(u.id);
-    let deletedForUser = 0;
-    let markedForUser = 0;
-
-    // A: same-product duplicates — hard delete
-    for (const d of sameProductDuplicates) {
-      const ids = d.purchases.slice(1).map((p) => p.id);
-      if (ids.length === 0) continue;
-      await db.profitLog.deleteMany({ where: { purchaseId: { in: ids } } });
+    // STEP 1: same-product Purchase duplikat → hard delete
+    const activePurchases = await db.purchase.findMany({
+      where: { userId: u.id, status: 'active' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const byProduct = new Map<string, typeof activePurchases>();
+    for (const p of activePurchases) {
+      const arr = byProduct.get(p.productId) || [];
+      arr.push(p);
+      byProduct.set(p.productId, arr);
+    }
+    const deletedPurchaseIds: string[] = [];
+    for (const [, arr] of byProduct) {
+      if (arr.length > 1) {
+        for (const p of arr.slice(1)) deletedPurchaseIds.push(p.id);
+      }
+    }
+    if (deletedPurchaseIds.length > 0) {
+      await db.profitLog.deleteMany({ where: { purchaseId: { in: deletedPurchaseIds } } });
       await db.investment.updateMany({
-        where: { purchaseId: { in: ids } },
+        where: { purchaseId: { in: deletedPurchaseIds } },
         data: { purchaseId: null, status: 'completed' },
       });
-      await db.purchase.deleteMany({ where: { id: { in: ids } } });
-      deletedForUser += ids.length;
+      await db.purchase.deleteMany({ where: { id: { in: deletedPurchaseIds } } });
     }
 
-    // B: multi-active violation — re-check active, mark older 'completed'
-    if (multiActiveViolation) {
-      const ids = multiActiveViolation.toRemove.map((p) => p.id);
-      await db.purchase.updateMany({ where: { id: { in: ids } }, data: { status: 'completed' } });
-      await db.investment.updateMany({ where: { purchaseId: { in: ids } }, data: { status: 'completed' } });
-      markedForUser += ids.length;
+    // STEP 2: multi-active Purchase → mark older 'completed'
+    const stillActivePurchases = await db.purchase.findMany({
+      where: { userId: u.id, status: 'active' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const purchaseMarkedIds: string[] = [];
+    if (stillActivePurchases.length > 1) {
+      for (const p of stillActivePurchases.slice(1)) purchaseMarkedIds.push(p.id);
+    }
+    if (purchaseMarkedIds.length > 0) {
+      await db.purchase.updateMany({
+        where: { id: { in: purchaseMarkedIds } },
+        data: { status: 'completed' },
+      });
+      await db.investment.updateMany({
+        where: { purchaseId: { in: purchaseMarkedIds } },
+        data: { status: 'completed' },
+      });
     }
 
-    if (deletedForUser > 0 || markedForUser > 0) {
-      console.log(`  ✅ ${u.userId} | ${u.name || '-'} | hapus ${deletedForUser} + mark ${markedForUser} 'completed'`);
+    // STEP 3: ★ Investment table cleanup (source of truth)
+    const { toMarkCompleted } = await detectInvestmentViolations(u.id);
+    const investmentMarkedIds = toMarkCompleted.map((inv) => inv.id);
+    if (investmentMarkedIds.length > 0) {
+      await db.investment.updateMany({
+        where: { id: { in: investmentMarkedIds } },
+        data: { status: 'completed' },
+      });
+      // Sync: Purchase terkait juga 'completed' (kalau masih active)
+      const invPurchaseIds = toMarkCompleted
+        .map((inv) => inv.purchaseId)
+        .filter((pid): pid is string => !!pid);
+      if (invPurchaseIds.length > 0) {
+        await db.purchase.updateMany({
+          where: { id: { in: invPurchaseIds }, status: 'active' },
+          data: { status: 'completed' },
+        });
+      }
+    }
+
+    const dp = deletedPurchaseIds.length;
+    const mp = purchaseMarkedIds.length;
+    const mi = investmentMarkedIds.length;
+    if (dp > 0 || mp > 0 || mi > 0) {
+      console.log(`  ✅ ${u.userId} | ${u.name || '-'} | hapus ${dp} Purchase + mark ${mp} Purchase + ${mi} Investment 'completed'`);
     }
   }
 
   console.log(`\n═══════════════════════════════════════════════════════════════`);
   console.log(`  ✅ Fix selesai. ${usersFixed} user diperbaiki.`);
-  console.log(`     - ${totalDeleted} same-product duplikat dihapus`);
-  console.log(`     - ${totalMarked} multi-active ditandai 'completed' (audit trail dipertahankan)`);
+  console.log(`     - ${totalDeletedPurchases} Purchase duplikat dihapus`);
+  console.log(`     - ${totalMarkedPurchases} Purchase ditandai 'completed'`);
+  console.log(`     - ${totalMarkedInvestments} Investment ditandai 'completed' (★ source of truth)`);
   console.log(`     - Saldo TIDAK diubah (gunakan admin UI "Set Saldo 0" per user kalau perlu)`);
   console.log(`═══════════════════════════════════════════════════════════════\n`);
 }
@@ -368,6 +485,30 @@ async function main() {
           data: { status: 'completed' },
         });
         console.log(`  ✅ ${toRemoveIds.length} paket ditandai 'completed' (audit trail dipertahankan)`);
+      }
+
+      // 3b.★ CRITICAL — Investment table cleanup (source of truth).
+      // Kalau user punya ≥2 active Investments (bisa terjadi tanpa Purchase duplikat,
+      // e.g. Sholeh01: 1 active Purchase tapi 4 active Investments), keep latest, mark sisanya 'completed'.
+      const { toMarkCompleted: invToMark } = await detectInvestmentViolations(target.id);
+      if (invToMark.length > 0) {
+        const invIds = invToMark.map((inv) => inv.id);
+        console.log(`  ★ Fix Investment multi-active: ${invToMark.length + 1} active Investments → keep latest, mark ${invIds.length} 'completed'`);
+        await tx.investment.updateMany({
+          where: { id: { in: invIds } },
+          data: { status: 'completed' },
+        });
+        // Sync: Purchase terkait juga 'completed' (kalau masih active)
+        const invPurchaseIds = invToMark
+          .map((inv) => inv.purchaseId)
+          .filter((pid): pid is string => !!pid);
+        if (invPurchaseIds.length > 0) {
+          await tx.purchase.updateMany({
+            where: { id: { in: invPurchaseIds }, status: 'active' },
+            data: { status: 'completed' },
+          });
+        }
+        console.log(`  ✅ ${invIds.length} Investment ditandai 'completed' (audit trail dipertahankan)`);
       }
 
       // 3c. Set saldo to 0 (main + deposit + profit)

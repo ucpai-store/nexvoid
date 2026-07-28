@@ -297,7 +297,7 @@ export default function AdminUsersPage() {
   // ★ Global Fix All Duplicates — one click, fix SEMUA user yang punya paket duplikat (v18)
   const handleFixAllDupes = async () => {
     if (!adminToken) return;
-    if (!confirm('Yakin fix SEMUA user yang punya paket duplikat?\n\nAturan v18: user hanya boleh 1 paket/produk aktif.\n\n- Same-product dup → hapus duplikat, keep latest\n- Multi-active (beda produk) → tandai lama "completed", keep latest\n\nAudit trail dipertahankan. Saldo TIDAK diubah.')) return;
+    if (!confirm('Yakin fix SEMUA user yang punya paket/produk duplikat?\n\nAturan v18: user hanya boleh 1 paket/produk aktif.\n\nBersihkan BOTH:\n- Purchase duplikat (same-product → hapus, multi-active → tandai completed)\n- Investment multi-active (★ source of truth — keep latest, tandai sisanya completed)\n\nAudit trail dipertahankan. Saldo TIDAK diubah.')) return;
     setFixAllBusy(true);
     setFixAllReport(null);
     try {
@@ -311,7 +311,7 @@ export default function AdminUsersPage() {
         setFixAllReport(data.data);
         toast({
           title: `Fix selesai`,
-          description: `${data.data.usersFixed} user diperbaiki · ${data.data.totalDeleted} duplikat dihapus · ${data.data.totalMarked} ditandai 'completed'`,
+          description: `${data.data.usersFixed} user · ${data.data.totalDeletedPurchases} Purchase dihapus · ${data.data.totalMarkedPurchases + data.data.totalMarkedInvestments} ditandai 'completed'`,
         });
         fetchUsers();
       } else {
@@ -421,48 +421,54 @@ export default function AdminUsersPage() {
               Fix Semua Duplikat — Selesai
             </DialogTitle>
             <DialogDescription>
-              v18 ONE-ACTIVE-RULE: user hanya boleh punya 1 paket/produk aktif.
+              v18 ONE-ACTIVE-RULE: user hanya boleh punya 1 paket/produk aktif. Source of truth = tabel Investment.
             </DialogDescription>
           </DialogHeader>
           {fixAllReport && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="glass rounded-xl p-3 text-center">
-                  <div className="text-2xl font-bold text-amber-500">{fixAllReport.usersFixed}</div>
+                  <div className="text-xl font-bold text-amber-500">{fixAllReport.usersFixed}</div>
                   <div className="text-[10px] text-muted-foreground mt-1">User Diperbaiki</div>
                 </div>
                 <div className="glass rounded-xl p-3 text-center">
-                  <div className="text-2xl font-bold text-red-400">{fixAllReport.totalDeleted}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Duplikat Dihapus</div>
+                  <div className="text-xl font-bold text-red-400">{fixAllReport.totalDeletedPurchases ?? fixAllReport.totalDeleted ?? 0}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Purchase Dihapus</div>
                 </div>
                 <div className="glass rounded-xl p-3 text-center">
-                  <div className="text-2xl font-bold text-emerald-400">{fixAllReport.totalMarked}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Ditandai 'completed'</div>
+                  <div className="text-xl font-bold text-orange-400">{fixAllReport.totalMarkedPurchases ?? 0}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Purchase → completed</div>
+                </div>
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="text-xl font-bold text-emerald-400">{fixAllReport.totalMarkedInvestments ?? 0}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Investment → completed</div>
                 </div>
               </div>
               {fixAllReport.report && fixAllReport.report.length > 0 ? (
                 <div className="max-h-64 overflow-y-auto rounded-xl border border-border p-3 space-y-2">
                   {fixAllReport.report.map((r: any, idx: number) => (
                     <div key={idx} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-amber-500/10 text-amber-500 text-[9px] border-border">{r.userId}</Badge>
-                        <span className="text-foreground">{r.name}</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Badge className="bg-amber-500/10 text-amber-500 text-[9px] border-border shrink-0">{r.userId}</Badge>
+                        <span className="text-foreground truncate">{r.name}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        {r.deletedCount > 0 && <span className="text-red-400">−{r.deletedCount} hapus</span>}
-                        {r.markedCompleted > 0 && <span className="text-emerald-400">→{r.markedCompleted} completed</span>}
-                        {r.deletedCount === 0 && r.markedCompleted === 0 && <span>—</span>}
+                      <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                        {(r.deletedPurchases ?? r.deletedCount ?? 0) > 0 && <span className="text-red-400">−{r.deletedPurchases ?? r.deletedCount} P</span>}
+                        {(r.markedPurchases ?? 0) > 0 && <span className="text-orange-400">→{r.markedPurchases} P</span>}
+                        {(r.markedInvestments ?? 0) > 0 && <span className="text-emerald-400">→{r.markedInvestments} I</span>}
+                        {(r.deletedPurchases ?? r.deletedCount ?? 0) === 0 && (r.markedPurchases ?? 0) === 0 && (r.markedInvestments ?? 0) === 0 && (r.markedCompleted ?? 0) === 0 && <span>—</span>}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center text-sm text-muted-foreground py-4">
-                  Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18.
+                  ✅ Tidak ada user dengan duplikat. Semua sudah sesuai aturan v18 (1 aset aktif per user).
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground">
-                Catatan: Audit trail dipertahankan. Multi-active paket ditandai 'completed' (tidak di-hard-delete).
+                <span className="text-foreground">P</span> = Purchase (transaksi), <span className="text-foreground">I</span> = Investment (active asset, source of truth).
+                Audit trail dipertahankan — data ditandai 'completed' (tidak di-hard-delete, kecuali same-product Purchase duplikat).
                 Saldo <span className="text-foreground">TIDAK diubah</span> — pakai "Set Saldo 0" per user kalau perlu.
               </p>
             </div>
