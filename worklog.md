@@ -9892,3 +9892,73 @@ Cara deploy ke VPS:
    bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply    (EKSEKUSI)
    atau via Admin UI: Kelola Users → "Fix Semua Duplikat" (text baru: v19 PER-ASSET-UNIQUE-RULE)
 4. Verifikasi: bun run scripts/verify-one-active-rule.ts (harusnya 15/15 PASS)
+
+---
+Task ID: 16
+Agent: main (Z.ai Code)
+Task: User tegaskan v19 PER-ASSET-UNIQUE-RULE benar — "sampek vip 4 5 tu biarin, cuman yang dobel sam tu kamu perbaiki itu aja". Verifikasi sistem handle VIP 4/5/6+ (lebih dari 3 tier), hanya perbaiki duplikat aset yang sama.
+
+Work Log:
+- Baca worklog: Task ID 15 (sebelumnya) sudah implement v19 PER-ASSET-UNIQUE-RULE end-to-end.
+- Re-read src/lib/tier-system.ts (v19):
+  • getPackageAssetIndex: query packages amount>0 AND isActive, order by amount asc → 1-based index. TIDAK ada batas hardcoded.
+  • getProductAssetIndex: query all products, order by price asc → 1-based index. TIDAK ada batas hardcoded.
+  • getUserActiveAssets: return Set<number> of active asset indices (dynamic, no limit).
+  • validateProductPurchase: block ONLY if activeAssets.has(productAssetIdx) — per-asset, multi-asset OK.
+  • validateTierPurchase: block ONLY if tier.state==='active' (THIS specific tier) — multi-asset OK.
+- Re-read scripts/fix-mulyono5-and-dupes.ts:
+  • buildAssetIndexMaps: dinamis dari db.product.findMany + db.investmentPackage.findMany. Handle N tier.
+  • detectInvestmentViolations: group by asset index, ≥2 = duplicate. Keep latest per asset.
+  • runFixAll: apply per-asset fix. Saldo TIDAK diubah.
+- Re-read src/app/api/admin/users/route.ts (fix-all-dupes action):
+  • Build asset index maps dinamis (all products + active packages amount>0).
+  • Group active Investments by asset index. Keep latest per asset, mark sisanya 'completed'.
+  • Sync Purchase status terkait. Audit trail dijaga (mark, not delete).
+- Run verification script (scripts/verify-one-active-rule.ts): 15/15 PASS.
+  • User boleh banyak aset aktif (multi-asset allowed).
+  • Dobel aset yang sama (same tier) → DIBLOCK.
+  • produk[i] ≡ paket[i] = same asset.
+- Tulis verification script baru (scripts/verify-multi-tier.ts) — test khusus VIP 4/5/6+:
+  • Cek state awal (3 produk + 3 paket).
+  • Buat extra test paket VIP 4, VIP 5 + produk Aset 4, Aset 5.
+  • Verify getPackageAssetIndex returns 4, 5 (NOT capped at 3).
+  • Verify getProductAssetIndex returns 4, 5 (NOT capped at 3).
+  • Verify produk[i] ≡ paket[i] = same asset untuk index > 3.
+  • Cleanup: hapus test paket + produk.
+- Run verify-multi-tier.ts: 19/19 PASS.
+  ✓ VIP 4 paket → index 4 (TIDAK dibatasi 3)
+  ✓ VIP 5 paket → index 5
+  ✓ Aset 4 produk → index 4
+  ✓ Aset 5 produk → index 5
+  ✓ produk[4] ≡ paket[4] = same asset 4
+  ✓ produk[5] ≡ paket[5] = same asset 5
+- Run fix-all dry-run (scripts/fix-mulyono5-and-dupes.ts --fix-all): 0 user perlu diperbaiki (local DB clean).
+- Dev server cek: HTTP 200 di /api/site-settings, / return <title>NEXVO</title>.
+- Agent Browser: gagal connect (sandbox network isolation — known limitation, sama seperti Task ID 15).
+- Commit + push scripts/verify-multi-tier.ts ke GitHub (a1ffd35).
+
+Stage Summary:
+- ✅ v19 PER-ASSET-UNIQUE-RULE confirmed cocok sama requirement user:
+  • "sampek vip 4 5 tu biarin" → asset index dinamis, TIDAK ada batas hardcoded 3. VIP 4/5/6+ semua OK.
+  • "cuman yang dobel sam tu kamu perbaiki itu aja" → hanya same-asset duplicates yang diperbaiki.
+  • User boleh punya VIP1+VIP2+VIP3+VIP4+VIP5 bersamaan (semua beda aset → OK).
+  • YANG DIBLOCK: dobel aset yang sama (produk VIP1 + paket VIP1 = same asset → block).
+- ✅ Verifikasi 19/19 PASS (multi-tier test) + 15/15 PASS (full rule test) = 34 total PASS.
+- ✅ Fix script handle N tier dinamis (buildAssetIndexMaps dari DB, bukan konstan 3).
+- ✅ Admin route fix-all-dupes handle N tier dinamis.
+- ✅ Saldo user TIDAK diubah (pakai admin "Set Saldo 0" per user kalau perlu).
+- ✅ Audit trail dijaga (mark 'completed', bukan delete — kecuali same-product Purchase duplikat hard-delete).
+- Files modified:
+  • scripts/verify-multi-tier.ts (NEW — 205 lines, test VIP 4/5/6+ support)
+- Code v19 (tier-system.ts, api/products, api/investments, api/admin/users, fix script) TIDAK diubah — sudah benar dari Task ID 15.
+
+Cara deploy ke VPS (kalau belum):
+1. ssh ke VPS → cd /var/www/nexvo → git pull
+2. bun run build && pm2 restart nexvo-web nexvo-cron
+3. Fix data existing (cuma same-asset duplicates, VIP 4/5 tetap):
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all            (DRY-RUN — preview)
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply    (EKSEKUSI)
+   atau via Admin UI: Kelola Users → "Fix Semua Duplikat"
+4. Verifikasi:
+   bun run scripts/verify-one-active-rule.ts    (15/15 PASS)
+   bun run scripts/verify-multi-tier.ts         (19/19 PASS)
