@@ -1,24 +1,26 @@
 /**
- * Tier System — Unified Package/Product purchasing with contract-end re-activation.
+ * Tier System — ONE-ACTIVE-RULE (v18):
  *
- * Business rules (per product owner):
+ * Business rules (per product owner — updated 2025):
  *  - "Paket" dan "Produk" itu sama → both map to the same VIP tier list
  *    (sourced from InvestmentPackage, ordered by `amount` ascending).
- *  - MULTI-ACTIVE: user BOLEH punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst).
- *    Tiap paket generate profit sendiri jam 00:00 WIB. Cron credit SEMUA active
- *    investments — bukan cuma satu.
- *  - Setiap tier hanya bisa dibeli SEKALI per kontrak (180 hari). Tier yang sedang
- *    aktif tidak bisa dibeli lagi sampai kontrak selesai.
+ *  - ★ ONE-ACTIVE-RULE: user hanya boleh punya SATU paket aktif pada satu waktu.
+ *    Kalau user sudah punya paket aktif (apapun tier-nya), TIDAK BISA beli paket
+ *    lain sampai kontrak yang aktif selesai (180 hari).
  *  - Tier yang kontraknya sudah HABIS (status='completed') BISA dibeli lagi.
  *  - Profit PERTAMA tidak langsung masuk saat beli — tunggu jam 00:00 WIB.
+ *
+ * Before v18: MULTI-ACTIVE (boleh VIP1+VIP2+VIP3 bersamaan). Ini bikin user
+ * bisa punya 2 paket aktif — bug. Sekarang: 1 aktif saja.
  */
 
 import { db } from '@/lib/db';
 
 export type TierState =
-  | 'available' // tier the user can buy right now (never bought, OR contract ended)
-  | 'active' // user's currently active tier (most recently purchased, still in contract)
-  | 'bought'; // already owned AND contract still running (superseded by a later purchase)
+  | 'available' // tier the user can buy right now (no active package anywhere)
+  | 'active' // user's currently active tier (the ONE active package)
+  | 'bought' // already owned AND contract still running (superseded by a later purchase)
+  | 'locked'; // user has another active tier — must wait until that one completes
 
 export interface TierInfo {
   id: string;
@@ -60,12 +62,12 @@ export interface TierAvailability {
  * Load all tiers ordered ascending by amount (VIP 1 → VIP n).
  *
  * ★★★ v17 FIX: Previously filtered `isActive: true` → paket 4/5/6 that admin
- *   set isActive=false were EXCLUDED from tiers list. When PaketPage merged
+ *   set isActive=false were EXCLUDED from tiers list. When Paket page merged
  *   tier state into the package list, those packages kept their default
  *   state ('available') and the isAvailable flag from /api/packages was
  *   the only thing showing them as unavailable. BUT if the merge somehow
  *   overwrote isAvailable (e.g., from cache), the badge disappeared.
- *   Now: return ALL packages (mirror V16 /api/packages) + isAvailable flag
+ *   Now: return ALL packages (mirror V16 /api/packages + isAvailable flag)
  *   so the tier system is consistent with the packages API.
  */
 export async function loadOrderedTiers() {
@@ -89,10 +91,59 @@ export async function loadOrderedTiers() {
 }
 
 /**
- * Compute the user's tier availability:
- *  - which tier is currently active (still in contract)
- *  - which tiers are blocked because contract is still running
- *  - which tiers are available to buy (never bought OR contract ended)
+ * ★★★ v18 — ONE-ACTIVE-RULE helper ★★★
+ * Returns true if user has ANY active Investment (status='active').
+ * Used by both /api/products and /api/investments to block buying when
+ * user already has an active package.
+ *
+ * Also returns the active investment's end date for display.
+ */
+export async function getUserActivePackageInfo(userId: string): Promise<{
+  hasActive: boolean;
+  activePackageId: string | null;
+  activePackageName: string | null;
+  endDate: Date | null;
+  daysRemaining: number | null;
+}> {
+  const activeInvestment = await db.investment.findFirst({
+    where: { userId, status: 'active' },
+    orderBy: { createdAt: 'desc' },
+    include: { package: { select: { name: true } } },
+  });
+
+  if (!activeInvestment) {
+    return {
+      hasActive: false,
+      activePackageId: null,
+      activePackageName: null,
+      endDate: null,
+      daysRemaining: null,
+    };
+  }
+
+  const now = new Date();
+  const endDate = activeInvestment.endDate || new Date(activeInvestment.startDate);
+  // Calculate days remaining (rounded up so user sees "1 day" not "0 days" on the last day)
+  const msRemaining = endDate.getTime() - now.getTime();
+  const daysRemaining = Math.max(
+    0,
+    Math.ceil(msRemaining / (1000 * 60 * 60 * 24))
+  );
+
+  return {
+    hasActive: true,
+    activePackageId: activeInvestment.packageId,
+    activePackageName: activeInvestment.package?.name || null,
+    endDate,
+    daysRemaining,
+  };
+}
+
+/**
+ * Compute the user's tier availability under the ONE-ACTIVE-RULE:
+ *  - which tier is currently active (the ONE active package)
+ *  - all OTHER tiers are 'locked' (must wait until active contract ends)
+ *  - if NO active tier, ALL tiers are 'available' (subject to package isActive)
  *
  * Re-activation rule: a tier is "available" if the user has NO active
  * investment for it. If all previous investments for that tier have
@@ -127,21 +178,33 @@ export async function getUserTierAvailability(
       .map((i) => i.packageId)
   );
 
-  // ★ MULTI-ACTIVE: user boleh punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst).
-  //   currentTier = first active investment (for backwards-compat display), tapi SEMUA
-  //   tier yang active harus dapat state='active' (bukan 'bought').
+  // ★ v18 ONE-ACTIVE-RULE: only ONE active investment allowed per user.
+  //   If user has any active investment, ALL OTHER tiers are 'locked'.
   const activeInvestment = userInvestments.find((i) => i.status === 'active');
   const currentTier = activeInvestment
     ? tiers.find((t) => t.id === activeInvestment.packageId) || null
     : null;
   const hasAnyActive = !!activeInvestment;
 
-  // A tier is "available" if user has NO active investment for it
-  // (either never bought, or all previous purchases are completed/expired).
-  const remainingCount = tiers.filter((t) => !activeTierIds.has(t.id)).length;
-  // "Maxed out" only if user has bought every tier AND none have expired (no re-activation possible).
+  // Calculate days remaining on active contract (for UI display)
+  let daysRemaining = 0;
+  if (activeInvestment?.endDate) {
+    const msRemaining = activeInvestment.endDate.getTime() - Date.now();
+    daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+  }
+
+  // A tier is "available" only if user has NO active investment ANYWHERE
+  // (not just for this tier). Under ONE-ACTIVE-RULE, having any active tier
+  // locks ALL other tiers until the active contract ends.
+  const remainingCount = hasAnyActive
+    ? 0 // locked — nothing available while one is active
+    : tiers.filter((t) => !activeTierIds.has(t.id)).length;
+  // "Maxed out" only if user has bought every tier AND none have expired,
+  // no re-activation possible. Under ONE-ACTIVE-RULE, this is essentially
+  // "user has an active tier and it's the highest tier".
   const maxedOut =
     tiers.length > 0 &&
+    hasAnyActive &&
     remainingCount === 0 &&
     [...boughtTierIds].every((id) => !expiredTierIds.has(id));
 
@@ -151,23 +214,28 @@ export async function getUserTierAvailability(
       let reason: string | undefined;
 
       if (activeTierIds.has(tier.id)) {
-        // ★ MULTI-ACTIVE: SEMUA tier yang sedang active dapat state='active' (bukan 'bought').
-        //   User boleh lihat badge AKTIF di semua paket yang sedang berjalan.
+        // ★ This is the ONE active tier
         state = 'active';
-        reason = 'Paket aktif — kontrak masih berjalan. Profit masuk jam 00:00 WIB setiap hari.';
+        reason = daysRemaining > 0
+          ? `Paket aktif — kontrak tersisa ${daysRemaining} hari. Profit masuk jam 00:00 WIB setiap hari.`
+          : 'Paket aktif — kontrak hampir selesai.';
+      } else if (hasAnyActive) {
+        // ★ v18: user has another active tier → this tier is LOCKED
+        state = 'locked';
+        reason = daysRemaining > 0
+          ? `Anda sudah punya paket aktif ("${currentTier?.name || 'aktif'}"). Tunggu ${daysRemaining} hari sampai kontrak selesai sebelum beli paket lain.`
+          : 'Anda sudah punya paket aktif. Tunggu sampai kontrak selesai.';
       } else if (boughtTierIds.has(tier.id) && expiredTierIds.has(tier.id)) {
         // Contract ended → can re-activate!
         state = 'available';
         reason = 'Kontrak sebelumnya sudah berakhir — bisa diaktifkan lagi';
       } else if (boughtTierIds.has(tier.id)) {
-        // Bought but not active and not expired (shouldn't happen, but defensive).
+        // Bought but not active and not expired (shouldn't happen under v18, but defensive).
         state = 'bought';
         reason = 'Sudah pernah dibeli — pilih paket lain yang belum dimiliki';
       } else {
         state = 'available';
-        reason = hasAnyActive
-          ? 'Beli paket lain — boleh punya banyak paket aktif bersamaan'
-          : 'Belum dimiliki — silakan beli';
+        reason = 'Belum dimiliki — silakan beli';
       }
 
       return {
@@ -190,8 +258,11 @@ export async function getUserTierAvailability(
 
 /**
  * Validate that a purchase request targets a tier the user can buy right now.
- * A tier is purchasable if the user has NO active investment for it.
- * (Never bought → OK. Previously bought but contract ended → OK. Currently active → REJECT.)
+ *
+ * ★ v18 ONE-ACTIVE-RULE: reject if user has ANY active investment (not just
+ *   same tier). User must wait until their current active contract ends before
+ *   buying another tier.
+ *
  * Returns { ok: true } or { ok: false, error }.
  */
 export async function validateTierPurchase(
@@ -211,7 +282,7 @@ export async function validateTierPurchase(
   if (tier.state === 'active') {
     return {
       ok: false,
-      error: `Paket "${tier.name}" sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai (180 hari).`,
+      error: `Paket "${tier.name}" sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai.`,
     };
   }
 
@@ -219,6 +290,20 @@ export async function validateTierPurchase(
     return {
       ok: false,
       error: `Paket "${tier.name}" sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai.`,
+    };
+  }
+
+  // ★ v18: locked = user has ANOTHER active tier
+  if (tier.state === 'locked') {
+    const activeInfo = await getUserActivePackageInfo(userId);
+    const days = activeInfo.daysRemaining ?? 0;
+    const name = activeInfo.activePackageName ?? 'paket aktif';
+    return {
+      ok: false,
+      error:
+        days > 0
+          ? `Anda sudah memiliki paket aktif ("${name}"). Tunggu ${days} hari sampai kontrak selesai sebelum beli paket lain.`
+          : `Anda sudah memiliki paket aktif ("${name}"). Tunggu sampai kontrak selesai sebelum beli paket lain.`,
     };
   }
 
