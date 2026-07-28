@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { creditInvestmentReferralBonusesTx } from '@/lib/referral-bonus';
-import { validateSequentialPurchase, getUserTierAvailability } from '@/lib/tier-system';
+import {
+  validateSequentialPurchase,
+  getUserTierAvailability,
+  getUserActivePackageInfo,
+} from '@/lib/tier-system';
 
 // ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
 export const dynamic = 'force-dynamic';
@@ -148,6 +152,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ★ v18 ONE-ACTIVE-RULE: user hanya boleh punya SATU paket/produk aktif.
+    //   Kalau user sudah punya active Investment (entah dari beli PRODUK atau
+    //   PAKET), block beli paket lain sampai kontrak yang aktif selesai.
+    //   Produk & Paket = 1 aset (per user request).
+    //
+    //   Cek di tabel Investment (sumber of truth) — cover semua jalur beli.
+    const activeInfo = await getUserActivePackageInfo(user.id);
+    if (activeInfo.hasActive) {
+      const days = activeInfo.daysRemaining ?? 0;
+      const name = activeInfo.activePackageName ?? 'paket aktif';
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            days > 0
+              ? `Anda sudah memiliki paket aktif ("${name}"). Tunggu ${days} hari sampai kontrak selesai sebelum beli paket lain.`
+              : `Anda sudah memiliki paket aktif ("${name}"). Tunggu sampai kontrak selesai sebelum beli paket lain.`,
+        },
+        { status: 400 }
+      );
+    }
+
     // ★ Multi-active rule: user BOLEH punya banyak paket aktif bersamaan (VIP1+VIP2+VIP3 dst) ★
     // Tiap paket generate profit sendiri jam 00:00 WIB. Cron credit SEMUA active investments.
     // Aturan tunggal: tiap paket hanya bisa dibeli SEKALI per kontrak (180 hari).
@@ -204,9 +230,9 @@ export async function POST(request: NextRequest) {
           data: updateData,
         });
 
-        // ★ MULTI-ACTIVE: user boleh punya banyak paket aktif bersamaan ★
-        // JANGAN mark previous investments as completed — biarkan VIP1+VIP2+VIP3 semua aktif.
-        // Cron akan credit SEMUA active investments jam 00:00 WIB, masing-masing dapat dailyProfit-nya.
+        // ★ v18 ONE-ACTIVE-RULE: block beli di atas sudah pastikan user belum
+        // punya paket aktif. New investment = ONE active package user has.
+        // Cron akan credit active investments jam 00:00 WIB.
         // Profit PERTAMA tunggu jam 00:00 WIB (lastProfitDate: null di bawah).
 
         // Create investment WITHOUT immediate profit — cron will credit at 00:00 WIB

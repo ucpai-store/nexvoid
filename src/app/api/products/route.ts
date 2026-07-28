@@ -306,10 +306,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: `Produk '${product.name}' sedang dihentikan sementara oleh admin.` }, { status: 400 });
     }
 
-    // ★ Re-activation rule: reject ONLY if user has an ACTIVE purchase for this SAME product.
-    // User BOLEH punya banyak produk aktif bersamaan (VIP1+VIP2+VIP3 dst).
-    // Tiap produk hanya bisa dibeli SEKALI per kontrak (180 hari).
-    // Kalau kontrak sudah habis (status='completed'), bisa di-aktivasi lagi.
+    // ★ Defensive backstop: ONE-ACTIVE-RULE block di atas sudah pastikan user
+    // belum punya active package/investment manapun. Cek ini tinggal backstop
+    // kalau ada data legacy yang inconsistent (Purchase active tapi Investment
+    // hilang). Praktis tidak akan ke-trigger di VPS sehat.
     const activePurchase = await db.purchase.findFirst({
       where: { userId: user.id, productId, status: 'active' },
       select: { id: true, status: true },

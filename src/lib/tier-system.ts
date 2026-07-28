@@ -70,11 +70,11 @@ export interface TierAvailability {
  *   Now: return ALL packages (mirror V16 /api/packages + isAvailable flag)
  *   so the tier system is consistent with the packages API.
  */
-export async function loadOrderedTiers() {
+export async function loadOrderedTiers(): Promise<TierInfo[]> {
   const packages = await db.investmentPackage.findMany({
     orderBy: [{ amount: 'asc' }, { order: 'asc' }],
   });
-  return packages.map((pkg, idx) => ({
+  return packages.map((pkg, idx): TierInfo => ({
     id: pkg.id,
     name: pkg.name,
     amount: pkg.amount,
@@ -84,6 +84,7 @@ export async function loadOrderedTiers() {
     dailyProfit: pkg.amount * (pkg.profitRate / 100),
     totalProfit: pkg.amount * (pkg.profitRate / 100) * pkg.contractDays,
     tierIndex: idx,
+    state: 'available', // default state — overridden by getUserTierAvailability
     isActive: pkg.isActive,
     isAvailable: pkg.isActive,
     availabilityReason: !pkg.isActive ? 'tidak-tersedia' : null,
@@ -96,19 +97,34 @@ export async function loadOrderedTiers() {
  * Used by both /api/products and /api/investments to block buying when
  * user already has an active package.
  *
- * Also returns the active investment's end date for display.
+ * ★ v18.1: Produk & Paket = 1 aset (per user request).
+ *   - Kalau Investment di-link ke Purchase (purchaseId != null), itu dari
+ *     beli PRODUK → ambil nama dari Purchase.product.
+ *   - Kalau Investment gak punya purchaseId, itu dari beli PAKET → ambil
+ *     nama dari Investment.package.
+ *   - Jadi `activePackageName` selalu meaningful, bukan "_internal_default".
  */
 export async function getUserActivePackageInfo(userId: string): Promise<{
   hasActive: boolean;
   activePackageId: string | null;
   activePackageName: string | null;
+  /** 'product' kalau dari beli produk, 'package' kalau dari beli paket */
+  activeType: 'product' | 'package' | null;
   endDate: Date | null;
   daysRemaining: number | null;
 }> {
   const activeInvestment = await db.investment.findFirst({
     where: { userId, status: 'active' },
     orderBy: { createdAt: 'desc' },
-    include: { package: { select: { name: true } } },
+    include: {
+      package: { select: { name: true } },
+      // ★ v18.1: include Purchase + Product untuk detect beli lewat Product page
+      purchase: {
+        select: {
+          product: { select: { name: true } },
+        },
+      },
+    },
   });
 
   if (!activeInvestment) {
@@ -116,6 +132,7 @@ export async function getUserActivePackageInfo(userId: string): Promise<{
       hasActive: false,
       activePackageId: null,
       activePackageName: null,
+      activeType: null,
       endDate: null,
       daysRemaining: null,
     };
@@ -130,10 +147,22 @@ export async function getUserActivePackageInfo(userId: string): Promise<{
     Math.ceil(msRemaining / (1000 * 60 * 60 * 24))
   );
 
+  // ★ v18.1: detect source. Kalau ada purchaseId + purchase.product → dari
+  // beli PRODUK. Kalau gak, dari beli PAKET (InvestmentPackage).
+  const fromProduct = !!activeInvestment.purchaseId && !!activeInvestment.purchase?.product;
+  const productName = activeInvestment.purchase?.product?.name || null;
+  const packageName = activeInvestment.package?.name || null;
+
+  // Filter out the internal fallback package name — never show "_internal_default" to user.
+  const realPackageName =
+    packageName && packageName !== '_internal_default' ? packageName : null;
+
   return {
     hasActive: true,
     activePackageId: activeInvestment.packageId,
-    activePackageName: activeInvestment.package?.name || null,
+    // Prefer product name (real name) over package name (might be fallback).
+    activePackageName: fromProduct ? productName : realPackageName,
+    activeType: fromProduct ? 'product' : 'package',
     endDate,
     daysRemaining,
   };
@@ -155,9 +184,19 @@ export async function getUserTierAvailability(
   const tiers = await loadOrderedTiers();
 
   // Every tier the user has ever bought, with status + endDate for re-activation check.
+  // ★ v18.1: include purchase+product so we can show real name when active
+  // investment came from beli PRODUK (not PAKET).
   const userInvestments = await db.investment.findMany({
     where: { userId },
-    select: { packageId: true, status: true, endDate: true, createdAt: true },
+    select: {
+      packageId: true,
+      status: true,
+      endDate: true,
+      createdAt: true,
+      purchaseId: true,
+      purchase: { select: { product: { select: { name: true } } } },
+      package: { select: { name: true } },
+    },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -186,6 +225,18 @@ export async function getUserTierAvailability(
     : null;
   const hasAnyActive = !!activeInvestment;
 
+  // ★ v18.1: Get real display name for the active package.
+  //   Kalau dari beli PRODUK → use Purchase.product.name (real name).
+  //   Kalau dari beli PAKET → use Investment.package.name (skip "_internal_default").
+  let activeDisplayName: string | null = null;
+  if (activeInvestment) {
+    const productName = activeInvestment.purchase?.product?.name || null;
+    const packageName = activeInvestment.package?.name || null;
+    const realPackageName =
+      packageName && packageName !== '_internal_default' ? packageName : null;
+    activeDisplayName = productName || realPackageName;
+  }
+
   // Calculate days remaining on active contract (for UI display)
   let daysRemaining = 0;
   if (activeInvestment?.endDate) {
@@ -209,22 +260,24 @@ export async function getUserTierAvailability(
     [...boughtTierIds].every((id) => !expiredTierIds.has(id));
 
   const result: TierAvailability = {
-    tiers: tiers.map((tier) => {
+    tiers: tiers.map((tier): TierInfo => {
       let state: TierState;
       let reason: string | undefined;
 
       if (activeTierIds.has(tier.id)) {
-        // ★ This is the ONE active tier
+        // ★ This is the ONE active tier (could be PAKET, or fallback for PRODUK).
         state = 'active';
         reason = daysRemaining > 0
           ? `Paket aktif — kontrak tersisa ${daysRemaining} hari. Profit masuk jam 00:00 WIB setiap hari.`
           : 'Paket aktif — kontrak hampir selesai.';
       } else if (hasAnyActive) {
-        // ★ v18: user has another active tier → this tier is LOCKED
+        // ★ v18: user has another active tier → this tier is LOCKED.
+        //   Use real display name (productName if from PRODUK, packageName if PAKET).
+        const displayName = activeDisplayName || 'paket aktif';
         state = 'locked';
         reason = daysRemaining > 0
-          ? `Anda sudah punya paket aktif ("${currentTier?.name || 'aktif'}"). Tunggu ${daysRemaining} hari sampai kontrak selesai sebelum beli paket lain.`
-          : 'Anda sudah punya paket aktif. Tunggu sampai kontrak selesai.';
+          ? `Anda sudah punya paket aktif ("${displayName}"). Tunggu ${daysRemaining} hari sampai kontrak selesai sebelum beli paket lain.`
+          : `Anda sudah punya paket aktif ("${displayName}"). Tunggu sampai kontrak selesai.`;
       } else if (boughtTierIds.has(tier.id) && expiredTierIds.has(tier.id)) {
         // Contract ended → can re-activate!
         state = 'available';
@@ -248,7 +301,8 @@ export async function getUserTierAvailability(
     remainingCount,
     maxedOut,
     currentTierId: currentTier?.id ?? null,
-    currentTierName: currentTier?.name ?? null,
+    // ★ v18.1: prefer real display name over tier.name (which might be "_internal_default")
+    currentTierName: activeDisplayName ?? currentTier?.name ?? null,
     hasActive: !!activeInvestment,
     boughtCount: boughtTierIds.size,
   };

@@ -1,45 +1,26 @@
 /**
  * ════════════════════════════════════════════════════════════════
- *  NEXVO — Fix Mulyono5 + Audit Duplicate Packages Across All Users
+ *  NEXVO — Fix Mulyono5 + Audit Duplicate Packages + ONE-ACTIVE-RULE
  * ════════════════════════════════════════════════════════════════
+ *
+ *  v18 ONE-ACTIVE-RULE: user hanya boleh punya SATU paket/produk aktif.
+ *  Script ini detect:
+ *    A. Same-product duplicates (≥2 active purchases untuk produk yang sama)
+ *    B. Multi-active violations (≥2 active purchases untuk produk BERBEDA)
+ *       — sebelumnya boleh (MULTI-ACTIVE era), sekarang dilarang.
+ *
+ *  Fix apply untuk A & B:
+ *    - Keep 1 active purchase terbaru (createdAt DESC)
+ *    - Purchase duplikat → nullify Investment.purchaseId + delete ProfitLog
+ *      + delete Purchase.
+ *    - Investment duplikat → mark 'completed' (jangan hard-delete, keep audit trail).
  *
  *  Run on VPS:
  *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts
+ *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts --apply
+ *    cd /var/www/nexvo && bun run scripts/fix-mulyono5-and-dupes.ts --user=62812xxxx --apply
  *
- *  Default mode = DRY-RUN (read-only, no DB writes).
- *  Add --apply to actually perform the fix.
- *
- *  Search behaviour (FIXED — was failing on VPS before):
- *    The script searches across ALL identifying fields, not just userId:
- *      - userId   (exact match, then contains)
- *      - whatsapp (contains)
- *      - email    (contains)
- *      - name     (contains)
- *    Because on VPS the userId is auto-generated as "NXV-XXXXXX", so
- *    searching userId="mulyono5" always returns 0 rows. We must search
- *    email/whatsapp/name instead.
- *
- *  Custom target:
- *    --user=<term>     search for a different user (any identifier)
- *    --apply           actually modify DB (default = dry-run)
- *
- *  What this script does:
- *    1. Find the target user across userId/whatsapp/email/name.
- *       If multiple matches, list them and exit (admin picks one with --user=).
- *    2. List all their active purchases; detect duplicate product IDs.
- *    3. (apply) Delete duplicate active purchases keeping only the LATEST
- *       one per productId (cascade profitLogs + nullify investment.purchaseId).
- *    4. (apply) Set the target's saldo to 0 (mainBalance, depositBalance,
- *       profitBalance all → 0). Stats (totalDeposit/totalWithdraw/
- *       totalProfit) NOT touched.
- *    5. Audit ALL other users: list every user with duplicate active
- *       purchases (same productId appears > 1 time with status='active').
- *
- *  Safety:
- *    - DRY-RUN by default. Will NOT modify anything.
- *    - Only the matched target's saldo + duplicates are touched when --apply.
- *    - Other users are reported, NOT auto-fixed.
- *    - Uses Prisma $transaction for atomicity.
+ *  Default = DRY-RUN (read-only). Add --apply to actually modify DB.
  * ════════════════════════════════════════════════════════════════
  */
 import { db } from '../src/lib/db';
@@ -90,22 +71,38 @@ async function findUserEverywhere(term: string) {
   return Array.from(combined.values());
 }
 
+/**
+ * Detect duplicates for a user — v18 ONE-ACTIVE-RULE aware.
+ *
+ * Returns:
+ *   - activePurchases: ALL active purchases (any product), sorted by createdAt DESC.
+ *   - sameProductDuplicates: groups where same product has ≥2 active.
+ *   - multiActiveViolation: under v18, only 1 active purchase allowed TOTAL.
+ *     If user has ≥2 active for DIFFERENT products, that's a violation.
+ */
 async function detectDuplicatesForUser(userId: string) {
   const activePurchases = await db.purchase.findMany({
     where: { userId, status: 'active' },
     orderBy: { createdAt: 'desc' },
     include: { product: true },
   });
+
+  // Group by productId (A: same-product duplicates)
   const byProduct = new Map<string, typeof activePurchases>();
   for (const p of activePurchases) {
     const arr = byProduct.get(p.productId) || [];
     arr.push(p);
     byProduct.set(p.productId, arr);
   }
-  const duplicates: { productId: string; productName: string; count: number; purchases: typeof activePurchases }[] = [];
+  const sameProductDuplicates: {
+    productId: string;
+    productName: string;
+    count: number;
+    purchases: typeof activePurchases;
+  }[] = [];
   for (const [productId, arr] of byProduct) {
     if (arr.length > 1) {
-      duplicates.push({
+      sameProductDuplicates.push({
         productId,
         productName: arr[0].product?.name || '(deleted)',
         count: arr.length,
@@ -113,12 +110,39 @@ async function detectDuplicatesForUser(userId: string) {
       });
     }
   }
-  return { activePurchases, duplicates };
+
+  // B: multi-active violation — under v18, only 1 active purchase allowed TOTAL.
+  // If user has ≥2 active purchases (across ANY products), it's a violation.
+  // Strategy: keep the LATEST active purchase, mark all others 'completed'.
+  let multiActiveViolation: {
+    isViolation: boolean;
+    keepPurchase: typeof activePurchases[number] | null;
+    toRemove: typeof activePurchases;
+    description: string;
+  } | null = null;
+
+  if (activePurchases.length > 1) {
+    const keep = activePurchases[0]; // already sorted desc by createdAt
+    const toRemove = activePurchases.slice(1);
+    const removedNames = toRemove.map((p) => p.product?.name || '(deleted)');
+    multiActiveViolation = {
+      isViolation: true,
+      keepPurchase: keep,
+      toRemove,
+      description: `User punya ${activePurchases.length} paket aktif (harusnya 1). Keep: ${keep.product?.name || '-'}. Hapus: ${removedNames.join(', ')}.`,
+    };
+  }
+
+  return {
+    activePurchases,
+    sameProductDuplicates,
+    multiActiveViolation,
+  };
 }
 
 async function main() {
   console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log('  NEXVO — Fix Mulyono5 + Audit Duplicate Packages');
+  console.log('  NEXVO — Fix Mulyono5 + Audit + ONE-ACTIVE-RULE');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`  Mode       : ${APPLY ? '⚡ APPLY (will modify DB)' : '🔍 DRY-RUN (read-only)'}`);
   console.log(`  Search term: "${SEARCH_TERM}"`);
@@ -167,14 +191,17 @@ async function main() {
   console.log(`   totalProfit    : ${fmt(target.totalProfit)}`);
   console.log();
 
-  /* ─── 2. Detect duplicates for target ─── */
-  const { activePurchases, duplicates } = await detectDuplicatesForUser(target.id);
+  /* ─── 2. Detect duplicates for target (v18: same-product + multi-active) ─── */
+  const { activePurchases, sameProductDuplicates, multiActiveViolation } =
+    await detectDuplicatesForUser(target.id);
 
   console.log(`📦 Active purchases: ${activePurchases.length} total`);
-  console.log(`🔁 Duplicate groups: ${duplicates.length}`);
-  if (duplicates.length > 0) {
-    console.log('\n   ── DUPLICATE PACKAGES ──');
-    for (const d of duplicates) {
+  console.log(`🔁 Same-product duplicate groups: ${sameProductDuplicates.length}`);
+  console.log(`🚫 Multi-active violations: ${multiActiveViolation ? 1 : 0}`);
+
+  if (sameProductDuplicates.length > 0) {
+    console.log('\n   ── DUPLICATE PACKAGES (same product, ≥2 active) ──');
+    for (const d of sameProductDuplicates) {
       console.log(`\n   Product: "${d.productName}" (productId=${d.productId})`);
       console.log(`   Active count: ${d.count}`);
       d.purchases.forEach((p, idx) => {
@@ -182,8 +209,19 @@ async function main() {
         console.log(`     ${tag} | ${p.id} | qty=${p.quantity} | total=${fmt(p.totalPrice)} | created=${ts(p.createdAt)} | profitEarned=${fmt(p.profitEarned)}`);
       });
     }
-  } else {
-    console.log('   ✅ Tidak ada duplikat untuk user ini.');
+  }
+
+  if (multiActiveViolation) {
+    console.log('\n   ── MULTI-ACTIVE VIOLATION (v18: only 1 active allowed) ──');
+    console.log(`   ${multiActiveViolation.description}`);
+    console.log(`   ✅ KEEP: ${multiActiveViolation.keepPurchase?.product?.name || '-'} | id=${multiActiveViolation.keepPurchase?.id} | created=${ts(multiActiveViolation.keepPurchase?.createdAt ?? null)}`);
+    multiActiveViolation.toRemove.forEach((p, idx) => {
+      console.log(`   ❌ REMOVE: ${p.product?.name || '-'} | id=${p.id} | created=${ts(p.createdAt)}`);
+    });
+  }
+
+  if (sameProductDuplicates.length === 0 && !multiActiveViolation) {
+    console.log('   ✅ Tidak ada duplikat atau multi-active violation untuk user ini.');
   }
   console.log();
 
@@ -194,22 +232,45 @@ async function main() {
     console.log('═══════════════════════════════════════════════════════════════\n');
 
     await db.$transaction(async (tx) => {
-      // 3a. Delete duplicate purchases (keep latest per product)
+      // 3a. Delete same-product duplicates (keep latest per product).
       let totalDeleted = 0;
-      for (const d of duplicates) {
+      for (const d of sameProductDuplicates) {
         const toDelete = d.purchases.slice(1); // skip first (latest)
         const ids = toDelete.map((p) => p.id);
         if (ids.length === 0) continue;
 
+        // Nullify linked Investment.purchaseId + mark Investment 'completed'
+        // (so audit trail kept, but profit stops).
         await tx.profitLog.deleteMany({ where: { purchaseId: { in: ids } } });
-        await tx.investment.updateMany({ where: { purchaseId: { in: ids } }, data: { purchaseId: null } });
+        await tx.investment.updateMany({
+          where: { purchaseId: { in: ids } },
+          data: { purchaseId: null, status: 'completed' },
+        });
         await tx.purchase.deleteMany({ where: { id: { in: ids } } });
         totalDeleted += ids.length;
         console.log(`  🗑️  Hapus ${ids.length} duplikat untuk product "${d.productName}" (productId=${d.productId})`);
       }
-      console.log(`  ✅ Total duplikat dihapus: ${totalDeleted} purchases`);
+      console.log(`  ✅ Total same-product duplikat dihapus: ${totalDeleted} purchases`);
 
-      // 3b. Set saldo to 0 (main + deposit + profit)
+      // 3b. Multi-active violation fix — under v18, only 1 active allowed TOTAL.
+      //     Keep latest, mark all others 'completed' (Purchase + Investment).
+      if (multiActiveViolation) {
+        const toRemoveIds = multiActiveViolation.toRemove.map((p) => p.id);
+        console.log(`  🚫 Fix multi-active violation: keep "${multiActiveViolation.keepPurchase?.product?.name || '-'}", mark ${toRemoveIds.length} lainnya 'completed'`);
+        // Mark Purchase 'completed'
+        await tx.purchase.updateMany({
+          where: { id: { in: toRemoveIds } },
+          data: { status: 'completed' },
+        });
+        // Mark linked Investment 'completed' (don't hard-delete — keep audit trail)
+        await tx.investment.updateMany({
+          where: { purchaseId: { in: toRemoveIds } },
+          data: { status: 'completed' },
+        });
+        console.log(`  ✅ ${toRemoveIds.length} paket ditandai 'completed' (audit trail dipertahankan)`);
+      }
+
+      // 3c. Set saldo to 0 (main + deposit + profit)
       const before = {
         main: target.mainBalance,
         dep: target.depositBalance,
@@ -244,26 +305,36 @@ async function main() {
   console.log(`Total users: ${allUsers.length}`);
 
   let usersWithDupes = 0;
+  let usersWithMultiActive = 0;
   let totalDupeRecords = 0;
+  let totalMultiActiveRecords = 0;
 
   for (const u of allUsers) {
-    const { duplicates: userDupes } = await detectDuplicatesForUser(u.id);
-    if (userDupes.length > 0) {
+    const { sameProductDuplicates, multiActiveViolation } = await detectDuplicatesForUser(u.id);
+    if (sameProductDuplicates.length > 0) {
       usersWithDupes++;
-      for (const d of userDupes) {
+      for (const d of sameProductDuplicates) {
         totalDupeRecords += d.count - 1;
-        console.log(`  ⚠️  ${u.userId} | ${u.name || '-'} | duplikat "${d.productName}" (×${d.count}) — perlu hapus ${d.count - 1}`);
+        console.log(`  ⚠️  ${u.userId} | ${u.name || '-'} | same-product dup "${d.productName}" (×${d.count}) — hapus ${d.count - 1}`);
       }
+    }
+    if (multiActiveViolation) {
+      usersWithMultiActive++;
+      totalMultiActiveRecords += multiActiveViolation.toRemove.length;
+      console.log(`  🚫 ${u.userId} | ${u.name || '-'} | MULTI-ACTIVE (${multiActiveViolation.toRemove.length + 1} paket aktif) — keep latest, mark ${multiActiveViolation.toRemove.length} 'completed'`);
     }
   }
 
   console.log(`\n  ── RINGKASAN AUDIT ──`);
-  console.log(`  Users dengan duplikat: ${usersWithDupes}`);
-  console.log(`  Total duplikat yang perlu dihapus (estimasi): ${totalDupeRecords}`);
-  if (usersWithDupes > 0) {
+  console.log(`  Users dengan same-product duplicate: ${usersWithDupes}`);
+  console.log(`  Users dengan multi-active violation : ${usersWithMultiActive}`);
+  console.log(`  Total same-product duplikat         : ${totalDupeRecords}`);
+  console.log(`  Total multi-active to mark completed: ${totalMultiActiveRecords}`);
+  if (usersWithDupes > 0 || usersWithMultiActive > 0) {
     console.log('\n  👉 Cara fix: buka admin panel → Kelola Users → klik tombol 📦 (Kelola Aset)');
-    console.log('     → lihat banner merah "Paket Duplikat Ditemukan" → klik "Fix Duplikat Paket".');
-    console.log('     Atau admin bisa hapus per-purchase satu-satu lewat tombol 🗑️.');
+    console.log('     → lihat banner merah → klik tombol fix.');
+    console.log('     Atau jalankan: bun run scripts/fix-mulyono5-and-dupes.ts --user=<identifier> --apply');
+    console.log('     untuk fix per-user. Tidak ada opsi fix-semua otomatis (admin wajib pilih user).');
   } else {
     console.log('\n  ✅ Tidak ada user lain dengan duplikat. Selesai.');
   }
