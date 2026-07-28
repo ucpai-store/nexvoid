@@ -9616,3 +9616,77 @@ Stage Summary:
   4. bun run scripts/fix-mulyono5-and-dupes.ts --apply    (eksekusi: hapus duplikat + set saldo 0)
   5. Kalau muncul "Ditemukan N user yang cocok" → pilih salah satu: --user=<email atau wa>
   6. Kalau muncul "Tidak ada user" → list semua user muncul, cari manual, lalu pakai --user=<identifier>
+
+---
+Task ID: 12
+Agent: main (Z.ai Code)
+Task: ONE-ACTIVE-RULE — user hanya boleh punya 1 paket/produk aktif (entah produk atau paket, itu 1 aset)
+
+User's exact request:
+  "bukan multi aktif jadi gini lo ya produk dan paket itu terkait cuman beda nya
+   produk ada bener paket tidak ada gitu doang namun itu tetep aja kayak 1 aset
+   gitu entah aktifin produk entah paket ya itu 1 barang itu gitu"
+
+Artinya:
+  - Produk & Paket = 1 aset (sama, beda nama aja).
+  - Bedanya: produk ada stock/quota, paket tidak ada.
+  - Tapi aturan 1 aktif tetap berlaku — entah beli produk atau paket,
+    itu dihitung 1 aset aktif.
+  - Kalau sudah punya 1, gak bisa beli lain sampai kontrak selesai.
+
+Work Log:
+- Baca prisma/schema.prisma → Investment model: userId, packageId, purchaseId (link ke Purchase), status, endDate.
+- Baca src/app/api/products/route.ts → POST create Investment dengan packageId=fallback "_internal_default", purchaseId=newPurchase.id. Jadi beli PRODUK tetap bikin Investment.
+- Baca src/app/api/investments/route.ts → POST create Investment dengan packageId=pkg.id (InvestmentPackage). Jadi beli PAKET juga bikin Investment.
+- Baca src/lib/tier-system.ts → ada validateSequentialPurchase + getUserTierAvailability, tapi implementasi lama MULTI-ACTIVE.
+- Update src/lib/tier-system.ts:
+  • Add 'locked' to TierState union = user has another active tier.
+  • Add getUserActivePackageInfo(userId) helper: cek Investment active + include
+    Purchase+Product supaya detect beli lewat Product page (karena Purchase Investment
+    punya packageId="_internal_default", nama package useless). Kalau dari beli produk,
+    ambil nama dari Purchase.product; kalau dari beli paket, ambil dari Investment.package
+    (skip "_internal_default").
+  • Update getUserTierAvailability: kalau user hasAnyActive, all other tiers → 'locked'
+    dengan reason message pakai real display name (productName || realPackageName).
+    remainingCount = 0 kalau hasAnyActive (nothing available).
+  • Update validateTierPurchase: reject if tier.state === 'locked' dengan error message
+    yang mention nama paket aktif + days remaining.
+  • loadOrderedTiers() return type explicit Promise<TierInfo[]> + add default state='available'.
+- Update src/app/api/products/route.ts:
+  • Import getUserActivePackageInfo from tier-system.
+  • Add ONE-ACTIVE-RULE block di awal POST: cek Investment active, kalau ada → return
+    error "Anda sudah memiliki paket aktif (X). Tunggu N hari sampai kontrak selesai".
+  • Backward-compat safety: juga cek Purchase active (kalau ada legacy data inconsistent).
+  • Defensive backstop: cek same-product active Purchase (sebenarnya redundant, cuma backstop).
+  • Update comment: "MULTI-ACTIVE" → "v18 ONE-ACTIVE-RULE".
+- Update src/app/api/investments/route.ts:
+  • Import getUserActivePackageInfo.
+  • Add ONE-ACTIVE-RULE block di awal POST: cek Investment active, return error kalau ada.
+  • Update comment: "MULTI-ACTIVE" → "v18 ONE-ACTIVE-RULE".
+- Update scripts/fix-mulyono5-and-dupes.ts:
+  • detectDuplicatesForUser sekarang return:
+    - sameProductDuplicates (A: ≥2 active untuk produk yang sama)
+    - multiActiveViolation (B: ≥2 active untuk produk BERBEDA — under v18 dilarang)
+  • Apply fix untuk A: hapus Purchase duplikat (keep latest), nullify+mark Investment 'completed'
+    (jangan hard-delete — keep audit trail).
+  • Apply fix untuk B: keep latest active, mark all others Purchase+Investment 'completed'.
+  • Audit report: tampilkan both same-product dupes + multi-active violations per user.
+- Test dry-run: script jalan, ketemu mulyono5 (local DB), 0 duplicates (local test DB
+  bersih). Logic verified — siap pakai di VPS.
+- TypeScript check: 0 errors di file yang di-edit.
+- Commit + push GitHub (commit 5b8bb51).
+
+Stage Summary:
+- ONE-ACTIVE-RULE implemented end-to-end:
+  • Backend block beli di /api/products + /api/investments.
+  • Tier system UI state 'locked' untuk semua tier lain ketika user has active.
+  • Helper getUserActivePackageInfo return real display name (productName ||
+    realPackageName) — handle case beli lewat Product page yang pakai fallback
+    packageId="_internal_default".
+- Fix script v18-aware: detect both same-product + multi-active violations.
+  Apply fix mark 'completed' (bukan hard-delete) supaya audit trail dipertahankan.
+- Deploy ke VPS: git pull → bun run build → pm2 restart nexvo-web nexvo-cron.
+  Setelah deploy, aturan baru aktif. User yang sudah punya 2 paket aktif
+  (legacy data) masih bisa dikasih fix manual via:
+    bun run scripts/fix-mulyono5-and-dupes.ts --user=<email> (dry-run)
+    bun run scripts/fix-mulyono5-and-dupes.ts --user=<email> --apply (eksekusi)
