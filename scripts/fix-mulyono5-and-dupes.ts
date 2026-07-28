@@ -9,32 +9,45 @@
  *  Default mode = DRY-RUN (read-only, no DB writes).
  *  Add --apply to actually perform the fix.
  *
+ *  Search behaviour (FIXED — was failing on VPS before):
+ *    The script searches across ALL identifying fields, not just userId:
+ *      - userId   (exact match, then contains)
+ *      - whatsapp (contains)
+ *      - email    (contains)
+ *      - name     (contains)
+ *    Because on VPS the userId is auto-generated as "NXV-XXXXXX", so
+ *    searching userId="mulyono5" always returns 0 rows. We must search
+ *    email/whatsapp/name instead.
+ *
+ *  Custom target:
+ *    --user=<term>     search for a different user (any identifier)
+ *    --apply           actually modify DB (default = dry-run)
+ *
  *  What this script does:
- *    1. Find user "mulyono5" (by userId exact, case-insensitive).
+ *    1. Find the target user across userId/whatsapp/email/name.
+ *       If multiple matches, list them and exit (admin picks one with --user=).
  *    2. List all their active purchases; detect duplicate product IDs.
- *       Show every duplicate package (product name + qty duplicates).
- *    3. (apply) For mulyono5: delete duplicate active purchases keeping
- *       only the LATEST one per productId (cascade profitLogs + nullify
- *       investment.purchaseId). Other users' duplicates are REPORTED ONLY
- *       (not auto-fixed) — admin should fix them via admin UI to stay safe.
- *    4. (apply) Set mulyono5's saldo to 0 (mainBalance, depositBalance,
+ *    3. (apply) Delete duplicate active purchases keeping only the LATEST
+ *       one per productId (cascade profitLogs + nullify investment.purchaseId).
+ *    4. (apply) Set the target's saldo to 0 (mainBalance, depositBalance,
  *       profitBalance all → 0). Stats (totalDeposit/totalWithdraw/
- *       totalProfit) NOT touched — admin can reset-stats via UI if needed.
+ *       totalProfit) NOT touched.
  *    5. Audit ALL other users: list every user with duplicate active
  *       purchases (same productId appears > 1 time with status='active').
- *       Print a report table.
  *
  *  Safety:
  *    - DRY-RUN by default. Will NOT modify anything.
- *    - Only mulyono5's saldo + duplicates are touched when --apply is used.
+ *    - Only the matched target's saldo + duplicates are touched when --apply.
  *    - Other users are reported, NOT auto-fixed.
  *    - Uses Prisma $transaction for atomicity.
  * ════════════════════════════════════════════════════════════════
  */
 import { db } from '../src/lib/db';
 
-const TARGET_USER_ID = 'mulyono5'; // exact match (case-insensitive)
+const DEFAULT_SEARCH = 'mulyono5';
 const APPLY = process.argv.includes('--apply');
+const userArg = process.argv.find((a) => a.startsWith('--user='));
+const SEARCH_TERM = (userArg ? userArg.split('=')[1] : DEFAULT_SEARCH) as string;
 
 function fmt(amount: number): string {
   return 'Rp' + Math.floor(amount).toLocaleString('id-ID');
@@ -47,6 +60,34 @@ function ts(date: Date | string | null): string {
     dateStyle: 'short',
     timeStyle: 'short',
   }) + ' WIB';
+}
+
+/** Search a user across all identifying fields. Returns all matches. */
+async function findUserEverywhere(term: string) {
+  const lc = term.toLowerCase();
+  // 1) Try exact userId match first
+  const exact = await db.user.findUnique({ where: { userId: term } }).catch(() => null);
+  const matches: Awaited<ReturnType<typeof db.user.findMany>> = [];
+  if (exact) matches.push(exact as any);
+
+  // 2) Then contains search across all identifier fields
+  // NOTE: SQLite's `contains` is already case-insensitive, no `mode` arg needed.
+  const [byUserId, byWhatsapp, byEmail, byName] = await Promise.all([
+    db.user.findMany({ where: { userId:   { contains: term } } }),
+    db.user.findMany({ where: { whatsapp: { contains: term } } }),
+    db.user.findMany({ where: { email:    { contains: term } } }),
+    db.user.findMany({ where: { name:     { contains: term } } }),
+  ]);
+
+  // Extra JS-level filter for safety (in case future DB is case-sensitive)
+  const filterCi = (rows: any[], field: string) =>
+    rows.filter((r) => String(r[field] ?? '').toLowerCase().includes(lc));
+
+  const combined = new Map<string, any>();
+  for (const u of [exact, ...filterCi(byUserId, 'userId'), ...filterCi(byWhatsapp, 'whatsapp'), ...filterCi(byEmail, 'email'), ...filterCi(byName, 'name')]) {
+    if (u) combined.set((u as any).id, u);
+  }
+  return Array.from(combined.values());
 }
 
 async function detectDuplicatesForUser(userId: string) {
@@ -79,40 +120,39 @@ async function main() {
   console.log('\n═══════════════════════════════════════════════════════════════');
   console.log('  NEXVO — Fix Mulyono5 + Audit Duplicate Packages');
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log(`  Mode: ${APPLY ? '⚡ APPLY (will modify DB)' : '🔍 DRY-RUN (read-only)'}`);
-  console.log(`  Target user: "${TARGET_USER_ID}"`);
+  console.log(`  Mode       : ${APPLY ? '⚡ APPLY (will modify DB)' : '🔍 DRY-RUN (read-only)'}`);
+  console.log(`  Search term: "${SEARCH_TERM}"`);
+  console.log(`  Fields     : userId | whatsapp | email | name`);
   console.log('═══════════════════════════════════════════════════════════════\n');
 
-  /* ─── 1. Find mulyono5 ─── */
-  const target = await db.user.findFirst({
-    where: { userId: TARGET_USER_ID },
-    select: {
-      id: true, userId: true, name: true, whatsapp: true, email: true,
-      mainBalance: true, depositBalance: true, profitBalance: true,
-      totalDeposit: true, totalWithdraw: true, totalProfit: true,
-      createdAt: true,
-    },
-  });
+  /* ─── 1. Find target user across all fields ─── */
+  const candidates = await findUserEverywhere(SEARCH_TERM);
 
-  if (!target) {
-    console.log(`❌ User "${TARGET_USER_ID}" tidak ditemukan (case-sensitive match).`);
-    console.log('   Mencari user dengan userId mengandung "mulyono"...\n');
-    const candidates = await db.user.findMany({
-      where: { userId: { contains: 'mulyono' } },
-      select: { id: true, userId: true, name: true, whatsapp: true, mainBalance: true },
+  if (candidates.length === 0) {
+    console.log(`❌ Tidak ada user yang cocok dengan "${SEARCH_TERM}" di field manapun.`);
+    console.log('   Coba gunakan --user=<kata-kunci> dengan email / whatsapp / nama user.');
+    console.log('\n   ── SEMUA USER (untuk referensi) ──');
+    const allUsers = await db.user.findMany({
+      select: { userId: true, whatsapp: true, email: true, name: true, mainBalance: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
     });
-    if (candidates.length === 0) {
-      console.log('   Tidak ada user dengan "mulyono" di userId. Keluar.');
-      return;
+    console.log(`Total: ${allUsers.length} user(s)`);
+    for (const u of allUsers) {
+      console.log(`  • userId=${u.userId} | wa=${u.whatsapp} | email=${u.email} | name=${u.name || '-'} | main=${fmt(u.mainBalance)}`);
     }
-    console.log('   Kandidat ditemukan:');
-    for (const c of candidates) {
-      console.log(`     • ${c.userId} | id=${c.id} | name=${c.name || '-'} | wa=${c.whatsapp} | main=${fmt(c.mainBalance)}`);
-    }
-    console.log('\n   Edit TARGET_USER_ID di script ini kalau perlu, lalu run lagi.');
     return;
   }
 
+  if (candidates.length > 1) {
+    console.log(`⚠️  Ditemukan ${candidates.length} user yang cocok. Pilih salah satu dengan --user=<identifier>:\n`);
+    for (const u of candidates) {
+      console.log(`  • userId=${u.userId} | wa=${u.whatsapp} | email=${u.email} | name=${u.name || '-'} | main=${fmt(u.mainBalance)}`);
+    }
+    console.log('\n  Contoh: bun run scripts/fix-mulyono5-and-dupes.ts --user=62812xxxx --apply');
+    return;
+  }
+
+  const target = candidates[0];
   console.log(`✅ User ditemukan:`);
   console.log(`   userId         : ${target.userId}`);
   console.log(`   id (cuid)      : ${target.id}`);
@@ -127,13 +167,13 @@ async function main() {
   console.log(`   totalProfit    : ${fmt(target.totalProfit)}`);
   console.log();
 
-  /* ─── 2. Detect duplicates for mulyono5 ─── */
+  /* ─── 2. Detect duplicates for target ─── */
   const { activePurchases, duplicates } = await detectDuplicatesForUser(target.id);
 
   console.log(`📦 Active purchases: ${activePurchases.length} total`);
   console.log(`🔁 Duplicate groups: ${duplicates.length}`);
   if (duplicates.length > 0) {
-    console.log('\n   ── DUPLICATE PACKAGES (mulyono5) ──');
+    console.log('\n   ── DUPLICATE PACKAGES ──');
     for (const d of duplicates) {
       console.log(`\n   Product: "${d.productName}" (productId=${d.productId})`);
       console.log(`   Active count: ${d.count}`);
@@ -143,14 +183,14 @@ async function main() {
       });
     }
   } else {
-    console.log('   ✅ Tidak ada duplikat untuk mulyono5.');
+    console.log('   ✅ Tidak ada duplikat untuk user ini.');
   }
   console.log();
 
-  /* ─── 3. Apply fix for mulyono5 ─── */
+  /* ─── 3. Apply fix for target ─── */
   if (APPLY) {
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log('  ⚡ APPLY — Performing fix for mulyono5...');
+    console.log('  ⚡ APPLY — Performing fix...');
     console.log('═══════════════════════════════════════════════════════════════\n');
 
     await db.$transaction(async (tx) => {
@@ -161,7 +201,6 @@ async function main() {
         const ids = toDelete.map((p) => p.id);
         if (ids.length === 0) continue;
 
-        // Cascade: profitLogs, then nullify investment.purchaseId, then delete purchase
         await tx.profitLog.deleteMany({ where: { purchaseId: { in: ids } } });
         await tx.investment.updateMany({ where: { purchaseId: { in: ids } }, data: { purchaseId: null } });
         await tx.purchase.deleteMany({ where: { id: { in: ids } } });
@@ -187,7 +226,7 @@ async function main() {
       console.log(`     (totalDeposit/totalWithdraw/totalProfit TIDAK diubah — pakai admin UI "Reset Stats" kalau perlu)`);
     });
 
-    console.log('\n✅ Fix selesai untuk mulyono5.\n');
+    console.log('\n✅ Fix selesai.\n');
   } else {
     console.log('🔍 DRY-RUN: tidak ada perubahan. Run dengan --apply untuk eksekusi.');
     console.log('   Contoh: bun run scripts/fix-mulyono5-and-dupes.ts --apply\n');
@@ -199,22 +238,20 @@ async function main() {
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   const allUsers = await db.user.findMany({
-    select: { id: true, userId: true, name: true, whatsapp: true, mainBalance: true, depositBalance: true },
+    select: { id: true, userId: true, name: true, whatsapp: true, email: true, mainBalance: true, depositBalance: true },
     orderBy: { createdAt: 'asc' },
   });
   console.log(`Total users: ${allUsers.length}`);
 
   let usersWithDupes = 0;
   let totalDupeRecords = 0;
-  const report: Array<{ userId: string; name: string; productName: string; count: number }> = [];
 
   for (const u of allUsers) {
     const { duplicates: userDupes } = await detectDuplicatesForUser(u.id);
     if (userDupes.length > 0) {
       usersWithDupes++;
       for (const d of userDupes) {
-        totalDupeRecords += d.count - 1; // count of duplicates to delete
-        report.push({ userId: u.userId, name: u.name || '-', productName: d.productName, count: d.count });
+        totalDupeRecords += d.count - 1;
         console.log(`  ⚠️  ${u.userId} | ${u.name || '-'} | duplikat "${d.productName}" (×${d.count}) — perlu hapus ${d.count - 1}`);
       }
     }
