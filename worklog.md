@@ -9582,3 +9582,37 @@ Next step for user (deploy to VPS):
 3. Run fix script: bun run scripts/fix-mulyono5-and-dupes.ts (DRY-RUN dulu untuk lihat)
 4. Kalau OK: bun run scripts/fix-mulyono5-and-dupes.ts --apply
 5. Cek user lain dengan error → buka admin panel → Kelola Users → 📦 Kelola Aset → Fix Duplikat Paket (atau per-item delete)
+
+---
+Task ID: 11
+Agent: main (Z.ai Code)
+Task: Fix bug — script fix-mulyono5-and-dupes.ts tidak bisa nemuin user "mulyono5" di VPS (hanya jalan di local DB)
+
+Work Log:
+- Baca prisma/schema.prisma → User model punya field: id (cuid), userId (unique), whatsapp, email, name
+- Baca src/lib/auth.ts → generateUserId() bikin userId format "NXV-XXXXXX" (6 char random), BUKAN dari input user
+- Baca scripts/fix-mulyono5-and-dupes.ts (versi lama) → cari user cuma by `userId == 'mulyono5'`
+- Diagnosis: di local DB test user pakai userId='mulyono5' (manual insert), tapi di VPS production userId = "NXV-XXXXXX" (auto-generate). Email/whatsapp/name field aja yang punya kata "mulyono". Itu sebabnya script return 0 rows di VPS.
+- Bikin script diagnostic scripts/find-mulyono5.ts → konfirmasi local DB punya 1 user dengan userId='mulyono5'
+- Rewrite scripts/fix-mulyono5-and-dupes.ts:
+  • Search ACROSS ALL identifying fields: userId (exact + contains), whatsapp (contains), email (contains), name (contains)
+  • Case-insensitive (SQLite contains udah CI by default, JS-level filter backup)
+  • Custom search term via --user=<term>
+  • Multiple matches → list semua + exit (admin pilih manual)
+  • No match → list SEMUA user untuk referensi
+  • Tetap DRY-RUN default, --apply untuk eksekusi
+- Test dry-run: search "mulyono5" → ✓ ketemu via userId field (local)
+- Test dry-run: search "mulyono5@test.local" → ✓ ketemu via email field (simulasi VPS scenario)
+- Test dry-run: search "6281234567890" → ✓ ketemu via whatsapp field
+- Commit + push GitHub (commit 9f6f95b)
+
+Stage Summary:
+- Root cause: userId di VPS = "NXV-XXXXXX" (auto-generate), BUKAN "mulyono5". Script lama cuma search by userId exact → 0 rows di VPS.
+- Fix: script sekarang search across userId/whatsapp/email/name. Di VPS, "mulyono5" bakal ketemu via email (e.g. mulyono5@xxx.com) atau name field.
+- Cara pakai di VPS:
+  1. ssh ke VPS, cd /var/www/nexvo (atau path project)
+  2. git pull origin main
+  3. bun run scripts/fix-mulyono5-and-dupes.ts            (DRY-RUN — verifikasi ketemu)
+  4. bun run scripts/fix-mulyono5-and-dupes.ts --apply    (eksekusi: hapus duplikat + set saldo 0)
+  5. Kalau muncul "Ditemukan N user yang cocok" → pilih salah satu: --user=<email atau wa>
+  6. Kalau muncul "Tidak ada user" → list semua user muncul, cari manual, lalu pakai --user=<identifier>
