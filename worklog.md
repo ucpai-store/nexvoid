@@ -9753,3 +9753,45 @@ Cara deploy + fix mulyono5 di VPS:
    Login admin → Kelola Users → klik 'Fix Semua Duplikat' → confirm → lihat report
 5. Kalau perlu set saldo mulyono5 ke 0: buka dialog 📦 Kelola Aset user → 'Set Saldo 0'
    Atau pakai CLI --user=<email> --apply (per-user, akan auto-set saldo ke 0)
+
+---
+Task ID: 14
+Agent: main, Z.ai Code
+Task: Verify v18 ONE-ACTIVE-RULE correctly treats "3 PRODUK + 3 PAKET = 3 ASSET (bukan 6)" — produk VIP_x = paket VIP_x = SAME asset. User can only have 1 active asset, blocked from buying more via either route.
+
+Work Log:
+- User clarified the data model: 3 produk + 3 paket = 3 aset (NOT 6). produk VIP_x ≡ paket VIP_x = SAME asset.
+- Re-read implementation in src/lib/tier-system.ts — getUserActivePackageInfo() queries Investment table (source of truth) for any active Investment (status='active'), with includes for purchase.product (PRODUK route) and package (PAKET route).
+- Re-read src/app/api/products/route.ts POST — calls getUserActivePackageInfo, returns 400 if hasActive=true. Also has defensive backstop for legacy Purchase without Investment.
+- Re-read src/app/api/investments/route.ts POST — calls getUserActivePackageInfo, returns 400 if hasActive=true. Also calls validateSequentialPurchase (alias for validateTierPurchase).
+- Verified ALL buy endpoints: only /api/products and /api/investments create Purchase/Investment. /api/cron/profit only reads. No other route can create an active asset.
+- Wrote scripts/verify-one-active-rule.ts — comprehensive 10-test verification:
+  - TEST 1: Seed 3 produk + 3 paket (if empty) — represents the "3 aset" model
+  - TEST 2: Empty user → hasActive=false (can buy)
+  - TEST 3: Buy via PRODUK (creates Purchase + Investment linked by purchaseId)
+  - TEST 4: After buying produk → hasActive=true, activeType='product', correct name
+  - TEST 5: Try to buy PAKET (any) → BLOCKED by validateTierPurchase (ONE-ACTIVE-RULE)
+  - TEST 6: Try to buy another PRODUK → BLOCKED (hasActive=true)
+  - TEST 7: Set status='completed' → hasActive=false (can re-activate after contract end)
+  - TEST 8: Buy via PAKET (purchaseId=null) → hasActive=true, activeType='package', correct name
+  - TEST 9: After buying paket → trying to buy PRODUK BLOCKED
+  - TEST 10: Concept: 3 produk + 3 paket = 3 unique assets (NOT 6) — ONE-ACTIVE-RULE ensures only 1 active
+- Ran script: 9 PASS, 0 FAIL. All assertions confirmed.
+
+Stage Summary:
+- ✅ Implementation CORRECTLY enforces "3 PRODUK + 3 PAKET = 3 ASSET (bukan 6)":
+  - produk VIP_x via /api/products → creates Investment with purchaseId (links to Purchase)
+  - paket VIP_x via /api/investments → creates Investment with purchaseId=null
+  - getUserActivePackageInfo queries Investment table (source of truth) — covers BOTH routes
+  - hasActive=true blocks ANY new purchase (regardless of route/tier/name)
+  - This means: produk VIP1 active + trying to buy paket VIP1 (same asset) → BLOCKED ✓
+  - Also: produk VIP1 active + trying to buy paket VIP2 (different asset) → BLOCKED ✓
+  - Also: paket VIP1 active + trying to buy produk VIP1 → BLOCKED ✓
+  - Also: paket VIP1 active + trying to buy produk VIP2 → BLOCKED ✓
+- ✅ Contract completion (status='completed') → user can re-activate same/different asset (correct v18 rule).
+- ✅ Source of truth = Investment table (not Purchase), so any inconsistency in Purchase is still caught via Investment check.
+- ✅ Defensive backstop in /api/products for legacy Purchase without Investment.
+- 📁 New file: scripts/verify-one-active-rule.ts (reusable verification — run anytime to confirm rule still works)
+- 📊 Result: 9/9 PASS — system correctly treats produk + paket as 1 aset per tier.
+
+Next step: deploy to VPS + run fix-all script (per worklog Task ID 12).
