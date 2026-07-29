@@ -236,177 +236,76 @@ async function detectInvestmentViolations(
 }
 
 /**
- * Fix ALL users with duplicates in one go (v19 PER-ASSET-UNIQUE-RULE).
- * Same logic as `fix-all-dupes` admin action.
+ * Fix ALL users with duplicates in one go (v20 ANTI-DOUBLE-PROFIT).
+ * Uses helper terpusat di src/lib/investment-cleanup.ts.
  *
- * Strategi:
- *   1. Same-product Purchase duplikat → hard delete (keep latest per productId).
- *   2. ★ Same-asset Investment duplicates → keep latest per asset, mark sisanya
- *      'completed' + sync Purchase terkait.
- *
- * Data user (saldo, profile) TIDAK diubah. Audit trail dijaga (mark, not delete).
+ * Strategi (v20):
+ *   - Detect duplicate active Investments per (user, asset index)
+ *   - Keep latest (max createdAt) per group
+ *   - For each older duplicate:
+ *     ★ REFUND totalProfitEarned dari User.mainBalance + totalProfit (clamp 0)
+ *     ★ Create BonusLog(type='refund', amount=-X) buat audit trail
+ *     ★ Mark Investment status='completed' + set endDate=now (cron skip)
+ *     ★ Sync linked Purchase status='completed'
+ *   - Multi-asset tetap BOLEH (beda aset)
  */
 async function runFixAll() {
-  console.log('🌐 Fix ALL users — detect + fix duplicates untuk SEMUA user (v19 PER-ASSET)\n');
-  const allUsers = await db.user.findMany({
-    select: { id: true, userId: true, name: true, whatsapp: true, email: true, mainBalance: true },
-    orderBy: { createdAt: 'asc' },
-  });
-  console.log(`Total users: ${allUsers.length}\n`);
+  console.log('🌐 Fix ALL users — v20 ANTI-DOUBLE-PROFIT (refund + mark + skip cron)\n');
 
-  const maps = await buildAssetIndexMaps();
+  // Import helper terpusat
+  const { cleanupAllUsersDuplicateInvestments } = await import('../src/lib/investment-cleanup');
 
-  interface UserReport {
-    userId: string; name: string;
-    deletedPurchases: number; markedPurchases: number; markedInvestments: number;
-  }
-  const report: UserReport[] = [];
-  let totalDeletedPurchases = 0;
-  let totalMarkedPurchases = 0;
-  let totalMarkedInvestments = 0;
-  let usersFixed = 0;
-
-  for (const u of allUsers) {
-    // ─── STEP 1: same-product Purchase duplikat (hard delete) ───
-    const activePurchases = await db.purchase.findMany({
-      where: { userId: u.id, status: 'active' },
-      orderBy: { createdAt: 'desc' },
-    });
-    const byProduct = new Map<string, typeof activePurchases>();
-    for (const p of activePurchases) {
-      const arr = byProduct.get(p.productId) || [];
-      arr.push(p);
-      byProduct.set(p.productId, arr);
-    }
-    const deletedPurchaseIds: string[] = [];
-    for (const [, arr] of byProduct) {
-      if (arr.length > 1) {
-        for (const p of arr.slice(1)) deletedPurchaseIds.push(p.id);
-      }
-    }
-
-    // ─── STEP 2: ★ v19 per-asset Investment duplicates ───
-    const { duplicateGroups } = await detectInvestmentViolations(u.id, maps);
-    const investmentMarkedIds: string[] = [];
-    const purchaseMarkedIds: string[] = [];
-    for (const g of duplicateGroups) {
-      for (const inv of g.toMarkCompleted) {
-        investmentMarkedIds.push(inv.id);
-        if (inv.purchaseId) purchaseMarkedIds.push(inv.purchaseId);
-      }
-    }
-
-    const dp = deletedPurchaseIds.length;
-    const mp = purchaseMarkedIds.length;
-    const mi = investmentMarkedIds.length;
-
-    if (dp > 0 || mp > 0 || mi > 0) {
-      usersFixed++;
-      totalDeletedPurchases += dp;
-      totalMarkedPurchases += mp;
-      totalMarkedInvestments += mi;
-      report.push({
-        userId: u.userId, name: u.name || '-',
-        deletedPurchases: dp, markedPurchases: mp, markedInvestments: mi,
-      });
-      console.log(
-        `  ⚠️  ${u.userId} | ${u.name || '-'} | −${dp} P · →${mp} P 'completed' · →${mi} I 'completed'`,
-      );
-    }
-  }
-
-  console.log(`\n  ── RINGKASAN PREVIEW ──`);
-  console.log(`  Users yang bakal diperbaiki: ${usersFixed}`);
-  console.log(`  Total Purchase duplikat dihapus: ${totalDeletedPurchases}`);
-  console.log(`  Total Purchase ditandai 'completed': ${totalMarkedPurchases}`);
-  console.log(`  Total Investment ditandai 'completed': ${totalMarkedInvestments} (★ source of truth)`);
-
-  if (usersFixed === 0) {
-    console.log('\n  ✅ Tidak ada user dengan same-asset duplikat. Semua sudah sesuai aturan v19 (1 aset aktif per tier).');
-    return;
-  }
-
+  // DRY-RUN preview dulu (biar user lihat apa yg bakal di-fix)
   if (!APPLY) {
-    console.log('\n  🔍 DRY-RUN: tidak ada perubahan. Run dengan --apply untuk eksekusi.');
-    console.log('     Contoh: bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply\n');
+    console.log('  🔍 DRY-RUN — preview duplicate yg bakal diperbaiki:\n');
+    const preview = await cleanupAllUsersDuplicateInvestments(false);
+    console.log(`  Users scanned: ${preview.usersScanned}`);
+    console.log(`  Users yang bakal diperbaiki: ${preview.usersFixed}`);
+    console.log(`  Investment duplikat yg bakal di-refund: ${preview.duplicateInvestmentsRefunded}`);
+    console.log(`  Total profit yg bakal di-refund: Rp${Math.floor(preview.totalProfitRefunded).toLocaleString('id-ID')}`);
+    console.log(`  Purchase yg bakal ditandai completed: ${preview.purchasesMarkedCompleted}`);
+    if (preview.perUser.length > 0) {
+      console.log('\n  ── DETAIL PER USER ──');
+      for (const r of preview.perUser) {
+        console.log(`    ⚠️  ${r.userId} | ${r.name} | ${r.groupsFixed} group, ${r.investmentsRefunded} inv refunded Rp${Math.floor(r.profitRefunded).toLocaleString('id-ID')}`);
+      }
+    } else {
+      console.log('\n  ✅ Tidak ada user dengan same-asset duplikat. Semua sudah bersih.');
+    }
+    console.log('\n  💡 Run dengan --apply untuk eksekusi:');
+    console.log('     bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply\n');
     return;
   }
 
-  // APPLY — execute fix for each user
-  console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log('  ⚡ APPLY — Performing fix for all users...');
+  // APPLY — execute fix
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('  ⚡ APPLY — v20 anti-double-profit fix for ALL users...');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
-  for (const u of allUsers) {
-    // STEP 1: same-product Purchase duplikat → hard delete
-    const activePurchases = await db.purchase.findMany({
-      where: { userId: u.id, status: 'active' },
-      orderBy: { createdAt: 'desc' },
-    });
-    const byProduct = new Map<string, typeof activePurchases>();
-    for (const p of activePurchases) {
-      const arr = byProduct.get(p.productId) || [];
-      arr.push(p);
-      byProduct.set(p.productId, arr);
-    }
-    const deletedPurchaseIds: string[] = [];
-    for (const [, arr] of byProduct) {
-      if (arr.length > 1) {
-        for (const p of arr.slice(1)) deletedPurchaseIds.push(p.id);
-      }
-    }
-    if (deletedPurchaseIds.length > 0) {
-      await db.profitLog.deleteMany({ where: { purchaseId: { in: deletedPurchaseIds } } });
-      await db.investment.updateMany({
-        where: { purchaseId: { in: deletedPurchaseIds } },
-        data: { purchaseId: null, status: 'completed' },
-      });
-      await db.purchase.deleteMany({ where: { id: { in: deletedPurchaseIds } } });
-    }
-
-    // STEP 2: ★ v19 per-asset Investment duplicates
-    const { duplicateGroups } = await detectInvestmentViolations(u.id, maps);
-    const investmentMarkedIds: string[] = [];
-    const purchaseMarkedIds: string[] = [];
-    for (const g of duplicateGroups) {
-      for (const inv of g.toMarkCompleted) {
-        investmentMarkedIds.push(inv.id);
-        if (inv.purchaseId) purchaseMarkedIds.push(inv.purchaseId);
-      }
-    }
-    if (investmentMarkedIds.length > 0) {
-      await db.investment.updateMany({
-        where: { id: { in: investmentMarkedIds } },
-        data: { status: 'completed' },
-      });
-    }
-    if (purchaseMarkedIds.length > 0) {
-      await db.purchase.updateMany({
-        where: { id: { in: purchaseMarkedIds }, status: 'active' },
-        data: { status: 'completed' },
-      });
-    }
-
-    const dp = deletedPurchaseIds.length;
-    const mp = purchaseMarkedIds.length;
-    const mi = investmentMarkedIds.length;
-    if (dp > 0 || mp > 0 || mi > 0) {
-      console.log(`  ✅ ${u.userId} | ${u.name || '-'} | hapus ${dp} Purchase + mark ${mp} Purchase + ${mi} Investment 'completed'`);
-    }
-  }
+  const report = await cleanupAllUsersDuplicateInvestments(true);
 
   console.log(`\n═══════════════════════════════════════════════════════════════`);
-  console.log(`  ✅ Fix selesai. ${usersFixed} user diperbaiki.`);
-  console.log(`     - ${totalDeletedPurchases} Purchase duplikat dihapus`);
-  console.log(`     - ${totalMarkedPurchases} Purchase ditandai 'completed'`);
-  console.log(`     - ${totalMarkedInvestments} Investment ditandai 'completed' (★ source of truth)`);
-  console.log(`     - Saldo TIDAK diubah (gunakan admin UI "Set Saldo 0" per user kalau perlu)`);
-  console.log(`═══════════════════════════════════════════════════════════════\n`);
+  console.log(`  ✅ Fix v20 selesai.`);
+  console.log(`     - Users scanned: ${report.usersScanned}`);
+  console.log(`     - Users diperbaiki: ${report.usersFixed}`);
+  console.log(`     - Investment duplikat di-refund: ${report.duplicateInvestmentsRefunded}`);
+  console.log(`     - Total profit di-refund: Rp${Math.floor(report.totalProfitRefunded).toLocaleString('id-ID')}`);
+  console.log(`     - Purchase ditandai completed: ${report.purchasesMarkedCompleted}`);
+  console.log(`═══════════════════════════════════════════════════════════════`);
+  if (report.perUser.length > 0) {
+    console.log('\n  ── DETAIL PER USER ──');
+    for (const r of report.perUser) {
+      console.log(`    ✅ ${r.userId} | ${r.name} | ${r.groupsFixed} group, ${r.investmentsRefunded} inv refunded Rp${Math.floor(r.profitRefunded).toLocaleString('id-ID')}`);
+    }
+  }
+  console.log('\n  💡 Saldo user SUDAH otomatis di-refund (v20).');
+  console.log('     BonusLog entry "refund" dibuat buat audit trail.');
+  console.log('     Cron akan skip Investment "completed" (endDate=now).\n');
 }
 
 async function main() {
   console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log('  NEXVO — Fix Mulyono5 + Audit + PER-ASSET-UNIQUE-RULE (v19)');
+  console.log('  NEXVO — Fix Mulyono5 + Audit + ANTI-DOUBLE-PROFIT (v20)');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`  Mode       : ${APPLY ? '⚡ APPLY (will modify DB)' : '🔍 DRY-RUN (read-only)'}`);
   console.log(`  Scope      : ${FIX_ALL ? '🌐 ALL users (--fix-all)' : `🎯 single user "${SEARCH_TERM}"`}`);

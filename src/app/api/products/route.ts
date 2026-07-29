@@ -234,13 +234,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Product ID wajib diisi' }, { status: 400 });
     }
 
-    // ★ v19 PER-ASSET-UNIQUE-RULE: user boleh punya BANYAK aset aktif (VIP1+VIP2+VIP3)
-    //   bersamaan. YANG DILARANG: beli aset yang SAMA (same tier index) saat masih aktif.
-    //   Contoh: produk VIP1 aktif → beli paket VIP1 (atau produk VIP1 lagi) = DITOLAK.
-    //            produk VIP1 aktif → beli paket VIP2 = BOLEH (aset beda).
-    //
-    //   Matching: produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset i.
-    //   Source of truth = Investment table (cover semua jalur beli: produk & paket).
+    // ★ v20 ANTI-RACE-CONDITION: validateProductPurchase dipanggil di luar transaction
+    //   buat UX error message cepat (user tahu kalau aset sama masih aktif).
+    //   TAPI race condition bisa terjadi kalau user double-click (2 request lewat
+    //   check di luar tx sebelum salah satu insert). Maka RE-CHECK dilakukan
+    //   DI DALAM transaction di bawah (atomic — SQLite serializable).
     const productCheck = await validateProductPurchase(user.id, productId);
     if (!productCheck.ok) {
       return NextResponse.json(
@@ -317,6 +315,64 @@ export async function POST(request: NextRequest) {
       const totalAvailable = currentUser.depositBalance + currentUser.mainBalance;
       if (totalAvailable < totalPrice) {
         throw new Error('Saldo tidak mencukupi');
+      }
+
+      // ★★★ v20 ANTI-RACE-CONDITION: re-check duplicate DI DALAM transaction ★★★
+      //   Kalau ada 2 request concurrent (user double-click), kedua-nya lewat
+      //   check di luar tx. Re-check ini di DALAM tx (SQLite serializable)
+      //   pastikan cuma 1 request yg berhasil insert Investment.
+      //   Request ke-2 akan lihat Investment dari request ke-1 → throw error.
+      const existingActiveInvestment = await tx.investment.findFirst({
+        where: { userId: user.id, status: 'active' },
+        include: {
+          purchase: { select: { product: { select: { id: true } } } },
+          package: { select: { id: true, amount: true, isActive: true } },
+        },
+      });
+      if (existingActiveInvestment) {
+        // Compute asset index for existing active investment
+        let existingAssetIdx: number | null = null;
+        if (
+          existingActiveInvestment.purchaseId &&
+          existingActiveInvestment.purchase?.product?.id
+        ) {
+          // Rank by product price
+          const allProducts = await tx.product.findMany({
+            orderBy: [{ price: 'asc' }, { createdAt: 'asc' }],
+            select: { id: true },
+          });
+          const idx = allProducts.findIndex(
+            (p) => p.id === existingActiveInvestment.purchase!.product!.id
+          );
+          if (idx >= 0) existingAssetIdx = idx + 1;
+        } else if (existingActiveInvestment.package) {
+          const allPkgs = await tx.investmentPackage.findMany({
+            where: { amount: { gt: 0 }, isActive: true },
+            orderBy: [{ amount: 'asc' }, { order: 'asc' }],
+            select: { id: true },
+          });
+          const idx = allPkgs.findIndex(
+            (p) => p.id === existingActiveInvestment.package!.id
+          );
+          if (idx >= 0) existingAssetIdx = idx + 1;
+        }
+        // Compute asset index for THIS product
+        const allProductsNow = await tx.product.findMany({
+          orderBy: [{ price: 'asc' }, { createdAt: 'asc' }],
+          select: { id: true },
+        });
+        const thisIdx = allProductsNow.findIndex((p) => p.id === productId);
+        const thisAssetIdx = thisIdx >= 0 ? thisIdx + 1 : null;
+        // Same asset + still active → BLOCK (race condition caught!)
+        if (
+          existingAssetIdx !== null &&
+          thisAssetIdx !== null &&
+          existingAssetIdx === thisAssetIdx
+        ) {
+          throw new Error(
+            `ASET_SAMA_AKTIF: Aset "${product.name}" sedang aktif. Tidak bisa dibeli lagi sampai kontrak selesai.`
+          );
+        }
       }
 
       // ★ v19 PER-ASSET-UNIQUE-RULE: do NOT mark previous purchases/investments
@@ -457,8 +513,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('Buy product error:', error);
-    const message = error instanceof Error ? error.message : 'Database belum tersedia. Silakan hubungi admin.';
-    const status = message === 'Saldo tidak mencukupi' ? 400 : 503;
+    let message = error instanceof Error ? error.message : 'Database belum tersedia. Silakan hubungi admin.';
+    let status = 503;
+    if (message === 'Saldo tidak mencukupi') status = 400;
+    if (message.startsWith('ASET_SAMA_AKTIF')) {
+      // ★ v20 anti-race-condition: duplicate caught inside tx
+      message = message.replace('ASET_SAMA_AKTIF: ', '');
+      status = 400;
+    }
     return NextResponse.json({ success: false, error: message }, { status });
   }
 }

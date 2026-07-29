@@ -231,6 +231,62 @@ export async function POST(request: NextRequest) {
           throw new Error('INSUFFICIENT_BALANCE');
         }
 
+        // ★★★ v20 ANTI-RACE-CONDITION: re-check duplicate DI DALAM transaction ★★★
+        //   Cek di luar tx (getPackageAssetIndex + getUserActiveAssets) bisa lewat
+        //   kalau user double-click. Re-check ini di DALAM tx pastikan atomic.
+        //   Request ke-2 akan lihat Investment dari request ke-1 → throw error.
+        const existingActiveInvestment = await tx.investment.findFirst({
+          where: { userId: user.id, status: 'active' },
+          include: {
+            purchase: { select: { product: { select: { id: true } } } },
+            package: { select: { id: true, amount: true, isActive: true } },
+          },
+        });
+        if (existingActiveInvestment) {
+          // Compute asset index for existing active investment
+          let existingAssetIdx: number | null = null;
+          if (
+            existingActiveInvestment.purchaseId &&
+            existingActiveInvestment.purchase?.product?.id
+          ) {
+            const allProducts = await tx.product.findMany({
+              orderBy: [{ price: 'asc' }, { createdAt: 'asc' }],
+              select: { id: true },
+            });
+            const idx = allProducts.findIndex(
+              (p) => p.id === existingActiveInvestment.purchase!.product!.id
+            );
+            if (idx >= 0) existingAssetIdx = idx + 1;
+          } else if (existingActiveInvestment.package) {
+            const allPkgs = await tx.investmentPackage.findMany({
+              where: { amount: { gt: 0 }, isActive: true },
+              orderBy: [{ amount: 'asc' }, { order: 'asc' }],
+              select: { id: true },
+            });
+            const idx = allPkgs.findIndex(
+              (p) => p.id === existingActiveInvestment.package!.id
+            );
+            if (idx >= 0) existingAssetIdx = idx + 1;
+          }
+          // Compute asset index for THIS package
+          const allPkgsNow = await tx.investmentPackage.findMany({
+            where: { amount: { gt: 0 }, isActive: true },
+            orderBy: [{ amount: 'asc' }, { order: 'asc' }],
+            select: { id: true },
+          });
+          const thisIdx = allPkgsNow.findIndex((p) => p.id === pkg.id);
+          const thisAssetIdx = thisIdx >= 0 ? thisIdx + 1 : null;
+          if (
+            existingAssetIdx !== null &&
+            thisAssetIdx !== null &&
+            existingAssetIdx === thisAssetIdx
+          ) {
+            throw new Error(
+              `ASET_SAMA_AKTIF: Aset "${pkg.name}" sedang aktif (sama dengan paket/produk ini). Tunggu sampai kontrak selesai sebelum beli aset yang sama.`
+            );
+          }
+        }
+
         let remaining = pkg.amount;
         const depositDeduct = Math.min(txUser.depositBalance, remaining);
         remaining -= depositDeduct;
@@ -299,6 +355,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { success: false, error: 'User tidak ditemukan' },
           { status: 404 }
+        );
+      }
+      // ★ v20 anti-race-condition: duplicate caught inside tx
+      if (
+        txError instanceof Error &&
+        txError.message.startsWith('ASET_SAMA_AKTIF')
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: txError.message.replace('ASET_SAMA_AKTIF: ', ''),
+          },
+          { status: 400 }
         );
       }
       throw txError;

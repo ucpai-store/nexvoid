@@ -803,11 +803,33 @@ async function processDailyInvestmentProfitsCore(): Promise<{
   const todayDow = wibNow.getDay(); // 0=Sun, 6=Sat
   const isTodayWeekday = todayDow !== 0 && todayDow !== 6;
 
+  // ★★★ v20 ANTI-DOUBLE-PROFIT: auto-cleanup duplicate Investments sebelum kredit ★★★
+  //   Kalau ada 2+ active Investments untuk aset yg sama (same asset index),
+  //   cron akan kredit profit ke SEMUA → user balance dobel.
+  //   Fix: panggil cleanupAllUsersDuplicateInvestments(true) di awal cron.
+  //   - Detect duplicate per (user, asset index)
+  //   - Keep latest, refund older's totalProfitEarned + mark 'completed'
+  //   - Setelah ini, loop di bawah cuma proses Investment bersih (1 per asset).
+  try {
+    const cleanupMod = await import('./src/lib/investment-cleanup');
+    const cleanupReport = await cleanupMod.cleanupAllUsersDuplicateInvestments(true);
+    if (cleanupReport.usersFixed > 0) {
+      console.log(`[Profit Cron] 🧹 v20 cleanup: ${cleanupReport.usersFixed} user(s) fixed, ${cleanupReport.duplicateInvestmentsRefunded} duplicate(s) refunded Rp${Math.floor(cleanupReport.totalProfitRefunded).toLocaleString('id-ID')}, ${cleanupReport.purchasesMarkedCompleted} purchase(s) marked completed`);
+      for (const r of cleanupReport.perUser) {
+        console.log(`  ⚠️  ${r.userId} | ${r.name} | ${r.groupsFixed} group(s), ${r.investmentsRefunded} inv refunded Rp${Math.floor(r.profitRefunded).toLocaleString('id-ID')}`);
+      }
+    }
+  } catch (e: any) {
+    console.error('[Profit Cron] v20 cleanup error (non-fatal):', e.message);
+  }
+
   // ★★★ v2.5 BULLETPROOF: NO status filter — use endDate as source of truth.
   //   Old v2.4 filtered `status: 'active'` but VPS data had wrong statuses
   //   (completed/stopped/Active) even when endDate was in the FUTURE →
   //   Investment loop skipped them → Purchase loop also skipped → NO PROFIT.
   //   Now: fetch ALL investments, filter by endDate > wibNow (mirrors admin v2.5).
+  //   ★ v20: cleanup di atas sudah mark duplicates as 'completed' + set endDate=now.
+  //   Mereka akan ke-skip di filter bawah (endDate <= wibNow).
   const allInvestments = await db.investment.findMany({
     include: { package: true, user: { select: { userId: true, name: true } } },
   });
@@ -1799,6 +1821,23 @@ console.log(`  - ★ v2.6 SELF-HEAL: Reconcile Purchase.profitEarned ↔ sum(Inv
 //   balance was already incremented by cron AND decremented by cleanup).
 //   Fix: use cleanupDone flag — cron's checkAndRunCrons() waits until cleanup is done.
 let cleanupDone = false;
+
+// ★★★ v20 ANTI-DOUBLE-PROFIT: cleanup duplicate Investments on startup ★★★
+//   Detect duplicate active Investments (same asset index) per user.
+//   Keep latest, refund older's totalProfitEarned + mark 'completed' + set endDate=now.
+//   This auto-fixes any duplicates from race conditions or old data.
+(async () => {
+  try {
+    const cleanupMod = await import('./src/lib/investment-cleanup');
+    const report = await cleanupMod.cleanupAllUsersDuplicateInvestments(true);
+    console.log(`[Cron Service] 🧹 v20 Investment Cleanup: scanned ${report.usersScanned} users, fixed ${report.usersFixed}, refunded ${report.duplicateInvestmentsRefunded} duplicate(s), total refund Rp${Math.floor(report.totalProfitRefunded).toLocaleString('id-ID')}, ${report.purchasesMarkedCompleted} purchase(s) marked completed`);
+    for (const r of report.perUser) {
+      console.log(`  ⚠️  ${r.userId} | ${r.name} | ${r.groupsFixed} group(s), ${r.investmentsRefunded} inv refunded Rp${Math.floor(r.profitRefunded).toLocaleString('id-ID')}`);
+    }
+  } catch (e: any) {
+    console.error('[Cron Service] v20 Investment Cleanup failed (non-fatal):', e.message);
+  }
+})();
 
 cleanupDuplicateProfits().then((report) => {
   console.log(`[Cron Service] 🧹 v3.2 Profit Cleanup done: removed ${report.duplicateEntriesRemoved} duplicate entries, recalculated ${report.investmentsRecalculated} investments, corrected ${report.usersBalanceCorrected} users (total ${report.totalBalanceCorrected} over-credit removed)`);
