@@ -24,8 +24,15 @@ fi
 echo ""
 echo "[1/6] 📦 git pull — ambil kode v20 terbaru dari GitHub..."
 git pull origin main || {
-  echo "⚠️  git pull gagal. Coba: git stash && git pull origin main"
-  exit 1
+  echo "⚠️  git pull gagal. Auto-stash local changes + retry..."
+  git stash || true
+  git pull origin main || {
+    echo "❌ git pull masih gagal. Fix manual:"
+    echo "   git status          # lihat file konflik"
+    echo "   git checkout -- .   # reset ALL local changes (HATI-HATI!)"
+    echo "   git pull origin main"
+    exit 1
+  }
 }
 
 echo ""
