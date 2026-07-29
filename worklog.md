@@ -10227,3 +10227,44 @@ Files modified:
 - src/components/nexvo/pages/AdminUsersPage.tsx (UI confirm + toast refund info)
 - scripts/refund-orphan-profit.ts (NEW — 175 lines, phantom profit refund)
 - scripts/vps-update.sh (add refund-orphan instruction)
+
+---
+Task ID: 20
+Agent: main (Z.ai Code)
+Task: User kirim screenshot "YANG BENER DONG" — error "bash: scripts/vps-update.sh: No such file or directory" di VPS. User coba jalanin script yg belum ada di VPS (chicken-and-egg: script cuma ada setelah git pull).
+
+Work Log:
+- Baca screenshot VPS (pasted_image_1785316114397.png) via VLM:
+  • User di /var/www/nexvo, coba: bash scripts/vps-update.sh
+  • ERROR: "bash: scripts/vps-update.sh: No such file or directory"
+  • Penyebab: VPS belum git pull → file vps-update.sh gak ada
+  • Chicken-and-egg: script cuma ada setelah git pull
+- Verifikasi v20.1 code SUDAH di GitHub origin/main (commits 47ac22c, 58f98ff, a55bdea) ✓
+- Bikin scripts/vps-bootstrap.sh (NEW, 78 lines):
+  • Script yg bisa di-curl dari GitHub (gak butuh file exist di VPS)
+  • Force sync: git fetch + git reset --hard origin/main
+    (override local changes, gak butuh git pull)
+  • 6 step: cd → git fetch+reset → bun install → db push → build → pm2 restart → verify
+  • Verifikasi BOTH scripts (fix-mulyono5-and-dupes.ts + refund-orphan-profit.ts) ada
+- Update scripts/vps-update.sh:
+  • Improve git pull fallback: auto-stash + retry
+  • Hint git checkout -- . kalau masih gagal
+- Cara pakai vps-bootstrap.sh (curl pipe, foolproof):
+    cd /var/www/nexvo && curl -sSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/scripts/vps-bootstrap.sh | bash
+- Commit + push: d807ac1 → main ✓
+
+Stage Summary:
+- ✅ Solusi chicken-and-egg: vps-bootstrap.sh bisa di-curl dari GitHub
+- ✅ Force sync (git reset --hard origin/main) — gak peduli local state VPS
+- ✅ Verifikasi 2 scripts penting ada (fix-mulyono5 + refund-orphan-profit)
+- ✅ Hanya butuh 1 command: curl ... | bash
+
+Cara deploy KE VPS (YANG BENAR — copy-paste 1 baris ini):
+  cd /var/www/nexvo && curl -sSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/scripts/vps-bootstrap.sh | bash
+
+Atau kalau git VPS udah sync, pakai vps-update.sh:
+  bash scripts/vps-update.sh
+
+Files modified:
+- scripts/vps-bootstrap.sh (NEW — 78 lines, curl-pipe friendly, force sync)
+- scripts/vps-update.sh (improve git pull fallback)
