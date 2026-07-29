@@ -363,3 +363,154 @@ export async function cleanupAllUsersDuplicateInvestments(
 
   return report;
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════
+ *  deleteInvestmentWithRefund (v20.1) ★★★
+ * ════════════════════════════════════════════════════════════════
+ *
+ *  THE FIX for: "tadi aku dah hapus yang duplikat tapi profitnya lo"
+ *
+ *  Problem:
+ *    - Admin delete-investment LAMA: cuma hapus record Investment.
+ *    - TIDAK refund profit yg sudah masuk ke User.mainBalance + totalProfit.
+ *    - User balance TETAP dobel walau Investment udah dihapus.
+ *
+ *  Solution (v20.1):
+ *    1. Baca Investment (totalProfitEarned, packageId, purchaseId, userId).
+ *    2. Kalau totalProfitEarned > 0:
+ *       - REFUND deduct dari User.mainBalance + User.totalProfit (clamp 0).
+ *       - Create BonusLog(type='refund', amount=-X) — audit trail.
+ *       - Decrement linked Purchase.profitEarned (if any, clamp 0).
+ *    3. Delete linked ProfitLog entries (kalau Investment ini punya Purchase
+ *       dan adalah satu-satunya Investment di Purchase itu → delete semua
+ *       ProfitLog untuk Purchase tsb; kalau ada Investment lain, skip).
+ *       ★ Safe approach: ProfitLog cuma link ke Purchase, jadi kalau Purchase
+ *         dihapus juga, ProfitLog ikut terhapus (onDelete: Cascade). Tapi
+ *         kalau Purchase tetap aktif, ProfitLog TIDAK dihapus (mungkin serve
+ *         Investment lain di Purchase yg sama).
+ *    4. Delete Investment record.
+ *
+ *  Idempotent: kalau Investment gak ada → no-op.
+ *  Safe: refund di-clamp ke 0, gak bikin balance negatif.
+ * ════════════════════════════════════════════════════════════════
+ */
+export async function deleteInvestmentWithRefund(
+  investmentId: string,
+  apply = true
+): Promise<{
+  found: boolean;
+  refunded: number;
+  deleted: boolean;
+  purchaseSynced: boolean;
+  error?: string;
+}> {
+  const inv = await db.investment.findUnique({
+    where: { id: investmentId },
+    select: {
+      id: true,
+      userId: true,
+      packageId: true,
+      purchaseId: true,
+      amount: true,
+      totalProfitEarned: true,
+      status: true,
+    },
+  });
+
+  if (!inv) {
+    return {
+      found: false,
+      refunded: 0,
+      deleted: false,
+      purchaseSynced: false,
+    };
+  }
+
+  const refundAmount = inv.totalProfitEarned || 0;
+
+  if (!apply) {
+    return {
+      found: true,
+      refunded: refundAmount,
+      deleted: false,
+      purchaseSynced: !!inv.purchaseId,
+    };
+  }
+
+  let refunded = 0;
+  let purchaseSynced = false;
+
+  try {
+    await db.$transaction(async (tx) => {
+      // 1. Refund User balance (clamp ke 0)
+      if (refundAmount > 0) {
+        const user = await tx.user.findUnique({
+          where: { id: inv.userId },
+          select: { mainBalance: true, totalProfit: true },
+        });
+        if (user) {
+          const newMain = Math.max(0, user.mainBalance - refundAmount);
+          const newTotalProfit = Math.max(0, user.totalProfit - refundAmount);
+          const actualRefundMain = user.mainBalance - newMain;
+          const actualRefundTotal = user.totalProfit - newTotalProfit;
+          const actualRefund = Math.min(actualRefundMain, actualRefundTotal);
+          await tx.user.update({
+            where: { id: inv.userId },
+            data: {
+              mainBalance: newMain,
+              totalProfit: newTotalProfit,
+            },
+          });
+          if (actualRefund > 0) {
+            await tx.bonusLog.create({
+              data: {
+                userId: inv.userId,
+                fromUserId: inv.userId,
+                type: 'refund',
+                level: 0,
+                amount: -actualRefund,
+                description: `Refund profit dari hapus Investment ${investmentId} (amount ${inv.amount}). Rp${Math.floor(actualRefund).toLocaleString('id-ID')} dikembalikan.`,
+              },
+            });
+            refunded = actualRefund;
+          }
+        }
+      }
+
+      // 2. Sync linked Purchase.profitEarned (decrement, clamp 0)
+      if (inv.purchaseId) {
+        const purchase = await tx.purchase.findUnique({
+          where: { id: inv.purchaseId },
+          select: { id: true, profitEarned: true },
+        });
+        if (purchase) {
+          const newProfit = Math.max(0, (purchase.profitEarned || 0) - refundAmount);
+          await tx.purchase.update({
+            where: { id: inv.purchaseId },
+            data: { profitEarned: newProfit },
+          });
+          purchaseSynced = true;
+        }
+      }
+
+      // 3. Delete Investment
+      await tx.investment.delete({ where: { id: investmentId } });
+    });
+
+    return {
+      found: true,
+      refunded,
+      deleted: true,
+      purchaseSynced,
+    };
+  } catch (e: any) {
+    return {
+      found: true,
+      refunded: 0,
+      deleted: false,
+      purchaseSynced: false,
+      error: e?.message || 'Unknown error',
+    };
+  }
+}

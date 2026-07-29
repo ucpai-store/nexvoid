@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAdminFromRequest, logAdminAction, generateUserId, generateReferralCode } from '@/lib/auth';
+import { deleteInvestmentWithRefund } from '@/lib/investment-cleanup';
 import bcrypt from 'bcryptjs';
 
 // ★ CRITICAL FIX v7: Force dynamic — disable Next.js route cache.
@@ -343,23 +344,92 @@ export async function PUT(request: NextRequest) {
       case 'delete-purchase': {
         const purchaseId = String(body.purchaseId || '');
         if (!purchaseId) return NextResponse.json({ success: false, error: 'purchaseId wajib diisi' }, { status: 400 });
-        const target = await db.purchase.findFirst({ where: { id: purchaseId, userId: id } });
+        const target = await db.purchase.findFirst({
+          where: { id: purchaseId, userId: id },
+          select: { id: true, totalPrice: true, profitEarned: true, userId: true },
+        });
         if (!target) return NextResponse.json({ success: false, error: 'Purchase tidak ditemukan' }, { status: 404 });
+
+        // ★ v20.1: refund profitEarned dari User balance sebelum delete.
+        //   Sebelumnya cuma delete ProfitLog + nullify Investment.purchaseId → profit dobel masih nangkring.
+        let refundedAmount = 0;
+        const profitToRefund = target.profitEarned || 0;
+        if (profitToRefund > 0) {
+          const u = await db.user.findUnique({
+            where: { id: target.userId },
+            select: { mainBalance: true, totalProfit: true },
+          });
+          if (u) {
+            const newMain = Math.max(0, u.mainBalance - profitToRefund);
+            const newTotalProfit = Math.max(0, u.totalProfit - profitToRefund);
+            const actualRefund = Math.min(u.mainBalance - newMain, u.totalProfit - newTotalProfit);
+            if (actualRefund > 0) {
+              await db.user.update({
+                where: { id: target.userId },
+                data: { mainBalance: newMain, totalProfit: newTotalProfit },
+              });
+              await db.bonusLog.create({
+                data: {
+                  userId: target.userId,
+                  fromUserId: target.userId,
+                  type: 'refund',
+                  level: 0,
+                  amount: -actualRefund,
+                  description: `Refund profit dari hapus Purchase ${purchaseId}. Rp${Math.floor(actualRefund).toLocaleString('id-ID')} dikembalikan.`,
+                },
+              });
+              refundedAmount = actualRefund;
+            }
+          }
+        }
+
         // Cascade: delete profitLogs first, then nullify investment.purchaseId, then delete purchase
         await db.profitLog.deleteMany({ where: { purchaseId } });
+        // ★ Refund ALL linked Investments' totalProfitEarned (kalau ada Investment lain yg link ke Purchase ini)
+        //   — actually, setelah nullify, Investment.totalProfitEarned tetap di record. Cron v2.6 reconcile
+        //   bakal recompute Purchase.profitEarned = sum(linked Investment.totalProfitEarned). Tapi karena
+        //   Purchase udah dihapus, gak masalah.
         await db.investment.updateMany({ where: { purchaseId }, data: { purchaseId: null } });
         await db.purchase.delete({ where: { id: purchaseId } });
-        await logAdminAction(admin.id, 'DELETE_PURCHASE', `Hapus purchase ${purchaseId} (${formatRupiahAdmin(target.totalPrice)}) dari user ${user.userId}`);
-        break;
+        await logAdminAction(
+          admin.id,
+          'DELETE_PURCHASE',
+          `Hapus purchase ${purchaseId} (${formatRupiahAdmin(target.totalPrice)}) dari user ${user.userId}` +
+            (refundedAmount > 0
+              ? ` + REFUND profit ${formatRupiahAdmin(refundedAmount)} ke balance (BonusLog audit trail dibuat)`
+              : ' (tidak ada profit untuk di-refund)')
+        );
+        return NextResponse.json({
+          success: true,
+          message: `Purchase dihapus. Profit ${formatRupiahAdmin(refundedAmount)} di-refund ke balance user.`,
+          refunded: refundedAmount,
+        });
       }
       case 'delete-investment': {
         const investmentId = String(body.investmentId || '');
         if (!investmentId) return NextResponse.json({ success: false, error: 'investmentId wajib diisi' }, { status: 400 });
         const target = await db.investment.findFirst({ where: { id: investmentId, userId: id } });
         if (!target) return NextResponse.json({ success: false, error: 'Investment tidak ditemukan' }, { status: 404 });
-        await db.investment.delete({ where: { id: investmentId } });
-        await logAdminAction(admin.id, 'DELETE_INVESTMENT', `Hapus investment ${investmentId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}`);
-        break;
+        // ★ v20.1: delete + refund profit yang sudah masuk ke user balance.
+        //   Sebelumnya cuma hapus record → profit dobel masih nangkring di balance.
+        const refundResult = await deleteInvestmentWithRefund(investmentId, true);
+        if (refundResult.error) {
+          return NextResponse.json({ success: false, error: `Gagal hapus+refund: ${refundResult.error}` }, { status: 500 });
+        }
+        await logAdminAction(
+          admin.id,
+          'DELETE_INVESTMENT',
+          `Hapus investment ${investmentId} (${formatRupiahAdmin(target.amount)}) dari user ${user.userId}` +
+            (refundResult.refunded > 0
+              ? ` + REFUND profit ${formatRupiahAdmin(refundResult.refunded)} ke balance (BonusLog audit trail dibuat)`
+              : ' (tidak ada profit untuk di-refund)')
+        );
+        return NextResponse.json({
+          success: true,
+          message: `Investment dihapus. Profit ${formatRupiahAdmin(refundResult.refunded)} di-refund ke balance user.`,
+          refunded: refundResult.refunded,
+          purchaseSynced: refundResult.purchaseSynced,
+        });
       }
       case 'delete-deposit': {
         const depositId = String(body.depositId || '');

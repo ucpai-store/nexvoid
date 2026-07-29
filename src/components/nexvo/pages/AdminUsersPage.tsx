@@ -283,7 +283,15 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: successMsg || 'Aksi berhasil' });
+        // ★ v20.1: tampilkan info refund di toast kalau ada
+        if (typeof data.refunded === 'number' && data.refunded > 0) {
+          toast({
+            title: successMsg || 'Aksi berhasil',
+            description: `Profit ${formatRupiah(data.refunded)} di-REFUND ke balance user (BonusLog audit trail dibuat).`,
+          });
+        } else {
+          toast({ title: successMsg || 'Aksi berhasil' });
+        }
         await reloadAssetData(userId);
         fetchUsers();
       } else {
@@ -1338,11 +1346,11 @@ export default function AdminUsersPage() {
                               'delete-purchase',
                               { purchaseId: p.id },
                               'Purchase dihapus',
-                              `Yakin hapus purchase ${p.product?.name || p.id}? Profit logs terkait juga dihapus.`
+                              `Yakin hapus purchase ${p.product?.name || p.id}?\n\n★ Profit ${formatRupiah(p.profitEarned || 0)} yg sudah masuk ke balance user akan di-REFUND otomatis. Profit logs terkait juga dihapus.`
                             )}
                             disabled={assetBusy === `delete-purchase`}
                             className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors"
-                            title="Hapus purchase ini"
+                            title="Hapus purchase ini (profit auto-refund)"
                           >
                             <Trash2 className="w-3 h-3 text-red-400" />
                           </button>
@@ -1389,10 +1397,10 @@ export default function AdminUsersPage() {
                             {inv.status}
                           </Badge>
                           <button
-                            onClick={() => runAssetAction(assetDialog!.id, 'delete-investment', { investmentId: inv.id }, 'Investasi dihapus', `Yakin hapus investasi ${inv.package?.name || inv.id}?`)}
+                            onClick={() => runAssetAction(assetDialog!.id, 'delete-investment', { investmentId: inv.id }, 'Investasi dihapus', `Yakin hapus investasi ${inv.package?.name || inv.id}?\n\n★ Profit ${formatRupiah(inv.totalProfitEarned || 0)} yg sudah masuk ke balance user akan di-REFUND otomatis.`)}
                             disabled={assetBusy === 'delete-investment'}
                             className="w-7 h-7 rounded-md bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-colors"
-                            title="Hapus investasi ini"
+                            title="Hapus investasi ini (profit auto-refund)"
                           >
                             <Trash2 className="w-3 h-3 text-red-400" />
                           </button>
