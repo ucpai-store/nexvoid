@@ -10085,3 +10085,52 @@ Key insight buat user:
 - v20: fix AUTO-REFUND profit dobel → user balance benar → gak perlu klik Fix lagi
 - v20 cron: auto-cleanup setiap startup + sebelum profit credit → gak akan ada profit dobel lagi
 - v20 buy: re-check DI DALAM transaction → double-click di-block → gak akan ada duplicate baru
+
+---
+Task ID: 18
+Agent: main (Z.ai Code)
+Task: User kirim screenshot VPS error "Script not found build" + "Module not found scripts/fix-mulyono5-and-dupes.ts" — VPS belum git pull kode v20 ANTI-DOUBLE-PROFIT. Bikin deploy script foolproof supaya user gak salah command lagi.
+
+Work Log:
+- Baca screenshot VPS user (pasted_image_1785314783371.png) via VLM:
+  • User di VPS root@srv1656887 (Hostinger VPS)
+  • Coba jalanin: bun run scripts/fix-mulyono5-and-dupes.ts --fix-all
+  • ERROR: "Script not found 'build'" → package.json lama, no build script
+  • ERROR: "Module not found 'scripts/fix-mulyono5-and-dupes.ts'" → file gak ada
+  • KESIMPULAN: VPS masih kode LAMA (v18/v19), belum git pull kode v20
+- Cek git log: v20 ANTI-DOUBLE-PROFIT commits (efc8311 + 5635cba) SUDAH di GitHub origin/main ✓
+- Cek git status: ada 1 local commit (1373917) belum di-push (worklog auto-update dari deploy)
+- Push local commit ke GitHub: 5635cba..1373917 main -> main ✓
+- Test script lokal: bun run scripts/fix-mulyono5-and-dupes.ts --fix-all → 0 user diperbaiki (DB lokal bersih, gak ada duplikat) ✓
+- Dev server check: HTTP 200 on / + logo, ready in 276ms ✓
+- Bikin scripts/vps-update.sh (NEW, 92 lines):
+  • Bash script foolproof buat deploy di VPS
+  • 6 step: git pull → bun install → prisma generate/push → bun run build → pm2 restart → verify file ada
+  • Set -e (exit on first error)
+  • Cek package.json + .git ada (kalau salah direktori → exit dengan pesan jelas)
+  • Verifikasi scripts/fix-mulyono5-and-dupes.ts ada di akhir
+  • Print next-step instructions (DRY-RUN vs APPLY, Admin UI option, verification scripts)
+- .gitignore rule `deploy*.sh` block nama pertama → rename ke vps-update.sh ✓
+- Commit + push: 61344da deploy(v20): add foolproof VPS update script
+
+Stage Summary:
+- ✅ ROOT CAUSE konfirmasi: VPS user belum git pull kode v20 ANTI-DOUBLE-PROFIT
+- ✅ Kode v20 SUDAH di GitHub (efc8311 + 5635cba + 61344da)
+- ✅ Bikin deploy script foolproof: scripts/vps-update.sh
+  • User tinggal: cd /var/www/nexvo && bash scripts/vps-update.sh
+  • Script handle: git pull + install + db push + build + pm2 restart + verify
+  • Set -e = stop kalau ada error (gak lanjut kalau build gagal)
+- ✅ Setelah deploy, cron auto-jalan cleanup (self-heal duplicates + refund profit dobel)
+
+Cara deploy KE VPS (yang BENAR — copy paste ini ke VPS):
+1. ssh root@VPS kamu
+2. cd /var/www/nexvo
+3. bash scripts/vps-update.sh
+   ★ git pull + build + pm2 restart semua otomatis
+   ★ Cron restart akan auto-cleanup + refund existing duplicate
+4. (Optional) Fix existing duplicate + refund:
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply
+   ATAU via Admin UI → Kelola Users → Fix Semua Duplikat
+
+Files modified:
+- scripts/vps-update.sh (NEW — 92 lines, foolproof deploy script)
