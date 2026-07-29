@@ -301,7 +301,7 @@ export default function AdminUsersPage() {
   //   (VIP1+VIP2+VIP3 bersamaan), tapi 1 aset maks 1 aktif.
   const handleFixAllDupes = async () => {
     if (!adminToken) return;
-    if (!confirm('Yakin fix SEMUA user yang punya same-asset duplikat?\n\nAturan v19 PER-ASSET-UNIQUE-RULE:\n- User BOLEH punya banyak aset aktif (VIP1 + VIP2 + VIP3 bersamaan)\n- YANG DILARANG: 2 active untuk aset yang sama (same tier index)\n- produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset\n\nAkan dibersihkan:\n- Purchase duplikat (same-product → hapus, keep latest)\n- Investment same-asset duplikat (★ source of truth — keep latest per asset, tandai sisanya completed)\n\nAudit trail dipertahankan. Saldo TIDAK diubah.')) return;
+    if (!confirm('Yakin fix SEMUA user yang punya same-asset duplikat?\n\nAturan v20 ANTI-DOUBLE-PROFIT:\n- User BOLEH punya banyak aset aktif (VIP1 + VIP2 + VIP3 bersamaan)\n- YANG DILARANG: 2 active untuk aset yang sama (same tier index)\n- produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset\n\nAkan dibersihkan otomatis:\n- Detect duplicate active Investments per (user, asset index)\n- Keep latest (max createdAt) per asset, sisanya di-mark completed\n- ★ PROFIT DOBEL di-REFUND ke user balance (clamp 0)\n- ★ BonusLog entry refund dibuat buat audit trail\n- ★ Investment endDate=now (cron skip — gak kredit lagi)\n- ★ Linked Purchase juga di-mark completed\n\nIdempotent — aman di-run berkala.')) return;
     setFixAllBusy(true);
     setFixAllReport(null);
     try {
@@ -314,8 +314,8 @@ export default function AdminUsersPage() {
       if (data.success) {
         setFixAllReport(data.data);
         toast({
-          title: `Fix selesai`,
-          description: `${data.data.usersFixed} user · ${data.data.totalDeletedPurchases} Purchase dihapus · ${data.data.totalMarkedPurchases + data.data.totalMarkedInvestments} ditandai 'completed'`,
+          title: `Fix v20 selesai`,
+          description: `${data.data.usersFixed} user · ${data.data.totalMarkedInvestments} Investment di-refund [Rp${Math.floor(data.data.totalProfitRefunded || 0).toLocaleString('id-ID')}] · ${data.data.purchasesMarkedCompleted} Purchase completed`,
         });
         fetchUsers();
       } else {
@@ -425,29 +425,29 @@ export default function AdminUsersPage() {
               Fix Semua Duplikat — Selesai
             </DialogTitle>
             <DialogDescription>
-              v19 PER-ASSET-UNIQUE-RULE: user boleh punya banyak aset aktif (VIP1+VIP2+VIP3 bersamaan),
-              tapi 1 aset maks 1 aktif. Source of truth = tabel Investment.
-              Matching: produk[i] (by price asc) ≡ paket[i] (by amount asc) = same asset.
+              v20 ANTI-DOUBLE-PROFIT: user boleh punya banyak aset aktif (VIP1+VIP2+VIP3+VIP4+VIP5 bersamaan),
+              tapi 1 aset maks 1 aktif. Duplicate active Investments → keep latest,
+              profit dobel di-REFUND ke user balance + audit trail BonusLog.
             </DialogDescription>
           </DialogHeader>
           {fixAllReport && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="glass rounded-xl p-3 text-center">
                   <div className="text-xl font-bold text-amber-500">{fixAllReport.usersFixed}</div>
                   <div className="text-[10px] text-muted-foreground mt-1">User Diperbaiki</div>
                 </div>
                 <div className="glass rounded-xl p-3 text-center">
-                  <div className="text-xl font-bold text-red-400">{fixAllReport.totalDeletedPurchases ?? fixAllReport.totalDeleted ?? 0}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Purchase Dihapus</div>
-                </div>
-                <div className="glass rounded-xl p-3 text-center">
-                  <div className="text-xl font-bold text-orange-400">{fixAllReport.totalMarkedPurchases ?? 0}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Purchase → completed</div>
-                </div>
-                <div className="glass rounded-xl p-3 text-center">
                   <div className="text-xl font-bold text-emerald-400">{fixAllReport.totalMarkedInvestments ?? 0}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Investment → completed</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Investment Refund</div>
+                </div>
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="text-xl font-bold text-rose-400">Rp{Math.floor(fixAllReport.totalProfitRefunded ?? 0).toLocaleString('id-ID')}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Profit Di-Refund</div>
+                </div>
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="text-xl font-bold text-orange-400">{fixAllReport.purchasesMarkedCompleted ?? fixAllReport.totalMarkedPurchases ?? 0}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Purchase → completed</div>
                 </div>
               </div>
               {fixAllReport.report && fixAllReport.report.length > 0 ? (
@@ -473,9 +473,9 @@ export default function AdminUsersPage() {
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground">
-                <span className="text-foreground">P</span> = Purchase (transaksi), <span className="text-foreground">I</span> = Investment (active asset, source of truth).
-                Audit trail dipertahankan — data ditandai 'completed' (tidak di-hard-delete, kecuali same-product Purchase duplikat).
-                Saldo <span className="text-foreground">TIDAK diubah</span> — pakai "Set Saldo 0" per user kalau perlu.
+                <span className="text-foreground">I</span> = Investment (active asset, source of truth). ★ v20: profit dobel di-refund otomatis.
+                Cron akan skip Investment 'completed' (endDate=now). BonusLog entry refund dibuat buat audit trail.
+                Saldo <span className="text-foreground">OTOMATIS di-refund</span> — gak perlu set manual lagi.
               </p>
             </div>
           )}
