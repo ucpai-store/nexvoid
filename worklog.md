@@ -9962,3 +9962,126 @@ Cara deploy ke VPS (kalau belum):
 4. Verifikasi:
    bun run scripts/verify-one-active-rule.ts    (15/15 PASS)
    bun run scripts/verify-multi-tier.ts         (19/19 PASS)
+
+---
+Task ID: 17
+Agent: main (Z.ai Code)
+Task: User komplain "MASIH ADA YANG DOBE MASAK FIX MULU, PROFIT NYA JUGA DOBE, USER BARU SAMA LAMA JUGA DA YANG DOBEL, MASAK KLIK FIKS MULU, KALO BISA JANGAN SAMPEK ADA YANG DOBEL ATAU EROR DONG". Fix komprehensif: prevent dobel di source + refund profit dobel + auto-heal.
+
+Work Log:
+- Investigate akar masalah:
+  • Cron job (cron-service.ts processDailyInvestmentProfitsCore): kredit profit ke SEMUA active Investment (filter endDate > wibNow). TIDAK ada filter duplikat → kalau ada 2 active Investment untuk aset yg sama, profit DOBEL.
+  • Buy endpoints (/api/products POST, /api/investments POST): validateProductPurchase/getUserActiveAssets dipanggil DI LUAR transaction. Race condition: user double-click → 2 request concurrent lewat check → 2 Investment dibuat → DUPLICATE.
+  • Fix script lama (Task ID 15): cuma mark 'completed', TIDAK refund profit yg sudah masuk. User balance tetap dobel walau fix udah jalan.
+- Akar masalah: 3 bug berlapis
+  1. Race condition di buy endpoint → duplicate created
+  2. Cron kredit profit ke SEMUA active (termasuk duplicate) → profit dobel
+  3. Fix script tidak refund → user balance tetap dobel abis fix
+- Bikin src/lib/investment-cleanup.ts (NEW, 310 lines):
+  • buildAssetIndexMaps: produk by price asc + paket by amount asc (amount>0, isActive=true)
+  • detectDuplicateActiveInvestments(userId): group active Investments per asset index, return groups with ≥2 (keep latest, toRefund sisanya)
+  • cleanupDuplicateInvestmentsForUser(userId, apply):
+    - For each older duplicate: REFUND totalProfitEarned dari User.mainBalance + totalProfit (clamp 0)
+    - Create BonusLog(type='refund', amount=-X, description='Refund profit duplikat')
+    - Mark Investment status='completed' + set endDate=now (cron skip)
+    - Sync linked Purchase status='completed'
+    - Idempotent (safe to run multiple times)
+  • cleanupAllUsersDuplicateInvestments(apply): loop SEMUA user, return aggregate report
+- Update src/app/api/products/route.ts POST:
+  • Tambah comment: validateProductPurchase di luar tx = UX check cepat
+  • TAMBAH re-check DI DALAM transaction (anti-race-condition):
+    - Cek existing active Investment via tx.investment.findFirst
+    - Compute asset index untuk existing dan THIS product
+    - Kalau same asset + still active → throw ASET_SAMA_AKTIF
+    - SQLite serializable → request ke-2 reject (atomic)
+  • Catch error ASET_SAMA_AKTIF → return 400 dengan message
+- Update src/app/api/investments/route.ts POST:
+  • Same anti-race-condition re-check di DALAM transaction
+  • Catch ASET_SAMA_AKTIF → return 400
+- Update cron-service.ts:
+  • Startup (line ~1825): import + call cleanupAllUsersDuplicateInvestments(true) — self-heal on boot
+  • processDailyInvestmentProfitsCore (line ~806): call cleanupAllUsersDuplicateInvestments(true) SEBELUM profit credit loop
+    - Auto-bersihkan duplicate per (user, asset index)
+    - Refund profit dobel + mark 'completed' + set endDate=now
+    - Loop filter `endDate > wibNow` skip mereka (endDate=now)
+  • Filter logic tetap v2.5 BULLETPROOF (endDate > wibNow) — duplicate di-skip via endDate=now
+- Update src/app/api/admin/users/route.ts:
+  • fix-all-dupes action: REPLACE inline logic dengan helper cleanupAllUsersDuplicateInvestments(true)
+    - Return report: usersFixed, totalProfitRefunded, duplicateInvestmentsRefunded, purchasesMarkedCompleted
+    - Backward-compat field names (totalDeleted, totalMarked) buat UI lama
+  • dedupe-purchases action (per-user): REPLACE dengan cleanupDuplicateInvestmentsForUser(id, true)
+    - Return: groupsFixed, profitRefunded, investmentsRefunded, purchasesMarkedCompleted
+- Update scripts/fix-mulyono5-and-dupes.ts:
+  • runFixAll: REPLACE dengan cleanupAllUsersDuplicateInvestments(apply)
+    - DRY-RUN: preview duplicate yg bakal di-fix + profit yg bakal di-refund
+    - APPLY: execute fix, print ringkasan (user diperbaiki, Investment di-refund, profit di-refund, Purchase completed)
+  • Header: v19 → v20 ANTI-DOUBLE-PROFIT
+- Update src/components/nexvo/pages/AdminUsersPage.tsx:
+  • Confirm dialog: update text v19 → v20 ANTI-DOUBLE-PROFIT (auto-refund)
+  • Toast: tampilkan Investment di-refund + profit amount + Purchase completed
+  • Report dialog:
+    - Header: v20 description
+    - 4 stat cards: User Fixed, Investment Refund, Profit Di-Refund (Rp), Purchase completed
+    - Footer: profit auto-refund, cron skip, BonusLog audit trail
+- Bikin test scripts:
+  • scripts/test-anti-double-profit.ts (NEW): simulasikan 2 active Investment + profit dobel, run cleanup, verify refund. 20/20 PASS.
+    - Bikin test user, 2 Investment untuk aset 1 (race condition simulasi)
+    - Simulasi cron kredit dobel (3 hari x 2 inv)
+    - Run cleanupDuplicateInvestmentsForUser
+    - Verify: 1 inv 'completed', 1 inv tetap active, profit dobel di-refund, BonusLog refund entry dibuat
+    - Idempotency test: run ke-2 = no-op
+  • scripts/test-anti-race-direct.ts (NEW): simulasi 2 concurrent request ke buy endpoint. 5/5 PASS.
+    - Fire 2 Promise.all simulateBuyWithRaceGuard (sama logic dengan /api/investments POST)
+    - Verify: 1 sukses, 1 reject (ASET_SAMA_AKTIF)
+    - Verify beli aset beda (VIP 2) = BOLEH (multi-asset tetap jalan)
+- Run verify-one-active-rule.ts (v19 regression test): 15/15 PASS (no regression)
+- Total: 40/40 PASS across 3 test scripts
+- TypeScript: 0 new errors (semua type-safe)
+- Dev server: HTTP 200 on / + /api/site-settings (UI compiles clean)
+- Agent Browser: cannot connect (sandbox network isolation — known limitation)
+- Commit + push to GitHub (commits efc8311 + 5635cba)
+
+Stage Summary:
+- ✅ v20 ANTI-DOUBLE-PROFIT — fix komprehensif 3 lapis:
+  1. PREVENT di source: buy endpoint re-check duplicate DI DALAM transaction (SQLite serializable → race condition blocked)
+  2. AUTO-HEAL: cron startup + sebelum profit credit → detect duplicate, refund profit dobel, mark 'completed', set endDate=now
+  3. MANUAL FIX: admin UI "Fix Semua Duplikat" + script --fix-all → pakai helper terpusat dengan refund
+- ✅ Profit dobel OTOMATIS di-refund (TIDAK perlu set manual saldo 0 lagi)
+  - User.mainBalance + totalProfit decrement by totalProfitEarned (clamp 0)
+  - BonusLog entry type='refund' amount=-X dibuat buat audit trail
+- ✅ Cron skip duplicate (endDate=now → filter endDate > wibNow exclude)
+- ✅ Idempotent (safe to run multiple times)
+- ✅ Multi-asset tetap BOLEH (VIP1+VIP2+VIP3+VIP4+VIP5 bersamaan — beda aset)
+- ✅ 40/40 test PASS (20 anti-double-profit + 5 anti-race + 15 v19 regression)
+- Files modified:
+  • src/lib/investment-cleanup.ts (NEW — 310 lines, helper terpusat dengan refund)
+  • src/app/api/products/route.ts (anti-race-condition re-check inside tx)
+  • src/app/api/investments/route.ts (anti-race-condition re-check inside tx)
+  • cron-service.ts (startup self-heal + before-profit-credit cleanup)
+  • src/app/api/admin/users/route.ts (fix-all-dupes + dedupe-purchases pakai helper)
+  • scripts/fix-mulyono5-and-dupes.ts (runFixAll pakai helper, v20 header)
+  • src/components/nexvo/pages/AdminUsersPage.tsx (UI text v20, refund info)
+  • scripts/test-anti-double-profit.ts (NEW — 20/20 PASS)
+  • scripts/test-anti-race-direct.ts (NEW — 5/5 PASS)
+
+Cara deploy ke VPS:
+1. ssh ke VPS → cd /var/www/nexvo → git pull
+2. bun run build && pm2 restart nexvo-web nexvo-cron
+   ★ Cron restart akan otomatis jalankan v20 cleanup di startup (self-heal)
+   ★ Setiap jam 00:00 WIB, cron akan auto-cleanup sebelum kredit profit
+3. Option A (CLI — one shot fix semua user dengan duplikat + refund):
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all            (DRY-RUN preview)
+   bun run scripts/fix-mulyono5-and-dupes.ts --fix-all --apply   (EKSEKUSI + refund)
+4. Option B (Admin UI):
+   Login admin → Kelola Users → "Fix Semua Duplikat" → confirm → lihat report
+   (Report dialog sekarang tampilkan: User Fixed, Investment Refund, Profit Di-Refund Rp, Purchase completed)
+5. Verifikasi:
+   bun run scripts/test-anti-double-profit.ts    (20/20 PASS)
+   bun run scripts/test-anti-race-direct.ts       (5/5 PASS)
+   bun run scripts/verify-one-active-rule.ts      (15/15 PASS — v19 regression)
+
+Key insight buat user:
+- Sebelum v20: fix cuma "mark completed" → user balance tetap dobel → klik Fix mulu gak bersih
+- v20: fix AUTO-REFUND profit dobel → user balance benar → gak perlu klik Fix lagi
+- v20 cron: auto-cleanup setiap startup + sebelum profit credit → gak akan ada profit dobel lagi
+- v20 buy: re-check DI DALAM transaction → double-click di-block → gak akan ada duplicate baru
