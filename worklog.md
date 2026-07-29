@@ -10134,3 +10134,96 @@ Cara deploy KE VPS (yang BENAR — copy paste ini ke VPS):
 
 Files modified:
 - scripts/vps-update.sh (NEW — 92 lines, foolproof deploy script)
+
+---
+Task ID: 19
+Agent: main (Z.ai Code)
+Task: User: "PROFIT YANG MASUK DOBEL HAPUS SAMA YG DUPLIKAT TU LO TADI AKU DAH HAPUS YANG DUPLIKAT TAPI PROFIT NYA LO" — user hapus Investment duplicate via admin, tapi profit yg sudah masuk ke balance MASIH ADA. Fix delete agar auto-refund + bikin script buat refund phantom profit existing.
+
+Work Log:
+- Investigate admin route /api/admin/users (delete-investment, delete-purchase):
+  • delete-investment (line 355-362 lama): CUMA hapus record Investment.
+    TIDAK refund profit yg sudah masuk ke User.mainBalance + totalProfit.
+  • delete-purchase (line 343-353 lama): delete ProfitLog + nullify
+    Investment.purchaseId + delete Purchase. Juga TIDAK refund profit.
+- Confirm cron credit pattern (cron-service.ts line 933-938):
+  • Setiap cron credit update User.mainBalance + totalProfit (increment).
+  • Cron jg create BonusLog type='profit' (audit trail) line 947-956.
+- Akar masalah konfirmasi:
+  • Cron kredit profit dobel (kalau Investment duplicate) → balance user naik dobel.
+  • Admin hapus Investment duplicate → cuma hapus record, balance tetap dobel.
+  • User bilang "aku dah hapus duplicate tapi profitnya lo" = case persis ini.
+- Bikin helper deleteInvestmentWithRefund (investment-cleanup.ts, +150 lines):
+  • Baca Investment (totalProfitEarned, packageId, purchaseId, userId).
+  • Kalau totalProfitEarned > 0:
+    - REFUND deduct dari User.mainBalance + User.totalProfit (clamp 0).
+    - Create BonusLog type='refund' amount=-X (audit trail).
+    - Decrement linked Purchase.profitEarned (clamp 0).
+  • Delete Investment record (semua dalam single $transaction).
+  • Idempotent + safe (gak bikin balance negatif).
+- Update admin route delete-investment:
+  • Pakai deleteInvestmentWithRefund(investmentId, true).
+  • Return success + refunded amount + purchaseSynced info.
+  • logAdminAction: tulis refund amount ke audit log.
+- Update admin route delete-purchase:
+  • Baca Purchase.profitEarned sebelum delete.
+  • Refund deduct dari User.mainBalance + totalProfit (clamp 0).
+  • Create BonusLog type='refund' audit trail.
+  • Lalu delete ProfitLog + nullify Investment.purchaseId + delete Purchase.
+  • Return refunded amount ke UI.
+- Update Admin UI (AdminUsersPage.tsx):
+  • Confirm dialog delete-investment: tampilkan profit yg bakal di-refund.
+  • Confirm dialog delete-purchase: tampilkan profit auto-refund info.
+  • runAssetAction: toast tampilkan refund amount + BonusLog info
+    kalau response.refunded > 0.
+- Bikin scripts/refund-orphan-profit.ts (NEW, 175 lines):
+  • Untuk user yg SUDAH hapus duplicate manual di masa lalu (profit masih dobel).
+  • Logic phantom:
+    - credited_investments = sum(BonusLog.amount where type='profit')
+    - refunded_already = -sum(BonusLog.amount where type='refund') (positive)
+    - expected_now = sum(Investment.totalProfitEarned) (active + completed)
+    - phantom = (credited_investments - refunded_already) - expected_now
+  • Kalau phantom > 0 → refund phantom dari User.mainBalance + totalProfit,
+    create BonusLog type='refund' audit trail.
+  • Support --apply, --user=FILTER (per-user specific).
+  • Default DRY-RUN.
+- Update scripts/vps-update.sh:
+  • Tambah section "KALAU USER SUDAH HAPUS DUPLICATE MANUAL":
+    - bun run scripts/refund-orphan-profit.ts (DRY-RUN)
+    - bun run scripts/refund-orphan-profit.ts --apply
+    - bun run scripts/refund-orphan-profit.ts --user=62812xxxx --apply
+- Test refund-orphan-profit.ts dry-run lokal: 0 user ditemukan (DB lokal bersih) ✓
+- Run test-anti-double-profit.ts: 20/20 PASS (no regression) ✓
+- Run test-anti-race-direct.ts: 5/5 PASS (no regression) ✓
+- Dev server: listening on :3000, GET / 200, no compile error.
+- Commit + push: 47ac22c → main.
+
+Stage Summary:
+- ✅ AKAR MASALAH FIXED: admin delete-investment + delete-purchase sekarang
+  AUTO-REFUND profit yg sudah masuk ke balance user.
+- ✅ Helper deleteInvestmentWithRefund: atomic refund + delete dalam 1 tx.
+- ✅ UI: confirm dialog + toast tampilkan refund amount.
+- ✅ Script refund-orphan-profit.ts: buat user yg SUDAH hapus duplicate manual
+  di masa lalu (phantom profit still in balance).
+- ✅ Phantom detection logic: credited_investments - refunded_already - expected_now.
+- ✅ 20/20 + 5/5 test PASS (no regression).
+- ✅ BonusLog type='refund' audit trail untuk semua refund.
+
+Cara deploy ke VPS:
+1. ssh root@VPS → cd /var/www/nexvo
+2. bash scripts/vps-update.sh
+3. KALAU user sudah hapus duplicate manual (profit masih dobel):
+   bun run scripts/refund-orphan-profit.ts            (DRY-RUN preview)
+   bun run scripts/refund-orphan-profit.ts --apply    (EKSEKUSI refund)
+   # atau per-user:
+   bun run scripts/refund-orphan-profit.ts --user=62812xxxx --apply
+4. KALAU user baru hapus duplicate via admin UI sekarang:
+   ★ Auto-refund jalan di backend (gak perlu script terpisah)
+   ★ Toast tampilkan refund amount di UI
+
+Files modified:
+- src/lib/investment-cleanup.ts (+150 lines — deleteInvestmentWithRefund)
+- src/app/api/admin/users/route.ts (delete-investment + delete-purchase auto-refund)
+- src/components/nexvo/pages/AdminUsersPage.tsx (UI confirm + toast refund info)
+- scripts/refund-orphan-profit.ts (NEW — 175 lines, phantom profit refund)
+- scripts/vps-update.sh (add refund-orphan instruction)
