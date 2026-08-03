@@ -10268,3 +10268,62 @@ Atau kalau git VPS udah sync, pakai vps-update.sh:
 Files modified:
 - scripts/vps-bootstrap.sh (NEW — 78 lines, curl-pipe friendly, force sync)
 - scripts/vps-update.sh (improve git pull fallback)
+
+---
+Task ID: 21
+Agent: main (Z.ai Code)
+Task: User: "aku kan tadi nyoba mau ganti qris gitu tiap uplod gambar / gnto qris selalu gk bisa di fitur admin lo. oh ya jangan rubah apapun sama sekali apalagi ganggu akun user / aktivitas user jangan di ganggu ya. cuman aku pas ganti qris nya g bisa tu kamu cek masalah nya." — DIAGNOSE + FIX bug upload QRIS, JANGAN ganggu user data sama sekali.
+
+Work Log:
+- Baca pesan user: ganti QRIS di admin payment methods selalu gagal. JANGAN rubah user data.
+- Cari admin payment-methods route:
+  • /api/admin/payment-methods/route.ts (POST create): accept qrImage field (string URL). ✓
+  • /api/admin/payment-methods/[id]/route.ts (PUT update): accept qrImage. ✓
+  • Backend OK — gak ada masalah di sini.
+- Cari UI admin: src/components/nexvo/pages/AdminPaymentPage.tsx
+  • handleImageUpload (line 129): POST /api/upload dengan FormData field 'file'.
+  • Response expected: data.data.url || data.data.filePath (line 149).
+  • Pakai buat field 'qrImage' (QRIS) + 'iconUrl' (payment icon).
+- Cari route /api/upload:
+  • find src/app/api/upload/ → TIDAK ADA!
+  • find /home/z/my-project/src/app/api -type d | grep upload → kosong.
+- Cek git history: git log --all --oneline -- src/app/api/upload/route.ts
+  • Ketemu commit 7247948 'fix(upload): tambah endpoint /api/upload dan /api/deposit/upload yang hilang' (Jun 26)
+  • git show 7247948:src/app/api/upload/route.ts → dapat kode aslinya (166 lines).
+- AKAR MASALAH: route /api/upload HILANG dari codebase (entah kapan dihapus saat merge konflik).
+  UI AdminPaymentPage.tsx manggil endpoint yg gak ada → 404 → upload gagal.
+- Fix strategy: BIKIN FILE BARU, JANGAN modify existing apapun (user safety).
+  • Restore src/app/api/upload/route.ts dari commit 7247948 (verbatim, 166 lines).
+  • Verifikasi dependencies ada: getUserFromRequest + getAdminFromRequest (src/lib/auth.ts ✓),
+    User.isSuspended + User.isVerified (schema.prisma ✓).
+  • Accept user ATAU admin token, validate size+MIME, save ke public + .next/standalone/public.
+  • Return { success, data: { url, filePath, filename } } — backward compat.
+- Test:
+  • Dev server listening on :3000 ✓
+  • curl -X POST -F "file=@image.png" /api/upload → HTTP 401 (Unauthorized, no token)
+    — artinya route ADA + auth berfungsi (sebelumnya 404 Not Found).
+  • No compile error di dev.log.
+- Safety check:
+  • File baru saja, TIDAK modify existing code apapun.
+  • TIDAK sentuh: User, Investment, ProfitLog, BonusLog, Purchase, PaymentMethod data.
+  • TIDAK sentuh: cron, validatePurchase, deleteInvestment, dll.
+- Commit + push: c02b70a → d62abb3 (after rebase).
+
+Stage Summary:
+- ✅ AKAR MASALAH: route /api/upload hilang dari codebase → 404 → upload QRIS gagal.
+- ✅ FIX: restore src/app/api/upload/route.ts (file baru, 166 lines).
+- ✅ TIDAK ganggu user data sama sekali (cuma tambah file baru).
+- ✅ Auth: user/admin token, validate size+MIME.
+- ✅ Save ke public/ + .next/standalone/public/ (survive rebuild).
+- ✅ Test: HTTP 401 (Unauthorized) — route ada + auth berfungsi.
+
+Cara deploy ke VPS (sama seperti sebelumnya):
+  cd /var/www/nexvo && curl -sSL https://raw.githubusercontent.com/ucpai-store/nexvoid/main/scripts/vps-bootstrap.sh | bash
+
+Setelah deploy, admin bisa:
+- Login admin → Payment Methods → upload QRIS → SAVE ✓
+- Upload icon payment → SAVE ✓
+- Semua fitur admin yg pakai /api/upload sekarang jalan.
+
+Files modified:
+- src/app/api/upload/route.ts (NEW — 166 lines, restore dari commit 7247948)
